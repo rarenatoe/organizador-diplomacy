@@ -1,15 +1,20 @@
 """
-Tests de unidad para organizador.py
+Tests de unidad para organizador.py y utils.py
 
 Cubre:
   - Clase Jugador (atributos y puntaje de prioridad)
   - _calcular_partidas: número de mesas, balance, duplicados, prioridad,
     reglas de GM, lista de espera y casos de error.
+  - utils: ultimo_csv(), siguiente_csv()
 """
 import random
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
 
 from organizador import Jugador, ResultadoPartidas, _calcular_partidas
+from utils import siguiente_csv, ultimo_csv
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -446,6 +451,60 @@ class TestCalcularPartidas(unittest.TestCase):
             # El sobrante debe ser el 2do ticket de Multi, no el de GM1
             self.assertNotIn("GM1", sobrantes,
                              f"GM1 está en lista de espera en lugar de Multi (seed={seed})")
+
+
+# ── Tests de utils.py ────────────────────────────────────────────────────────
+
+class TestUtils(unittest.TestCase):
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.mkdtemp()
+        self.tmp = Path(self._tmp)
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self._tmp, ignore_errors=True)
+
+    # ── ultimo_csv ─────────────────────────────────────────────────────────────
+
+    def test_ultimo_csv_none_when_empty(self):
+        """Returns None when no jugadores CSV exists."""
+        self.assertIsNone(ultimo_csv(self.tmp))
+
+    def test_ultimo_csv_returns_highest_numbered(self):
+        """Returns the CSV with the highest sequence number."""
+        (self.tmp / "jugadores_0001.csv").touch()
+        (self.tmp / "jugadores_0003.csv").touch()
+        (self.tmp / "jugadores_0002.csv").touch()
+        self.assertEqual(ultimo_csv(self.tmp).name, "jugadores_0003.csv")
+
+    def test_ultimo_csv_ignores_non_matching_files(self):
+        """Does not match files outside the jugadores_NNNN.csv pattern."""
+        (self.tmp / "jugadores.csv").touch()       # no number
+        (self.tmp / "jugadores_001.csv").touch()   # only 3 digits
+        (self.tmp / "reporte_2026-01-01.txt").touch()
+        self.assertIsNone(ultimo_csv(self.tmp))
+
+    # ── siguiente_csv ──────────────────────────────────────────────────────────
+
+    def test_siguiente_csv_starts_at_0001_when_empty(self):
+        """First CSV in an empty directory is jugadores_0001.csv."""
+        self.assertEqual(siguiente_csv(self.tmp).name, "jugadores_0001.csv")
+
+    def test_siguiente_csv_increments_by_one(self):
+        """Returns NNNN+1 when a highest CSV already exists."""
+        (self.tmp / "jugadores_0004.csv").touch()
+        self.assertEqual(siguiente_csv(self.tmp).name, "jugadores_0005.csv")
+
+    def test_siguiente_csv_pads_to_four_digits(self):
+        """Sequence number is always zero-padded to 4 digits."""
+        (self.tmp / "jugadores_0009.csv").touch()
+        name = siguiente_csv(self.tmp).name
+        self.assertRegex(name, r"^jugadores_\d{4}\.csv$")
+
+    def test_siguiente_csv_does_not_create_file(self):
+        """siguiente_csv only computes the path; it does NOT create the file."""
+        path = siguiente_csv(self.tmp)
+        self.assertFalse(path.exists())
 
 
 if __name__ == "__main__":

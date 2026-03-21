@@ -105,6 +105,10 @@ def _make_csv(tmp_path: Path, name: str, rows: int = 5) -> Path:
 
 class TestParseReportSections:
     def test_returns_four_sections(self, tmp_path):
+        """The report format contract: every file must contain exactly these
+        four sections separated by `'═'*44`. Adding or renaming a section here
+        is a breaking change that requires updating `_parse_report_sections`,
+        the API response shape, and the UI panel renderer."""
         rpt = _make_report(tmp_path)
         text = rpt.read_text(encoding="utf-8")
         sections = _parse_report_sections(text)
@@ -135,6 +139,9 @@ class TestParseReportSections:
 
 class TestParseRegistro:
     def test_leido_de_extracted(self):
+        """`Leído de` and `Escrito en` are the canonical lineage edges used by
+        `_build_chain`. If these keys are not parsed, the DFS cannot trace the
+        CSV→report→CSV chain and every CSV becomes an orphan root."""
         text = "  Leído de:      jugadores_0001.csv\n  Escrito en:    jugadores_0002.csv\n"
         r = _parse_registro(text)
         assert r["Leído de"] == "jugadores_0001.csv"
@@ -155,6 +162,8 @@ class TestParseRegistro:
         assert r["Key"] == "value"
 
     def test_value_with_colon_kept_intact(self):
+        """Timestamps (`HH:MM:SS`) contain colons. The parser must split only on
+        the *first* colon (`partition`) so the full time string is preserved."""
         text = "  Generado:      2026-03-21 10:00:00\n"
         r = _parse_registro(text)
         assert "10:00:00" in r["Generado"]

@@ -1,9 +1,73 @@
 # Copilot Instructions — Organizador Diplomacy
 
-## Project overview
+## Stack
+Python 3.13 · uv · Flask 3 · pytest · notion-client · python-dotenv · flat CSVs in `data/`
 
-Local Python tool for managing Diplomacy tournament rounds.
-Stack: Python 3.13 · uv · Flask · pytest · notion-client · flat CSVs in `data/`.
+## File map
+| File | Role |
+|---|---|
+| `organizador.py` | Algorithm: `Jugador`, `Mesa`, `ResultadoPartidas`, `_calcular_partidas()` |
+| `utils.py` | Shared: `DIRECTORIO`, `ultimo_csv()`, `siguiente_csv()` |
+| `viewer.py` | Flask viewer: report parsing, `_build_chain()`, REST API |
+| `notion_sync.py` | Notion → CSV sync; writes CSVs + `.pending` flag |
+| `templates/index.html` | Single-page UI — plain HTML/CSS/JS, no build step, no framework |
+| `test_organizador.py` | Tests for `organizador.py` + `utils.py` (`TestUtils` class) |
+| `test_viewer.py` | Tests for `viewer.py` |
+| `data/` | `jugadores_NNNN.csv` (immutable, git-tracked) + `reporte_*.txt` (git-ignored) |
+
+Tests live at root alongside source — flat layout is intentional for this project size.
+
+## Data model
+- **CSV** `data/jugadores_NNNN.csv` — immutable numbered snapshots; never edit in-place.
+  Columns: `Nombre, Experiencia, Juegos_Este_Ano, Prioridad, Partidas_Deseadas, Partidas_GM`
+- **Report** `data/reporte_YYYY-MM-DD_HH-MM-SS.txt` — 4 sections separated by `"═"*44`:
+  `LISTO PARA COMPARTIR` · `DETALLE DEL EVENTO` · `PROYECCIÓN JUEGOS_ESTE_AÑO` · `REGISTRO`
+  `REGISTRO` fields `Leído de` / `Escrito en` are the **canonical chain lineage edges**.
+- **Pending flag** `data/.pending` — created by `notion_sync.py`, deleted by `organizador.py`.
+
+## Chain lineage (`_build_chain` in viewer.py)
+DFS on `Leído de`/`Escrito en` edges from report REGISTRO — **never** rely on CSV filename order.
+- Root CSVs = CSVs not produced by any report (notion_sync outputs or manual imports).
+- `csv_to_reports[csv]` = reports sorted by filename (timestamp = chronological).
+- Walk: CSV node → each report in order → recurse into `escrito` CSV.
+- Safety net: CSVs unreachable from roots are appended at end.
+
+## UI conventions (`templates/index.html`)
+- No framework, no build step. All logic in vanilla JS inside the file.
+- **Click-to-select**: CSV node click → `setSelectedCsv(fn)` → `.csv-selected` green ring + button label "Organizar · NNNN".
+- `runOrganizar()` reads `_selectedCsv` (`null` = latest CSV). `deselectCsv()` resets.
+
+## Code conventions
+- Type hints on **all** function signatures. `Path` everywhere (no raw strings).
+- No `input()` — non-interactive. `print()` → stdout; `print(..., file=sys.stderr)` → errors.
+- Code section separators: `# ── Title ────────────────────────────────────────────`
+- Filename regexes: CSV `jugadores_\d{4}\.csv` · Report `reporte_.+\.txt`
+
+## Testing rules
+Every new behavior → test in the corresponding file.
+- New function → happy path + edge case (empty/zero) + invalid input.
+- New Flask route → 200 success + 400 invalid input + 404 missing resource.
+- New business rule → test name/docstring names the rule explicitly.
+- Bug fix → regression test that would have caught it **before** the fix.
+- Run `uv run python -m pytest -q` — all must pass before committing.
+
+| Module | Test location |
+|---|---|
+| `organizador.py` | `test_organizador.py` |
+| `utils.py` | `test_organizador.py` → `TestUtils` |
+| `viewer.py` | `test_viewer.py` |
+| `notion_sync.py` | manual/integration only (requires Notion API key) |
+
+## After every feature or fix
+1. Run `uv run python -m pytest -q` — confirm all pass.
+2. Add/update tests in the relevant test file.
+3. Update **this file** if conventions, stack, data model, or architecture changed.
+4. Commit: `feat:` · `fix:` · `refactor:` · `test:` prefix.
+
+## Ripple-effect checklist
+**CSV column change** → `organizador.py` · `notion_sync.py` · `viewer.py` (API + HTML table) · `test_organizador.py` (`_j()` + `_pool()` helpers) · `test_viewer.py` (`_make_csv()` helper)
+**New Flask route** → `TestApi*` class in `test_viewer.py` with 200 + 400 + 404 coverage.
+**Chain algorithm change** → update `TestApiChain` in `test_viewer.py` + "Chain lineage" section above.
 
 ## Testing rules
 
