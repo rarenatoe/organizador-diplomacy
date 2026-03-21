@@ -10,6 +10,106 @@ Python 3.13 · uv · Flask 3 · pytest · notion-client · python-dotenv · flat
 | `utils.py` | Shared: `DIRECTORIO`, `ultimo_csv()`, `siguiente_csv()` |
 | `viewer.py` | Flask viewer: report parsing, `_build_chain()`, REST API |
 | `notion_sync.py` | Notion → CSV sync; writes CSVs + `.pending` flag |
+| `templates/index.html` | Minimal HTML shell (~57 lines); references static files via Jinja2 `url_for` |
+| `static/style.css` | All CSS for the viewer UI |
+| `static/app.js` | All JavaScript for the viewer UI |
+| `test_organizador.py` | Tests for `organizador.py` + `utils.py` (`TestUtils` class) |
+| `test_viewer.py` | Tests for `viewer.py` |
+| `data/` | `jugadores_NNNN.csv` (immutable, git-tracked) + `reporte_*.txt` (git-ignored) |
+
+Tests live at root alongside source — flat layout is intentional for this project size.
+
+## Data model
+- **CSV** `data/jugadores_NNNN.csv` — immutable numbered snapshots; never edit in-place.
+  Columns: `Nombre, Experiencia, Juegos_Este_Ano, Prioridad, Partidas_Deseadas, Partidas_GM`
+- **Report** `data/reporte_YYYY-MM-DD_HH-MM-SS.txt` — 4 sections separated by `"═"*44`:
+  `LISTO PARA COMPARTIR` · `DETALLE DEL EVENTO` · `PROYECCIÓN JUEGOS_ESTE_AÑO` · `REGISTRO`
+  `REGISTRO` fields `Leído de` / `Escrito en` are the **canonical chain lineage edges**.
+- **Pending flag** `data/.pending` — contains the **CSV filename** it was created for
+  (e.g. `jugadores_0005.csv`). Written by `notion_sync.py`, deleted by `organizador.py`.
+  Never `.touch()` it — always `.write_text(csv_name)` so the badge stays tied to the
+  correct CSV even if files are deleted or more CSVs are added afterward.
+
+## Chain lineage (`_build_chain` in viewer.py)
+Returns `{"roots": [...], "pending": bool}` — a **tree**, not a flat list.
+Each CSV node: `{type, filename, player_count, is_latest, pending, branches: [{report, output}, …]}`
+Each report node: `{type, filename, generated, partidas, en_espera, intentos, leido, escrito}`
+
+- Root CSVs = CSVs not produced by any report (notion_sync outputs or manual imports).
+- `csv_to_reports[csv]` = reports sorted by filename (timestamp = chronological).
+- Walk: each CSV owns its branches; each branch is `{report, output_csv_subtree}`.
+- Safety net: CSVs unreachable from roots are appended as additional roots.
+- **Never use a flat `nodes` list** — that caused the bug where report_B from csv_0001
+  rendered as a child of csv_0002 instead of a sibling branch of report_A.
+
+## Notion Sync behavior (important UX distinction)
+`notion_sync.py` is a **fresh pull from Notion** — it does NOT use the selected CSV.
+- Always reads Notion for `Nombre`, `Experiencia`, `Juegos_Este_Ano`.
+- Preserves `Prioridad`, `Partidas_Deseadas`, `Partidas_GM` from `ultimo_csv()` (the latest local CSV, not the UI-selected one).
+- Output CSV is always an **orphan root** in the chain tree (no `Leído de` lineage edge).
+- The selected CSV in the UI only affects `Organizar`, never `Sync Notion`.
+
+## UI conventions (`templates/index.html` + `static/`)
+- `index.html` is a ~57-line Jinja2 shell. **No logic here** — all CSS in `static/style.css`, all JS in `static/app.js`.
+- No framework, no build step. Plain HTML/CSS/JS.
+- **Click-to-select**: CSV node click → `setSelectedCsv(fn)` → `.csv-selected` green ring + button label "Organizar · NNNN".
+- `runOrganizar()` reads `_selectedCsv` (`null` = latest CSV). `deselectCsv()` resets.
+- `renderCsvTree()` in `app.js` renders the chain recursively — branches stacked vertically so no false arrow is drawn between sibling outputs.
+
+## Code conventions
+- Type hints on **all** function signatures. `Path` everywhere (no raw strings).
+- No `input()` — non-interactive. `print()` → stdout; `print(..., file=sys.stderr)` → errors.
+- Code section separators: `# ── Title ────────────────────────────────────────────`
+- Filename regexes: CSV `jugadores_\d{4}\.csv` · Report `reporte_.+\.txt`
+
+## Testing rules
+Every new behavior → test in the corresponding file.
+- New function → happy path + edge case (empty/zero) + invalid input.
+- New Flask route → 200 success + 400 invalid input + 404 missing resource.
+- New business rule → test name/docstring names the rule explicitly.
+- Bug fix → regression test that would have caught it **before** the fix.
+- Run `uv run python -m pytest -q` — all must pass before committing.
+
+| Module | Test location |
+|---|---|
+| `organizador.py` | `test_organizador.py` |
+| `utils.py` | `test_organizador.py` → `TestUtils` |
+| `viewer.py` | `test_viewer.py` |
+| `notion_sync.py` | manual/integration only (requires Notion API key) |
+
+## After every feature or fix
+1. Run `uv run python -m pytest -q` — confirm all pass.
+2. Add/update tests in the relevant test file.
+3. Update **this file** if conventions, stack, data model, or architecture changed.
+4. Commit: `feat:` · `fix:` · `refactor:` · `test:` prefix.
+
+## Engineering philosophy
+**Never choose the shortcut over the maintainable solution.**
+- Do not skip tests to save time. Do not defer documentation updates.
+- Do not inline CSS/JS into HTML. Do not inline magic strings into multiple files.
+- If a proper fix requires a larger refactor, do the refactor in a dedicated commit — do not apply a hack and plan to "fix it later."
+- When uncertain between two approaches, choose the one that makes future changes easier, not the one that makes this change faster.
+
+## Planned migrations (not yet implemented — do not regress)
+- **SQLite**: When query history, cross-round player tracking, or concurrent writes are needed, migrate `data/` to SQLite. Tables: `csvs(id, filename, created_at, source)`, `reports(id, filename, created_at, leido_csv_id, escrito_csv_id)`. The `.pending` flag becomes a nullable FK on `csvs`. All lineage queries become SQL joins instead of text parsing. Implement as a dedicated PR with schema, migration script, and full test coverage.
+- **Framework (Vue/React)**: Revisit if `app.js` exceeds ~400 lines or if the UI needs reactive state (e.g. real-time sync status). Do not add a build step until then.
+
+## Ripple-effect checklist
+**CSV column change** → `organizador.py` · `notion_sync.py` · `viewer.py` (API + HTML table) · `test_organizador.py` (`_j()` + `_pool()` helpers) · `test_viewer.py` (`_make_csv()` helper)
+**New Flask route** → `TestApi*` class in `test_viewer.py` with 200 + 400 + 404 coverage.
+**Chain algorithm change** → update `TestApiChain` in `test_viewer.py` (use `roots` tree, not `nodes` flat list) + "Chain lineage" section above.
+**UI logic change** → edit `static/app.js`. **Style change** → edit `static/style.css`. Never re-inline into `index.html`.
+
+## Stack
+Python 3.13 · uv · Flask 3 · pytest · notion-client · python-dotenv · flat CSVs in `data/`
+
+## File map
+| File | Role |
+|---|---|
+| `organizador.py` | Algorithm: `Jugador`, `Mesa`, `ResultadoPartidas`, `_calcular_partidas()` |
+| `utils.py` | Shared: `DIRECTORIO`, `ultimo_csv()`, `siguiente_csv()` |
+| `viewer.py` | Flask viewer: report parsing, `_build_chain()`, REST API |
+| `notion_sync.py` | Notion → CSV sync; writes CSVs + `.pending` flag |
 | `templates/index.html` | Single-page UI — plain HTML/CSS/JS, no build step, no framework |
 | `test_organizador.py` | Tests for `organizador.py` + `utils.py` (`TestUtils` class) |
 | `test_viewer.py` | Tests for `viewer.py` |

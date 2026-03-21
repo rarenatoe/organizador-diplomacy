@@ -165,12 +165,16 @@ def _build_chain() -> dict:
         if meta["escrito"]
     }
 
-    pending  = (DATA / ".pending").exists()
+    pending_file = DATA / ".pending"
+    # .pending stores the exact CSV filename it was created for (written by notion_sync).
+    # Never read only existence — that caused the badge to move to a different CSV
+    # if the user deleted files after the sync.
+    pending_csv  = pending_file.read_text(encoding="utf-8").strip() if pending_file.exists() else None
     all_csvs = sorted(csvs)
     latest   = all_csvs[-1] if all_csvs else None
 
     if not csvs:
-        return {"roots": [], "pending": pending}
+        return {"roots": [], "pending": pending_csv is not None}
 
     # Root CSVs: not produced by any report (notion_sync output or initial import)
     root_csvs = [c for c in all_csvs if c not in produced_by]
@@ -184,7 +188,7 @@ def _build_chain() -> dict:
             "filename":     name,
             "player_count": len(players),
             "is_latest":    name == latest,
-            "pending":      name == latest and pending,
+            "pending":      name == pending_csv,
             "branches":     [],
         }
 
@@ -223,7 +227,7 @@ def _build_chain() -> dict:
             if node is not None:
                 roots.append(node)
 
-    return {"roots": roots, "pending": pending}
+    return {"roots": roots, "pending": pending_csv is not None}
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────

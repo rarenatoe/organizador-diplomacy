@@ -359,12 +359,14 @@ class TestApiChain:
         assert "jugadores_0002.csv" not in root_filenames  # child of csv_0001
 
     def test_pending_flag_detected(self, client, tmp_path, monkeypatch):
+        """.pending stores the CSV filename; the matching CSV node gets pending=True."""
         monkeypatch.setattr(viewer, "DATA", tmp_path)
         _make_csv(tmp_path, "jugadores_0001.csv")
-        (tmp_path / ".pending").touch()
+        (tmp_path / ".pending").write_text("jugadores_0001.csv")
         resp = client.get("/api/chain")
         data = json.loads(resp.data)
         assert data["pending"] is True
+        assert data["roots"][0]["pending"] is True
 
     def test_pending_false_when_no_flag(self, client, tmp_path, monkeypatch):
         monkeypatch.setattr(viewer, "DATA", tmp_path)
@@ -372,6 +374,30 @@ class TestApiChain:
         resp = client.get("/api/chain")
         data = json.loads(resp.data)
         assert data["pending"] is False
+
+    def test_pending_flag_tied_to_specific_csv_not_to_latest(self, client, tmp_path, monkeypatch):
+        """
+        Regression: .pending was an empty file so _build_chain marked whichever CSV
+        happened to be latest as pending. Deleting the synced CSV (or adding another
+        after it) would silently transfer the pending badge to a different CSV.
+
+        Fix: .pending stores the exact CSV filename written by notion_sync.
+        Only that CSV gets pending=True — even if it is no longer the latest.
+        """
+        monkeypatch.setattr(viewer, "DATA", tmp_path)
+        _make_csv(tmp_path, "jugadores_0001.csv")
+        _make_csv(tmp_path, "jugadores_0002.csv")  # latest, but pending was set for 0001
+        (tmp_path / ".pending").write_text("jugadores_0001.csv")
+        resp = client.get("/api/chain")
+        data = json.loads(resp.data)
+        assert data["pending"] is True
+        # csv_0001 is the pending CSV
+        csv1 = next(r for r in data["roots"] if r["filename"] == "jugadores_0001.csv")
+        assert csv1["pending"] is True
+        # csv_0002 is latest but NOT pending
+        csv2 = next(r for r in data["roots"] if r["filename"] == "jugadores_0002.csv")
+        assert csv2["pending"] is False
+        assert csv2["is_latest"] is True
 
 
 class TestApiCsv:

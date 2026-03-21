@@ -302,7 +302,9 @@ def main() -> None:
     else:
         ruta = _escribir_csv(filas)
         print(f"✓  {ruta.name} creado con {len(filas)} jugador(es).")
-        (DIRECTORIO / ".pending").touch()
+        # Store the CSV filename so _build_chain can tie the pending badge to
+        # exactly this CSV — not to whichever CSV happens to be latest at read time.
+        (DIRECTORIO / ".pending").write_text(ruta.name, encoding="utf-8")
         print("   (data/.pending creado — se eliminará automáticamente al organizar la próxima partida)")
 
 
