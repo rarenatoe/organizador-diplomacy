@@ -6,11 +6,14 @@ Uso:
     uv run python notion_sync.py --dry-run    # muestra lo que se escribiría sin tocar el CSV
 
 Qué viene de Notion:
-    Nombre          → propiedad 'Nombre' (title)
-    Juegos_Este_Ano → propiedad 'Nro. Partidas' (formula numérica)
-    Experiencia     → derivado de 'Participaciones' (relation):
-                        vacío  → "Nuevo"
-                        con entradas → "Antiguo"
+    Nombre          → propiedad 'Nombre' (title) de la DB Jugadores
+    Experiencia     → 'Antiguo' si Participaciones (relation) tiene ≥1 entrada,
+                       'Nuevo' si está vacía (conteo histórico total)
+    Juegos_Este_Ano → partidas del año en curso: se consulta la DB Participaciones
+                       filtrando por Temporada == año actual, y se cruza con los
+                       IDs de la relation de cada jugador.
+                       (La formula 'Nro. Partidas' siempre retorna 0 vía API —
+                        limitación conocida de Notion con relations.)
 
 Qué se preserva del jugadores.csv existente (no existe en Notion):
     Prioridad        → se conserva del CSV; default "False" para jugadores nuevos
@@ -18,13 +21,15 @@ Qué se preserva del jugadores.csv existente (no existe en Notion):
     Partidas_GM      → se conserva del CSV; default "0" para jugadores nuevos
 
 Requisitos:
-    - Archivo .env en la raíz del proyecto con NOTION_TOKEN y NOTION_DATABASE_ID
+    - Archivo .env con NOTION_TOKEN, NOTION_DATABASE_ID y
+      NOTION_PARTICIPACIONES_DB_ID
 """
 from __future__ import annotations
 
 import argparse
 import csv
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -55,17 +60,9 @@ def _extraer_nombre(prop: dict) -> str:
     return "".join(p.get("plain_text", "") for p in prop.get("title", [])).strip()
 
 
-def _desde_participaciones(prop: dict) -> tuple[str, str]:
-    """
-    A partir de la relation 'Participaciones' devuelve (Experiencia, Juegos_Este_Ano).
-    - Experiencia: 'Antiguo' si tiene ≥1 entrada, 'Nuevo' si está vacía.
-    - Juegos_Este_Ano: cantidad de entradas en la relation (como string).
-    Nota: la formula 'Nro. Partidas' siempre devuelve 0 vía API (limitación de
-    Notion), por lo que usamos directamente el conteo de la relation.
-    """
-    entradas = prop.get("relation", [])
-    count = len(entradas)
-    return ("Antiguo" if count > 0 else "Nuevo"), str(count)
+def _experiencia(participaciones_prop: dict) -> str:
+    """'Antiguo' si el jugador tiene ≥1 participación histórica, 'Nuevo' si no."""
+    return "Antiguo" if participaciones_prop.get("relation") else "Nuevo"
 
 
 # ── CSV existente ─────────────────────────────────────────────────────────────
@@ -78,15 +75,82 @@ def _leer_csv_existente(ruta: Path) -> dict[str, dict[str, str]]:
         return {row["Nombre"]: row for row in csv.DictReader(f)}
 
 
+# ── Partidas del año actual ──────────────────────────────────────────────────
+
+def _conteo_partidas_este_ano(
+    client: Client,
+    participaciones_db_id: str,
+    año: int,
+) -> dict[str, int]:
+    """
+    Descarga todas las páginas de la DB Participaciones y cuenta, por jugador,
+    cuántas tienen Temporada == año (filtrado en el cliente).
+
+    Retorna {player_page_id_sin_guiones: conteo}.
+
+    Nota: Temporada es un rollup desde la relación 'Partida'. Si la DB Partida
+    no está conectada a la integración, el valor será None y se advertirá al
+    usuario (todos los conteos quedarán en 0).
+    """
+    db_info = client.databases.retrieve(database_id=participaciones_db_id)
+    data_sources = db_info.get("data_sources", [])
+    if not data_sources:
+        raise RuntimeError(
+            f"La DB de Participaciones '{participaciones_db_id}' no tiene data_sources. "
+            "Asegúrate de que la integración tenga acceso de lectura."
+        )
+    ds_id: str = data_sources[0]["id"]
+
+    conteo: dict[str, int] = {}
+    sin_temporada = 0
+    cursor: str | None = None
+
+    while True:
+        kwargs: dict = {"data_source_id": ds_id, "result_type": "page"}
+        if cursor:
+            kwargs["start_cursor"] = cursor
+        response = client.data_sources.query(**kwargs)
+
+        for page in response.get("results", []):
+            props = page.get("properties", {})
+
+            # Temporada: rollup de la relation 'Partida' (function: sum del año)
+            temporada = props.get("Temporada", {}).get("rollup", {}).get("number")
+            if temporada is None:
+                sin_temporada += 1
+                continue
+            if int(temporada) != año:
+                continue
+
+            # Jugador: relation de vuelta al jugador
+            for rel in props.get("Jugador", {}).get("relation", []):
+                pid = rel["id"].replace("-", "")
+                conteo[pid] = conteo.get(pid, 0) + 1
+
+        if not response.get("has_more"):
+            break
+        cursor = response.get("next_cursor")
+
+    if sin_temporada > 0 and not conteo:
+        print(
+            f"  ⚠️  {sin_temporada} participación(es) sin Temporada (rollup None). "
+            "Conecta la DB 'Partida' a la integración para obtener Juegos_Este_Año correcto.",
+            file=sys.stderr,
+        )
+
+    return conteo
+
+
 # ── Conversión Notion → filas CSV ─────────────────────────────────────────────
 
 def _paginas_a_filas(
     pages: list[dict],
     existentes: dict[str, dict[str, str]],
+    conteo_por_jugador: dict[str, int],
 ) -> list[dict[str, str]]:
     """
     Convierte páginas de Notion en filas listas para jugadores.csv.
-    Nombre, Juegos_Este_Ano y Experiencia vienen de Notion.
+    Nombre, Experiencia y Juegos_Este_Ano vienen de Notion.
     Prioridad, Partidas_Deseadas y Partidas_GM se preservan del CSV existente
     (o se usan defaults para jugadores que aún no están en el CSV).
     Omite páginas sin nombre.
@@ -103,10 +167,13 @@ def _paginas_a_filas(
         if not nombre:
             continue
 
-        # Experiencia y Juegos_Este_Ano ← 'Participaciones' (relation)
-        # (La formula 'Nro. Partidas' siempre retorna 0 vía API)
+        # Experiencia ← total histórico de Participaciones
         part_prop = props.get("Participaciones")
-        experiencia, juegos = _desde_participaciones(part_prop) if part_prop else ("Nuevo", "0")
+        experiencia = _experiencia(part_prop) if part_prop else "Nuevo"
+
+        # Juegos_Este_Ano ← conteo filtrado por año (indexado por page ID del jugador)
+        player_id = page["id"].replace("-", "")
+        juegos = str(conteo_por_jugador.get(player_id, 0))
 
         # Columnas que vienen del CSV local (preservar o usar defaults)
         existente = existentes.get(nombre, {})
@@ -177,8 +244,9 @@ def main() -> None:
 
     load_dotenv()
 
-    token = os.getenv("NOTION_TOKEN")
-    db_id = os.getenv("NOTION_DATABASE_ID")
+    token        = os.getenv("NOTION_TOKEN")
+    db_id        = os.getenv("NOTION_DATABASE_ID")
+    part_db_id   = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
 
     if not token or token.startswith("secret_XXX"):
         print("❌  NOTION_TOKEN no configurado. Copia .env.example → .env y rellénalo.")
@@ -186,19 +254,24 @@ def main() -> None:
     if not db_id or "XXX" in db_id:
         print("❌  NOTION_DATABASE_ID no configurado. Copia .env.example → .env y rellénalo.")
         sys.exit(1)
+    if not part_db_id or "XXX" in part_db_id:
+        print("❌  NOTION_PARTICIPACIONES_DB_ID no configurado. Copia .env.example → .env y rellénalo.")
+        sys.exit(1)
 
+    año_actual = datetime.now().year
     client = Client(auth=token)
 
     print("⟳  Conectando a Notion...", end=" ", flush=True)
     try:
         pages = _descargar_todos(client, db_id)
+        conteo_por_jugador = _conteo_partidas_este_ano(client, part_db_id, año_actual)
     except APIResponseError as e:
         print(f"\n❌  Error de API Notion: {e}")
         sys.exit(1)
-    print(f"{len(pages)} página(s) recibidas.")
+    print(f"{len(pages)} jugador(es), {sum(conteo_por_jugador.values())} partida(s) en {año_actual}.")
 
     existentes = _leer_csv_existente(CSV_PATH)
-    filas = _paginas_a_filas(pages, existentes)
+    filas = _paginas_a_filas(pages, existentes, conteo_por_jugador)
 
     nuevos = [f["Nombre"] for f in filas if f["Nombre"] not in existentes]
     print(f"⟳  {len(filas)} jugador(es) procesados ({len(nuevos)} nuevo(s)).")
