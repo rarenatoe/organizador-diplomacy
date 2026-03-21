@@ -122,15 +122,16 @@ def _read_csv(path: Path) -> list[dict]:
 
 def _build_chain() -> dict:
     """
-    Builds the node list by following actual data lineage (Leído de / Escrito en)
-    instead of relying on CSV filename order alone.
+    Builds a **tree** of CSV and report nodes by following actual data lineage
+    (Leído de / Escrito en in each report's REGISTRO section).
 
-    Algorithm:
-      1. Parse every report's REGISTRO to extract (leido, escrito) edges.
-      2. Root CSVs = CSVs with no parent report (notion_sync output or initial).
-      3. DFS from each root: CSV → its reports (sorted by name/time) → each
-         output CSV → …
-      4. Any CSVs unreachable from roots (shouldn't happen) appended at the end.
+    Returns {"roots": [...], "pending": bool} where each root is a CSV node:
+      {type, filename, player_count, is_latest, pending,
+       branches: [{report: {...}, output: <csv_node_or_null>}, …]}
+
+    A CSV node with N reports from the same source has N branches — never a
+    linear chain — so the UI can render each branch as its own path and avoid
+    the false implication that report_B came from csv_0002 instead of csv_0001.
     """
     csvs: dict[str, Path] = {p.name: p for p in sorted(DATA.glob("jugadores_*.csv"))}
     report_paths: list[Path] = sorted(DATA.glob("reporte_*.txt"))
@@ -169,13 +170,12 @@ def _build_chain() -> dict:
     latest   = all_csvs[-1] if all_csvs else None
 
     if not csvs:
-        return {"nodes": [], "pending": pending}
+        return {"roots": [], "pending": pending}
 
     # Root CSVs: not produced by any report (notion_sync output or initial import)
     root_csvs = [c for c in all_csvs if c not in produced_by]
 
-    nodes:   list[dict] = []
-    visited: set[str]   = set()
+    visited: set[str] = set()
 
     def _csv_node(name: str) -> dict:
         players = _read_csv(csvs[name])
@@ -185,17 +185,18 @@ def _build_chain() -> dict:
             "player_count": len(players),
             "is_latest":    name == latest,
             "pending":      name == latest and pending,
+            "branches":     [],
         }
 
-    def _walk(csv_name: str) -> None:
-        if csv_name in visited or csv_name not in csvs:
-            return
+    def _walk(csv_name: str) -> dict | None:
+        if csv_name not in csvs or csv_name in visited:
+            return None
         visited.add(csv_name)
-        nodes.append(_csv_node(csv_name))
+        node = _csv_node(csv_name)
         for rname in csv_to_reports.get(csv_name, []):
             meta = report_meta[rname]
             reg  = meta["registro"]
-            nodes.append({
+            report_node = {
                 "type":      "report",
                 "filename":  rname,
                 "generated": reg.get("Generado", ""),
@@ -204,18 +205,25 @@ def _build_chain() -> dict:
                 "intentos":  reg.get("Intentos",  ""),
                 "leido":     meta["leido"],
                 "escrito":   meta["escrito"],
-            })
-            _walk(meta["escrito"])
+            }
+            output = _walk(meta["escrito"]) if meta["escrito"] else None
+            node["branches"].append({"report": report_node, "output": output})
+        return node
 
-    for root in root_csvs:
-        _walk(root)
+    roots: list[dict] = []
+    for r in root_csvs:
+        node = _walk(r)
+        if node is not None:
+            roots.append(node)
 
-    # Safety net: append any CSVs not reached by the DFS
+    # Safety net: any CSVs not reached by the DFS become additional roots
     for name in all_csvs:
         if name not in visited:
-            nodes.append(_csv_node(name))
+            node = _walk(name)
+            if node is not None:
+                roots.append(node)
 
-    return {"nodes": nodes, "pending": pending}
+    return {"roots": roots, "pending": pending}
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────

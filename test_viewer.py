@@ -6,7 +6,7 @@ Covers:
   - _parse_registro: extracts key→value pairs from REGISTRO section
   - _parse_detalle: extracts mesas + waiting list from DETALLE section
   - _parse_proyeccion: extracts projection rows
-  - _build_chain: builds ordered chain from data/ directory
+  - _build_chain: builds tree {"roots": [...], "pending": bool} from data/ directory
   - API routes: /api/chain, /api/csv/<f>, /api/report/<f>, /api/csvs
   - /api/run validation (unknown script, invalid csv name)
 """
@@ -269,35 +269,45 @@ class TestApiChain:
         resp = client.get("/api/chain")
         assert resp.status_code == 200
         data = json.loads(resp.data)
-        assert data["nodes"] == []
+        assert data["roots"] == []
 
     def test_csv_only_chain(self, client, tmp_path, monkeypatch):
-        """A single CSV with no reports appears as a root node."""
+        """A single CSV with no reports is a root node with no branches."""
         monkeypatch.setattr(viewer, "DATA", tmp_path)
         _make_csv(tmp_path, "jugadores_0001.csv", rows=3)
         resp = client.get("/api/chain")
         data = json.loads(resp.data)
-        assert len(data["nodes"]) == 1
-        assert data["nodes"][0]["type"] == "csv"
-        assert data["nodes"][0]["player_count"] == 3
+        assert len(data["roots"]) == 1
+        root = data["roots"][0]
+        assert root["type"] == "csv"
+        assert root["player_count"] == 3
+        assert root["branches"] == []
 
     def test_chain_with_report_linked(self, client, tmp_path, monkeypatch):
-        """csv_0001 → report → csv_0002 is ordered correctly via DFS."""
+        """csv_0001 → report → csv_0002 is a root with one branch, not a flat list."""
         monkeypatch.setattr(viewer, "DATA", tmp_path)
         _make_csv(tmp_path, "jugadores_0001.csv")
         _make_csv(tmp_path, "jugadores_0002.csv")
         _make_report(tmp_path, leido="jugadores_0001.csv", escrito="jugadores_0002.csv")
         resp = client.get("/api/chain")
         data = json.loads(resp.data)
-        types = [n["type"] for n in data["nodes"]]
-        assert types == ["csv", "report", "csv"]
+        root = data["roots"][0]
+        assert root["filename"] == "jugadores_0001.csv"
+        assert len(root["branches"]) == 1
+        branch = root["branches"][0]
+        assert branch["report"]["type"] == "report"
+        assert branch["output"]["filename"] == "jugadores_0002.csv"
 
-    def test_second_report_from_same_csv_ordered_correctly(self, client, tmp_path, monkeypatch):
+    def test_second_report_from_same_csv_branches_correctly(self, client, tmp_path, monkeypatch):
         """
-        When csv_0001 produces two reports in sequence (report_A → csv_0002,
-        report_B → csv_0003), the chain follows temporal order:
+        Regression: when csv_0001 produces two reports (report_A → csv_0002,
+        report_B → csv_0003), both must appear as direct branches of csv_0001.
+
+        The old flat-list DFS rendered this as the linear chain:
           csv_0001 → report_A → csv_0002 → report_B → csv_0003
-        rather than placing report_B at the end by filename order alone.
+        which falsely implied that report_B was generated FROM csv_0002.
+        The tree structure fixes this: report_B is a sibling branch of report_A,
+        both owned by csv_0001, with no arrow drawn from csv_0002 to report_B.
         """
         monkeypatch.setattr(viewer, "DATA", tmp_path)
         _make_csv(tmp_path, "jugadores_0001.csv")
@@ -317,16 +327,23 @@ class TestApiChain:
         )
         resp = client.get("/api/chain")
         data = json.loads(resp.data)
-        filenames = [n["filename"] for n in data["nodes"]]
-        assert filenames.index("jugadores_0001.csv") < filenames.index("reporte_2026-01-01_00-00-01.txt")
-        assert filenames.index("reporte_2026-01-01_00-00-01.txt") < filenames.index("jugadores_0002.csv")
-        assert filenames.index("jugadores_0002.csv") < filenames.index("reporte_2026-01-01_00-00-02.txt")
-        assert filenames.index("reporte_2026-01-01_00-00-02.txt") < filenames.index("jugadores_0003.csv")
+        root = data["roots"][0]
+        assert root["filename"] == "jugadores_0001.csv"
+        # Both reports must be direct branches of csv_0001 — not chained
+        assert len(root["branches"]) == 2
+        assert root["branches"][0]["report"]["filename"] == "reporte_2026-01-01_00-00-01.txt"
+        assert root["branches"][0]["output"]["filename"] == "jugadores_0002.csv"
+        assert root["branches"][1]["report"]["filename"] == "reporte_2026-01-01_00-00-02.txt"
+        assert root["branches"][1]["output"]["filename"] == "jugadores_0003.csv"
+        # Each output CSV is a leaf — it has no further branches
+        assert root["branches"][0]["output"]["branches"] == []
+        assert root["branches"][1]["output"]["branches"] == []
 
     def test_notion_sync_csv_is_a_new_root(self, client, tmp_path, monkeypatch):
         """
-        A CSV with no parent report (created by notion_sync) is a root node.
-        It should appear in the chain even if not reachable from other CSVs.
+        A CSV with no parent report (created by notion_sync) is its own root.
+        It must appear even if unreachable from other CSVs — and must NOT appear
+        as a child of an unrelated CSV.
         """
         monkeypatch.setattr(viewer, "DATA", tmp_path)
         _make_csv(tmp_path, "jugadores_0001.csv")
@@ -336,10 +353,10 @@ class TestApiChain:
         _make_csv(tmp_path, "jugadores_0003.csv")
         resp = client.get("/api/chain")
         data = json.loads(resp.data)
-        filenames = [n["filename"] for n in data["nodes"]]
-        assert "jugadores_0003.csv" in filenames
-        # csv_0003 must appear after csv_0002 in the list (appended after DFS)
-        assert filenames.index("jugadores_0002.csv") < filenames.index("jugadores_0003.csv")
+        root_filenames = [r["filename"] for r in data["roots"]]
+        assert "jugadores_0001.csv" in root_filenames   # root: has no parent
+        assert "jugadores_0003.csv" in root_filenames   # root: notion_sync output
+        assert "jugadores_0002.csv" not in root_filenames  # child of csv_0001
 
     def test_pending_flag_detected(self, client, tmp_path, monkeypatch):
         monkeypatch.setattr(viewer, "DATA", tmp_path)

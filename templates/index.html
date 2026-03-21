@@ -116,8 +116,8 @@
     }
     #chain {
       display: flex;
-      align-items: center;
-      gap: 0;
+      flex-direction: column;
+      gap: 20px;
       min-height: 140px;
     }
 
@@ -161,6 +161,11 @@
 
     /* Arrow connectors */
     .arrow { color: #9ca3af; font-size: 18px; padding: 0 6px; flex-shrink: 0; user-select: none; }
+
+    /* Chain tree layout */
+    .chain-row    { display: flex; align-items: center; }
+    .chain-fork   { display: flex; flex-direction: column; gap: 10px; }
+    .chain-branch { display: flex; align-items: center; }
 
     /* Empty state */
     .empty-state { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 60px; color: var(--muted); text-align: center; }
@@ -402,22 +407,32 @@
   function renderChain(data) {
     document.getElementById('pending-badge').classList.toggle('visible', !!data.pending);
     const el    = document.getElementById('chain');
-    const nodes = data.nodes || [];
-    if (!nodes.length) {
+    const roots = data.roots || [];
+    if (!roots.length) {
       el.innerHTML = '<div class="empty-state"><div class="icon">📂</div><p>No hay CSVs en <strong>data/</strong></p><p>Ejecuta <em>Sync Notion</em> para comenzar.</p></div>';
       return;
     }
-    el.innerHTML = nodes.map((n, i) =>
-      (i > 0 ? '<span class="arrow">→</span>' : '') + (n.type === 'csv' ? csvNode(n) : reportNode(n))
-    ).join('');
+    el.innerHTML = roots.map(renderCsvTree).join('');
     updateSelectionUI(); // restore green ring after re-render
+  }
+
+  function renderCsvTree(n) {
+    const branches = n.branches || [];
+    if (!branches.length) {
+      return `<div class="chain-row">${csvNodeHtml(n)}</div>`;
+    }
+    const fork = branches.map(b => {
+      const out = b.output ? `<span class="arrow">→</span>${renderCsvTree(b.output)}` : '';
+      return `<div class="chain-branch"><span class="arrow">→</span>${reportNodeHtml(b.report)}${out}</div>`;
+    }).join('');
+    return `<div class="chain-row">${csvNodeHtml(n)}<div class="chain-fork">${fork}</div></div>`;
   }
 
   function esc(s) {
     return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  function csvNode(n) {
+  function csvNodeHtml(n) {
     const badge = n.pending ? '<span class="badge badge-pending">⏳ Sin jugar</span>'
                 : n.is_latest ? '<span class="badge badge-latest">Actual</span>' : '';
     return `<div class="node node-csv ${n.pending?'latest-pending':''}" data-filename="${esc(n.filename)}" data-type="csv">
@@ -426,7 +441,7 @@
       <div class="node-meta">${n.player_count} jugadores</div>${badge}</div>`;
   }
 
-  function reportNode(n) {
+  function reportNodeHtml(n) {
     const date = (n.generated||'').split(' ')[0];
     const time = (n.generated||'').split(' ')[1] ?? '';
     return `<div class="node node-report" data-filename="${esc(n.filename)}" data-type="report">

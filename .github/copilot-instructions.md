@@ -26,11 +26,16 @@ Tests live at root alongside source — flat layout is intentional for this proj
 - **Pending flag** `data/.pending` — created by `notion_sync.py`, deleted by `organizador.py`.
 
 ## Chain lineage (`_build_chain` in viewer.py)
-DFS on `Leído de`/`Escrito en` edges from report REGISTRO — **never** rely on CSV filename order.
+Returns `{"roots": [...], "pending": bool}` — a **tree**, not a flat list.
+Each CSV node: `{type, filename, player_count, is_latest, pending, branches: [{report, output}, …]}`
+Each report node: `{type, filename, generated, partidas, en_espera, intentos, leido, escrito}`
+
 - Root CSVs = CSVs not produced by any report (notion_sync outputs or manual imports).
 - `csv_to_reports[csv]` = reports sorted by filename (timestamp = chronological).
-- Walk: CSV node → each report in order → recurse into `escrito` CSV.
-- Safety net: CSVs unreachable from roots are appended at end.
+- Walk: each CSV owns its branches; each branch is `{report, output_csv_subtree}`.
+- Safety net: CSVs unreachable from roots are appended as additional roots.
+- **Never use a flat `nodes` list** — that caused the bug where report_B from csv_0001
+  rendered as a child of csv_0002 instead of a sibling branch of report_A.
 
 ## UI conventions (`templates/index.html`)
 - No framework, no build step. All logic in vanilla JS inside the file.
@@ -67,7 +72,7 @@ Every new behavior → test in the corresponding file.
 ## Ripple-effect checklist
 **CSV column change** → `organizador.py` · `notion_sync.py` · `viewer.py` (API + HTML table) · `test_organizador.py` (`_j()` + `_pool()` helpers) · `test_viewer.py` (`_make_csv()` helper)
 **New Flask route** → `TestApi*` class in `test_viewer.py` with 200 + 400 + 404 coverage.
-**Chain algorithm change** → update `TestApiChain` in `test_viewer.py` + "Chain lineage" section above.
+**Chain algorithm change** → update `TestApiChain` in `test_viewer.py` (use `roots` tree, not `nodes` flat list) + "Chain lineage" section above.
 
 ## Testing rules
 
