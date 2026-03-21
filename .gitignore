@@ -1,0 +1,19 @@
+# ── Credenciales (NUNCA al repo) ──────────────────────────────────────────────
+.env
+
+# ── Archivos generados por el organizador ─────────────────────────────────────
+reporte_*.txt
+jugadores_*.csv        # CSVs archivados con timestamp
+
+# ── Python / uv ───────────────────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.python-version
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+.DS_Store
