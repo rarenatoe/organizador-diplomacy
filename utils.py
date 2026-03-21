@@ -1,8 +1,8 @@
 """utils.py – Utilidades compartidas entre organizador.py y notion_sync.py."""
 from pathlib import Path
 
-# Directorio raíz del proyecto (donde viven los CSVs numerados).
-DIRECTORIO: Path = Path(__file__).parent
+# Carpeta donde viven los CSVs numerados.
+DIRECTORIO: Path = Path(__file__).parent / "data"
 
 
 def ultimo_csv(directorio: Path = DIRECTORIO) -> Path | None:
