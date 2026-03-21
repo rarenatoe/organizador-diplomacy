@@ -2,17 +2,23 @@
 notion_sync.py  –  Sincroniza la base de datos de jugadores desde Notion.
 
 Uso:
-    uv run python notion_sync.py              # descarga y sobreescribe jugadores.csv
+    uv run python notion_sync.py              # descarga y fusiona con jugadores.csv
     uv run python notion_sync.py --dry-run    # muestra lo que se escribiría sin tocar el CSV
+
+Qué viene de Notion:
+    Nombre          → propiedad 'Nombre' (title)
+    Juegos_Este_Ano → propiedad 'Nro. Partidas' (formula numérica)
+    Experiencia     → derivado de 'Participaciones' (relation):
+                        vacío  → "Nuevo"
+                        con entradas → "Antiguo"
+
+Qué se preserva del jugadores.csv existente (no existe en Notion):
+    Prioridad        → se conserva del CSV; default "False" para jugadores nuevos
+    Partidas_Deseadas → se conserva del CSV; default "1" para jugadores nuevos
+    Partidas_GM      → se conserva del CSV; default "0" para jugadores nuevos
 
 Requisitos:
     - Archivo .env en la raíz del proyecto con NOTION_TOKEN y NOTION_DATABASE_ID
-    - La base de datos de Notion debe tener exactamente las columnas definidas en
-      COLUMN_MAP (los nombres son case-sensitive; ajusta si los tuyos difieren).
-
-Flujo:
-    Notion DB → lista de Jugador Python → jugadores.csv
-    (una sola dirección; nunca escribe de vuelta a Notion)
 """
 from __future__ import annotations
 
@@ -30,114 +36,124 @@ import os
 
 CSV_PATH: Path = Path(__file__).parent / "jugadores.csv"
 
-# Mapeo: nombre de columna en Notion → nombre de columna en el CSV.
-# Ajusta los valores de la izquierda si tus propiedades en Notion tienen
-# nombres distintos.
-COLUMN_MAP: dict[str, str] = {
-    "Nombre":            "Nombre",
-    "Experiencia":       "Experiencia",       # "Nuevo" o "Antiguo"
-    "Juegos_Este_Ano":   "Juegos_Este_Ano",   # número entero
-    "Prioridad":         "Prioridad",         # checkbox → "True"/"False"
-    "Partidas_Deseadas": "Partidas_Deseadas", # número entero
-    "Partidas_GM":       "Partidas_GM",       # número entero
+CSV_FIELDNAMES: list[str] = [
+    "Nombre", "Experiencia", "Juegos_Este_Ano",
+    "Prioridad", "Partidas_Deseadas", "Partidas_GM",
+]
+
+# Valores por defecto para jugadores que no están aún en jugadores.csv
+CSV_DEFAULTS: dict[str, str] = {
+    "Prioridad":         "False",
+    "Partidas_Deseadas": "1",
+    "Partidas_GM":       "0",
 }
 
-CSV_FIELDNAMES: list[str] = list(COLUMN_MAP.values())
+# ── Helpers de extracción ─────────────────────────────────────────────────────
 
-# ── Helpers de extracción de propiedades Notion ───────────────────────────────
-
-def _extraer_texto(prop: dict) -> str:
-    """Extrae el texto plano de una propiedad title o rich_text."""
-    tipo = prop.get("type")
-    if tipo == "title":
-        partes = prop.get("title", [])
-    elif tipo == "rich_text":
-        partes = prop.get("rich_text", [])
-    else:
-        return ""
-    return "".join(p.get("plain_text", "") for p in partes).strip()
+def _extraer_nombre(prop: dict) -> str:
+    """Extrae texto plano de una propiedad title."""
+    return "".join(p.get("plain_text", "") for p in prop.get("title", [])).strip()
 
 
-def _extraer_numero(prop: dict) -> str:
-    """Extrae un número como string (devuelve '0' si es None)."""
-    valor = prop.get("number")
-    return str(int(valor)) if valor is not None else "0"
-
-
-def _extraer_select(prop: dict) -> str:
-    """Extrae el nombre de una propiedad select."""
-    sel = prop.get("select")
-    return sel["name"].strip() if sel else ""
-
-
-def _extraer_checkbox(prop: dict) -> str:
-    """Convierte un checkbox en 'True' o 'False'."""
-    return str(prop.get("checkbox", False))
-
-
-# Despacho por tipo de propiedad Notion
-_EXTRACTORES: dict[str, object] = {
-    "title":     _extraer_texto,
-    "rich_text": _extraer_texto,
-    "number":    _extraer_numero,
-    "select":    _extraer_select,
-    "checkbox":  _extraer_checkbox,
-}
-
-
-def _extraer_propiedad(prop: dict) -> str:
-    """Extrae el valor de una propiedad Notion sin importar su tipo."""
-    tipo = prop.get("type", "")
-    extractor = _EXTRACTORES.get(tipo)
-    if extractor is None:
-        return ""
-    return extractor(prop)  # type: ignore[operator]
-
-
-# ── Lógica principal ──────────────────────────────────────────────────────────
-
-def _paginas_a_filas(pages: list[dict]) -> list[dict[str, str]]:
+def _desde_participaciones(prop: dict) -> tuple[str, str]:
     """
-    Convierte una lista de páginas de Notion en filas listas para el CSV.
-    Omite páginas donde 'Nombre' esté vacío (filas en blanco en la DB).
+    A partir de la relation 'Participaciones' devuelve (Experiencia, Juegos_Este_Ano).
+    - Experiencia: 'Antiguo' si tiene ≥1 entrada, 'Nuevo' si está vacía.
+    - Juegos_Este_Ano: cantidad de entradas en la relation (como string).
+    Nota: la formula 'Nro. Partidas' siempre devuelve 0 vía API (limitación de
+    Notion), por lo que usamos directamente el conteo de la relation.
+    """
+    entradas = prop.get("relation", [])
+    count = len(entradas)
+    return ("Antiguo" if count > 0 else "Nuevo"), str(count)
+
+
+# ── CSV existente ─────────────────────────────────────────────────────────────
+
+def _leer_csv_existente(ruta: Path) -> dict[str, dict[str, str]]:
+    """Lee jugadores.csv y retorna un dict nombre → fila completa."""
+    if not ruta.exists():
+        return {}
+    with ruta.open(encoding="utf-8") as f:
+        return {row["Nombre"]: row for row in csv.DictReader(f)}
+
+
+# ── Conversión Notion → filas CSV ─────────────────────────────────────────────
+
+def _paginas_a_filas(
+    pages: list[dict],
+    existentes: dict[str, dict[str, str]],
+) -> list[dict[str, str]]:
+    """
+    Convierte páginas de Notion en filas listas para jugadores.csv.
+    Nombre, Juegos_Este_Ano y Experiencia vienen de Notion.
+    Prioridad, Partidas_Deseadas y Partidas_GM se preservan del CSV existente
+    (o se usan defaults para jugadores que aún no están en el CSV).
+    Omite páginas sin nombre.
     """
     filas: list[dict[str, str]] = []
     for page in pages:
         props = page.get("properties", {})
-        fila: dict[str, str] = {}
-        for notion_col, csv_col in COLUMN_MAP.items():
-            prop = props.get(notion_col)
-            if prop is None:
-                print(
-                    f"  ⚠️  Columna '{notion_col}' no encontrada en la página "
-                    f"'{page.get('id', '?')}'. Se usará cadena vacía.",
-                    file=sys.stderr,
-                )
-                fila[csv_col] = ""
-            else:
-                fila[csv_col] = _extraer_propiedad(prop)
 
-        if not fila.get("Nombre"):
-            continue  # saltar filas sin nombre
-        filas.append(fila)
+        # Nombre (obligatorio)
+        nombre_prop = props.get("Nombre")
+        if not nombre_prop:
+            continue
+        nombre = _extraer_nombre(nombre_prop)
+        if not nombre:
+            continue
+
+        # Experiencia y Juegos_Este_Ano ← 'Participaciones' (relation)
+        # (La formula 'Nro. Partidas' siempre retorna 0 vía API)
+        part_prop = props.get("Participaciones")
+        experiencia, juegos = _desde_participaciones(part_prop) if part_prop else ("Nuevo", "0")
+
+        # Columnas que vienen del CSV local (preservar o usar defaults)
+        existente = existentes.get(nombre, {})
+        filas.append({
+            "Nombre":            nombre,
+            "Experiencia":       experiencia,
+            "Juegos_Este_Ano":   juegos,
+            "Prioridad":         existente.get("Prioridad",         CSV_DEFAULTS["Prioridad"]),
+            "Partidas_Deseadas": existente.get("Partidas_Deseadas", CSV_DEFAULTS["Partidas_Deseadas"]),
+            "Partidas_GM":       existente.get("Partidas_GM",       CSV_DEFAULTS["Partidas_GM"]),
+        })
     return filas
 
 
+# ── Descarga desde Notion ─────────────────────────────────────────────────────
+
 def _descargar_todos(client: Client, database_id: str) -> list[dict]:
-    """Descarga todas las páginas de la DB paginando automáticamente."""
+    """
+    Descarga todas las páginas de la DB paginando automáticamente.
+
+    notion-client ≥2.7 eliminó databases.query(); hay que obtener el
+    data_source_id desde databases.retrieve() y luego usar data_sources.query().
+    """
+    db_info = client.databases.retrieve(database_id=database_id)
+    data_sources = db_info.get("data_sources", [])
+    if not data_sources:
+        raise RuntimeError(
+            f"La base de datos '{database_id}' no tiene data_sources. "
+            "Asegúrate de que la integración tenga acceso de lectura."
+        )
+    data_source_id: str = data_sources[0]["id"]
+
     pages: list[dict] = []
     cursor: str | None = None
     while True:
-        kwargs: dict = {"database_id": database_id}
+        kwargs: dict = {"data_source_id": data_source_id, "result_type": "page"}
         if cursor:
             kwargs["start_cursor"] = cursor
-        response = client.databases.query(**kwargs)
+        response = client.data_sources.query(**kwargs)
         pages.extend(response.get("results", []))
         if not response.get("has_more"):
             break
         cursor = response.get("next_cursor")
     return pages
 
+
+# ── Escritura CSV ─────────────────────────────────────────────────────────────
 
 def _escribir_csv(filas: list[dict[str, str]], ruta: Path) -> None:
     with ruta.open(mode="w", encoding="utf-8", newline="") as f:
@@ -150,7 +166,7 @@ def _escribir_csv(filas: list[dict[str, str]], ruta: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Descarga la DB de jugadores desde Notion y sobreescribe jugadores.csv"
+        description="Descarga jugadores desde Notion y fusiona con jugadores.csv"
     )
     parser.add_argument(
         "--dry-run",
@@ -159,7 +175,6 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    # Cargar .env (si existe; en CI las variables ya están en el entorno)
     load_dotenv()
 
     token = os.getenv("NOTION_TOKEN")
@@ -182,8 +197,13 @@ def main() -> None:
         sys.exit(1)
     print(f"{len(pages)} página(s) recibidas.")
 
-    filas = _paginas_a_filas(pages)
-    print(f"⟳  {len(filas)} jugador(es) procesados.")
+    existentes = _leer_csv_existente(CSV_PATH)
+    filas = _paginas_a_filas(pages, existentes)
+
+    nuevos = [f["Nombre"] for f in filas if f["Nombre"] not in existentes]
+    print(f"⟳  {len(filas)} jugador(es) procesados ({len(nuevos)} nuevo(s)).")
+    if nuevos:
+        print(f"   Nuevos: {', '.join(nuevos)}")
 
     if args.dry_run:
         print("\n── dry-run: contenido que se escribiría ──")
