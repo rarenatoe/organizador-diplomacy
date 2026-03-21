@@ -37,9 +37,9 @@ from notion_client import Client
 from notion_client.errors import APIResponseError
 import os
 
-# ── Configuración ─────────────────────────────────────────────────────────────
+from utils import DIRECTORIO, siguiente_csv, ultimo_csv
 
-CSV_PATH: Path = Path(__file__).parent / "jugadores.csv"
+# ── Configuración ──────────────────────────────────────────────────
 
 CSV_FIELDNAMES: list[str] = [
     "Nombre", "Experiencia", "Juegos_Este_Ano",
@@ -67,9 +67,10 @@ def _experiencia(participaciones_prop: dict) -> str:
 
 # ── CSV existente ─────────────────────────────────────────────────────────────
 
-def _leer_csv_existente(ruta: Path) -> dict[str, dict[str, str]]:
-    """Lee jugadores.csv y retorna un dict nombre → fila completa."""
-    if not ruta.exists():
+def _leer_csv_existente() -> dict[str, dict[str, str]]:
+    """Lee el último jugadores_NNNN.csv y retorna un dict nombre → fila completa."""
+    ruta = ultimo_csv()
+    if ruta is None:
         return {}
     with ruta.open(encoding="utf-8") as f:
         return {row["Nombre"]: row for row in csv.DictReader(f)}
@@ -222,11 +223,13 @@ def _descargar_todos(client: Client, database_id: str) -> list[dict]:
 
 # ── Escritura CSV ─────────────────────────────────────────────────────────────
 
-def _escribir_csv(filas: list[dict[str, str]], ruta: Path) -> None:
+def _escribir_csv(filas: list[dict[str, str]]) -> Path:
+    ruta = siguiente_csv()
     with ruta.open(mode="w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
         writer.writeheader()
         writer.writerows(filas)
+    return ruta
 
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────
@@ -270,7 +273,7 @@ def main() -> None:
         sys.exit(1)
     print(f"{len(pages)} jugador(es), {sum(conteo_por_jugador.values())} partida(s) en {año_actual}.")
 
-    existentes = _leer_csv_existente(CSV_PATH)
+    existentes = _leer_csv_existente()
     filas = _paginas_a_filas(pages, existentes, conteo_por_jugador)
 
     nuevos = [f["Nombre"] for f in filas if f["Nombre"] not in existentes]
@@ -285,8 +288,8 @@ def main() -> None:
         writer.writerows(filas)
         print("\n(No se escribió ningún archivo)")
     else:
-        _escribir_csv(filas, CSV_PATH)
-        print(f"✓  {CSV_PATH.name} actualizado con {len(filas)} jugador(es).")
+        ruta = _escribir_csv(filas)
+        print(f"✓  {ruta.name} creado con {len(filas)} jugador(es).")
 
 
 if __name__ == "__main__":

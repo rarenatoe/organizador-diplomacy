@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from utils import siguiente_csv, ultimo_csv
+
+from utils import DIRECTORIO, siguiente_csv, ultimo_csv
+
 SEP: str = "─" * 44
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -410,11 +414,12 @@ def _escribir_reporte(
 def _actualizar_csv(
     resultado: ResultadoPartidas,
     jugadores: list[Jugador],
-    csv_path: Path,
+    directorio: Path,
 ) -> Path:
     """
-    Archiva jugadores.csv con timestamp y escribe un nuevo jugadores.csv con
-    los valores actualizados tras el evento. Devuelve la ruta del archivo archivado.
+    Escribe el siguiente jugadores_NNNN.csv con los valores actualizados
+    tras el evento. El archivo anterior queda intacto (inmutable).
+    Devuelve la ruta del nuevo archivo.
 
     Cambios aplicados por jugador:
       - Juegos_Este_Ano  += mesas jugadas como jugador (GMing no suma)
@@ -423,10 +428,6 @@ def _actualizar_csv(
       - Partidas_GM       = 0  (se reasigna manualmente en cada evento)
       - Partidas_Deseadas = sin cambios
     """
-    timestamp: str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    ruta_archivada: Path = csv_path.parent / f"jugadores_{timestamp}.csv"
-    csv_path.rename(ruta_archivada)
-
     cupos_jugados: Counter[str] = Counter(
         j.nombre for mesa in resultado.mesas for j in mesa.jugadores
     )
@@ -449,19 +450,29 @@ def _actualizar_csv(
             "Partidas_GM":       0,
         })
 
-    with csv_path.open(mode="w", encoding="utf-8", newline="") as f:
+    ruta_nueva: Path = siguiente_csv(directorio)
+    with ruta_nueva.open(mode="w", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(filas)
 
-    return ruta_archivada
+    return ruta_nueva
 
 
-def organizar_partidas(archivo_csv: str) -> None:
+def organizar_partidas(directorio: str | Path = DIRECTORIO) -> None:
+    directorio = Path(directorio)
+
+    # ── Auto-detectar el CSV más reciente ────────────────────────────────────
+    csv_path: Path | None = ultimo_csv(directorio)
+    if csv_path is None:
+        print("⚠️  No se encontró ningún jugadores_NNNN.csv en el directorio.")
+        print("   Ejecuta primero: uv run python notion_sync.py")
+        input("\nPresiona Enter para cerrar...")
+        return
+
     jugadores: list[Jugador] = []
 
     # ── Leer CSV ──────────────────────────────────────────────────────────────
-    csv_path: Path = Path(archivo_csv)
     with csv_path.open(mode="r", encoding="utf-8") as file:
         reader = csv.DictReader(file)
         for row in reader:
@@ -508,8 +519,8 @@ def organizar_partidas(archivo_csv: str) -> None:
             vistos.add(j.nombre)
             con_prioridad.append(j.nombre)
 
-    # ── Archivar y actualizar CSV ─────────────────────────────────────────────
-    ruta_archivada: Path = _actualizar_csv(resultado, jugadores, csv_path)
+    # ── Escribir siguiente CSV ────────────────────────────────────────────────
+    ruta_nueva: Path = _actualizar_csv(resultado, jugadores, directorio)
 
     # ── Construir secciones del reporte ───────────────────────────────────────
     total_cupos: int = len(resultado.mesas) * 7
@@ -521,7 +532,8 @@ def organizar_partidas(archivo_csv: str) -> None:
         f"  Partidas:      {len(resultado.mesas)}  ({total_tickets} solicitados, {total_cupos} disponibles)",
         f"  En espera:     {jugadores_en_espera} jugador(es)",
         f"  Intentos:      {resultado.intentos_usados} de 200",
-        f"  Archivado:     {ruta_archivada.name}",
+        f"  Leído de:      {csv_path.name}",
+        f"  Escrito en:    {ruta_nueva.name}",
     ]
     if promovidos:
         lineas_registro.append(f"  Promovidos:    {', '.join(promovidos)}")
@@ -533,17 +545,17 @@ def organizar_partidas(archivo_csv: str) -> None:
         lineas_detalle=_formatear_resultado(resultado, sep),
         lineas_proyeccion=_construir_proyeccion(resultado, jugadores, sep),
         lineas_registro=lineas_registro,
-        directorio=csv_path.parent,
+        directorio=directorio,
     )
 
-    # ── Consola: resumen mínimo (sin duplicar el contenido del archivo) ───────
+    # ── Consola: resumen mínimo ───────────────────────────────────────────────
     print(
         f"\n✓  {len(resultado.mesas)} partidas  |  "
         f"{total_tickets} solicitados, {total_cupos} disponibles, "
         f"{jugadores_en_espera} en espera  |  {resultado.intentos_usados} intento(s)"
     )
     print(f"✓  {ruta_reporte.name}")
-    print(f"✓  jugadores.csv  (anterior: {ruta_archivada.name})")
+    print(f"✓  {csv_path.name}  →  {ruta_nueva.name}")
     if promovidos:
         print(f"   Promovidos:  {', '.join(promovidos)}")
     if con_prioridad:
@@ -553,4 +565,4 @@ def organizar_partidas(archivo_csv: str) -> None:
 
 
 if __name__ == "__main__":
-    organizar_partidas("jugadores.csv")
+    organizar_partidas()

@@ -2,8 +2,8 @@
 .env
 
 # ── Archivos generados por el organizador ─────────────────────────────────────
+# Los jugadores_NNNN.csv SE TRACKEAN (historial inmutable de la liga).
 reporte_*.txt
-jugadores_*.csv        # CSVs archivados con timestamp
 
 # ── Python / uv ───────────────────────────────────────────────────────────────
 .venv/
