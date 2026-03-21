@@ -318,6 +318,16 @@
     /* Spinner */
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .65s linear infinite; }
+
+    /* ── CSV picker modal ── */
+    .picker-box { background: var(--surface); border-radius: 14px; padding: 24px; width: 380px; max-width: 90vw; display: flex; flex-direction: column; gap: 14px; box-shadow: var(--shadow-md); }
+    .picker-box h3 { font-size: 15px; font-weight: 700; }
+    .picker-box p  { font-size: 12px; color: var(--muted); }
+    .csv-option { display: flex; align-items: center; gap: 12px; padding: 10px 13px; border: 2px solid var(--border); border-radius: 9px; cursor: pointer; font-size: 13px; font-weight: 500; transition: border-color .15s, background .15s; }
+    .csv-option:hover { border-color: var(--accent); background: var(--csv-bg); }
+    .csv-option.sel   { border-color: var(--accent); background: var(--csv-bg); }
+    .csv-option-name  { flex: 1; }
+    .picker-foot { display: flex; justify-content: flex-end; gap: 8px; }
   </style>
 </head>
 
@@ -328,7 +338,7 @@
   <h1>🎲 Organizador Diplomacy <span id="pending-badge">⏳ Sin jugar</span></h1>
   <button class="btn btn-secondary" onclick="loadChain()">⟳ Actualizar</button>
   <button class="btn btn-secondary" id="btn-sync"     onclick="runScript('notion_sync')">↻ Sync Notion</button>
-  <button class="btn btn-primary"   id="btn-organizar" onclick="runScript('organizar')">▶ Organizar</button>
+  <button class="btn btn-primary"   id="btn-organizar" onclick="openCsvPicker()">▶ Organizar…</button>
 </header>
 
 <!-- ── Main ───────────────────────────────────────────────────── -->
@@ -370,7 +380,18 @@
     </div>
   </div>
 </div>
-
+<!-- ── CSV picker modal ──────────────────────────────────────── -->
+<div class="modal-overlay" id="modal-picker">
+  <div class="picker-box">
+    <h3>📋 Seleccionar CSV de origen</h3>
+    <p>¿Desde qué jugadores deseas organizar la próxima ronda?</p>
+    <div id="csv-options"></div>
+    <div class="picker-foot">
+      <button class="btn btn-secondary" onclick="closePicker()">Cancelar</button>
+      <button class="btn btn-primary"   id="btn-picker-ok" onclick="confirmPicker()">▶ Organizar</button>
+    </div>
+  </div>
+</div>
 <!-- ── Script ──────────────────────────────────────────────────── -->
 <script>
   // ── Copy store (avoids large inline data attributes) ──────────
@@ -533,7 +554,6 @@
     const reg_data  = data.registro   ?? {};
     const mesas     = (data.detalle?.mesas)        ?? [];
     const waiting   = (data.detalle?.waiting_list) ?? [];
-    const proyeccion = data.proyeccion ?? [];
     const copyText   = data.copypaste  ?? '';
 
     document.getElementById('panel-title').textContent = reg_data['Generado'] ?? filename;
@@ -598,33 +618,52 @@
       </div>`;
     }
 
-    // ── Proyección ──
-    if (proyeccion.length) {
-      const projRows = proyeccion.map(r => `<tr>
-        <td>${esc(r.nombre)}</td>
-        <td style="text-align:center">${esc(r.actual)}</td>
-        <td style="text-align:center;color:var(--success);font-weight:600">${+r.jugadas > 0 ? '+'+r.jugadas : '—'}</td>
-        <td style="text-align:center;color:var(--muted)">${+r.gm > 0 ? r.gm : '—'}</td>
-        <td style="text-align:center;font-weight:700">${esc(r.proyectado)}</td>
-      </tr>`).join('');
-      html += `<div class="section">
-        <div class="section-title">Proyección Juegos_Este_Año</div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Jugador</th><th>Actual</th><th>+Juega</th><th>+GM</th><th>Final</th></tr></thead>
-            <tbody>${projRows}</tbody>
-          </table>
-        </div>
-      </div>`;
-    }
-
     document.getElementById('panel-body').innerHTML = html;
+  }
+
+  // ── CSV picker ────────────────────────────────────────────────
+  let _pickerSelected = null;
+
+  async function openCsvPicker() {
+    _pickerSelected = null;
+    const data   = await fetch('/api/csvs').then(r => r.json());
+    const csvs   = data.csvs ?? [];
+    const latest = csvs[csvs.length - 1] ?? null;
+    const container = document.getElementById('csv-options');
+    container.innerHTML = csvs.map(name => {
+      const isLatest = name === latest;
+      const badge = isLatest
+        ? '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;background:#dbeafe;color:#1e40af;border:1px solid #93c5fd">Actual</span>'
+        : '';
+      return `<div class="csv-option${isLatest ? ' sel' : ''}" data-csv="${esc(name)}" onclick="selectCsv(this)">
+        <span>📋</span><span class="csv-option-name">${esc(name)}</span>${badge}
+      </div>`;
+    }).join('');
+    _pickerSelected = latest;
+    document.getElementById('modal-picker').classList.add('open');
+  }
+
+  function selectCsv(el) {
+    document.querySelectorAll('.csv-option').forEach(o => o.classList.remove('sel'));
+    el.classList.add('sel');
+    _pickerSelected = el.dataset.csv;
+  }
+
+  function closePicker() {
+    document.getElementById('modal-picker').classList.remove('open');
+    _pickerSelected = null;
+  }
+
+  function confirmPicker() {
+    const csv = _pickerSelected;
+    closePicker();
+    runScript('organizar', csv);
   }
 
   // ── Run scripts ───────────────────────────────────────────────
   const scriptLabels = { notion_sync: '↻ Sync Notion', organizar: '▶ Organizar' };
 
-  async function runScript(script) {
+  async function runScript(script, csvName = null) {
     const modal     = document.getElementById('modal');
     const out       = document.getElementById('modal-out');
     const titleEl   = document.getElementById('modal-title-text');
@@ -638,11 +677,17 @@
     closeBtn.disabled = true;
     modal.classList.add('open');
 
-    document.getElementById('btn-sync').disabled     = true;
+    document.getElementById('btn-sync').disabled      = true;
     document.getElementById('btn-organizar').disabled = true;
 
+    const body = (script === 'organizar' && csvName) ? { csv: csvName } : undefined;
+
     try {
-      const res  = await fetch(`/api/run/${script}`, { method: 'POST' });
+      const res  = await fetch(`/api/run/${script}`, {
+        method:  'POST',
+        headers: body ? { 'Content-Type': 'application/json' } : {},
+        body:    body ? JSON.stringify(body) : undefined,
+      });
       const data = await res.json();
       const ok   = data.returncode === 0;
       iconEl.textContent    = ok ? '✅' : '❌';
@@ -657,7 +702,7 @@
       out.classList.add('err');
     } finally {
       closeBtn.disabled = false;
-      document.getElementById('btn-sync').disabled     = false;
+      document.getElementById('btn-sync').disabled      = false;
       document.getElementById('btn-organizar').disabled = false;
     }
   }

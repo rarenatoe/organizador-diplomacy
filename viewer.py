@@ -15,7 +15,7 @@ import threading
 import webbrowser
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 
 from utils import DIRECTORIO
 
@@ -206,17 +206,34 @@ def api_report(filename: str):
     })
 
 
+@app.route("/api/csvs")
+def api_csvs():
+    """Lists all jugadores_NNNN.csv files available as organizar sources."""
+    files = sorted(p.name for p in DATA.glob("jugadores_*.csv"))
+    return jsonify({"csvs": files})
+
+
 @app.route("/api/run/<script>", methods=["POST"])
 def api_run(script: str):
-    scripts = {
-        "notion_sync": "notion_sync.py",
-        "organizar":   "organizador.py",
-    }
-    if script not in scripts:
+    if script not in ("notion_sync", "organizar"):
         return jsonify({"error": "unknown script"}), 400
+
     cwd = Path(__file__).parent
+
+    if script == "organizar":
+        body = request.get_json(silent=True) or {}
+        csv_name: str | None = body.get("csv")
+        cmd = ["uv", "run", "python", "organizador.py"]
+        if csv_name:
+            if not re.match(r"^jugadores_\d{4}\.csv$", csv_name):
+                return jsonify({"error": "invalid csv name"}), 400
+            csv_full = str(DATA / csv_name)
+            cmd += ["--csv", csv_full]
+    else:
+        cmd = ["uv", "run", "python", "notion_sync.py"]
+
     result = subprocess.run(
-        ["uv", "run", "python", scripts[script]],
+        cmd,
         cwd=cwd,
         capture_output=True,
         text=True,

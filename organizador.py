@@ -456,11 +456,29 @@ def _actualizar_csv(
     return ruta_nueva
 
 
-def organizar_partidas(directorio: str | Path = DIRECTORIO) -> None:
+def organizar_partidas(
+    directorio: str | Path = DIRECTORIO,
+    csv_path: str | Path | None = None,
+) -> None:
+    """
+    Organiza una ronda de partidas.
+
+    Args:
+        directorio: Carpeta donde se leen/escriben los CSVs y reportes.
+        csv_path: CSV de origen explícito. Si es None se usa el más reciente
+                  (jugadores con número más alto). Útil para re-organizar desde
+                  un CSV anterior sin afectar el flujo normal.
+    """
     directorio = Path(directorio)
 
-    # ── Auto-detectar el CSV más reciente ────────────────────────────────────
-    csv_path: Path | None = ultimo_csv(directorio)
+    # ── Resolver CSV de origen ────────────────────────────────────────────────
+    if csv_path is not None:
+        csv_path = Path(csv_path)
+        if not csv_path.exists():
+            print(f"⚠️  CSV no encontrado: {csv_path}")
+            return
+    else:
+        csv_path = ultimo_csv(directorio)
     if csv_path is None:
         print("⚠️  No se encontró ningún jugadores_NNNN.csv en el directorio.")
         print("   Ejecuta primero: uv run python notion_sync.py")
@@ -556,4 +574,8 @@ def organizar_partidas(directorio: str | Path = DIRECTORIO) -> None:
 
 
 if __name__ == "__main__":
-    organizar_partidas()
+    import argparse as _ap
+    _parser = _ap.ArgumentParser(description="Organiza las partidas de Diplomacy")
+    _parser.add_argument("--csv", metavar="RUTA", help="CSV de origen explícito (por defecto: el más reciente)")
+    _args = _parser.parse_args()
+    organizar_partidas(csv_path=_args.csv)
