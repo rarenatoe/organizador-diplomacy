@@ -121,47 +121,99 @@ def _read_csv(path: Path) -> list[dict]:
 # ── Chain builder ──────────────────────────────────────────────────────────────
 
 def _build_chain() -> dict:
-    csvs = {p.name: p for p in sorted(DATA.glob("jugadores_*.csv"))}
-    reports = sorted(DATA.glob("reporte_*.txt"))
+    """
+    Builds the node list by following actual data lineage (Leído de / Escrito en)
+    instead of relying on CSV filename order alone.
 
-    # Map source CSV name → (most recent report path, registro dict)
-    report_by_source: dict[str, tuple[Path, dict]] = {}
-    for rpt in reports:
+    Algorithm:
+      1. Parse every report's REGISTRO to extract (leido, escrito) edges.
+      2. Root CSVs = CSVs with no parent report (notion_sync output or initial).
+      3. DFS from each root: CSV → its reports (sorted by name/time) → each
+         output CSV → …
+      4. Any CSVs unreachable from roots (shouldn't happen) appended at the end.
+    """
+    csvs: dict[str, Path] = {p.name: p for p in sorted(DATA.glob("jugadores_*.csv"))}
+    report_paths: list[Path] = sorted(DATA.glob("reporte_*.txt"))
+
+    # Parse every report once
+    report_meta: dict[str, dict] = {}  # report_name → {registro, leido, escrito}
+    for rpt in report_paths:
         text = rpt.read_text(encoding="utf-8")
         sections = _parse_report_sections(text)
         registro = _parse_registro(sections.get("REGISTRO", ""))
-        leido = registro.get("Leído de", "").strip()
+        leido   = registro.get("Leído de",  "").strip()
+        escrito = registro.get("Escrito en", "").strip()
         if leido:
-            existing = report_by_source.get(leido)
-            if existing is None or rpt.name > existing[0].name:
-                report_by_source[leido] = (rpt, registro)
+            report_meta[rpt.name] = {
+                "registro": registro,
+                "leido":    leido,
+                "escrito":  escrito,
+            }
 
-    pending = (DATA / ".pending").exists()
-    nodes: list[dict] = []
+    # csv_name → [sorted report names that read from this CSV]
+    csv_to_reports: dict[str, list[str]] = {}
+    for rname, meta in report_meta.items():
+        csv_to_reports.setdefault(meta["leido"], []).append(rname)
+    for lst in csv_to_reports.values():
+        lst.sort()  # report filenames are timestamp-based → chronological order
+
+    # output_csv → report that produced it
+    produced_by: dict[str, str] = {
+        meta["escrito"]: rname
+        for rname, meta in report_meta.items()
+        if meta["escrito"]
+    }
+
+    pending  = (DATA / ".pending").exists()
+    all_csvs = sorted(csvs)
+    latest   = all_csvs[-1] if all_csvs else None
 
     if not csvs:
         return {"nodes": [], "pending": pending}
 
-    for csv_name in sorted(csvs.keys()):
-        players = _read_csv(csvs[csv_name])
-        is_latest = csv_name == sorted(csvs.keys())[-1]
-        nodes.append({
+    # Root CSVs: not produced by any report (notion_sync output or initial import)
+    root_csvs = [c for c in all_csvs if c not in produced_by]
+
+    nodes:   list[dict] = []
+    visited: set[str]   = set()
+
+    def _csv_node(name: str) -> dict:
+        players = _read_csv(csvs[name])
+        return {
             "type":         "csv",
-            "filename":     csv_name,
+            "filename":     name,
             "player_count": len(players),
-            "is_latest":    is_latest,
-            "pending":      is_latest and pending,
-        })
-        if csv_name in report_by_source:
-            rpt_path, registro = report_by_source[csv_name]
+            "is_latest":    name == latest,
+            "pending":      name == latest and pending,
+        }
+
+    def _walk(csv_name: str) -> None:
+        if csv_name in visited or csv_name not in csvs:
+            return
+        visited.add(csv_name)
+        nodes.append(_csv_node(csv_name))
+        for rname in csv_to_reports.get(csv_name, []):
+            meta = report_meta[rname]
+            reg  = meta["registro"]
             nodes.append({
                 "type":      "report",
-                "filename":  rpt_path.name,
-                "generated": registro.get("Generado", ""),
-                "partidas":  registro.get("Partidas", ""),
-                "en_espera": registro.get("En espera", ""),
-                "intentos":  registro.get("Intentos", ""),
+                "filename":  rname,
+                "generated": reg.get("Generado", ""),
+                "partidas":  reg.get("Partidas",  ""),
+                "en_espera": reg.get("En espera", ""),
+                "intentos":  reg.get("Intentos",  ""),
+                "leido":     meta["leido"],
+                "escrito":   meta["escrito"],
             })
+            _walk(meta["escrito"])
+
+    for root in root_csvs:
+        _walk(root)
+
+    # Safety net: append any CSVs not reached by the DFS
+    for name in all_csvs:
+        if name not in visited:
+            nodes.append(_csv_node(name))
 
     return {"nodes": nodes, "pending": pending}
 

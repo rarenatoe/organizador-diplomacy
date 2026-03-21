@@ -263,6 +263,7 @@ class TestApiChain:
         assert data["nodes"] == []
 
     def test_csv_only_chain(self, client, tmp_path, monkeypatch):
+        """A single CSV with no reports appears as a root node."""
         monkeypatch.setattr(viewer, "DATA", tmp_path)
         _make_csv(tmp_path, "jugadores_0001.csv", rows=3)
         resp = client.get("/api/chain")
@@ -272,6 +273,7 @@ class TestApiChain:
         assert data["nodes"][0]["player_count"] == 3
 
     def test_chain_with_report_linked(self, client, tmp_path, monkeypatch):
+        """csv_0001 → report → csv_0002 is ordered correctly via DFS."""
         monkeypatch.setattr(viewer, "DATA", tmp_path)
         _make_csv(tmp_path, "jugadores_0001.csv")
         _make_csv(tmp_path, "jugadores_0002.csv")
@@ -280,6 +282,55 @@ class TestApiChain:
         data = json.loads(resp.data)
         types = [n["type"] for n in data["nodes"]]
         assert types == ["csv", "report", "csv"]
+
+    def test_second_report_from_same_csv_ordered_correctly(self, client, tmp_path, monkeypatch):
+        """
+        When csv_0001 produces two reports in sequence (report_A → csv_0002,
+        report_B → csv_0003), the chain follows temporal order:
+          csv_0001 → report_A → csv_0002 → report_B → csv_0003
+        rather than placing report_B at the end by filename order alone.
+        """
+        monkeypatch.setattr(viewer, "DATA", tmp_path)
+        _make_csv(tmp_path, "jugadores_0001.csv")
+        _make_csv(tmp_path, "jugadores_0002.csv")
+        _make_csv(tmp_path, "jugadores_0003.csv")
+        _make_report(
+            tmp_path,
+            leido="jugadores_0001.csv",
+            escrito="jugadores_0002.csv",
+            filename="reporte_2026-01-01_00-00-01.txt",
+        )
+        _make_report(
+            tmp_path,
+            leido="jugadores_0001.csv",
+            escrito="jugadores_0003.csv",
+            filename="reporte_2026-01-01_00-00-02.txt",
+        )
+        resp = client.get("/api/chain")
+        data = json.loads(resp.data)
+        filenames = [n["filename"] for n in data["nodes"]]
+        assert filenames.index("jugadores_0001.csv") < filenames.index("reporte_2026-01-01_00-00-01.txt")
+        assert filenames.index("reporte_2026-01-01_00-00-01.txt") < filenames.index("jugadores_0002.csv")
+        assert filenames.index("jugadores_0002.csv") < filenames.index("reporte_2026-01-01_00-00-02.txt")
+        assert filenames.index("reporte_2026-01-01_00-00-02.txt") < filenames.index("jugadores_0003.csv")
+
+    def test_notion_sync_csv_is_a_new_root(self, client, tmp_path, monkeypatch):
+        """
+        A CSV with no parent report (created by notion_sync) is a root node.
+        It should appear in the chain even if not reachable from other CSVs.
+        """
+        monkeypatch.setattr(viewer, "DATA", tmp_path)
+        _make_csv(tmp_path, "jugadores_0001.csv")
+        _make_csv(tmp_path, "jugadores_0002.csv")
+        _make_report(tmp_path, leido="jugadores_0001.csv", escrito="jugadores_0002.csv")
+        # csv_0003 created by notion_sync — no parent report
+        _make_csv(tmp_path, "jugadores_0003.csv")
+        resp = client.get("/api/chain")
+        data = json.loads(resp.data)
+        filenames = [n["filename"] for n in data["nodes"]]
+        assert "jugadores_0003.csv" in filenames
+        # csv_0003 must appear after csv_0002 in the list (appended after DFS)
+        assert filenames.index("jugadores_0002.csv") < filenames.index("jugadores_0003.csv")
 
     def test_pending_flag_detected(self, client, tmp_path, monkeypatch):
         monkeypatch.setattr(viewer, "DATA", tmp_path)
