@@ -6,8 +6,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from utils import siguiente_csv, ultimo_csv
-
 from utils import DIRECTORIO, siguiente_csv, ultimo_csv
 
 SEP: str = "─" * 44
@@ -345,7 +343,6 @@ def _formatear_resultado(
 def _construir_proyeccion(
     resultado: ResultadoPartidas,
     jugadores: list[Jugador],
-    sep: str = SEP,
 ) -> list[str]:
     """
     Calcula cómo quedará Juegos_Este_Ano de cada jugador tras este evento.
@@ -467,7 +464,6 @@ def organizar_partidas(directorio: str | Path = DIRECTORIO) -> None:
     if csv_path is None:
         print("⚠️  No se encontró ningún jugadores_NNNN.csv en el directorio.")
         print("   Ejecuta primero: uv run python notion_sync.py")
-        input("\nPresiona Enter para cerrar...")
         return
 
     jugadores: list[Jugador] = []
@@ -488,22 +484,17 @@ def organizar_partidas(directorio: str | Path = DIRECTORIO) -> None:
     ]
     if duplicados:
         print(f"⚠️  Nombres duplicados en el CSV: {', '.join(duplicados)}")
-        input("\nPresiona Enter para salir...")
         return
 
     try:
         resultado: ResultadoPartidas | None = _calcular_partidas(jugadores)
     except ValueError as e:
         print(f"⚠️  Error de configuración: {e}")
-        input("\nPresiona Enter para salir...")
         return
 
     if resultado is None:
         print("No hay suficientes jugadores para armar ni siquiera una partida de 7.")
-        input("\nPresiona Enter para salir...")
         return
-
-    sep: str = SEP
 
     # ── Calcular cambios del evento ───────────────────────────────────────────
     cupos_post: Counter[str] = Counter(
@@ -542,8 +533,8 @@ def organizar_partidas(directorio: str | Path = DIRECTORIO) -> None:
 
     ruta_reporte: Path = _escribir_reporte(
         lineas_copypaste=_formatear_copypaste(resultado),
-        lineas_detalle=_formatear_resultado(resultado, sep),
-        lineas_proyeccion=_construir_proyeccion(resultado, jugadores, sep),
+        lineas_detalle=_formatear_resultado(resultado),
+        lineas_proyeccion=_construir_proyeccion(resultado, jugadores),
         lineas_registro=lineas_registro,
         directorio=directorio,
     )
@@ -560,8 +551,6 @@ def organizar_partidas(directorio: str | Path = DIRECTORIO) -> None:
         print(f"   Promovidos:  {', '.join(promovidos)}")
     if con_prioridad:
         print(f"   Prioridad:   {', '.join(con_prioridad)}")
-
-    input("\nPresiona Enter para cerrar...")
 
 
 if __name__ == "__main__":

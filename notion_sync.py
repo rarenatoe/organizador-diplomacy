@@ -2,8 +2,8 @@
 notion_sync.py  –  Sincroniza la base de datos de jugadores desde Notion.
 
 Uso:
-    uv run python notion_sync.py              # descarga y fusiona con jugadores.csv
-    uv run python notion_sync.py --dry-run    # muestra lo que se escribiría sin tocar el CSV
+    uv run python notion_sync.py              # descarga y crea jugadores_NNNN.csv
+    uv run python notion_sync.py --dry-run    # muestra lo que se escribiría sin tocar ningún archivo
 
 Qué viene de Notion:
     Nombre          → propiedad 'Nombre' (title) de la DB Jugadores
@@ -236,7 +236,7 @@ def _escribir_csv(filas: list[dict[str, str]]) -> Path:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Descarga jugadores desde Notion y fusiona con jugadores.csv"
+        description="Descarga jugadores desde Notion y crea el siguiente jugadores_NNNN.csv"
     )
     parser.add_argument(
         "--dry-run",
