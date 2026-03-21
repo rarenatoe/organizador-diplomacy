@@ -243,6 +243,11 @@ def main() -> None:
         action="store_true",
         help="Muestra el resultado sin escribir el CSV",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Sobreescribe aunque data/.pending exista (el CSV anterior aún no fue usado)",
+    )
     args = parser.parse_args()
 
     load_dotenv()
@@ -259,6 +264,13 @@ def main() -> None:
         sys.exit(1)
     if not part_db_id or "XXX" in part_db_id:
         print("❌  NOTION_PARTICIPACIONES_DB_ID no configurado. Copia .env.example → .env y rellénalo.")
+        sys.exit(1)
+
+    # ── Guard: evitar CSVs duplicados sin partida intermedia ────────────────────
+    pending_flag = DIRECTORIO / ".pending"
+    if pending_flag.exists() and not args.dry_run and not args.force:
+        print("⚠️  El último CSV ya fue generado por notion_sync y aún no se ha jugado una partida.")
+        print("   Usa --force para sobreescribir de todas formas.")
         sys.exit(1)
 
     año_actual = datetime.now().year
@@ -290,6 +302,8 @@ def main() -> None:
     else:
         ruta = _escribir_csv(filas)
         print(f"✓  {ruta.name} creado con {len(filas)} jugador(es).")
+        (DIRECTORIO / ".pending").touch()
+        print("   (data/.pending creado — se eliminará automáticamente al organizar la próxima partida)")
 
 
 if __name__ == "__main__":

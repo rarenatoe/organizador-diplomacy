@@ -552,6 +552,8 @@ def organizar_partidas(directorio: str | Path = DIRECTORIO) -> None:
     if con_prioridad:
         print(f"   Prioridad:   {', '.join(con_prioridad)}")
 
+    (directorio / ".pending").unlink(missing_ok=True)
+
 
 if __name__ == "__main__":
     organizar_partidas()

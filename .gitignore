@@ -4,6 +4,7 @@
 # ── Archivos generados por el organizador ─────────────────────────────────────
 # Los jugadores_NNNN.csv SE TRACKEAN (historial inmutable de la liga).
 reporte_*.txt
+data/.pending
 
 # ── Python / uv ───────────────────────────────────────────────────────────────
 .venv/
