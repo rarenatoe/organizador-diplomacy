@@ -32,14 +32,15 @@ export function closePanel(): void {
 }
 
 // Dim rows excluded from the next jornada via the player-keep checkbox.
-document
-  .getElementById("panel-body")!
-  .addEventListener("change", (e: Event) => {
+const panelBody = document.getElementById("panel-body");
+if (panelBody) {
+  panelBody.addEventListener("change", (e: Event) => {
     const cb = (e.target as Element).closest<HTMLInputElement>(".player-keep");
     if (!cb) return;
     const tr = cb.closest("tr");
     if (tr) tr.classList.toggle("excluded", !cb.checked);
   });
+}
 
 // ── Snapshot panel ────────────────────────────────────────────────────────────
 
@@ -84,7 +85,7 @@ export async function openSnapshot(id: number): Promise<void> {
       const expBadge = `<span style="font-size:10px;font-weight:700;color:${expColor};background:${expBg};padding:1px 6px;border-radius:4px">${esc(String(r["experiencia"] ?? ""))}</span>`;
       return `<tr data-nombre="${nombre}">
         <td><input type="checkbox" class="player-keep" checked title="Incluir"></td>
-        <td><span class="player-name">${nombre}</span> <button class="btn-ghost btn-rename" data-nombre="${nombre}" title="Renombrar">✏️</button></td>
+        <td><span class="player-name-cell"><span class="player-name">${nombre}</span><button class="btn-ghost btn-rename" data-nombre="${nombre}" title="Renombrar">✏️</button></span></td>
         <td>${expBadge}</td>
         <td>${String(r["juegos_este_ano"] ?? "")}</td>
         <td><input type="checkbox" class="player-prio" ${checked}></td>
@@ -127,7 +128,7 @@ export async function openSnapshot(id: number): Promise<void> {
   });
 }
 
-async function showRenameDialog(
+export async function showRenameDialog(
   oldName: string,
   snapshotId: number,
 ): Promise<void> {
@@ -153,7 +154,7 @@ async function showRenameDialog(
   }
 }
 
-async function showAddPlayerDialog(snapshotId: number): Promise<void> {
+export async function showAddPlayerDialog(snapshotId: number): Promise<void> {
   const nombre = prompt("Nombre del nuevo jugador:");
   if (!nombre) return;
 

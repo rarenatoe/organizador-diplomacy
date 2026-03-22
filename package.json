@@ -7,7 +7,9 @@
     "build": "bun build frontend/src/app.ts --outfile frontend/static/app.js --format iife",
     "typecheck": "tsc --noEmit",
     "lint": "eslint frontend/src/",
-    "lint:fix": "eslint frontend/src/ --fix"
+    "lint:fix": "eslint frontend/src/ --fix",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "repository": {
     "type": "git",
@@ -24,8 +26,13 @@
     "node": ">=24.14.0"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@vitest/coverage-v8": "^4.1.0",
     "eslint": "10.1.0",
+    "jsdom": "^29.0.1",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.57.1"
+    "typescript-eslint": "8.57.1",
+    "vitest": "^4.1.0"
   }
 }
