@@ -4,6 +4,7 @@
 // The selected snapshot is used as the base for both Organizar and Sync Notion.
 
 let _selectedSnapshot: number | null = null;
+let _snapshotCount: number = 0;
 
 export function getSelectedSnapshot(): number | null {
   return _selectedSnapshot;
@@ -17,6 +18,19 @@ export function setSelectedSnapshot(id: number): void {
 export function deselectSnapshot(): void {
   _selectedSnapshot = null;
   updateSelectionUI();
+}
+
+export function setSnapshotCount(count: number): void {
+  _snapshotCount = count;
+  updateSyncButtonState();
+}
+
+function updateSyncButtonState(): void {
+  const btnSync = document.getElementById("btn-sync") as HTMLButtonElement;
+  // Enabled if: no snapshots exist (initial sync) OR a snapshot is selected
+  // Disabled if: at least one snapshot exists but none are selected
+  const shouldEnable = _snapshotCount === 0 || _selectedSnapshot !== null;
+  btnSync.disabled = !shouldEnable;
 }
 
 export function updateSelectionUI(): void {
@@ -33,4 +47,5 @@ export function updateSelectionUI(): void {
     label.textContent = "Organizar";
     deselBtn.style.display = "none";
   }
+  updateSyncButtonState();
 }

@@ -4,7 +4,7 @@ applyTo: "frontend/src/**"
 
 ## TypeScript conventions
 - All domain interfaces live in `src/types.ts` — export everything from there.
-- Module responsibilities: `chain.ts` → renderers; `selection.ts` → state; `clipboard.ts` → copy store; `panels.ts` → panel content; `app.ts` → entry point wiring.
+- Module responsibilities: `chain.ts` → renderers; `selection.ts` → state (snapshot selection + Sync Notion button state); `clipboard.ts` → copy store; `panels.ts` → panel content; `app.ts` → entry point wiring.
 - Import graph (no cycles): `app.ts` → `chain`, `selection`, `panels`. `panels.ts` → `chain`, `clipboard`, `selection`. `chain.ts` → `selection`. `clipboard.ts` → none.
 - Run `bun run build` to bundle into `static/app.js` (IIFE, no `type="module"` needed). `bun run typecheck` for type-only check. `bun run lint` — ESLint strict.
 - All DOM interactions use `!` non-null assertion (acceptable — developer controls the HTML).

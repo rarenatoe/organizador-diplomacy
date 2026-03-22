@@ -1,5 +1,5 @@
 import type { ChainData, SnapshotNode, GameEdge, SyncEdge } from "./types";
-import { updateSelectionUI } from "./selection";
+import { updateSelectionUI, setSnapshotCount } from "./selection";
 
 // ── HTML escape ───────────────────────────────────────────────────────────────
 
@@ -22,6 +22,7 @@ export async function loadChain(): Promise<void> {
 function renderChain(data: ChainData): void {
   const el = document.getElementById("chain")!;
   const roots = data.roots ?? [];
+  setSnapshotCount(roots.length);
   if (!roots.length) {
     el.innerHTML =
       '<div class="empty-state"><div class="icon">📂</div><p>No hay snapshots en la DB.</p><p>Ejecuta <em>Sync Notion</em> para comenzar.</p></div>';
