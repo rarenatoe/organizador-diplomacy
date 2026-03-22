@@ -84,7 +84,7 @@ export async function openSnapshot(id: number): Promise<void> {
       const expBadge = `<span style="font-size:10px;font-weight:700;color:${expColor};background:${expBg};padding:1px 6px;border-radius:4px">${esc(String(r["experiencia"] ?? ""))}</span>`;
       return `<tr data-nombre="${nombre}">
         <td><input type="checkbox" class="player-keep" checked title="Incluir"></td>
-        <td>${nombre}</td>
+        <td><span class="player-name">${nombre}</span> <button class="btn-ghost btn-rename" data-nombre="${nombre}" title="Renombrar">✏️</button></td>
         <td>${expBadge}</td>
         <td>${String(r["juegos_este_ano"] ?? "")}</td>
         <td><input type="checkbox" class="player-prio" ${checked}></td>
@@ -106,12 +106,87 @@ export async function openSnapshot(id: number): Promise<void> {
       </table></div>
     </div>
     <div class="section">
+      <button class="btn btn-secondary" id="btn-add-player" style="width:100%;margin-bottom:8px">➕ Agregar jugador</button>
       <button class="btn btn-primary" id="btn-apply-edit" style="width:100%">✨ Crear snapshot manual con estos ajustes</button>
     </div>`;
 
   document.getElementById("btn-apply-edit")!.addEventListener("click", () => {
     void applySnapshotEdit(id);
   });
+
+  document.getElementById("btn-add-player")!.addEventListener("click", () => {
+    void showAddPlayerDialog(id);
+  });
+
+  // Event listeners for rename buttons
+  document.querySelectorAll(".btn-rename").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const nombre = (e.target as HTMLElement).dataset["nombre"];
+      if (nombre) void showRenameDialog(nombre, id);
+    });
+  });
+}
+
+async function showRenameDialog(
+  oldName: string,
+  snapshotId: number,
+): Promise<void> {
+  const newName = prompt(`Renombrar jugador "${oldName}" a:`, oldName);
+  if (!newName || newName === oldName) return;
+
+  try {
+    const res = await fetch("/api/player/rename", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ old_name: oldName, new_name: newName }),
+    });
+    const data = (await res.json()) as { error?: string };
+    if (!res.ok) {
+      alert(`Error: ${data.error ?? res.status}`);
+      return;
+    }
+    // Reload the snapshot panel to show the updated name
+    await openSnapshot(snapshotId);
+    await loadChain();
+  } catch (e) {
+    alert(`Error de conexión: ${String(e)}`);
+  }
+}
+
+async function showAddPlayerDialog(snapshotId: number): Promise<void> {
+  const nombre = prompt("Nombre del nuevo jugador:");
+  if (!nombre) return;
+
+  const experiencia = prompt("Experiencia (Nuevo/Antiguo):", "Nuevo");
+  if (!experiencia) return;
+
+  const juegosStr = prompt("Juegos este año:", "0");
+  const juegos = parseInt(juegosStr ?? "0", 10);
+
+  try {
+    const res = await fetch(`/api/snapshot/${snapshotId}/add-player`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nombre,
+        experiencia,
+        juegos_este_ano: juegos,
+        prioridad: 0,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
+      }),
+    });
+    const data = (await res.json()) as { error?: string };
+    if (!res.ok) {
+      alert(`Error: ${data.error ?? res.status}`);
+      return;
+    }
+    // Reload the snapshot panel to show the new player
+    await openSnapshot(snapshotId);
+    await loadChain();
+  } catch (e) {
+    alert(`Error de conexión: ${String(e)}`);
+  }
 }
 
 async function applySnapshotEdit(sourceId: number): Promise<void> {

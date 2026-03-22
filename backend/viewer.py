@@ -236,6 +236,78 @@ def api_sync_confirm():
     })
 
 
+@app.route("/api/player/rename", methods=["POST"])
+def api_player_rename():
+    """
+    Rename a player in the players table.
+    Body: {"old_name": "Turk", "new_name": "Kurt"}
+    Returns: {"success": true} or {"error": "..."}
+    """
+    conn = db.get_db()
+    try:
+        body = request.get_json(silent=True) or {}
+        old_name = body.get("old_name")
+        new_name = body.get("new_name")
+        
+        if not old_name or not new_name:
+            return jsonify({"error": "old_name and new_name are required"}), 400
+        
+        if old_name == new_name:
+            return jsonify({"error": "old_name and new_name are the same"}), 400
+        
+        success = db.rename_player(conn, old_name, new_name)
+        if not success:
+            return jsonify({"error": "Player not found or new name already exists"}), 404
+        
+        conn.commit()
+        return jsonify({"success": True})
+    except Exception as exc:
+        conn.rollback()
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/snapshot/<int:snapshot_id>/add-player", methods=["POST"])
+def api_add_player(snapshot_id: int):
+    """
+    Add a player to a snapshot.
+    Body: {"nombre": "Player Name", "experiencia": "Nuevo", "juegos_este_ano": 0,
+           "prioridad": 0, "partidas_deseadas": 1, "partidas_gm": 0}
+    Returns: {"player_id": <int>} or {"error": "..."}
+    """
+    conn = db.get_db()
+    try:
+        if not conn.execute(
+            "SELECT 1 FROM snapshots WHERE id = ?", (snapshot_id,)
+        ).fetchone():
+            return jsonify({"error": "snapshot not found"}), 404
+        
+        body = request.get_json(silent=True) or {}
+        nombre = body.get("nombre")
+        if not nombre:
+            return jsonify({"error": "nombre is required"}), 400
+        
+        experiencia = body.get("experiencia", "Nuevo")
+        juegos_este_ano = int(body.get("juegos_este_ano", 0))
+        prioridad = int(body.get("prioridad", 0))
+        partidas_deseadas = int(body.get("partidas_deseadas", 1))
+        partidas_gm = int(body.get("partidas_gm", 0))
+        
+        player_id = db.add_player_to_snapshot(
+            conn, snapshot_id, nombre,
+            experiencia, juegos_este_ano,
+            prioridad, partidas_deseadas, partidas_gm
+        )
+        conn.commit()
+        return jsonify({"player_id": player_id})
+    except Exception as exc:
+        conn.rollback()
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        conn.close()
+
+
 # ── Entry point ────────────────────────────────────────────────────────────────
 
 def main() -> None:

@@ -143,6 +143,57 @@ def get_or_create_player(conn: sqlite3.Connection, nombre: str) -> int:
     return cur.lastrowid  # type: ignore[return-value]
 
 
+def rename_player(conn: sqlite3.Connection, old_name: str, new_name: str) -> bool:
+    """
+    Renames a player in the players table.
+    Returns True if successful, False if old_name doesn't exist or new_name already exists.
+    Does NOT commit.
+    """
+    # Check if old name exists
+    old_row = conn.execute(
+        "SELECT id FROM players WHERE nombre = ?", (old_name,)
+    ).fetchone()
+    if not old_row:
+        return False
+    
+    # Check if new name already exists
+    new_row = conn.execute(
+        "SELECT id FROM players WHERE nombre = ?", (new_name,)
+    ).fetchone()
+    if new_row:
+        return False
+    
+    # Rename the player
+    conn.execute(
+        "UPDATE players SET nombre = ? WHERE nombre = ?",
+        (new_name, old_name)
+    )
+    return True
+
+
+def add_player_to_snapshot(
+    conn: sqlite3.Connection,
+    snapshot_id: int,
+    nombre: str,
+    experiencia: str = "Nuevo",
+    juegos_este_ano: int = 0,
+    prioridad: int = 0,
+    partidas_deseadas: int = 1,
+    partidas_gm: int = 0,
+) -> int:
+    """
+    Adds a player to a snapshot. Creates the player if they don't exist.
+    Returns the player id. Does NOT commit.
+    """
+    player_id = get_or_create_player(conn, nombre)
+    add_snapshot_player(
+        conn, snapshot_id, player_id,
+        experiencia, juegos_este_ano,
+        prioridad, partidas_deseadas, partidas_gm
+    )
+    return player_id
+
+
 def get_snapshot_players(
     conn: sqlite3.Connection, snapshot_id: int
 ) -> list[dict]:
