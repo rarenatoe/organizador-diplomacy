@@ -1,4 +1,4 @@
-import type { RunResult, SyncDetectResult, MergePair } from "./types";
+import type { RunResult, SyncDetectResult, MergePair, ChainData, SnapshotNode } from "./types";
 import { loadChain } from "./chain";
 import {
   getSelectedSnapshot,
@@ -55,6 +55,29 @@ function setActive(idStr: string): void {
   if (el) el.classList.add("active");
 }
 
+// ── Find latest game ──────────────────────────────────────────────────────────
+
+function findLatestGameId(roots: SnapshotNode[]): number | null {
+  let latestId: number | null = null;
+  let latestTime = 0;
+
+  function visit(node: SnapshotNode): void {
+    for (const branch of node.branches ?? []) {
+      if (branch.edge.type === "game") {
+        const time = new Date(branch.edge.created_at).getTime();
+        if (time > latestTime) {
+          latestTime = time;
+          latestId = branch.edge.id;
+        }
+      }
+      if (branch.output) visit(branch.output);
+    }
+  }
+
+  for (const root of roots) visit(root);
+  return latestId;
+}
+
 // ── Run scripts ───────────────────────────────────────────────────────────────
 
 const SCRIPT_LABELS: Record<string, string> = {
@@ -94,14 +117,36 @@ async function runScript(
     const res = await fetch(`/api/run/${script}`, fetchInit);
     const data = (await res.json()) as RunResult;
     const ok = data.returncode === 0;
-    iconEl.textContent = ok ? "✅" : "❌";
-    titleEl.textContent = ok
-      ? `${SCRIPT_LABELS[script] ?? script} completado`
-      : `Error en ${SCRIPT_LABELS[script] ?? script}`;
-    out.textContent =
-      (data.stdout ?? "") + (data.stderr ? "\n[stderr]\n" + data.stderr : "");
-    if (!ok) out.classList.add("err");
-    if (ok) await loadChain();
+
+    if (ok && script === "organizar") {
+      // For organizar success: close modal, show toast, open game panel
+      modal.classList.remove("open");
+      showSuccessToast("Organizar completado");
+      await loadChain();
+
+      // Find and open the latest game
+      const chainRes = await fetch("/api/chain");
+      const chainData = (await chainRes.json()) as ChainData;
+      const gameId = findLatestGameId(chainData.roots ?? []);
+      if (gameId !== null) {
+        setActive(String(gameId));
+        void openGame(gameId);
+      }
+    } else if (ok) {
+      // For other scripts success: show modal briefly then close
+      iconEl.textContent = "✅";
+      titleEl.textContent = `${SCRIPT_LABELS[script] ?? script} completado`;
+      out.textContent =
+        (data.stdout ?? "") + (data.stderr ? "\n[stderr]\n" + data.stderr : "");
+      await loadChain();
+    } else {
+      // For errors: show modal with error details
+      iconEl.textContent = "❌";
+      titleEl.textContent = `Error en ${SCRIPT_LABELS[script] ?? script}`;
+      out.textContent =
+        (data.stdout ?? "") + (data.stderr ? "\n[stderr]\n" + data.stderr : "");
+      out.classList.add("err");
+    }
   } catch (e) {
     iconEl.textContent = "❌";
     titleEl.textContent = "Error de conexión";
