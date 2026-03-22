@@ -96,17 +96,24 @@ header h1 {
 
 /* ── Player name cell with rename button ── */
 .player-name-cell {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 8px;
+  width: 100%;
+}
+.player-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .btn-rename {
   flex-shrink: 0;
   font-size: 12px;
-  padding: 2px 4px;
+  padding: 2px 6px;
   opacity: 0.7;
   transition: opacity .15s;
+  margin-left: auto;
 }
 .btn-rename:hover {
   opacity: 1;

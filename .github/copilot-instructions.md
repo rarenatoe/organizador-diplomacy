@@ -2,7 +2,7 @@
 
 ## Stack
 Python 3.13 · uv · Flask 3 · pytest · notion-client · python-dotenv · SQLite (stdlib)
-TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecked`)
+TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecked`) · Vitest 4 · @testing-library/dom
 
 > Scoped instructions: `python.instructions.md` (applyTo `backend/**/*.py`) and
 > `typescript.instructions.md` (applyTo `frontend/src/**`) contain language-specific detail.
@@ -78,12 +78,27 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 3. Python: add a new flat-layout file at root. TypeScript: add a new `src/*.ts` module (update file map and import graph in `typescript.instructions.md`).
 4. Run all tests + build + lint before committing the split.
 
+## Frontend testing conventions
+- Use Vitest with `@testing-library/dom` for DOM testing
+- Mock external dependencies with `vi.mock()` at the top of test files
+- Export functions that need testing (e.g., `showRenameDialog`, `showAddPlayerDialog`)
+- Wrap module-level DOM access in conditional checks for test environment compatibility
+- Test files: `frontend/src/*.test.ts`
+
+## CSS conventions
+- Use flexbox for layout (e.g., `.player-name-cell` with `display: flex`)
+- Use `flex: 1` for expandable content, `flex-shrink: 0` for fixed elements
+- Use `overflow: hidden; text-overflow: ellipsis; white-space: nowrap;` for text truncation
+- Use `margin-left: auto` to push elements to the right in flex containers
+- Never inline CSS in HTML — always use `static/style.css`
+
 ## Ripple-effect checklist
 **Player field change** → `organizador.py` · `models.py` · `formatter.py` · `notion_sync.py` · `db.py` (schema + helpers) · `db_game.py` (game helpers) · `viewer.py` (API) · `test_organizador.py` (`_j()` + `_pool()`) · `test_algoritmo.py` (`_j()` + `_pool()`) · `test_db.py` (`TestDb`) · `test_viewer.py` (`_add_snapshot()` helper)
 **New Flask route** → `TestApi*` class in `test_viewer.py` with 200 + 400 + 404 coverage.
 **Chain algorithm change** → update `db_views.py` · `TestApiChain` in `test_viewer.py` (use `roots` tree, not `nodes` flat list) · `TestDb` in `test_db.py` · "Chain lineage" section in `python.instructions.md`.
 **DB schema change** → update `_SCHEMA` in `db.py` · all affected helpers · `test_db.py` `TestDb` · `test_viewer.py` fixtures · `python.instructions.md`.
 **UI logic change** → edit relevant `src/*.ts` module + `bun run build`. **New domain type** → add to `src/types.ts`. **Style change** → edit `static/style.css`. Never re-inline into `index.html`.
+**Frontend test** → add to `frontend/src/*.test.ts` · mock dependencies with `vi.mock()` · export tested functions.
 
 Tests live at root alongside source — flat layout is intentional for this project size.
 
