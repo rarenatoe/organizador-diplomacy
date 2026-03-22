@@ -8,6 +8,11 @@ reporte_*.txt
 # Excluded because it changes on every sync/organizar run.
 data/metadata.json
 
+# ── SQLite database (runtime state) ──────────────────────────────────────────
+data/diplomacy.db
+data/diplomacy.db-shm
+data/diplomacy.db-wal
+
 # ── Python / uv ───────────────────────────────────────────────────────────────
 .venv/
 __pycache__/
@@ -24,6 +29,6 @@ wheels/
 # ── Node / TypeScript build (bun) ────────────────────────────────────────────
 node_modules/
 # bun.lockb is committed (reproducible installs).
-# static/app.js is a build artifact — regenerate with: bun run build
-static/app.js
+# frontend/static/app.js is a build artifact — regenerate with: bun run build
+frontend/static/app.js
 

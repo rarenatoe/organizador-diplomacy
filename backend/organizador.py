@@ -3,14 +3,14 @@ import random
 from collections import Counter
 from pathlib import Path
 
-import db
-from formatter import (
+from . import db, db_game
+from .formatter import (
     _construir_proyeccion,
     _formatear_copypaste,
     _formatear_resultado,
 )
-from models import Jugador, Mesa, ResultadoPartidas
-from utils import DIRECTORIO
+from .models import Jugador, Mesa, ResultadoPartidas
+from .utils import DIRECTORIO
 
 SEP: str = "─" * 44
 
@@ -272,8 +272,8 @@ def organizar_partidas(
     # ── Persist everything in a single transaction ──────────────────────────
     copypaste = _formatear_copypaste(resultado)
     try:
-        out_id = db.create_output_snapshot(conn, snapshot_id, resultado)
-        ge_id  = db.create_game_event(
+        out_id = db_game.create_output_snapshot(conn, snapshot_id, resultado)
+        ge_id  = db_game.create_game_event(
             conn, snapshot_id, out_id,
             resultado.intentos_usados, copypaste,
         )
@@ -281,17 +281,17 @@ def organizar_partidas(
             gm_pid: int | None = None
             if mesa.gm:
                 gm_pid = db.get_or_create_player(conn, mesa.gm.nombre)
-            mesa_id = db.create_mesa(conn, ge_id, mesa.numero, gm_pid)
+            mesa_id = db_game.create_mesa(conn, ge_id, mesa.numero, gm_pid)
             for orden, jugador in enumerate(mesa.jugadores, start=1):
                 pid = db.get_or_create_player(conn, jugador.nombre)
-                db.add_mesa_player(conn, mesa_id, pid, orden)
+                db_game.add_mesa_player(conn, mesa_id, pid, orden)
 
         conteo_espera: Counter[str] = Counter(
             j.nombre for j in resultado.tickets_sobrantes
         )
         for orden, (nombre, cupos) in enumerate(conteo_espera.items(), start=1):
             pid = db.get_or_create_player(conn, nombre)
-            db.add_waiting_player(conn, ge_id, pid, orden, cupos)
+            db_game.add_waiting_player(conn, ge_id, pid, orden, cupos)
 
         conn.commit()
     except Exception:

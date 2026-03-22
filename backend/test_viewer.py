@@ -12,9 +12,8 @@ import json
 
 import pytest
 
-import db
-import viewer
-from viewer import app
+from . import db, db_game, viewer
+from .viewer import app
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -45,8 +44,23 @@ def mem_db():
 
 @pytest.fixture
 def client(mem_db, monkeypatch):
-    """Flask test client with db.get_db() patched to return the in-memory DB."""
-    monkeypatch.setattr(db, "get_db", lambda path=None: mem_db)
+    """Flask test client with db.get_db() patched to return the in-memory DB.
+
+    A thin proxy that swallows close() lets routes follow their normal
+    try/finally cleanup without destroying the shared in-memory connection.
+    """
+    class _NoClose:
+        """Proxy for sqlite3.Connection that ignores close() calls."""
+        def __init__(self, conn: "db.sqlite3.Connection") -> None:
+            object.__setattr__(self, "_c", conn)
+        def __getattr__(self, name: str):  # type: ignore[override]
+            return getattr(object.__getattribute__(self, "_c"), name)
+        def __setattr__(self, name: str, value: object) -> None:
+            setattr(object.__getattribute__(self, "_c"), name, value)
+        def close(self) -> None:
+            pass  # keep the connection alive for the full test
+
+    monkeypatch.setattr(db, "get_db", lambda path=None: _NoClose(mem_db))
     app.config["TESTING"] = True
     with app.test_client() as c:
         yield c, mem_db
@@ -113,8 +127,8 @@ class TestApiChain:
         snap2 = _add_snapshot(conn, source="organizar", players=14)
         snap3 = _add_snapshot(conn, source="organizar", players=14)
 
-        db.create_game_event(conn, snap1, snap2, 1, "copypaste1")
-        db.create_game_event(conn, snap1, snap3, 1, "copypaste2")
+        db_game.create_game_event(conn, snap1, snap2, 1, "copypaste1")
+        db_game.create_game_event(conn, snap1, snap3, 1, "copypaste2")
         conn.commit()
 
         resp = c.get("/api/chain")
@@ -153,7 +167,7 @@ class TestApiGame:
         c, conn = client
         snap_in = _add_snapshot(conn, players=7)
         snap_out = _add_snapshot(conn, source="organizar", players=7)
-        ge_id = db.create_game_event(conn, snap_in, snap_out, 1, "copypaste text")
+        ge_id = db_game.create_game_event(conn, snap_in, snap_out, 1, "copypaste text")
         conn.commit()
         resp = c.get(f"/api/game/{ge_id}")
         assert resp.status_code == 200
@@ -245,6 +259,58 @@ class TestApiRun:
         assert resp.status_code == 200
         assert "--snapshot" in calls[0]
         assert "3" in calls[0]
+        assert "backend.notion_sync" in calls[0]
+
+    def test_run_organizar_invokes_correct_module(self, client, monkeypatch):
+        """Organizar script maps to backend.organizador module (not a bare .py file)."""
+        import subprocess
+        calls: list[list[str]] = []
+        c, conn = client
+        monkeypatch.setattr(
+            subprocess, "run",
+            lambda *a, **kw: calls.append(a[0]) or type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
+        )
+        resp = c.post("/api/run/organizar", content_type="application/json")
+        assert resp.status_code == 200
+        assert "backend.organizador" in calls[0]
+
+    def test_run_uses_module_flag(self, client, monkeypatch):
+        """Both scripts are invoked with 'python -m <module>' to avoid relative-import errors."""
+        import subprocess
+        calls: list[list[str]] = []
+        c, conn = client
+        monkeypatch.setattr(
+            subprocess, "run",
+            lambda *a, **kw: calls.append(a[0]) or type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
+        )
+        for script in ("notion_sync", "organizar"):
+            calls.clear()
+            c.post(f"/api/run/{script}", content_type="application/json")
+            assert "-m" in calls[0], f"{script}: expected '-m' flag in command"
+            # Must NOT be a bare .py filename (that would trigger the relative-import error)
+            assert not any(arg.endswith(".py") for arg in calls[0]), (
+                f"{script}: command must not reference a .py file directly"
+            )
+
+    def test_run_cwd_is_project_root(self, client, monkeypatch):
+        """subprocess.run must be called with cwd set to the project root (not backend/)."""
+        import subprocess
+        from pathlib import Path
+        captured_kwargs: list[dict] = []
+        c, conn = client
+        monkeypatch.setattr(
+            subprocess, "run",
+            lambda *a, **kw: captured_kwargs.append(kw) or type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
+        )
+        c.post("/api/run/notion_sync", content_type="application/json")
+        assert captured_kwargs, "subprocess.run was not called"
+        cwd = Path(captured_kwargs[0]["cwd"])
+        # The cwd must be the project root, which contains pyproject.toml
+        assert (cwd / "pyproject.toml").exists(), (
+            f"cwd '{cwd}' is not the project root (pyproject.toml not found there)"
+        )
+        # Must NOT be the backend/ subdirectory
+        assert cwd.name != "backend", "cwd must be project root, not backend/"
 
     def test_run_notion_sync_invalid_snapshot_type_returns_400(self, client):
         """notion_sync with a non-integer snapshot value returns 400."""
@@ -266,3 +332,105 @@ class TestApiRun:
         )
         resp = c.post("/api/run/notion_sync", content_type="application/json")
         assert resp.status_code == 200
+
+
+# ── DELETE /api/snapshot/<id> ───────────────────────────────────────────────────
+
+class TestApiDeleteSnapshot:
+    def test_delete_existing_snapshot_returns_200(self, client):
+        c, conn = client
+        snap_id = _add_snapshot(conn)
+        conn.commit()
+        resp = c.delete(f"/api/snapshot/{snap_id}")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert snap_id in data["deleted"]
+
+    def test_delete_nonexistent_snapshot_returns_404(self, client):
+        c, conn = client
+        resp = c.delete("/api/snapshot/9999")
+        assert resp.status_code == 404
+
+    def test_delete_removes_snapshot_from_chain(self, client):
+        """After deletion the snapshot no longer appears in /api/chain."""
+        c, conn = client
+        snap_id = _add_snapshot(conn)
+        conn.commit()
+        c.delete(f"/api/snapshot/{snap_id}")
+        chain = c.get("/api/chain").get_json()
+        ids = [n["id"] for n in chain["roots"]]
+        assert snap_id not in ids
+
+    def test_delete_cascades_sync_event_via_api(self, client):
+        """Deleting the output snapshot of a sync event returns both IDs deleted."""
+        c, conn = client
+        snap1 = _add_snapshot(conn)
+        snap2 = _add_snapshot(conn)
+        db.create_sync_event(conn, snap1, snap2)
+        conn.commit()
+        resp = c.delete(f"/api/snapshot/{snap2}")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert snap2 in data["deleted"]
+        # snap1 must NOT be in deleted list
+        assert snap1 not in data["deleted"]
+
+
+class TestApiEditSnapshot:
+    def test_edit_creates_new_manual_snapshot(self, client):
+        """POST /api/snapshot/<id>/edit returns 200 with new snapshot_id."""
+        c, conn = client
+        snap_id = _add_snapshot(conn, players=3)
+        conn.commit()
+        names = [p["nombre"] for p in db.get_snapshot_players(conn, snap_id)]
+        players_list = [
+            {"nombre": n, "prioridad": 0, "partidas_deseadas": 1, "partidas_gm": 0}
+            for n in names
+        ]
+        resp = c.post(
+            f"/api/snapshot/{snap_id}/edit",
+            data=json.dumps({"players": players_list}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "snapshot_id" in data
+        assert data["snapshot_id"] != snap_id
+
+    def test_edit_nonexistent_snapshot_returns_404(self, client):
+        c, conn = client
+        resp = c.post(
+            "/api/snapshot/9999/edit",
+            data=json.dumps({"players": []}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 404
+
+    def test_edit_invalid_players_type_returns_400(self, client):
+        c, conn = client
+        snap_id = _add_snapshot(conn)
+        conn.commit()
+        resp = c.post(
+            f"/api/snapshot/{snap_id}/edit",
+            data=json.dumps({"players": "not_a_list"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+    def test_edit_new_snapshot_has_manual_source(self, client):
+        """The snapshot created by the edit endpoint has source='manual'."""
+        c, conn = client
+        snap_id = _add_snapshot(conn, players=1)
+        conn.commit()
+        names = [p["nombre"] for p in db.get_snapshot_players(conn, snap_id)]
+        resp = c.post(
+            f"/api/snapshot/{snap_id}/edit",
+            data=json.dumps({"players": [
+                {"nombre": names[0], "prioridad": 0, "partidas_deseadas": 1, "partidas_gm": 0}
+            ]}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        new_id = resp.get_json()["snapshot_id"]
+        detail = c.get(f"/api/snapshot/{new_id}").get_json()
+        assert detail["source"] == "manual"

@@ -1,6 +1,6 @@
 """
 db.py – SQLite persistence layer.  Single source of truth for schema,
-connection management, and all query helpers.
+connection management, and snapshot/player/sync helpers.
 
 One file: data/diplomacy.db
 No CSVs, no .txt reports, no metadata.json.
@@ -20,35 +20,26 @@ Public API
   get_latest_snapshot_id(conn)                         → int | None
   snapshots_have_same_roster(conn, snapshot_id, rows)  → bool
 
+  # Manual snapshot (UI edit)
+  create_manual_snapshot(conn, source_snapshot_id, edits) → int
+
   # Sync events
   create_sync_event(conn, source_snapshot_id, output_snapshot_id) → int
 
-  # Game events
-  create_game_event(conn, input_snapshot_id, output_snapshot_id,
-                    intentos, copypaste_text)          → int
-  create_mesa(conn, game_event_id, numero, gm_player_id)         → int
-  add_mesa_player(conn, mesa_id, player_id, orden)               → None
-  add_waiting_player(conn, game_event_id, player_id,
-                     orden, cupos_faltantes)           → None
+  # Game events / mesas / post-game snapshot — see db_game.py
 
-  # Post-game snapshot (updated player state)
-  create_output_snapshot(conn, input_snapshot_id, resultado)     → int
+  # Delete (cascade to events, mesas, waiting_list, snapshot_players)
+  delete_snapshot_cascade(conn, snapshot_id)               → list[int]
 
-  # Viewer helpers (read-only complex queries — see db_views.py)
-  build_chain_data, get_snapshot_detail, get_game_event_detail
+  # Viewer helpers (read-only complex queries) — see db_views.py
 """
 from __future__ import annotations
 
 import sqlite3
-from collections import Counter
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
 
-from utils import DIRECTORIO
-
-if TYPE_CHECKING:
-    from models import ResultadoPartidas
+from .utils import DIRECTORIO
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 
@@ -246,6 +237,51 @@ def snapshots_have_same_roster(
     return True
 
 
+# ── Manual snapshot (UI edit) ──────────────────────────────────────────────────
+
+def create_manual_snapshot(
+    conn: sqlite3.Connection,
+    source_snapshot_id: int,
+    edits: list[dict],
+) -> int:
+    """
+    Creates a new 'manual' snapshot based on source_snapshot_id, applying edits.
+
+    `edits` is a list of dicts, one per player to KEEP, with keys:
+        nombre            str   (must exist in the source snapshot)
+        prioridad         int   (0 or 1)
+        partidas_deseadas int
+        partidas_gm       int
+
+    Players omitted from `edits` are excluded from the new snapshot.
+    Fields not supplied default to the source snapshot value.
+    experiencia and juegos_este_ano are always copied unchanged.
+
+    Returns the new snapshot id. Does NOT commit.
+    """
+    source_players = {
+        p["nombre"]: p for p in get_snapshot_players(conn, source_snapshot_id)
+    }
+    snap_id = create_snapshot(conn, "manual")
+    for e in edits:
+        nombre = e["nombre"]
+        base = source_players.get(nombre)
+        if base is None:
+            continue  # silently skip unknown names
+        pid = conn.execute(
+            "SELECT id FROM players WHERE nombre = ?", (nombre,)
+        ).fetchone()["id"]
+        add_snapshot_player(
+            conn, snap_id, pid,
+            base["experiencia"],
+            base["juegos_este_ano"],
+            int(e.get("prioridad",         base["prioridad"])),
+            int(e.get("partidas_deseadas", base["partidas_deseadas"])),
+            int(e.get("partidas_gm",       base["partidas_gm"])),
+        )
+    return snap_id
+
+
 # ── Sync events ────────────────────────────────────────────────────────────────
 
 def create_sync_event(
@@ -265,114 +301,62 @@ def create_sync_event(
     return cur.lastrowid  # type: ignore[return-value]
 
 
-# ── Game events ────────────────────────────────────────────────────────────────
+# ── Delete ────────────────────────────────────────────────────────────────────────
 
-def create_game_event(
+def delete_snapshot_cascade(
     conn: sqlite3.Connection,
-    input_snapshot_id: int,
-    output_snapshot_id: int,
-    intentos: int,
-    copypaste_text: str,
-) -> int:
-    """Inserts a game_events row. Does NOT commit."""
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cur = conn.execute(
-        """
-        INSERT INTO game_events
-            (created_at, input_snapshot_id, output_snapshot_id,
-             intentos, copypaste_text)
-        VALUES (?, ?, ?, ?, ?)
-        """,
-        (ts, input_snapshot_id, output_snapshot_id, intentos, copypaste_text),
-    )
-    return cur.lastrowid  # type: ignore[return-value]
-
-
-def create_mesa(
-    conn: sqlite3.Connection,
-    game_event_id: int,
-    numero: int,
-    gm_player_id: int | None,
-) -> int:
-    """Inserts a mesas row. Does NOT commit."""
-    cur = conn.execute(
-        "INSERT INTO mesas (game_event_id, numero, gm_player_id) VALUES (?, ?, ?)",
-        (game_event_id, numero, gm_player_id),
-    )
-    return cur.lastrowid  # type: ignore[return-value]
-
-
-def add_mesa_player(
-    conn: sqlite3.Connection,
-    mesa_id: int,
-    player_id: int,
-    orden: int,
-) -> None:
-    """Inserts one mesa_players row. Does NOT commit."""
-    conn.execute(
-        "INSERT INTO mesa_players (mesa_id, player_id, orden) VALUES (?, ?, ?)",
-        (mesa_id, player_id, orden),
-    )
-
-
-def add_waiting_player(
-    conn: sqlite3.Connection,
-    game_event_id: int,
-    player_id: int,
-    orden: int,
-    cupos_faltantes: int,
-) -> None:
-    """Inserts one waiting_list row. Does NOT commit."""
-    conn.execute(
-        """
-        INSERT INTO waiting_list
-            (game_event_id, player_id, orden, cupos_faltantes)
-        VALUES (?, ?, ?, ?)
-        """,
-        (game_event_id, player_id, orden, cupos_faltantes),
-    )
-
-
-# ── Post-game snapshot ─────────────────────────────────────────────────────────
-
-def create_output_snapshot(
-    conn: sqlite3.Connection,
-    input_snapshot_id: int,
-    resultado: ResultadoPartidas,
-) -> int:
+    snapshot_id: int,
+) -> list[int]:
     """
-    Creates the post-game snapshot (source='organizar') by copying all players
-    from the input snapshot and applying game results:
+    Deletes a snapshot and all downstream snapshots/events reachable from it
+    (DFS over game_events.input_snapshot_id and sync_events.source_snapshot).
+    Also deletes the event that produced snapshot_id (if any).
 
-      - juegos_este_ano  += tables played as a player (GMing does not count)
-      - prioridad         = 1 if left on waiting list, 0 otherwise
-      - experiencia       = 'Antiguo' if was Nuevo and played ≥ 1 table
-      - partidas_gm       = 0  (reassigned manually each event)
-      - partidas_deseadas = unchanged
-
+    Returns the sorted list of snapshot IDs that were deleted.
     Does NOT commit.
     """
-    cupos_jugados: Counter[str] = Counter(
-        j.nombre for mesa in resultado.mesas for j in mesa.jugadores
-    )
-    nombres_en_espera: set[str] = {j.nombre for j in resultado.tickets_sobrantes}
+    # ── Collect target + all descendants ──────────────────────────────────────
+    all_ids: set[int] = {snapshot_id}
+    stack = [snapshot_id]
+    while stack:
+        sid = stack.pop()
+        for row in conn.execute(
+            "SELECT output_snapshot_id FROM game_events WHERE input_snapshot_id = ?",
+            (sid,),
+        ).fetchall():
+            out = int(row[0])
+            if out not in all_ids:
+                all_ids.add(out)
+                stack.append(out)
+        for row in conn.execute(
+            "SELECT output_snapshot FROM sync_events WHERE source_snapshot = ?",
+            (sid,),
+        ).fetchall():
+            out = int(row[0])
+            if out not in all_ids:
+                all_ids.add(out)
+                stack.append(out)
 
-    snap_id = create_snapshot(conn, "organizar")
+    # ── Delete events that produced each snapshot (+ their dependent rows) ────
+    for sid in all_ids:
+        for row in conn.execute(
+            "SELECT id FROM game_events WHERE output_snapshot_id = ?", (sid,)
+        ).fetchall():
+            ge_id = int(row[0])
+            conn.execute("DELETE FROM waiting_list  WHERE game_event_id = ?", (ge_id,))
+            conn.execute(
+                "DELETE FROM mesa_players WHERE mesa_id IN "
+                "(SELECT id FROM mesas WHERE game_event_id = ?)",
+                (ge_id,),
+            )
+            conn.execute("DELETE FROM mesas       WHERE game_event_id = ?", (ge_id,))
+            conn.execute("DELETE FROM game_events WHERE id = ?",             (ge_id,))
+        conn.execute("DELETE FROM sync_events WHERE output_snapshot = ?", (sid,))
 
-    for p in get_snapshot_players(conn, input_snapshot_id):
-        nombre = p["nombre"]
-        jugadas = cupos_jugados[nombre]
-        fue_promovido = p["experiencia"] == "Nuevo" and jugadas > 0
-        pid = conn.execute(
-            "SELECT id FROM players WHERE nombre = ?", (nombre,)
-        ).fetchone()["id"]
-        add_snapshot_player(
-            conn, snap_id, pid,
-            "Antiguo" if fue_promovido else p["experiencia"],
-            p["juegos_este_ano"] + jugadas,
-            1 if nombre in nombres_en_espera else 0,
-            p["partidas_deseadas"],
-            0,  # partidas_gm reset
-        )
+    # ── Delete snapshot players and snapshots ────────────────────────────────
+    for sid in all_ids:
+        conn.execute("DELETE FROM snapshot_players WHERE snapshot_id = ?", (sid,))
+    for sid in all_ids:
+        conn.execute("DELETE FROM snapshots WHERE id = ?", (sid,))
 
-    return snap_id
+    return sorted(all_ids)

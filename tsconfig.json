@@ -5,8 +5,8 @@
     "lib": ["ES2022", "DOM"],
     "module": "ES2022",
     "moduleDetection": "auto",
-    "outDir": "static",
-    "rootDir": "src",
+    "outDir": "frontend/static",
+    "rootDir": "frontend/src",
 
     // Strict type checking — all of these are intentional
     "strict": true,
@@ -22,5 +22,5 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   },
-  "include": ["src/**/*"]
+  "include": ["frontend/src/**/*"]
 }

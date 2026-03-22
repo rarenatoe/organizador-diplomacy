@@ -79,3 +79,20 @@ export interface GameDetail {
   input_snapshot_id: number;
   output_snapshot_id: number;
 }
+
+export interface DeleteResult {
+  deleted: number[];
+  error?: string;
+}
+
+export interface EditPlayerRow {
+  nombre: string;
+  prioridad: number;
+  partidas_deseadas: number;
+  partidas_gm: number;
+}
+
+export interface EditSnapshotResponse {
+  snapshot_id?: number;
+  error?: string;
+}

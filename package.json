@@ -4,10 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "bun build src/app.ts --outfile static/app.js --format iife",
+    "build": "bun build frontend/src/app.ts --outfile frontend/static/app.js --format iife",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix"
+    "lint": "eslint frontend/src/",
+    "lint:fix": "eslint frontend/src/ --fix"
   },
   "repository": {
     "type": "git",
@@ -20,9 +20,12 @@
     "url": "https://github.com/rarenatoe/organizador-diplomacy/issues"
   },
   "homepage": "https://github.com/rarenatoe/organizador-diplomacy#readme",
+  "engines": {
+    "node": ">=24.14.0"
+  },
   "devDependencies": {
-    "eslint": "^9.39.4",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.57.1"
+    "eslint": "10.1.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.57.1"
   }
 }

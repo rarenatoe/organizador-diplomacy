@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from db import get_snapshot_players
+from .db import get_snapshot_players
 
 # ── Chain (viewer) ─────────────────────────────────────────────────────────────
 

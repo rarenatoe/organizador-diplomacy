@@ -1,16 +1,17 @@
 """
-Tests de unidad para db.py y db_views.py
+Tests de unidad para db.py, db_game.py y db_views.py
 
 Cubre los helpers de la capa de persistencia SQLite (in-memory):
   get_or_create_player, create_snapshot, add_snapshot_player,
   get_snapshot_players, get_latest_snapshot_id,
   snapshots_have_same_roster, create_sync_event,
+  create_manual_snapshot, delete_snapshot_cascade,
+  create_game_event, create_mesa, add_mesa_player (db_game),
   build_chain_data (db_views)
 """
 import unittest
 
-import db
-import db_views
+from . import db, db_game, db_views
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -178,6 +179,145 @@ class TestDb(unittest.TestCase):
         root = data["roots"][0]
         self.assertFalse(root["is_latest"])
         self.assertTrue(root["branches"][0]["output"]["is_latest"])
+
+    # ── delete_snapshot_cascade ─────────────────────────────────────────────
+
+    def test_delete_standalone_snapshot(self):
+        """Deleting a snapshot with no events removes it and its players."""
+        snap_id = db.create_snapshot(self.conn, "notion_sync")
+        pid = db.get_or_create_player(self.conn, "Alice")
+        db.add_snapshot_player(self.conn, snap_id, pid, "Antiguo", 0, 0, 1, 0)
+        self.conn.commit()
+        deleted = db.delete_snapshot_cascade(self.conn, snap_id)
+        self.conn.commit()
+        self.assertIn(snap_id, deleted)
+        self.assertIsNone(db.get_latest_snapshot_id(self.conn))
+        self.assertEqual(db.get_snapshot_players(self.conn, snap_id), [])
+
+    def test_delete_cascades_producing_sync_event(self):
+        """Deleting the output snapshot of a sync_event also removes the event."""
+        snap1 = db.create_snapshot(self.conn, "notion_sync")
+        snap2 = db.create_snapshot(self.conn, "notion_sync")
+        eid = db.create_sync_event(self.conn, snap1, snap2)
+        self.conn.commit()
+        db.delete_snapshot_cascade(self.conn, snap2)
+        self.conn.commit()
+        self.assertIsNone(self.conn.execute(
+            "SELECT id FROM sync_events WHERE id=?", (eid,)
+        ).fetchone())
+        self.assertIsNone(self.conn.execute(
+            "SELECT id FROM snapshots WHERE id=?", (snap2,)
+        ).fetchone())
+        # Source snapshot must survive
+        self.assertIsNotNone(self.conn.execute(
+            "SELECT id FROM snapshots WHERE id=?", (snap1,)
+        ).fetchone())
+
+    def test_delete_cascades_downstream_chain(self):
+        """Deleting snap2 also removes snap3 that was synced from snap2."""
+        snap1 = db.create_snapshot(self.conn, "notion_sync")
+        snap2 = db.create_snapshot(self.conn, "notion_sync")
+        snap3 = db.create_snapshot(self.conn, "notion_sync")
+        db.create_sync_event(self.conn, snap1, snap2)
+        db.create_sync_event(self.conn, snap2, snap3)
+        self.conn.commit()
+        deleted = db.delete_snapshot_cascade(self.conn, snap2)
+        self.conn.commit()
+        self.assertIn(snap2, deleted)
+        self.assertIn(snap3, deleted)
+        self.assertNotIn(snap1, deleted)
+        self.assertIsNotNone(self.conn.execute(
+            "SELECT id FROM snapshots WHERE id=?", (snap1,)
+        ).fetchone())
+        self.assertIsNone(self.conn.execute(
+            "SELECT id FROM snapshots WHERE id=?", (snap3,)
+        ).fetchone())
+
+    def test_delete_cascades_game_event_and_mesas(self):
+        """Deleting the output snapshot of a game_event also removes its mesas."""
+        snap1 = db.create_snapshot(self.conn, "notion_sync")
+        snap2 = db.create_snapshot(self.conn, "organizar")
+        pid = db.get_or_create_player(self.conn, "Alice")
+        ge_id = db_game.create_game_event(self.conn, snap1, snap2, 1, "copypaste")
+        mesa_id = db_game.create_mesa(self.conn, ge_id, 1, None)
+        db_game.add_mesa_player(self.conn, mesa_id, pid, 1)
+        self.conn.commit()
+        db.delete_snapshot_cascade(self.conn, snap2)
+        self.conn.commit()
+        self.assertIsNone(self.conn.execute(
+            "SELECT id FROM game_events WHERE id=?", (ge_id,)
+        ).fetchone())
+        self.assertIsNone(self.conn.execute(
+            "SELECT id FROM mesas WHERE id=?", (mesa_id,)
+        ).fetchone())
+
+    # ── create_manual_snapshot ───────────────────────────────────────────
+
+    def test_manual_snapshot_keeps_only_listed_players(self):
+        """Players not in edits list are excluded from the new snapshot."""
+        snap = db.create_snapshot(self.conn, "notion_sync")
+        for name in ("Alice", "Bob", "Carol"):
+            pid = db.get_or_create_player(self.conn, name)
+            db.add_snapshot_player(self.conn, snap, pid, "Antiguo", 1, 0, 2, 0)
+        self.conn.commit()
+        edits = [
+            {"nombre": "Alice", "prioridad": 1, "partidas_deseadas": 2, "partidas_gm": 0},
+            {"nombre": "Bob",   "prioridad": 0, "partidas_deseadas": 1, "partidas_gm": 1},
+        ]
+        new_id = db.create_manual_snapshot(self.conn, snap, edits)
+        self.conn.commit()
+        players = {p["nombre"]: p for p in db.get_snapshot_players(self.conn, new_id)}
+        self.assertIn("Alice", players)
+        self.assertIn("Bob", players)
+        self.assertNotIn("Carol", players)
+
+    def test_manual_snapshot_applies_field_edits(self):
+        """prioridad, partidas_deseadas and partidas_gm are updated in the new snapshot."""
+        snap = db.create_snapshot(self.conn, "notion_sync")
+        pid = db.get_or_create_player(self.conn, "Alice")
+        db.add_snapshot_player(self.conn, snap, pid, "Antiguo", 3, 0, 1, 0)
+        self.conn.commit()
+        edits = [{"nombre": "Alice", "prioridad": 1, "partidas_deseadas": 3, "partidas_gm": 1}]
+        new_id = db.create_manual_snapshot(self.conn, snap, edits)
+        self.conn.commit()
+        players = {p["nombre"]: p for p in db.get_snapshot_players(self.conn, new_id)}
+        alice = players["Alice"]
+        self.assertEqual(alice["prioridad"], 1)
+        self.assertEqual(alice["partidas_deseadas"], 3)
+        self.assertEqual(alice["partidas_gm"], 1)
+        # Immutable fields must be preserved from source
+        self.assertEqual(alice["experiencia"], "Antiguo")
+        self.assertEqual(alice["juegos_este_ano"], 3)
+
+    def test_manual_snapshot_source_is_manual(self):
+        """The new snapshot's source must be 'manual'."""
+        snap = db.create_snapshot(self.conn, "notion_sync")
+        pid = db.get_or_create_player(self.conn, "Alice")
+        db.add_snapshot_player(self.conn, snap, pid, "Antiguo", 0, 0, 1, 0)
+        self.conn.commit()
+        edits = [{"nombre": "Alice", "prioridad": 0, "partidas_deseadas": 1, "partidas_gm": 0}]
+        new_id = db.create_manual_snapshot(self.conn, snap, edits)
+        self.conn.commit()
+        row = self.conn.execute(
+            "SELECT source FROM snapshots WHERE id=?", (new_id,)
+        ).fetchone()
+        self.assertEqual(row["source"], "manual")
+
+    def test_manual_snapshot_ignores_unknown_players(self):
+        """Edits for players not in the source are silently skipped."""
+        snap = db.create_snapshot(self.conn, "notion_sync")
+        pid = db.get_or_create_player(self.conn, "Alice")
+        db.add_snapshot_player(self.conn, snap, pid, "Antiguo", 0, 0, 1, 0)
+        self.conn.commit()
+        edits = [
+            {"nombre": "Alice",  "prioridad": 0, "partidas_deseadas": 1, "partidas_gm": 0},
+            {"nombre": "Ghost",  "prioridad": 1, "partidas_deseadas": 2, "partidas_gm": 0},
+        ]
+        new_id = db.create_manual_snapshot(self.conn, snap, edits)
+        self.conn.commit()
+        players = {p["nombre"] for p in db.get_snapshot_players(self.conn, new_id)}
+        self.assertIn("Alice", players)
+        self.assertNotIn("Ghost", players)
 
 
 if __name__ == "__main__":

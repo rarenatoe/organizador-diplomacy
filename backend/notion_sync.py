@@ -41,8 +41,8 @@ from notion_client import Client
 from notion_client.errors import APIResponseError
 import os
 
-import db
-from utils import DIRECTORIO
+from . import db
+from .utils import DIRECTORIO
 
 # ── Player field defaults for first-time Notion players ──────────────────────
 

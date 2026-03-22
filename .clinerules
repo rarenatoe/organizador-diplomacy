@@ -1,0 +1,27 @@
+# Project Conventions
+
+This project uses scoped instruction files. Read the relevant one before working on code in that area.
+
+## Instruction Files
+
+| Scope | File | Applies to |
+|---|---|---|
+| Project-wide | `.github/copilot-instructions.md` | Stack, directory layout, file map, principles, workflow |
+| Python | `.github/python.instructions.md` | `backend/**/*.py` — type hints, DB schema, API routes, testing rules |
+| TypeScript | `.github/typescript.instructions.md` | `frontend/src/**` — module responsibilities, import graph, UI conventions |
+
+## When to read what
+
+- **Starting a new task?** → Read `.github/copilot-instructions.md` first for project context.
+- **Editing Python?** → Read `.github/python.instructions.md` for conventions.
+- **Editing TypeScript?** → Read `.github/typescript.instructions.md` for conventions.
+- **Changing DB schema or API?** → Both `copilot-instructions.md` (ripple-effect checklist) and `python.instructions.md` (schema + helpers).
+
+## Quick reference
+
+- Python 3.13 + uv · Flask 3 · pytest · SQLite
+- TypeScript 5 (strict) + bun · ESLint 9
+- Tests required for every new behavior.
+- 400-line soft limit per file.
+- Run `uv run python -m pytest -q` after Python changes.
+- Run `bun run build && bun run lint` after TypeScript changes.

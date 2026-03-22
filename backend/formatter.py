@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from models import Mesa, ResultadoPartidas
+from .models import Mesa, ResultadoPartidas
 
 SEP: str = "─" * 44
 

@@ -15,5 +15,6 @@ dev = [
 ]
 
 [project.scripts]
-organizar   = "organizador:organizar_partidas"
-notion-sync = "notion_sync:main"
+viewer      = "backend.viewer:main"
+organizar   = "backend.organizador:organizar_partidas"
+notion-sync = "backend.notion_sync:main"
