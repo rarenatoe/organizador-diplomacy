@@ -145,8 +145,10 @@ def get_or_create_player(conn: sqlite3.Connection, nombre: str) -> int:
 
 def rename_player(conn: sqlite3.Connection, old_name: str, new_name: str) -> bool:
     """
-    Renames a player in the players table.
-    Returns True if successful, False if old_name doesn't exist or new_name already exists.
+    Renames a player. If new_name already exists in players table, links snapshot_players
+    to the existing player and deletes the old player if orphaned.
+    Returns True if successful, False if old_name doesn't exist or if new_name is already
+    associated with a player in the same snapshot.
     Does NOT commit.
     """
     # Check if old name exists
@@ -156,19 +158,59 @@ def rename_player(conn: sqlite3.Connection, old_name: str, new_name: str) -> boo
     if not old_row:
         return False
     
+    old_id = int(old_row["id"])
+    
     # Check if new name already exists
     new_row = conn.execute(
         "SELECT id FROM players WHERE nombre = ?", (new_name,)
     ).fetchone()
-    if new_row:
-        return False
     
-    # Rename the player
-    conn.execute(
-        "UPDATE players SET nombre = ? WHERE nombre = ?",
-        (new_name, old_name)
-    )
-    return True
+    if new_row:
+        new_id = int(new_row["id"])
+        
+        # Check if both players are in the same snapshot
+        # Get all snapshots where old player appears
+        old_snapshots = conn.execute(
+            "SELECT DISTINCT snapshot_id FROM snapshot_players WHERE player_id = ?",
+            (old_id,)
+        ).fetchall()
+        
+        for snap_row in old_snapshots:
+            snapshot_id = int(snap_row["snapshot_id"])
+            # Check if new player is also in this snapshot
+            new_in_snapshot = conn.execute(
+                "SELECT 1 FROM snapshot_players WHERE snapshot_id = ? AND player_id = ?",
+                (snapshot_id, new_id)
+            ).fetchone()
+            
+            if new_in_snapshot:
+                # New name is already in the same snapshot - block the rename
+                return False
+        
+        # New name exists but not in the same snapshot - link snapshot_players to existing player
+        conn.execute(
+            "UPDATE snapshot_players SET player_id = ? WHERE player_id = ?",
+            (new_id, old_id)
+        )
+        
+        # Check if old player is now orphaned (no snapshots)
+        orphan_check = conn.execute(
+            "SELECT 1 FROM snapshot_players WHERE player_id = ?",
+            (old_id,)
+        ).fetchone()
+        
+        if not orphan_check:
+            # Old player is orphaned - delete it
+            conn.execute("DELETE FROM players WHERE id = ?", (old_id,))
+        
+        return True
+    else:
+        # New name doesn't exist - simple rename
+        conn.execute(
+            "UPDATE players SET nombre = ? WHERE id = ?",
+            (new_name, old_id)
+        )
+        return True
 
 
 def add_player_to_snapshot(
@@ -192,6 +234,22 @@ def add_player_to_snapshot(
         prioridad, partidas_deseadas, partidas_gm
     )
     return player_id
+
+
+def cleanup_orphaned_players(conn: sqlite3.Connection) -> int:
+    """
+    Deletes players from the players table that are not in any snapshot.
+    Returns the number of players deleted. Does NOT commit.
+    """
+    result = conn.execute(
+        """
+        DELETE FROM players
+        WHERE id NOT IN (
+            SELECT DISTINCT player_id FROM snapshot_players
+        )
+        """
+    )
+    return result.rowcount
 
 
 def get_snapshot_players(

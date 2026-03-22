@@ -257,7 +257,7 @@ def api_player_rename():
         
         success = db.rename_player(conn, old_name, new_name)
         if not success:
-            return jsonify({"error": "Player not found or new name already exists"}), 404
+            return jsonify({"error": "Jugador no encontrado o el nuevo nombre ya existe"}), 404
         
         conn.commit()
         return jsonify({"success": True})

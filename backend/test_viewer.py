@@ -604,13 +604,16 @@ class TestApiPlayerRename:
         )
         assert resp.status_code == 404
 
-    def test_rename_player_new_name_exists_returns_404(self, client):
+    def test_rename_player_new_name_in_same_snapshot_returns_404(self, client):
         c, conn = client
-        # Create two players
-        db.get_or_create_player(conn, "Player1")
-        db.get_or_create_player(conn, "Player2")
+        # Create two players in the same snapshot
+        snap_id = db.create_snapshot(conn, "notion_sync")
+        pid1 = db.get_or_create_player(conn, "Player1")
+        pid2 = db.get_or_create_player(conn, "Player2")
+        db.add_snapshot_player(conn, snap_id, pid1, "Antiguo", 0, 0, 1, 0)
+        db.add_snapshot_player(conn, snap_id, pid2, "Antiguo", 0, 0, 1, 0)
         conn.commit()
-        
+
         resp = c.post(
             "/api/player/rename",
             data=json.dumps({"old_name": "Player1", "new_name": "Player2"}),

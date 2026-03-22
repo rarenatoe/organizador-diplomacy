@@ -319,6 +319,87 @@ class TestDb(unittest.TestCase):
         self.assertIn("Alice", players)
         self.assertNotIn("Ghost", players)
 
+    # ── rename_player ─────────────────────────────────────────────────────
+
+    def test_rename_player_simple(self):
+        """Renaming a player when new_name doesn't exist works."""
+        pid = db.get_or_create_player(self.conn, "Alice")
+        self.conn.commit()
+        result = db.rename_player(self.conn, "Alice", "Alicia")
+        self.conn.commit()
+        self.assertTrue(result)
+        # Verify name was changed
+        row = self.conn.execute("SELECT nombre FROM players WHERE id=?", (pid,)).fetchone()
+        self.assertEqual(row["nombre"], "Alicia")
+
+    def test_rename_player_old_name_not_exists(self):
+        """Renaming a player that doesn't exist returns False."""
+        result = db.rename_player(self.conn, "NonExistent", "NewName")
+        self.assertFalse(result)
+
+    def test_rename_player_new_name_in_same_snapshot_fails(self):
+        """Renaming fails if new_name is already in the same snapshot."""
+        snap = db.create_snapshot(self.conn, "notion_sync")
+        pid1 = db.get_or_create_player(self.conn, "Alice")
+        pid2 = db.get_or_create_player(self.conn, "Bob")
+        db.add_snapshot_player(self.conn, snap, pid1, "Antiguo", 0, 0, 1, 0)
+        db.add_snapshot_player(self.conn, snap, pid2, "Antiguo", 0, 0, 1, 0)
+        self.conn.commit()
+        # Try to rename Alice to Bob (which is already in the same snapshot)
+        result = db.rename_player(self.conn, "Alice", "Bob")
+        self.conn.commit()
+        self.assertFalse(result)
+        # Verify Alice's name didn't change
+        row = self.conn.execute("SELECT nombre FROM players WHERE id=?", (pid1,)).fetchone()
+        self.assertEqual(row["nombre"], "Alice")
+
+    def test_rename_player_new_name_in_different_snapshot_succeeds(self):
+        """Renaming succeeds if new_name exists but not in the same snapshot."""
+        snap1 = db.create_snapshot(self.conn, "notion_sync")
+        snap2 = db.create_snapshot(self.conn, "notion_sync")
+        pid1 = db.get_or_create_player(self.conn, "Alice")
+        pid2 = db.get_or_create_player(self.conn, "Bob")
+        # Alice in snap1, Bob in snap2
+        db.add_snapshot_player(self.conn, snap1, pid1, "Antiguo", 0, 0, 1, 0)
+        db.add_snapshot_player(self.conn, snap2, pid2, "Antiguo", 0, 0, 1, 0)
+        self.conn.commit()
+        # Rename Alice to Bob (Bob exists but not in snap1)
+        result = db.rename_player(self.conn, "Alice", "Bob")
+        self.conn.commit()
+        self.assertTrue(result)
+        # Verify snap1 now has Bob (linked to pid2)
+        players = db.get_snapshot_players(self.conn, snap1)
+        self.assertEqual(len(players), 1)
+        self.assertEqual(players[0]["nombre"], "Bob")
+        # Verify Alice's player record was deleted (orphaned)
+        alice_row = self.conn.execute("SELECT id FROM players WHERE id=?", (pid1,)).fetchone()
+        self.assertIsNone(alice_row)
+
+    def test_rename_player_links_snapshot_players(self):
+        """When new_name exists, snapshot_players are linked to the existing player."""
+        snap = db.create_snapshot(self.conn, "notion_sync")
+        pid1 = db.get_or_create_player(self.conn, "Alice")
+        pid2 = db.get_or_create_player(self.conn, "Bob")
+        # Only Alice in snap
+        db.add_snapshot_player(self.conn, snap, pid1, "Antiguo", 5, 1, 2, 1)
+        self.conn.commit()
+        # Rename Alice to Bob (Bob exists but not in snap)
+        result = db.rename_player(self.conn, "Alice", "Bob")
+        self.conn.commit()
+        self.assertTrue(result)
+        # Verify snap now has Bob with pid2
+        players = db.get_snapshot_players(self.conn, snap)
+        self.assertEqual(len(players), 1)
+        self.assertEqual(players[0]["nombre"], "Bob")
+        # Verify the snapshot_player is linked to pid2
+        sp_row = self.conn.execute(
+            "SELECT player_id FROM snapshot_players WHERE snapshot_id=?", (snap,)
+        ).fetchone()
+        self.assertEqual(sp_row["player_id"], pid2)
+        # Verify Alice's data was preserved
+        self.assertEqual(players[0]["experiencia"], "Antiguo")
+        self.assertEqual(players[0]["juegos_este_ano"], 5)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
