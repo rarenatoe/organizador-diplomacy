@@ -33,6 +33,7 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 | `test_algoritmo.py` | Advanced algorithm tests (prioridad, GM rules, liga, peso de participación) |
 | `test_db.py` | Tests for `db.py`, `db_game.py` and `db_views.py` (`TestDb` class) |
 | `test_viewer.py` | Tests for `viewer.py` (in-memory SQLite via `db.get_db(":memory:")`) |
+| `test_notion_sync.py` | Tests for `notion_sync.py` (name similarity, normalization) |
 
 ### Frontend (`frontend/`)
 | Path | Role |

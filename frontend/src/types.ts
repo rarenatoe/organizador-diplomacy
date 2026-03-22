@@ -96,3 +96,20 @@ export interface EditSnapshotResponse {
   snapshot_id?: number;
   error?: string;
 }
+
+export interface SimilarName {
+  notion: string;
+  snapshot: string;
+  similarity: number;
+}
+
+export interface SyncDetectResult {
+  notion_count: number;
+  snapshot_count: number;
+  similar_names: SimilarName[];
+}
+
+export interface MergePair {
+  from: string;
+  to: string;
+}

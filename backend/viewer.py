@@ -8,6 +8,7 @@ Uso:
 """
 from __future__ import annotations
 
+import json
 import subprocess
 import threading
 import webbrowser
@@ -138,6 +139,88 @@ def api_run(script: str):
     cmd = ["uv", "run", "python", "-m", SCRIPT_MODULES[script]]
     if snapshot_id is not None:
         cmd += ["--snapshot", str(snapshot_id)]
+
+    result = subprocess.run(
+        cmd,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        timeout=90,
+    )
+    return jsonify({
+        "returncode": result.returncode,
+        "stdout":     result.stdout,
+        "stderr":     result.stderr,
+    })
+
+
+@app.route("/api/sync/detect", methods=["POST"])
+def api_sync_detect():
+    """
+    Detect similar names between Notion and snapshot.
+    Body: {"snapshot": <int_id> or null}
+    Returns: {"notion_count", "snapshot_count", "similar_names": [...]}
+    """
+    cwd = Path(__file__).parent.parent
+    body = request.get_json(silent=True) or {}
+    snapshot_id = body.get("snapshot")
+
+    if snapshot_id is not None and not isinstance(snapshot_id, int):
+        return jsonify({"error": "snapshot must be an integer"}), 400
+
+    cmd = ["uv", "run", "python", "-m", "backend.notion_sync", "--detect-only"]
+    if snapshot_id is not None:
+        cmd += ["--snapshot", str(snapshot_id)]
+
+    result = subprocess.run(
+        cmd,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        timeout=90,
+    )
+
+    if result.returncode != 0:
+        return jsonify({
+            "error": "Detection failed",
+            "stderr": result.stderr,
+        }), 500
+
+    try:
+        # Parse JSON from stdout (skip any non-JSON lines)
+        stdout = result.stdout
+        # Find the JSON output (starts with '{')
+        json_start = stdout.find("{")
+        if json_start == -1:
+            return jsonify({"error": "No JSON output from detection"}), 500
+        data = json.loads(stdout[json_start:])
+        return jsonify(data)
+    except json.JSONDecodeError as e:
+        return jsonify({"error": f"Failed to parse detection output: {e}"}), 500
+
+
+@app.route("/api/sync/confirm", methods=["POST"])
+def api_sync_confirm():
+    """
+    Confirm sync with optional merges.
+    Body: {"snapshot": <int_id> or null, "merges": [{"from": "Name1", "to": "Name2"}, ...]}
+    Returns: {"returncode", "stdout", "stderr"}
+    """
+    cwd = Path(__file__).parent.parent
+    body = request.get_json(silent=True) or {}
+    snapshot_id = body.get("snapshot")
+    merges = body.get("merges", [])
+
+    if snapshot_id is not None and not isinstance(snapshot_id, int):
+        return jsonify({"error": "snapshot must be an integer"}), 400
+
+    cmd = ["uv", "run", "python", "-m", "backend.notion_sync"]
+    if snapshot_id is not None:
+        cmd += ["--snapshot", str(snapshot_id)]
+
+    if merges:
+        merges_json = json.dumps({"merges": merges}, ensure_ascii=False)
+        cmd += ["--merges", merges_json]
 
     result = subprocess.run(
         cmd,

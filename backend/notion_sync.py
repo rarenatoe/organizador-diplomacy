@@ -5,6 +5,8 @@ Uso:
     uv run python notion_sync.py              # descarga y crea un snapshot en la DB
     uv run python notion_sync.py --dry-run    # muestra lo que se escribiría sin tocar la DB
     uv run python notion_sync.py --force      # fuerza la creación aunque los datos sean idénticos
+    uv run python notion_sync.py --detect-only # detecta nombres similares sin crear snapshot
+    uv run python notion_sync.py --merges '{"merges": [{"from": "Name1", "to": "Name2"}]}' # aplica fusiones
 
 Qué viene de Notion:
     Nombre          → propiedad 'Nombre' (title) de la DB Jugadores
@@ -33,8 +35,10 @@ Requisitos:
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from datetime import datetime
+from difflib import SequenceMatcher
 
 from dotenv import load_dotenv
 from notion_client import Client
@@ -62,6 +66,115 @@ def _extraer_nombre(prop: dict) -> str:
 def _experiencia(participaciones_prop: dict) -> str:
     """'Antiguo' si el jugador tiene ≥1 participación histórica, 'Nuevo' si no."""
     return "Antiguo" if participaciones_prop.get("relation") else "Nuevo"
+
+
+# ── Name similarity detection ────────────────────────────────────────────────
+
+def _normalize_name(name: str) -> str:
+    """Normalize a name for comparison: lowercase, strip, collapse whitespace."""
+    return " ".join(name.lower().split())
+
+
+def _words_match(word_a: str, word_b: str) -> bool:
+    """
+    Check if two words match, considering abbreviations and prefixes.
+    
+    Rules:
+    - Exact match (case-insensitive)
+    - One is a prefix of the other (e.g., "Ren" matches "Renato", "D" matches "Doe")
+    - One is abbreviated (ends with ".") and matches the start of the other
+      (e.g., "P." matches "Paul", "D." matches "Doe")
+    """
+    if not word_a or not word_b:
+        return False
+    
+    word_a_lower = word_a.lower().rstrip(".")
+    word_b_lower = word_b.lower().rstrip(".")
+    
+    # Exact match (after removing periods)
+    if word_a_lower == word_b_lower:
+        return True
+    
+    # Check if one is a prefix of the other (at least 1 char)
+    if len(word_a_lower) >= 1 and len(word_b_lower) >= 1:
+        if word_b_lower.startswith(word_a_lower) or word_a_lower.startswith(word_b_lower):
+            return True
+    
+    return False
+
+
+def _similarity(a: str, b: str) -> float:
+    """
+    Calculate similarity ratio between two names (0.0 to 1.0).
+    
+    Uses word-by-word comparison with special handling for abbreviations and prefixes.
+    
+    The algorithm:
+    1. Splits names into words
+    2. Compares each word position separately
+    3. Returns 1.0 if all words match (considering abbreviations/prefixes)
+    4. Returns 0.0 if any word doesn't match
+    
+    Examples:
+    - "Ren Alegre" vs "Renato Alegre" -> 1.0 (first name is prefix, last name exact)
+    - "Chachi Faker" vs "Charlie Faker" -> 0.0 (first names don't match)
+    - "P. Knight" vs "Paul Knight" -> 1.0 (abbreviated first name matches)
+    - "Miguel P." vs "Miguel Paucar" -> 1.0 (abbreviated last name matches)
+    - "T. Lopez" vs "Tomas L" -> 1.0 (both abbreviated, both match)
+    - "Lori Sanchez" vs "Lori Sal." -> 0.0 (last names don't match)
+    - "Gonzalo Ch." vs "Gonzalo L." -> 0.0 (last names don't match)
+    """
+    norm_a = _normalize_name(a)
+    norm_b = _normalize_name(b)
+    
+    # Handle empty strings
+    if not norm_a and not norm_b:
+        return 1.0
+    if not norm_a or not norm_b:
+        return 0.0
+    
+    words_a = norm_a.split()
+    words_b = norm_b.split()
+    
+    # Must have same number of words
+    if len(words_a) != len(words_b):
+        return 0.0
+    
+    # Check each word position
+    for word_a, word_b in zip(words_a, words_b):
+        if not _words_match(word_a, word_b):
+            return 0.0
+    
+    # All words match
+    return 1.0
+
+
+def _detect_similar_names(
+    notion_names: list[str],
+    snapshot_names: list[str],
+    threshold: float = 0.75,
+) -> list[dict]:
+    """
+    Detect similar names between Notion and snapshot.
+    Returns list of potential matches: [{"notion": name1, "snapshot": name2, "similarity": 0.85}]
+    Only includes pairs where similarity >= threshold and names are not identical.
+    """
+    matches: list[dict] = []
+    for notion_name in notion_names:
+        for snapshot_name in snapshot_names:
+            # Skip exact matches
+            if _normalize_name(notion_name) == _normalize_name(snapshot_name):
+                continue
+            sim = _similarity(notion_name, snapshot_name)
+            if sim >= threshold:
+                matches.append({
+                    "notion": notion_name,
+                    "snapshot": snapshot_name,
+                    "similarity": round(sim, 3),
+                })
+    # Sort by similarity descending
+    matches.sort(key=lambda m: m["similarity"], reverse=True)
+    return matches
 
 
 # ── Existing player data (from DB) ──────────────────────────────────────
@@ -235,6 +348,10 @@ def main() -> None:
                         help="Crea un snapshot aunque los datos sean idénticos al último")
     parser.add_argument("--snapshot", type=int, default=None,
                         help="ID del snapshot base (default: último snapshot en la DB)")
+    parser.add_argument("--detect-only", action="store_true",
+                        help="Detecta nombres similares sin crear snapshot (output JSON)")
+    parser.add_argument("--merges", type=str, default=None,
+                        help='JSON con fusiones confirmadas: {"merges": [{"from": "Name1", "to": "Name2"}]}')
     args = parser.parse_args()
 
     load_dotenv()
@@ -243,13 +360,13 @@ def main() -> None:
     part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
 
     if not token or token.startswith("secret_XXX"):
-        print("❌  NOTION_TOKEN no configurado. Copia .env.example → .env y rellénalo.")
+        print("❌  NOTION_TOKEN no configurado. Copia .env.example → .env y rellénalo.", file=sys.stderr)
         sys.exit(1)
     if not db_id or "XXX" in db_id:
-        print("❌  NOTION_DATABASE_ID no configurado. Copia .env.example → .env y rellénalo.")
+        print("❌  NOTION_DATABASE_ID no configurado. Copia .env.example → .env y rellénalo.", file=sys.stderr)
         sys.exit(1)
     if not part_db_id or "XXX" in part_db_id:
-        print("❌  NOTION_PARTICIPACIONES_DB_ID no configurado. Copia .env.example → .env y rellénalo.")
+        print("❌  NOTION_PARTICIPACIONES_DB_ID no configurado. Copia .env.example → .env y rellénalo.", file=sys.stderr)
         sys.exit(1)
 
     año_actual = datetime.now().year
@@ -260,7 +377,7 @@ def main() -> None:
         pages = _descargar_todos(client, db_id)
         conteo_por_jugador = _conteo_partidas_este_ano(client, part_db_id, año_actual)
     except APIResponseError as e:
-        print(f"\n❌  Error de API Notion: {e}")
+        print(f"\n❌  Error de API Notion: {e}", file=sys.stderr)
         sys.exit(1)
     print(f"{len(pages)} jugador(es), {sum(conteo_por_jugador.values())} partida(s) en {año_actual}.")
 
@@ -270,7 +387,57 @@ def main() -> None:
         else db.get_latest_snapshot_id(conn)
     )
     existentes = _leer_snapshot_existente(conn, source_snapshot_id)
+
+    # ── Parse merges if provided ──────────────────────────────────────────────
+    merges: dict[str, str] = {}  # from_name → to_name
+    if args.merges:
+        try:
+            merges_data = json.loads(args.merges)
+            for m in merges_data.get("merges", []):
+                merges[m["from"]] = m["to"]
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"❌  Error parsing --merges JSON: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    # ── Filter pages to only include snapshot players (if snapshot exists) ────
+    if source_snapshot_id is not None:
+        snapshot_names = set(existentes.keys())
+        # Apply merges: map snapshot names to their merged equivalents
+        merged_snapshot_names = set()
+        for name in snapshot_names:
+            merged_snapshot_names.add(merges.get(name, name))
+
+        # Filter Notion pages to only those that match (after merges) snapshot players
+        filtered_pages: list[dict] = []
+        for page in pages:
+            nombre_prop = page.get("properties", {}).get("Nombre")
+            if not nombre_prop:
+                continue
+            nombre = _extraer_nombre(nombre_prop)
+            if not nombre:
+                continue
+            # Check if this Notion name matches any snapshot name (considering merges)
+            if nombre in merged_snapshot_names or _normalize_name(nombre) in {
+                _normalize_name(n) for n in merged_snapshot_names
+            }:
+                filtered_pages.append(page)
+        pages = filtered_pages
+
     filas = _paginas_a_filas(pages, existentes, conteo_por_jugador)
+
+    # ── Detect-only mode: output similar names as JSON ────────────────────────
+    if args.detect_only:
+        notion_names = [f["Nombre"] for f in filas]
+        snapshot_names = list(existentes.keys())
+        similar = _detect_similar_names(notion_names, snapshot_names)
+        result = {
+            "notion_count": len(notion_names),
+            "snapshot_count": len(snapshot_names),
+            "similar_names": similar,
+        }
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        conn.close()
+        return
 
     nuevos = [f["Nombre"] for f in filas if f["Nombre"] not in existentes]
     print(f"⟳  {len(filas)} jugador(es) procesados ({len(nuevos)} nuevo(s)).")
