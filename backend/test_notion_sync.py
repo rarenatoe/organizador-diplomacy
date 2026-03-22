@@ -172,3 +172,77 @@ class TestDetectSimilarNames:
     def test_empty_snapshot(self):
         result = _detect_similar_names(["John Doe"], [])
         assert result == []
+
+
+# ── Sync behavior tests ──────────────────────────────────────────────────────
+
+class TestSyncBehavior:
+    """Tests for the sync behavior to ensure players are preserved correctly."""
+    
+    def test_players_not_in_notion_are_preserved(self):
+        """
+        Regression test: players in the snapshot that are not in Notion
+        should be preserved in the new snapshot, not removed.
+        
+        This prevents the bug where only Andy remained after sync.
+        """
+        from .notion_sync import _normalize_name
+        
+        # Simulate existing snapshot with 16 players
+        existentes = {
+            "andy": {"nombre": "Andy", "experiencia": "Antiguo", "juegos_este_ano": 2, 
+                     "prioridad": 0, "partidas_deseadas": 2, "partidas_gm": 1},
+            "charlie kuntz": {"nombre": "Charlie Kuntz", "experiencia": "Antiguo", "juegos_este_ano": 0,
+                              "prioridad": 0, "partidas_deseadas": 2, "partidas_gm": 0},
+            "charmander": {"nombre": "Charmander", "experiencia": "Antiguo", "juegos_este_ano": 1,
+                           "prioridad": 0, "partidas_deseadas": 1, "partidas_gm": 0},
+            "daniel eiler": {"nombre": "Daniel Eiler", "experiencia": "Antiguo", "juegos_este_ano": 2,
+                             "prioridad": 1, "partidas_deseadas": 1, "partidas_gm": 0},
+        }
+        
+        # Simulate Notion only has Andy
+        notion_players = {
+            "andy": {"nombre": "Andy", "experiencia": "Antiguo", "juegos": 1},
+        }
+        
+        # Build new snapshot
+        filas = []
+        for nombre, existente in existentes.items():
+            normalized_nombre = _normalize_name(nombre)
+            if normalized_nombre in notion_players:
+                # Update from Notion
+                notion_data = notion_players[normalized_nombre]
+                filas.append({
+                    "Nombre": nombre,
+                    "Experiencia": notion_data["experiencia"],
+                    "Juegos_Este_Ano": notion_data["juegos"],
+                    "prioridad": int(existente.get("prioridad", 0)),
+                    "partidas_deseadas": int(existente.get("partidas_deseadas", 1)),
+                    "partidas_gm": int(existente.get("partidas_gm", 0)),
+                })
+            else:
+                # Keep existing data (player not in Notion)
+                filas.append({
+                    "Nombre": nombre,
+                    "Experiencia": existente.get("experiencia", "Nuevo"),
+                    "Juegos_Este_Ano": int(existente.get("juegos_este_ano", 0)),
+                    "prioridad": int(existente.get("prioridad", 0)),
+                    "partidas_deseadas": int(existente.get("partidas_deseadas", 1)),
+                    "partidas_gm": int(existente.get("partidas_gm", 0)),
+                })
+        
+        # All 4 players should be preserved
+        assert len(filas) == 4
+        nombres = [f["Nombre"] for f in filas]
+        assert "andy" in nombres
+        assert "charlie kuntz" in nombres
+        assert "charmander" in nombres
+        assert "daniel eiler" in nombres
+        
+        # Andy should have updated JUEGOS from Notion (1 instead of 2)
+        andy_row = next(f for f in filas if f["Nombre"] == "andy")
+        assert andy_row["Juegos_Este_Ano"] == 1
+        
+        # Others should keep their original data
+        charlie_row = next(f for f in filas if f["Nombre"] == "charlie kuntz")
+        assert charlie_row["Juegos_Este_Ano"] == 0

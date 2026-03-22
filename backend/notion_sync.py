@@ -399,31 +399,84 @@ def main() -> None:
             print(f"❌  Error parsing --merges JSON: {e}", file=sys.stderr)
             sys.exit(1)
 
-    # ── Filter pages to only include snapshot players (if snapshot exists) ────
+    # ── Build Notion player lookup (for updating existing players) ──────────
+    notion_players: dict[str, dict] = {}
+    for page in pages:
+        props = page.get("properties", {})
+        nombre_prop = props.get("Nombre")
+        if not nombre_prop:
+            continue
+        nombre = _extraer_nombre(nombre_prop)
+        if not nombre:
+            continue
+        
+        # Experiencia ← total histórico de Participaciones
+        part_prop = props.get("Participaciones")
+        experiencia = _experiencia(part_prop) if part_prop else "Nuevo"
+        
+        # Juegos_Este_Ano ← conteo filtrado por año (indexado por page ID del jugador)
+        player_id = page["id"].replace("-", "")
+        juegos = conteo_por_jugador.get(player_id, 0)
+        
+        notion_players[_normalize_name(nombre)] = {
+            "nombre": nombre,
+            "experiencia": experiencia,
+            "juegos": juegos,
+        }
+    
+    # ── Build new snapshot: start with all existing players, update from Notion ──
+    filas: list[dict] = []
+    
     if source_snapshot_id is not None:
-        snapshot_names = set(existentes.keys())
-        # Apply merges: map snapshot names to their merged equivalents
-        merged_snapshot_names = set()
-        for name in snapshot_names:
-            merged_snapshot_names.add(merges.get(name, name))
-
-        # Filter Notion pages to only those that match (after merges) snapshot players
-        filtered_pages: list[dict] = []
+        # Start with all players from the existing snapshot
+        for nombre, existente in existentes.items():
+            # Check if this player exists in Notion (exact match)
+            normalized_nombre = _normalize_name(nombre)
+            if normalized_nombre in notion_players:
+                # Update from Notion
+                notion_data = notion_players[normalized_nombre]
+                filas.append({
+                    "Nombre":            nombre,
+                    "Experiencia":       notion_data["experiencia"],
+                    "Juegos_Este_Ano":   notion_data["juegos"],
+                    "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
+                    "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
+                    "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
+                })
+            else:
+                # Keep existing data (player not in Notion)
+                filas.append({
+                    "Nombre":            nombre,
+                    "Experiencia":       existente.get("experiencia", "Nuevo"),
+                    "Juegos_Este_Ano":   int(existente.get("juegos_este_ano", 0)),
+                    "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
+                    "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
+                    "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
+                })
+    else:
+        # No existing snapshot - use all Notion players
         for page in pages:
-            nombre_prop = page.get("properties", {}).get("Nombre")
+            props = page.get("properties", {})
+            nombre_prop = props.get("Nombre")
             if not nombre_prop:
                 continue
             nombre = _extraer_nombre(nombre_prop)
             if not nombre:
                 continue
-            # Check if this Notion name matches any snapshot name (considering merges)
-            if nombre in merged_snapshot_names or _normalize_name(nombre) in {
-                _normalize_name(n) for n in merged_snapshot_names
-            }:
-                filtered_pages.append(page)
-        pages = filtered_pages
-
-    filas = _paginas_a_filas(pages, existentes, conteo_por_jugador)
+            
+            part_prop = props.get("Participaciones")
+            experiencia = _experiencia(part_prop) if part_prop else "Nuevo"
+            player_id = page["id"].replace("-", "")
+            juegos = conteo_por_jugador.get(player_id, 0)
+            
+            filas.append({
+                "Nombre":            nombre,
+                "Experiencia":       experiencia,
+                "Juegos_Este_Ano":   juegos,
+                "prioridad":         FIELD_DEFAULTS["prioridad"],
+                "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
+                "partidas_gm":       FIELD_DEFAULTS["partidas_gm"],
+            })
 
     # ── Detect-only mode: output similar names as JSON ────────────────────────
     if args.detect_only:
