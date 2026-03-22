@@ -60,9 +60,10 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 ## After every feature or fix
 1. Run `uv run python -m pytest -q` — confirm all pass.
 2. Run `bun run build && bun run lint` — TypeScript must compile and lint clean.
-3. Add/update tests in the relevant test file.
-4. Update the relevant instructions file if conventions, data model, or architecture changed.
-5. Commit: `feat:` · `fix:` · `refactor:` · `test:` prefix.
+3. **Check file sizes**: `wc -l backend/*.py frontend/src/*.ts frontend/static/style.css | sort -rn` — refactor any file >400 LOC.
+4. Add/update tests in the relevant test file.
+5. Update the relevant instructions file if conventions, data model, or architecture changed.
+6. Commit: `feat:` · `fix:` · `refactor:` · `test:` prefix.
 
 ## Principles
 - Maintainability over expediency: design for extensibility and clarity.
