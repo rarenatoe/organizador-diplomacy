@@ -26,6 +26,11 @@ export default defineConfig([
       // Non-null assertions are acceptable for document.getElementById() calls in
       // a browser script where the developer controls the HTML structure.
       "@typescript-eslint/no-non-null-assertion": "off",
+      // Allow void expressions in arrow function callbacks (e.g., `setTimeout(() => toast.remove(), 300)`)
+      "@typescript-eslint/no-confusing-void-expression": [
+        "error",
+        { ignoreArrowShorthand: true },
+      ],
     },
   },
 ]);

@@ -113,3 +113,29 @@ export interface MergePair {
   from: string;
   to: string;
 }
+
+// ── Toast notification types ─────────────────────────────────────────────────
+
+export type ToastState = "syncing" | "success" | "error";
+
+export interface ToastOptions {
+  state: ToastState;
+  message: string;
+  dismissible?: boolean;
+}
+
+// ── Resolution card types ────────────────────────────────────────────────────
+
+export type ResolutionAction = "merge" | "skip";
+
+export interface ResolutionDecision {
+  pair: SimilarName;
+  action: ResolutionAction;
+}
+
+export interface ResolutionState {
+  pairs: SimilarName[];
+  currentIndex: number;
+  decisions: ResolutionDecision[];
+  snapshotId: number | null;
+}

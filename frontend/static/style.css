@@ -448,3 +448,227 @@ tbody tr.excluded { opacity: .35; }
   min-width: 120px;
   justify-content: center;
 }
+
+/* ── Toast notifications ── */
+#toast-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 500;
+  pointer-events: all;
+  animation: toast-in 0.25s ease;
+  max-width: 360px;
+}
+
+.toast-exiting {
+  animation: toast-out 0.2s ease forwards;
+}
+
+.toast-syncing {
+  border-color: var(--accent);
+  background: #eff6ff;
+}
+
+.toast-success {
+  border-color: var(--success);
+  background: #f0fdf4;
+}
+
+.toast-error {
+  border-color: var(--danger);
+  background: #fef2f2;
+}
+
+.toast-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  flex: 1;
+  color: var(--text);
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--muted);
+  padding: 2px 4px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  color: var(--text);
+  background: var(--surface2);
+}
+
+.toast-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(59, 130, 246, 0.3);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.65s linear infinite;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(20px); }
+}
+
+/* ── Resolution overlay ── */
+.resolution-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 150;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.resolution-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.resolution-card {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 24px;
+  width: 420px;
+  max-width: 90vw;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.resolution-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.resolution-icon {
+  font-size: 20px;
+}
+
+.resolution-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.resolution-counter {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.resolution-pair {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.resolution-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.resolution-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+
+.resolution-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.resolution-name-notion {
+  color: var(--sync-dark);
+}
+
+.resolution-name-snapshot {
+  color: var(--report-dark);
+}
+
+.resolution-vs {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.resolution-similarity {
+  font-size: 12px;
+  font-weight: 600;
+  color: #f59e0b;
+  text-align: center;
+}
+
+.resolution-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.resolution-actions .btn {
+  flex: 1;
+  justify-content: center;
+}
+
+.resolution-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.resolution-btn-stop {
+  font-size: 12px;
+  color: var(--muted);
+}
