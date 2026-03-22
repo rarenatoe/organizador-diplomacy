@@ -71,7 +71,7 @@ class TestApiRun:
         assert resp.status_code == 200
         assert "--snapshot" in calls[0]
         assert "3" in calls[0]
-        assert "backend.notion_sync" in calls[0]
+        assert "backend.sync.notion_sync" in calls[0]
 
     def test_run_organizar_invokes_correct_module(self, client, monkeypatch):
         """Organizar script maps to backend.organizador module (not a bare .py file)."""
@@ -84,7 +84,7 @@ class TestApiRun:
         )
         resp = c.post("/api/run/organizar", content_type="application/json")
         assert resp.status_code == 200
-        assert "backend.organizador" in calls[0]
+        assert "backend.organizador.organizador" in calls[0]
 
     def test_run_uses_module_flag(self, client, monkeypatch):
         """Both scripts are invoked with 'python -m <module>' to avoid relative-import errors."""

@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from . import db
+from backend.db import db
 from .conftest import _add_snapshot
 
 

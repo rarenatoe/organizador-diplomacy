@@ -3,14 +3,14 @@ import random
 from collections import Counter
 from pathlib import Path
 
-from . import db, db_game
+from backend.db import db, db_game
 from .formatter import (
     _construir_proyeccion,
     _formatear_copypaste,
     _formatear_resultado,
 )
 from .models import Jugador, Mesa, ResultadoPartidas
-from .utils import DIRECTORIO
+from backend.config import DATA_DIR
 
 SEP: str = "─" * 44
 
@@ -204,7 +204,7 @@ def _calcular_partidas(jugadores: list[Jugador]) -> ResultadoPartidas | None:
 
 def organizar_partidas(
     snapshot_id: int | None = None,
-    directorio: Path = DIRECTORIO,
+    directorio: Path = DATA_DIR,
 ) -> None:
     """
     Organiza una ronda de partidas.
@@ -215,7 +215,7 @@ def organizar_partidas(
       - game_event with copypaste_text
       - mesas, mesa_players, waiting_list
     """
-    conn = db.get_db(db.DB_PATH if directorio == DIRECTORIO else directorio / "diplomacy.db")
+    conn = db.get_db(db.DB_PATH if directorio == DATA_DIR else directorio / "diplomacy.db")
 
     # ── Resolve snapshot ─────────────────────────────────────────────────────
     if snapshot_id is None:

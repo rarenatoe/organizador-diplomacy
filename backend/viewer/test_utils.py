@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from . import db
+from backend.db import db
 from .viewer import app
 
 

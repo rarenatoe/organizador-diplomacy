@@ -12,15 +12,14 @@ import json
 import subprocess
 import threading
 import webbrowser
-from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
 
-from . import db, db_views
+from backend.config import FLASK_TEMPLATE_DIR, FLASK_STATIC_DIR, PROJECT_ROOT
+from backend.db import db, db_views
 
 # Configure Flask to find templates and static in frontend/
-FRONTEND_PATH = Path(__file__).parent.parent / "frontend"
-app = Flask(__name__, template_folder=str(FRONTEND_PATH / "templates"), static_folder=str(FRONTEND_PATH / "static"))
+app = Flask(__name__, template_folder=str(FLASK_TEMPLATE_DIR), static_folder=str(FLASK_STATIC_DIR))
 
 
 # ── Routes ─────────────────────────────────────────────────────────────────────
@@ -128,14 +127,14 @@ def api_run(script: str):
     if script not in ("notion_sync", "organizar"):
         return jsonify({"error": "unknown script"}), 400
 
-    cwd = Path(__file__).parent.parent  # project root, so -m backend.X works
+    cwd = PROJECT_ROOT  # project root, so -m backend.X works
     body = request.get_json(silent=True) or {}
     snapshot_id = body.get("snapshot")
 
     if snapshot_id is not None and not isinstance(snapshot_id, int):
         return jsonify({"error": "snapshot must be an integer"}), 400
 
-    SCRIPT_MODULES = {"organizar": "backend.organizador", "notion_sync": "backend.notion_sync"}
+    SCRIPT_MODULES = {"organizar": "backend.organizador.organizador", "notion_sync": "backend.sync.notion_sync"}
     cmd = ["uv", "run", "python", "-m", SCRIPT_MODULES[script]]
     if snapshot_id is not None:
         cmd += ["--snapshot", str(snapshot_id)]
@@ -161,14 +160,14 @@ def api_sync_detect():
     Body: {"snapshot": <int_id> or null}
     Returns: {"notion_count", "snapshot_count", "similar_names": [...]}
     """
-    cwd = Path(__file__).parent.parent
+    cwd = PROJECT_ROOT
     body = request.get_json(silent=True) or {}
     snapshot_id = body.get("snapshot")
 
     if snapshot_id is not None and not isinstance(snapshot_id, int):
         return jsonify({"error": "snapshot must be an integer"}), 400
 
-    cmd = ["uv", "run", "python", "-m", "backend.notion_sync", "--detect-only"]
+    cmd = ["uv", "run", "python", "-m", "backend.sync.notion_sync", "--detect-only"]
     if snapshot_id is not None:
         cmd += ["--snapshot", str(snapshot_id)]
 
@@ -206,7 +205,7 @@ def api_sync_confirm():
     Body: {"snapshot": <int_id> or null, "merges": [{"from": "Name1", "to": "Name2"}, ...]}
     Returns: {"returncode", "stdout", "stderr"}
     """
-    cwd = Path(__file__).parent.parent
+    cwd = PROJECT_ROOT
     body = request.get_json(silent=True) or {}
     snapshot_id = body.get("snapshot")
     merges = body.get("merges", [])
@@ -214,7 +213,7 @@ def api_sync_confirm():
     if snapshot_id is not None and not isinstance(snapshot_id, int):
         return jsonify({"error": "snapshot must be an integer"}), 400
 
-    cmd = ["uv", "run", "python", "-m", "backend.notion_sync"]
+    cmd = ["uv", "run", "python", "-m", "backend.sync.notion_sync"]
     if snapshot_id is not None:
         cmd += ["--snapshot", str(snapshot_id)]
 

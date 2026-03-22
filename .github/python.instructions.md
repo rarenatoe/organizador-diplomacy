@@ -92,8 +92,8 @@ Every new behavior → test in the corresponding file.
 
 | Module | Test location |
 |---|---|
-| `organizador.py` · `models.py` (basic) | `test_organizador.py` |
-| `organizador.py` (priority, GM, liga) | `test_algoritmo.py` |
-| `db.py` · `db_game.py` · `db_views.py` | `test_db.py` → `TestDb` class |
-| `viewer.py` | `test_viewer.py` (in-memory DB via `db.get_db(":memory:")`) |
-| `notion_sync.py` | manual/integration only (requires Notion API key) |
+| `organizador/organizador.py` · `organizador/models.py` (basic) | `organizador/test_organizador.py` |
+| `organizador/organizador.py` (priority, GM, liga) | `organizador/test_algoritmo.py` |
+| `db/db.py` · `db/db_game.py` · `db/db_views.py` | `db/test_db.py` → `TestDb` class |
+| `viewer/viewer.py` | `viewer/test_viewer.py` (in-memory DB via `db.get_db(":memory:")`) |
+| `sync/notion_sync.py` | manual/integration only (requires Notion API key) |

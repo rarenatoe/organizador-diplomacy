@@ -39,11 +39,11 @@ import sqlite3
 from datetime import datetime
 from pathlib import Path
 
-from .utils import DIRECTORIO
+from backend.config import DATA_DIR
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 
-DB_PATH: Path = DIRECTORIO / "diplomacy.db"
+DB_PATH: Path = DATA_DIR / "diplomacy.db"
 
 # ── Schema ─────────────────────────────────────────────────────────────────────
 

@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from . import db, db_game
+from backend.db import db, db_game
 from .conftest import _add_snapshot
 
 

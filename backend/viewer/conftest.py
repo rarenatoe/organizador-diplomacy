@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from . import db, db_game, viewer
+from backend.db import db, db_game
+from . import viewer
 from .viewer import app
 
 
