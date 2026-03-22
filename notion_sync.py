@@ -2,8 +2,9 @@
 notion_sync.py  –  Sincroniza la base de datos de jugadores desde Notion.
 
 Uso:
-    uv run python notion_sync.py              # descarga y crea jugadores_NNNN.csv
-    uv run python notion_sync.py --dry-run    # muestra lo que se escribiría sin tocar ningún archivo
+    uv run python notion_sync.py              # descarga y crea un snapshot en la DB
+    uv run python notion_sync.py --dry-run    # muestra lo que se escribiría sin tocar la DB
+    uv run python notion_sync.py --force      # fuerza la creación aunque los datos sean idénticos
 
 Qué viene de Notion:
     Nombre          → propiedad 'Nombre' (title) de la DB Jugadores
@@ -15,10 +16,15 @@ Qué viene de Notion:
                        (La formula 'Nro. Partidas' siempre retorna 0 vía API —
                         limitación conocida de Notion con relations.)
 
-Qué se preserva del jugadores.csv existente (no existe en Notion):
-    Prioridad        → se conserva del CSV; default "False" para jugadores nuevos
-    Partidas_Deseadas → se conserva del CSV; default "1" para jugadores nuevos
-    Partidas_GM      → se conserva del CSV; default "0" para jugadores nuevos
+Qué se preserva del último snapshot (no existe en Notion):
+    prioridad        → se conserva del snapshot anterior; default 0 para jugadores nuevos
+    partidas_deseadas → se conserva del snapshot anterior; default 1 para jugadores nuevos
+    partidas_gm      → se conserva del snapshot anterior; default 0 para jugadores nuevos
+
+Guard de datos idénticos:
+    Si los campos de Notion (Nombre, Experiencia, Juegos_Este_Ano) coinciden
+    exactamente con el último snapshot en la DB, no se crea un snapshot nuevo.
+    Usa --force para forzar la creación de todos modos.
 
 Requisitos:
     - Archivo .env con NOTION_TOKEN, NOTION_DATABASE_ID y
@@ -27,30 +33,23 @@ Requisitos:
 from __future__ import annotations
 
 import argparse
-import csv
 import sys
 from datetime import datetime
-from pathlib import Path
 
 from dotenv import load_dotenv
 from notion_client import Client
 from notion_client.errors import APIResponseError
 import os
 
-from utils import DIRECTORIO, siguiente_csv, ultimo_csv
+import db
+from utils import DIRECTORIO
 
-# ── Configuración ──────────────────────────────────────────────────
+# ── Player field defaults for first-time Notion players ──────────────────────
 
-CSV_FIELDNAMES: list[str] = [
-    "Nombre", "Experiencia", "Juegos_Este_Ano",
-    "Prioridad", "Partidas_Deseadas", "Partidas_GM",
-]
-
-# Valores por defecto para jugadores que no están aún en jugadores.csv
-CSV_DEFAULTS: dict[str, str] = {
-    "Prioridad":         "False",
-    "Partidas_Deseadas": "1",
-    "Partidas_GM":       "0",
+FIELD_DEFAULTS: dict[str, int] = {
+    "prioridad":         0,
+    "partidas_deseadas": 1,
+    "partidas_gm":       0,
 }
 
 # ── Helpers de extracción ─────────────────────────────────────────────────────
@@ -65,15 +64,19 @@ def _experiencia(participaciones_prop: dict) -> str:
     return "Antiguo" if participaciones_prop.get("relation") else "Nuevo"
 
 
-# ── CSV existente ─────────────────────────────────────────────────────────────
+# ── Existing player data (from DB) ──────────────────────────────────────
 
-def _leer_csv_existente() -> dict[str, dict[str, str]]:
-    """Lee el último jugadores_NNNN.csv y retorna un dict nombre → fila completa."""
-    ruta = ultimo_csv()
-    if ruta is None:
+def _leer_snapshot_existente(
+    conn: "db.sqlite3.Connection",
+) -> dict[str, dict]:
+    """Returns nombre → row dict from the latest snapshot, or {} if none."""
+    latest_id = db.get_latest_snapshot_id(conn)
+    if latest_id is None:
         return {}
-    with ruta.open(encoding="utf-8") as f:
-        return {row["Nombre"]: row for row in csv.DictReader(f)}
+    return {
+        r["nombre"]: r
+        for r in db.get_snapshot_players(conn, latest_id)
+    }
 
 
 # ── Partidas del año actual ──────────────────────────────────────────────────
@@ -142,21 +145,20 @@ def _conteo_partidas_este_ano(
     return conteo
 
 
-# ── Conversión Notion → filas CSV ─────────────────────────────────────────────
+# ── Conversión Notion → filas DB ─────────────────────────────────────────────
 
 def _paginas_a_filas(
     pages: list[dict],
-    existentes: dict[str, dict[str, str]],
+    existentes: dict[str, dict],
     conteo_por_jugador: dict[str, int],
-) -> list[dict[str, str]]:
+) -> list[dict]:
     """
-    Convierte páginas de Notion en filas listas para jugadores.csv.
-    Nombre, Experiencia y Juegos_Este_Ano vienen de Notion.
-    Prioridad, Partidas_Deseadas y Partidas_GM se preservan del CSV existente
-    (o se usan defaults para jugadores que aún no están en el CSV).
-    Omite páginas sin nombre.
+    Merges Notion page data with existing DB snapshot data.
+    Returns a list of normalized player dicts ready for DB insertion.
+    Keys: Nombre, Experiencia, Juegos_Este_Ano, prioridad, partidas_deseadas, partidas_gm
+    Omits pages without a name.
     """
-    filas: list[dict[str, str]] = []
+    filas: list[dict] = []
     for page in pages:
         props = page.get("properties", {})
 
@@ -174,17 +176,17 @@ def _paginas_a_filas(
 
         # Juegos_Este_Ano ← conteo filtrado por año (indexado por page ID del jugador)
         player_id = page["id"].replace("-", "")
-        juegos = str(conteo_por_jugador.get(player_id, 0))
+        juegos = conteo_por_jugador.get(player_id, 0)
 
-        # Columnas que vienen del CSV local (preservar o usar defaults)
+        # Preserve local fields from the latest snapshot, or use defaults
         existente = existentes.get(nombre, {})
         filas.append({
             "Nombre":            nombre,
             "Experiencia":       experiencia,
             "Juegos_Este_Ano":   juegos,
-            "Prioridad":         existente.get("Prioridad",         CSV_DEFAULTS["Prioridad"]),
-            "Partidas_Deseadas": existente.get("Partidas_Deseadas", CSV_DEFAULTS["Partidas_Deseadas"]),
-            "Partidas_GM":       existente.get("Partidas_GM",       CSV_DEFAULTS["Partidas_GM"]),
+            "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
+            "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
+            "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
         })
     return filas
 
@@ -221,40 +223,22 @@ def _descargar_todos(client: Client, database_id: str) -> list[dict]:
     return pages
 
 
-# ── Escritura CSV ─────────────────────────────────────────────────────────────
-
-def _escribir_csv(filas: list[dict[str, str]]) -> Path:
-    ruta = siguiente_csv()
-    with ruta.open(mode="w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
-        writer.writeheader()
-        writer.writerows(filas)
-    return ruta
-
-
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Descarga jugadores desde Notion y crea el siguiente jugadores_NNNN.csv"
+        description="Descarga jugadores desde Notion y crea un snapshot en la DB"
     )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Muestra el resultado sin escribir el CSV",
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Sobreescribe aunque data/.pending exista (el CSV anterior aún no fue usado)",
-    )
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Muestra el resultado sin escribir en la DB")
+    parser.add_argument("--force", action="store_true",
+                        help="Crea un snapshot aunque los datos sean idénticos al último")
     args = parser.parse_args()
 
     load_dotenv()
-
-    token        = os.getenv("NOTION_TOKEN")
-    db_id        = os.getenv("NOTION_DATABASE_ID")
-    part_db_id   = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
+    token      = os.getenv("NOTION_TOKEN")
+    db_id      = os.getenv("NOTION_DATABASE_ID")
+    part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
 
     if not token or token.startswith("secret_XXX"):
         print("❌  NOTION_TOKEN no configurado. Copia .env.example → .env y rellénalo.")
@@ -264,13 +248,6 @@ def main() -> None:
         sys.exit(1)
     if not part_db_id or "XXX" in part_db_id:
         print("❌  NOTION_PARTICIPACIONES_DB_ID no configurado. Copia .env.example → .env y rellénalo.")
-        sys.exit(1)
-
-    # ── Guard: evitar CSVs duplicados sin partida intermedia ────────────────────
-    pending_flag = DIRECTORIO / ".pending"
-    if pending_flag.exists() and not args.dry_run and not args.force:
-        print("⚠️  El último CSV ya fue generado por notion_sync y aún no se ha jugado una partida.")
-        print("   Usa --force para sobreescribir de todas formas.")
         sys.exit(1)
 
     año_actual = datetime.now().year
@@ -285,7 +262,8 @@ def main() -> None:
         sys.exit(1)
     print(f"{len(pages)} jugador(es), {sum(conteo_por_jugador.values())} partida(s) en {año_actual}.")
 
-    existentes = _leer_csv_existente()
+    conn = db.get_db()
+    existentes = _leer_snapshot_existente(conn)
     filas = _paginas_a_filas(pages, existentes, conteo_por_jugador)
 
     nuevos = [f["Nombre"] for f in filas if f["Nombre"] not in existentes]
@@ -294,18 +272,48 @@ def main() -> None:
         print(f"   Nuevos: {', '.join(nuevos)}")
 
     if args.dry_run:
-        print("\n── dry-run: contenido que se escribiría ──")
-        writer = csv.DictWriter(sys.stdout, fieldnames=CSV_FIELDNAMES)
-        writer.writeheader()
-        writer.writerows(filas)
-        print("\n(No se escribió ningún archivo)")
+        print("\n── dry-run: snapshot que se crearía ──")
+        for fila in filas:
+            print(f"  {fila['Nombre']} | {fila['Experiencia']} | {fila['Juegos_Este_Ano']}")
+        print("\n(No se escribió nada en la DB)")
+        conn.close()
+        return
+
+    # ── Content-addressed guard: skip if data hasn't changed ──────────────────
+    latest_id = db.get_latest_snapshot_id(conn)
+    if latest_id is not None and not args.force:
+        if db.snapshots_have_same_roster(conn, latest_id, filas):
+            print("✓  Los datos de Notion coinciden con el último snapshot — sin cambios.")
+            print("   Usa --force para crear un snapshot igualmente.")
+            conn.close()
+            return
+
+    # ── Persist new snapshot atomically ───────────────────────────────────────
+    try:
+        snap_id = db.create_snapshot(conn, "notion_sync")
+        for fila in filas:
+            pid = db.get_or_create_player(conn, fila["Nombre"])
+            db.add_snapshot_player(
+                conn, snap_id, pid,
+                fila["Experiencia"],
+                fila["Juegos_Este_Ano"],
+                fila["prioridad"],
+                fila["partidas_deseadas"],
+                fila["partidas_gm"],
+            )
+        db.create_sync_event(conn, latest_id, snap_id)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        conn.close()
+        raise
+
+    conn.close()
+    print(f"✓  Snapshot #{snap_id} creado con {len(filas)} jugador(es).")
+    if latest_id:
+        print(f"   sync_event: snapshot #{latest_id} → #{snap_id}")
     else:
-        ruta = _escribir_csv(filas)
-        print(f"✓  {ruta.name} creado con {len(filas)} jugador(es).")
-        # Store the CSV filename so _build_chain can tie the pending badge to
-        # exactly this CSV — not to whichever CSV happens to be latest at read time.
-        (DIRECTORIO / ".pending").write_text(ruta.name, encoding="utf-8")
-        print("   (data/.pending creado — se eliminará automáticamente al organizar la próxima partida)")
+        print("   (primer sync — sin snapshot anterior)")
 
 
 if __name__ == "__main__":

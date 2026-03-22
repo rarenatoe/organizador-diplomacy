@@ -11,10 +11,10 @@
 <!-- Header -->
 <header>
   <h1>🎲 Organizador Diplomacy <span id="pending-badge">⏳ Sin jugar</span></h1>
-  <button class="btn btn-secondary" onclick="loadChain()">⟳ Actualizar</button>
-  <button class="btn btn-secondary" id="btn-sync"      onclick="runScript('notion_sync')">↻ Sync Notion</button>
-  <button class="btn btn-primary"   id="btn-organizar" onclick="runOrganizar()">▶ <span id="organizar-label">Organizar</span></button>
-  <button class="btn btn-ghost"     id="btn-deselect"  onclick="deselectCsv()" style="display:none" title="Volver al CSV más reciente">✕</button>
+  <button class="btn btn-secondary" id="btn-refresh">⟳ Actualizar</button>
+  <button class="btn btn-secondary" id="btn-sync">↻ Sync Notion</button>
+  <button class="btn btn-primary"   id="btn-organizar">▶ <span id="organizar-label">Organizar</span></button>
+  <button class="btn btn-ghost"     id="btn-deselect"  style="display:none" title="Volver al CSV más reciente">✕</button>
 </header>
 
 <!-- Main -->
@@ -31,7 +31,7 @@
     <div class="panel-inner">
       <div class="panel-header">
         <h2 id="panel-title">—</h2>
-        <button class="btn btn-ghost" onclick="closePanel()">✕</button>
+        <button class="btn btn-ghost" id="btn-close-panel">✕</button>
       </div>
       <div class="panel-body" id="panel-body"></div>
     </div>
@@ -47,7 +47,7 @@
     </div>
     <div class="modal-out" id="modal-out"></div>
     <div class="modal-foot">
-      <button class="btn btn-secondary" id="btn-modal-close" onclick="closeModal()" disabled>Cerrar</button>
+      <button class="btn btn-secondary" id="btn-modal-close" disabled>Cerrar</button>
     </div>
   </div>
 </div>

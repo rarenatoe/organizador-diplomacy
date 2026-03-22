@@ -1,0 +1,28 @@
+{
+  "name": "organizadordiplomacy",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "bun build src/app.ts --outfile static/app.js --format iife",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rarenatoe/organizador-diplomacy.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rarenatoe/organizador-diplomacy/issues"
+  },
+  "homepage": "https://github.com/rarenatoe/organizador-diplomacy#readme",
+  "devDependencies": {
+    "eslint": "^9.39.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.1"
+  }
+}

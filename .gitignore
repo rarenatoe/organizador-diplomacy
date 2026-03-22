@@ -4,7 +4,9 @@
 # ── Archivos generados por el organizador ─────────────────────────────────────
 # Los jugadores_NNNN.csv SE TRACKEAN (historial inmutable de la liga).
 reporte_*.txt
-data/.pending
+# metadata.json tracks runtime state (pending badge + sync lineage).
+# Excluded because it changes on every sync/organizar run.
+data/metadata.json
 
 # ── Python / uv ───────────────────────────────────────────────────────────────
 .venv/
@@ -18,3 +20,10 @@ wheels/
 
 # ── macOS ─────────────────────────────────────────────────────────────────────
 .DS_Store
+
+# ── Node / TypeScript build (bun) ────────────────────────────────────────────
+node_modules/
+# bun.lockb is committed (reproducible installs).
+# static/app.js is a build artifact — regenerate with: bun run build
+static/app.js
+

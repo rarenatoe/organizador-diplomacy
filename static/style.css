@@ -11,6 +11,9 @@
   --report-bg:      #f0fdf4;
   --report-border:  #22c55e;
   --report-dark:    #15803d;
+  --sync-bg:        #f5f3ff;
+  --sync-border:    #7c3aed;
+  --sync-dark:      #5b21b6;
   --pending-bg:     #fffbeb;
   --pending-border: #f59e0b;
   --accent:         #3b82f6;
@@ -130,9 +133,11 @@ header h1 {
 .node.active { box-shadow: 0 0 0 3px rgba(59,130,246,.25); }
 .node-csv    { background: var(--csv-bg);    border-color: var(--csv-border); }
 .node-report { background: var(--report-bg); border-color: var(--report-border); }
+.node-sync   { background: var(--sync-bg);   border-color: var(--sync-border); }
 .node-csv.latest-pending { background: var(--pending-bg); border-color: var(--pending-border); }
 .node.active.node-csv    { border-color: var(--csv-border); }
 .node.active.node-report { border-color: var(--report-border); }
+.node.active.node-sync   { border-color: var(--sync-border); }
 
 .node-icon  { font-size: 20px; margin-bottom: 5px; }
 .node-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 3px; }
