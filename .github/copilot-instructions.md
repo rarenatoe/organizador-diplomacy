@@ -99,12 +99,12 @@ Each sync edge: `{type:"sync", id, created_at, from_id, to_id}`
 - **Never use a flat `nodes` list** — that caused the bug where report_B from csv_0001 rendered as a child of csv_0002.
 
 ## Notion Sync behavior (important UX distinction)
-`notion_sync.py` is a **fresh pull from Notion** — it does NOT use the selected snapshot.
-- Always reads Notion for `Nombre`, `Experiencia`, `Juegos_Este_Ano`.
-- Preserves `prioridad`, `partidas_deseadas`, `partidas_gm` from the latest snapshot in the DB.
-- Guard: `snapshots_have_same_roster(conn, latest_id, notion_rows)` — if identical data and not `--force`, skips creating a new snapshot.
-- Creates `sync_event(source=latest_id, output=new_snap_id)`.
-- The selected snapshot in the UI only affects `Organizar`, never `Sync Notion`.
+`notion_sync.py` is a **fresh pull from Notion** — it always reads `Nombre`, `Experiencia`, `Juegos_Este_Ano` from Notion.
+- Preserves `prioridad`, `partidas_deseadas`, `partidas_gm` from the **selected snapshot** (or latest if none is selected).
+- Accepts `--snapshot <id>` CLI arg; `viewer.py` passes this from the request body, which `src/app.ts` populates with `_selectedSnapshot`.
+- Guard: `snapshots_have_same_roster(conn, source_snapshot_id, notion_rows)` — if identical data and not `--force`, skips creating a new snapshot.
+- Creates `sync_event(source=source_snapshot_id, output=new_snap_id)`.
+- **The selected snapshot affects both `Organizar` and `Sync Notion`.**
 
 ## Flask API (`viewer.py`)
 | Route | Method | Response |

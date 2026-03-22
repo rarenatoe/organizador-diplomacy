@@ -68,14 +68,14 @@ def _experiencia(participaciones_prop: dict) -> str:
 
 def _leer_snapshot_existente(
     conn: "db.sqlite3.Connection",
+    snapshot_id: int | None = None,
 ) -> dict[str, dict]:
-    """Returns nombre → row dict from the latest snapshot, or {} if none."""
-    latest_id = db.get_latest_snapshot_id(conn)
-    if latest_id is None:
+    """Returns nombre → row dict from the given snapshot (or {} if None)."""
+    if snapshot_id is None:
         return {}
     return {
         r["nombre"]: r
-        for r in db.get_snapshot_players(conn, latest_id)
+        for r in db.get_snapshot_players(conn, snapshot_id)
     }
 
 
@@ -233,6 +233,8 @@ def main() -> None:
                         help="Muestra el resultado sin escribir en la DB")
     parser.add_argument("--force", action="store_true",
                         help="Crea un snapshot aunque los datos sean idénticos al último")
+    parser.add_argument("--snapshot", type=int, default=None,
+                        help="ID del snapshot base (default: último snapshot en la DB)")
     args = parser.parse_args()
 
     load_dotenv()
@@ -263,7 +265,11 @@ def main() -> None:
     print(f"{len(pages)} jugador(es), {sum(conteo_por_jugador.values())} partida(s) en {año_actual}.")
 
     conn = db.get_db()
-    existentes = _leer_snapshot_existente(conn)
+    source_snapshot_id = (
+        args.snapshot if args.snapshot is not None
+        else db.get_latest_snapshot_id(conn)
+    )
+    existentes = _leer_snapshot_existente(conn, source_snapshot_id)
     filas = _paginas_a_filas(pages, existentes, conteo_por_jugador)
 
     nuevos = [f["Nombre"] for f in filas if f["Nombre"] not in existentes]
@@ -280,9 +286,8 @@ def main() -> None:
         return
 
     # ── Content-addressed guard: skip if data hasn't changed ──────────────────
-    latest_id = db.get_latest_snapshot_id(conn)
-    if latest_id is not None and not args.force:
-        if db.snapshots_have_same_roster(conn, latest_id, filas):
+    if source_snapshot_id is not None and not args.force:
+        if db.snapshots_have_same_roster(conn, source_snapshot_id, filas):
             print("✓  Los datos de Notion coinciden con el último snapshot — sin cambios.")
             print("   Usa --force para crear un snapshot igualmente.")
             conn.close()
@@ -301,7 +306,7 @@ def main() -> None:
                 fila["partidas_deseadas"],
                 fila["partidas_gm"],
             )
-        db.create_sync_event(conn, latest_id, snap_id)
+        db.create_sync_event(conn, source_snapshot_id, snap_id)
         conn.commit()
     except Exception:
         conn.rollback()
@@ -310,8 +315,8 @@ def main() -> None:
 
     conn.close()
     print(f"✓  Snapshot #{snap_id} creado con {len(filas)} jugador(es).")
-    if latest_id:
-        print(f"   sync_event: snapshot #{latest_id} → #{snap_id}")
+    if source_snapshot_id is not None:
+        print(f"   sync_event: snapshot #{source_snapshot_id} → #{snap_id}")
     else:
         print("   (primer sync — sin snapshot anterior)")
 

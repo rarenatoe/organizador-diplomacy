@@ -410,7 +410,7 @@ async function runScript(
   btnSync.disabled = true;
   btnOrganizar.disabled = true;
   const fetchInit: RequestInit = { method: "POST" };
-  if (snapshotId !== null && script === "organizar") {
+  if (snapshotId !== null) {
     fetchInit.headers = { "Content-Type": "application/json" };
     fetchInit.body = JSON.stringify({ snapshot: snapshotId });
   }
@@ -448,7 +448,7 @@ document.getElementById("btn-refresh")!.addEventListener("click", () => {
   void loadChain();
 });
 document.getElementById("btn-sync")!.addEventListener("click", () => {
-  void runScript("notion_sync");
+  void runScript("notion_sync", _selectedSnapshot);
 });
 document
   .getElementById("btn-organizar")!

@@ -227,3 +227,42 @@ class TestApiRun:
         )
         resp = c.post("/api/run/organizar", content_type="application/json")
         assert resp.status_code == 200
+
+    def test_run_notion_sync_with_snapshot_passes_arg(self, client, monkeypatch):
+        """Passing snapshot id to notion_sync forwards --snapshot to the subprocess."""
+        import subprocess
+        calls: list[list[str]] = []
+        c, conn = client
+        monkeypatch.setattr(
+            subprocess, "run",
+            lambda *a, **kw: calls.append(a[0]) or type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
+        )
+        resp = c.post(
+            "/api/run/notion_sync",
+            data=json.dumps({"snapshot": 3}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        assert "--snapshot" in calls[0]
+        assert "3" in calls[0]
+
+    def test_run_notion_sync_invalid_snapshot_type_returns_400(self, client):
+        """notion_sync with a non-integer snapshot value returns 400."""
+        c, conn = client
+        resp = c.post(
+            "/api/run/notion_sync",
+            data=json.dumps({"snapshot": "bad"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+    def test_run_notion_sync_no_snapshot_accepted(self, client, monkeypatch):
+        """Calling notion_sync without snapshot uses latest — should not 400."""
+        import subprocess
+        c, conn = client
+        monkeypatch.setattr(
+            subprocess, "run",
+            lambda *a, **kw: type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
+        )
+        resp = c.post("/api/run/notion_sync", content_type="application/json")
+        assert resp.status_code == 200

@@ -81,17 +81,15 @@ def api_run(script: str):
         return jsonify({"error": "unknown script"}), 400
 
     cwd = Path(__file__).parent
+    body = request.get_json(silent=True) or {}
+    snapshot_id = body.get("snapshot")
 
-    if script == "organizar":
-        body = request.get_json(silent=True) or {}
-        snapshot_id = body.get("snapshot")
-        cmd = ["uv", "run", "python", "organizador.py"]
-        if snapshot_id is not None:
-            if not isinstance(snapshot_id, int):
-                return jsonify({"error": "snapshot must be an integer"}), 400
-            cmd += ["--snapshot", str(snapshot_id)]
-    else:
-        cmd = ["uv", "run", "python", "notion_sync.py"]
+    if snapshot_id is not None and not isinstance(snapshot_id, int):
+        return jsonify({"error": "snapshot must be an integer"}), 400
+
+    cmd = ["uv", "run", "python", f"{script}.py"]
+    if snapshot_id is not None:
+        cmd += ["--snapshot", str(snapshot_id)]
 
     result = subprocess.run(
         cmd,
