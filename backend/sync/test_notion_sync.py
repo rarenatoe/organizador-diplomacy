@@ -177,72 +177,139 @@ class TestDetectSimilarNames:
 # ── Sync behavior tests ──────────────────────────────────────────────────────
 
 class TestSyncBehavior:
-    """Tests for the sync behavior to ensure players are preserved correctly."""
-    
+    """Tests for the sync behavior to ensure players are preserved, merged, and filtered correctly."""
+
+    def _simulate_sync_logic(self, existentes, notion_players, merges=None, is_first_sync=False):
+        """Helper to simulate the exact row-building logic from notion_sync.py"""
+        from .notion_sync import _normalize_name, FIELD_DEFAULTS
+        if merges is None:
+            merges = {}
+        
+        filas = []
+        if not is_first_sync:
+            merged_notion_normalized = {_normalize_name(v) for v in merges.values()}
+            
+            for nombre, existente in existentes.items():
+                normalized_nombre = _normalize_name(nombre)
+
+                # 1. Merged players
+                if nombre in merges:
+                    notion_name = merges[nombre]
+                    notion_norm = _normalize_name(notion_name)
+                    if notion_norm in notion_players:
+                        notion_data = notion_players[notion_norm]
+                        filas.append({
+                            "Nombre":            notion_data["nombre"],
+                            "Experiencia":       notion_data["experiencia"],
+                            "Juegos_Este_Ano":   notion_data["juegos"],
+                            "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
+                            "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
+                            "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
+                        })
+                        continue
+                
+                # 2. Exact matches
+                if normalized_nombre in notion_players and normalized_nombre not in merged_notion_normalized:
+                    notion_data = notion_players[normalized_nombre]
+                    filas.append({
+                        "Nombre":            nombre,
+                        "Experiencia":       notion_data["experiencia"],
+                        "Juegos_Este_Ano":   notion_data["juegos"],
+                        "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
+                        "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
+                        "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
+                    })
+                # 3. Not in Notion (Preserved locally)
+                elif nombre not in merges:
+                    filas.append({
+                        "Nombre":            nombre,
+                        "Experiencia":       existente.get("experiencia", "Nuevo"),
+                        "Juegos_Este_Ano":   int(existente.get("juegos_este_ano", 0)),
+                        "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
+                        "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
+                        "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
+                    })
+        else:
+            # First ever sync
+            for norm_name, notion_data in notion_players.items():
+                filas.append({
+                    "Nombre":            notion_data["nombre"],
+                    "Experiencia":       notion_data["experiencia"],
+                    "Juegos_Este_Ano":   notion_data["juegos"],
+                    "prioridad":         FIELD_DEFAULTS["prioridad"],
+                    "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
+                    "partidas_gm":       FIELD_DEFAULTS["partidas_gm"],
+                })
+        return filas
+
     def test_players_not_in_notion_are_preserved(self):
-        """
-        Regression test: players in the snapshot that are not in Notion
-        should be preserved in the new snapshot, not removed.
-        
-        This prevents the bug where only Andy remained after sync.
-        """
-        from .notion_sync import _normalize_name
-        
-        # Simulate existing snapshot with 16 players
+        """Regression test: Local players not in Notion must not be deleted."""
         existentes = {
-            "andy": {"nombre": "Andy", "experiencia": "Antiguo", "juegos_este_ano": 2, 
-                     "prioridad": 0, "partidas_deseadas": 2, "partidas_gm": 1},
-            "charlie kuntz": {"nombre": "Charlie Kuntz", "experiencia": "Antiguo", "juegos_este_ano": 0,
-                              "prioridad": 0, "partidas_deseadas": 2, "partidas_gm": 0},
-            "charmander": {"nombre": "Charmander", "experiencia": "Antiguo", "juegos_este_ano": 1,
-                           "prioridad": 0, "partidas_deseadas": 1, "partidas_gm": 0},
-            "daniel eiler": {"nombre": "Daniel Eiler", "experiencia": "Antiguo", "juegos_este_ano": 2,
-                             "prioridad": 1, "partidas_deseadas": 1, "partidas_gm": 0},
+            "Andy": {"nombre": "Andy", "experiencia": "Antiguo", "juegos_este_ano": 2, "prioridad": 0, "partidas_deseadas": 2, "partidas_gm": 1},
+            "Charlie": {"nombre": "Charlie", "experiencia": "Antiguo", "juegos_este_ano": 0, "prioridad": 0, "partidas_deseadas": 2, "partidas_gm": 0},
         }
-        
-        # Simulate Notion only has Andy
         notion_players = {
             "andy": {"nombre": "Andy", "experiencia": "Antiguo", "juegos": 1},
         }
         
-        # Build new snapshot
-        filas = []
-        for nombre, existente in existentes.items():
-            normalized_nombre = _normalize_name(nombre)
-            if normalized_nombre in notion_players:
-                # Update from Notion
-                notion_data = notion_players[normalized_nombre]
-                filas.append({
-                    "Nombre": nombre,
-                    "Experiencia": notion_data["experiencia"],
-                    "Juegos_Este_Ano": notion_data["juegos"],
-                    "prioridad": int(existente.get("prioridad", 0)),
-                    "partidas_deseadas": int(existente.get("partidas_deseadas", 1)),
-                    "partidas_gm": int(existente.get("partidas_gm", 0)),
-                })
-            else:
-                # Keep existing data (player not in Notion)
-                filas.append({
-                    "Nombre": nombre,
-                    "Experiencia": existente.get("experiencia", "Nuevo"),
-                    "Juegos_Este_Ano": int(existente.get("juegos_este_ano", 0)),
-                    "prioridad": int(existente.get("prioridad", 0)),
-                    "partidas_deseadas": int(existente.get("partidas_deseadas", 1)),
-                    "partidas_gm": int(existente.get("partidas_gm", 0)),
-                })
+        filas = self._simulate_sync_logic(existentes, notion_players)
         
-        # All 4 players should be preserved
-        assert len(filas) == 4
+        assert len(filas) == 2
         nombres = [f["Nombre"] for f in filas]
-        assert "andy" in nombres
-        assert "charlie kuntz" in nombres
-        assert "charmander" in nombres
-        assert "daniel eiler" in nombres
+        assert "Andy" in nombres
+        assert "Charlie" in nombres
         
-        # Andy should have updated JUEGOS from Notion (1 instead of 2)
-        andy_row = next(f for f in filas if f["Nombre"] == "andy")
-        assert andy_row["Juegos_Este_Ano"] == 1
+        andy_row = next(f for f in filas if f["Nombre"] == "Andy")
+        assert andy_row["Juegos_Este_Ano"] == 1 # Updated from Notion
+        charlie_row = next(f for f in filas if f["Nombre"] == "Charlie")
+        assert charlie_row["Juegos_Este_Ano"] == 0 # Preserved from local
+
+    def test_new_notion_players_are_ignored(self):
+        """Regression test: New players in Notion must NOT be added to an existing snapshot."""
+        existentes = {
+            "Kur": {"nombre": "Kur", "experiencia": "Antiguo", "juegos_este_ano": 1},
+        }
+        notion_players = {
+            "kur": {"nombre": "Kur", "experiencia": "Antiguo", "juegos": 2},
+            "nuevo_jugador": {"nombre": "Nuevo Jugador", "experiencia": "Nuevo", "juegos": 0},
+        }
         
-        # Others should keep their original data
-        charlie_row = next(f for f in filas if f["Nombre"] == "charlie kuntz")
-        assert charlie_row["Juegos_Este_Ano"] == 0
+        filas = self._simulate_sync_logic(existentes, notion_players)
+        
+        assert len(filas) == 1
+        assert filas[0]["Nombre"] == "Kur"
+        assert filas[0]["Juegos_Este_Ano"] == 2 # Updated
+
+    def test_player_merged_correctly(self):
+        """Test that merging a player adopts the Notion name and updates stats."""
+        existentes = {
+            "Kur": {"nombre": "Kur", "experiencia": "Antiguo", "juegos_este_ano": 1, "prioridad": 1, "partidas_deseadas": 3},
+        }
+        notion_players = {
+            "kurt": {"nombre": "Kurt", "experiencia": "Antiguo", "juegos": 5},
+        }
+        merges = {"Kur": "Kurt"}
+        
+        filas = self._simulate_sync_logic(existentes, notion_players, merges)
+        
+        assert len(filas) == 1
+        assert filas[0]["Nombre"] == "Kurt" # Adopted new name
+        assert filas[0]["Juegos_Este_Ano"] == 5 # Updated from Notion
+        assert filas[0]["prioridad"] == 1 # Preserved local priority
+        assert filas[0]["partidas_deseadas"] == 3 # Preserved local config
+
+    def test_player_merge_skipped(self):
+        """Test that skipping a merge preserves the local player and ignores the new Notion player."""
+        existentes = {
+            "Kur": {"nombre": "Kur", "experiencia": "Antiguo", "juegos_este_ano": 1},
+        }
+        notion_players = {
+            "kurt": {"nombre": "Kurt", "experiencia": "Antiguo", "juegos": 5},
+        }
+        merges = {} # User clicked "Sincronizar sin fusionar"
+        
+        filas = self._simulate_sync_logic(existentes, notion_players, merges)
+        
+        assert len(filas) == 1
+        assert filas[0]["Nombre"] == "Kur" # Local preserved
+        assert filas[0]["Juegos_Este_Ano"] == 1 # Local stats preserved (Kurt was ignored)

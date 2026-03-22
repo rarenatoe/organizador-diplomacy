@@ -63,11 +63,9 @@ Each sync edge: `{type:"sync", id, created_at, from_id, to_id}`
 
 ## Notion Sync behavior (important UX distinction)
 `notion_sync.py` is a **fresh pull from Notion** — it always reads `Nombre`, `Experiencia`, `Juegos_Este_Ano` from Notion.
+- **Strict Roster Rule:** It only updates players already present in the selected snapshot. It does **NOT** import new players from Notion. Local players not found in Notion are preserved.
+- **Merge Name Support:** Accepts a `--merges` JSON argument to map local names to Notion names (e.g., "Kur" -> "Kurt"). Merged players adopt the Notion name and update their stats while preserving local configs.
 - Preserves `prioridad`, `partidas_deseadas`, `partidas_gm` from the **selected snapshot** (or latest if none is selected).
-- Accepts `--snapshot <id>` CLI arg; `viewer.py` passes this from the request body, which `src/app.ts` populates with `_selectedSnapshot`.
-- Guard: `snapshots_have_same_roster(conn, source_snapshot_id, notion_rows)` — if identical data and not `--force`, skips creating a new snapshot.
-- Creates `sync_event(source=source_snapshot_id, output=new_snap_id)`.
-- **The selected snapshot affects both `Organizar` and `Sync Notion`.**
 
 ## Flask API (`viewer.py`)
 | Route | Method | Response |

@@ -423,63 +423,10 @@ def main() -> None:
             "juegos": juegos,
         }
     
-    # ── Build new snapshot: start with all existing players, update from Notion ──
-    filas: list[dict] = []
-    
-    if source_snapshot_id is not None:
-        # Start with all players from the existing snapshot
-        for nombre, existente in existentes.items():
-            # Check if this player exists in Notion (exact match)
-            normalized_nombre = _normalize_name(nombre)
-            if normalized_nombre in notion_players:
-                # Update from Notion
-                notion_data = notion_players[normalized_nombre]
-                filas.append({
-                    "Nombre":            nombre,
-                    "Experiencia":       notion_data["experiencia"],
-                    "Juegos_Este_Ano":   notion_data["juegos"],
-                    "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
-                    "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
-                    "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
-                })
-            else:
-                # Keep existing data (player not in Notion)
-                filas.append({
-                    "Nombre":            nombre,
-                    "Experiencia":       existente.get("experiencia", "Nuevo"),
-                    "Juegos_Este_Ano":   int(existente.get("juegos_este_ano", 0)),
-                    "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
-                    "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
-                    "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
-                })
-    else:
-        # No existing snapshot - use all Notion players
-        for page in pages:
-            props = page.get("properties", {})
-            nombre_prop = props.get("Nombre")
-            if not nombre_prop:
-                continue
-            nombre = _extraer_nombre(nombre_prop)
-            if not nombre:
-                continue
-            
-            part_prop = props.get("Participaciones")
-            experiencia = _experiencia(part_prop) if part_prop else "Nuevo"
-            player_id = page["id"].replace("-", "")
-            juegos = conteo_por_jugador.get(player_id, 0)
-            
-            filas.append({
-                "Nombre":            nombre,
-                "Experiencia":       experiencia,
-                "Juegos_Este_Ano":   juegos,
-                "prioridad":         FIELD_DEFAULTS["prioridad"],
-                "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
-                "partidas_gm":       FIELD_DEFAULTS["partidas_gm"],
-            })
-
     # ── Detect-only mode: output similar names as JSON ────────────────────────
+    # We must do this BEFORE building `filas` so we use the raw incoming Notion names
     if args.detect_only:
-        notion_names = [f["Nombre"] for f in filas]
+        notion_names = [data["nombre"] for data in notion_players.values()]
         snapshot_names = list(existentes.keys())
         similar = _detect_similar_names(notion_names, snapshot_names)
         result = {
@@ -490,6 +437,66 @@ def main() -> None:
         print(json.dumps(result, ensure_ascii=False, indent=2))
         conn.close()
         return
+
+    # ── Build new snapshot: start with all existing players, update from Notion ──
+    filas: list[dict] = []
+    
+    if source_snapshot_id is not None:
+        merged_notion_normalized = {_normalize_name(v) for v in merges.values()}
+        
+        # Start with all players from the existing snapshot
+        for nombre, existente in existentes.items():
+            normalized_nombre = _normalize_name(nombre)
+
+            # 1. Check if this player was explicitly merged via the UI dialog
+            if nombre in merges:
+                notion_name = merges[nombre]
+                notion_norm = _normalize_name(notion_name)
+                if notion_norm in notion_players:
+                    notion_data = notion_players[notion_norm]
+                    filas.append({
+                        "Nombre":            notion_data["nombre"], # Switch to the Notion name
+                        "Experiencia":       notion_data["experiencia"],
+                        "Juegos_Este_Ano":   notion_data["juegos"],
+                        "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
+                        "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
+                        "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
+                    })
+                    continue
+            
+            # 2. Check if this player exists in Notion (exact match)
+            if normalized_nombre in notion_players and normalized_nombre not in merged_notion_normalized:
+                notion_data = notion_players[normalized_nombre]
+                filas.append({
+                    "Nombre":            nombre,
+                    "Experiencia":       notion_data["experiencia"],
+                    "Juegos_Este_Ano":   notion_data["juegos"],
+                    "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
+                    "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
+                    "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
+                })
+            elif nombre not in merges:
+                # 3. Keep existing data (player not in Notion and not merged)
+                filas.append({
+                    "Nombre":            nombre,
+                    "Experiencia":       existente.get("experiencia", "Nuevo"),
+                    "Juegos_Este_Ano":   int(existente.get("juegos_este_ano", 0)),
+                    "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
+                    "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
+                    "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
+                })
+
+    else:
+        # No existing snapshot - use all Notion players directly from our lookup
+        for norm_name, notion_data in notion_players.items():
+            filas.append({
+                "Nombre":            notion_data["nombre"],
+                "Experiencia":       notion_data["experiencia"],
+                "Juegos_Este_Ano":   notion_data["juegos"],
+                "prioridad":         FIELD_DEFAULTS["prioridad"],
+                "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
+                "partidas_gm":       FIELD_DEFAULTS["partidas_gm"],
+            })
 
     nuevos = [f["Nombre"] for f in filas if f["Nombre"] not in existentes]
     print(f"⟳  {len(filas)} jugador(es) procesados ({len(nuevos)} nuevo(s)).")
