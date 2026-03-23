@@ -39,15 +39,26 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 | Path | Role |
 |---|---|
 | `src/types.ts` | All TypeScript interfaces shared across the UI (domain types) |
-| `src/chain.ts` | `esc`, `loadChain`, chain HTML renderers (snapshot/game/sync nodes) |
-| `src/selection.ts` | `_selectedSnapshot` state, `setSelectedSnapshot`, `deselectSnapshot`, `setSnapshotCount`, `updateSelectionUI` (Sync Notion button state logic) |
-| `src/clipboard.ts` | Copy store (`reg`), copy-btn click listener |
-| `src/panels.ts` | `openPanel`, `closePanel`, `openSnapshot`, `applySnapshotEdit`, `openSyncPanel`, `openGame`, `deleteSnapshot`, `showRenameDialog`, `showAddPlayerDialog` |
-| `src/selection.test.ts` | Tests for selection module (Sync Notion button state, snapshot selection) |
-| `src/app.ts` | Entry point: node-click wiring, `runScript`, button event listeners |
-| `static/app.js` | Bundled output (bun build IIFE). **Gitignored** — regenerate with `bun run build`. |
-| `static/style.css` | All CSS for the viewer UI |
-| `templates/index.html` | ~57-line Jinja2 shell. No inline logic, no onclick attributes. |
+| `src/stores.svelte.ts` | Global Svelte 5 state using `$state` runes (selectedSnapshot, snapshotCount, chainData, activeNodeId) |
+| `src/api.ts` | Centralized API utility module (fetchChain, fetchSnapshot, fetchGame, runScript, detectSync, confirmSync, etc.) |
+| `src/main.ts` | Entry point: mounts App.svelte to DOM |
+| `src/App.svelte` | Main layout shell: Header, ChainViewer, SidePanel, Toaster, modals |
+| `src/components/Header.svelte` | Top bar with buttons (Refresh, Sync Notion, Organizar, Deselect) |
+| `src/components/ChainViewer.svelte` | Chain tree display, loads and renders snapshot nodes |
+| `src/components/SnapshotNode.svelte` | Recursive snapshot node with branches (uses self-import) |
+| `src/components/GameNode.svelte` | Game edge card component |
+| `src/components/SyncNode.svelte` | Sync edge card component |
+| `src/components/SidePanel.svelte` | Detail panel container with slide animation |
+| `src/components/SnapshotDetail.svelte` | Snapshot panel: player table, edit controls, CSV copy |
+| `src/components/GameDetail.svelte` | Game panel: mesa cards, waiting list, share text |
+| `src/components/SyncDetail.svelte` | Sync panel: metadata display |
+| `src/components/Toaster.svelte` | Toast notification system (syncing, success, error states) |
+| `src/components/SyncResolutionModal.svelte` | Sequential conflict resolution cards (Merge/Skip) |
+| `src/components/TerminalModal.svelte` | Script output modal with spinner |
+| `src/index.html` | Vite entry HTML template |
+| `static/style.css` | All CSS for the viewer UI (unchanged) |
+| `static/app.js` | Bundled output (Vite build). **Gitignored** — regenerate with `bun run build`. |
+| `templates/index.html` | Production HTML (copied from static/index.html by build script) |
 
 ### Data
 | File | Format | Git | Mutability |

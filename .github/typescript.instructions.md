@@ -2,23 +2,52 @@
 applyTo: "frontend/src/**"
 ---
 
-## TypeScript conventions
+## Svelte 5 conventions
 - All domain interfaces live in `src/types.ts` — export everything from there.
-- Module responsibilities: `chain.ts` → renderers; `selection.ts` → state (snapshot selection + Sync Notion button state); `clipboard.ts` → copy store; `panels.ts` → panel content; `app.ts` → entry point wiring.
-- Import graph (no cycles): `app.ts` → `chain`, `selection`, `panels`. `panels.ts` → `chain`, `clipboard`, `selection`. `chain.ts` → `selection`. `clipboard.ts` → none.
-- Run `bun run build` to bundle into `static/app.js` (IIFE, no `type="module"` needed). `bun run typecheck` for type-only check. `bun run lint` — ESLint strict.
-- All DOM interactions use `!` non-null assertion (acceptable — developer controls the HTML).
-- No `onclick` attributes in HTML — all event listeners in `src/app.ts`.
-- No `String()`, no `!!bool` — use the typed value directly.
+- Use Svelte 5 runes: `$state` for reactive state, `$derived` for computed values, `$effect` for side effects, `$props` for component props.
+- State management: `src/stores.svelte.ts` — class-based `AppState` with `$state` runes, exported as singleton `appState`. Use getter/setter functions (e.g., `getSelectedSnapshot()`, `setSelectedSnapshot()`).
+- API layer: `src/api.ts` — centralized fetch calls (fetchChain, fetchSnapshot, fetchGame, runScript, detectSync, confirmSync, etc.).
+- Component structure: `src/components/*.svelte` — each component is a single `.svelte` file with `<script>`, markup, and optional `<style>` blocks.
+- Import graph (no cycles): `App.svelte` → components, stores, api. Components → stores, api, types. Stores → types only.
+
+## Svelte component conventions
+- Use `$props()` to declare component props with TypeScript interfaces.
+- Use `$state` for local reactive state within components.
+- Use `$derived` for computed values (e.g., `let disabled = $derived(syncing || running)`).
+- Use `$effect(() => { ... })` for side effects (e.g., loading data on mount).
+- Use `$bindable()` for two-way binding when needed.
+- Event handling: use `onclick={handler}` directly in markup (not `addEventListener`).
+- Use `{#if}`, `{#each}`, `{#await}` blocks for control flow.
+- Use `{@render children()}` for slot content (not `<slot>` — deprecated in Svelte 5).
+- For recursive components, use self-imports (e.g., `import SnapshotNode from './SnapshotNode.svelte'`) instead of `<svelte:self>`.
+
+## Build & tooling
+- Vite builds from `src/index.html` entry point → `static/` output directory.
+- Run `bun run build` to build with Vite and copy `index.html` to `templates/`.
+- Run `bun run dev` for development server with HMR.
+- Run `bun run typecheck` for type-only check.
+- Run `bun run lint` — ESLint strict.
+- Svelte files use `<script lang="ts">` for TypeScript support.
 
 ## UI conventions
-- `index.html` is a ~57-line Jinja2 shell. **No logic here, no onclick attributes** — event listeners wired in `src/app.ts`.
-- All CSS in `static/style.css`. All JS compiled from `src/app.ts` (entry point) → `static/app.js`.
+- `templates/index.html` is the production HTML served by Flask (copied from build output).
+- `src/index.html` is the Vite entry template with `<div id="app">` mount point.
+- All CSS in `static/style.css` — unchanged, import globally in `App.svelte`.
 - **Click-to-select**: snapshot node click → `setSelectedSnapshot(id)` → `.csv-selected` green ring + button label "Organizar · #N".
-- Game node click → `openGame(id)` → GET `/api/game/<id>`, shows detail panel.
-- Sync node click → `openSyncPanel(id)` → searches chain data for the edge, shows metadata panel.
-- `runScript("organizar", getSelectedSnapshot())` reads selection from `src/selection.ts`. `deselectSnapshot()` resets.
-- `renderSnapshotTree()` in `src/chain.ts` renders the chain recursively — branches stacked vertically so no false arrow.
+- Game node click → `openGame(id)` → fetches game detail, shows in SidePanel.
+- Sync node click → `openSync(id)` → fetches sync metadata, shows in SidePanel.
+- `handleRunScript("organizar")` reads selection from stores. `deselectSnapshot()` resets.
+- `SnapshotNode.svelte` renders the chain recursively using self-import — branches stacked vertically.
 
-## Planned migrations
-- **Framework (Vue/React)**: currently deferred. The refactor into `chain`, `selection`, `clipboard`, `panels` modules resolved the immediate size/complexity problem. Reassess when a state change needs to drive multiple independent UI regions simultaneously (the trigger for reactive data binding). The bundler (`bun build`) is already in place.
+## Testing conventions
+- Use Vitest with `@testing-library/svelte` for component testing.
+- Test files co-located with components: `ComponentName.test.ts` next to `ComponentName.svelte`.
+- Mock API calls with `vi.mock('../api')`.
+- Test state management by importing from `stores.svelte.ts`.
+- Use `render()` from `@testing-library/svelte` to mount components in tests.
+- **Component typing in tests**: `render()` returns `any`-typed component. Avoid `as unknown as` double casts (code smell). Prefer using the component's exported methods directly or test via DOM queries instead of component instance.
+- Test exported component methods by accessing them through the rendered component, but be aware TypeScript won't infer their types from Svelte components.
+
+## Svelte 5 children pattern
+- For components with children, import `Snippet` type from "svelte" and declare `children: Snippet` in Props interface.
+- Use `{@render children()}` in template (not `<slot />` — deprecated).

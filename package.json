@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "bun build frontend/src/app.ts --outfile frontend/static/app.js --format iife",
+    "build": "cd frontend && npx vite build && cp static/index.html templates/",
+    "dev": "cd frontend && npx vite",
     "typecheck": "tsc --noEmit",
     "lint": "eslint frontend/src/",
     "lint:fix": "eslint frontend/src/ --fix",
@@ -26,13 +27,17 @@
     "node": ">=24.14.0"
   },
   "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/svelte": "^5.3.1",
     "@vitest/coverage-v8": "^4.1.0",
     "eslint": "10.1.0",
     "jsdom": "^29.0.1",
+    "svelte": "^5.54.1",
     "typescript": "5.9.3",
     "typescript-eslint": "8.57.1",
+    "vite": "^8.0.1",
     "vitest": "^4.1.0"
   }
 }

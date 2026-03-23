@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ES2022",
+    "moduleDetection": "auto",
+    "moduleResolution": "bundler",
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "exactOptionalPropertyTypes": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "types": ["svelte"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}
