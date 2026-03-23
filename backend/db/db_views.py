@@ -30,6 +30,7 @@ def build_chain_data(conn: sqlite3.Connection) -> dict:
     edge (sync):  {type:"sync", id, created_at, from_id, to_id}
     edge (game):  {type:"game", id, created_at, from_id, to_id,
                    intentos, mesa_count, espera_count}
+    edge (edit):  {type:"edit", id, created_at, from_id, to_id}
     """
     # ── All snapshots ──────────────────────────────────────────────────────────
     snap_rows = {
@@ -49,60 +50,45 @@ def build_chain_data(conn: sqlite3.Connection) -> dict:
 
     latest_id = max(snap_rows)
 
-    # ── Sync edges (only those with a non-null source) ─────────────────────────
-    sync_edges: list[dict] = [
-        {
-            "type": "sync",
+    # ── All edges from unified events table ────────────────────────────────────
+    edges: list[dict] = []
+    for r in conn.execute(
+        """
+        SELECT e.id, e.created_at, e.type, e.source_snapshot_id, e.output_snapshot_id,
+               gd.intentos,
+               COUNT(DISTINCT m.id)  AS mesa_count,
+               (SELECT COUNT(*) FROM waiting_list wl WHERE wl.event_id = e.id)
+                                     AS espera_count
+        FROM   events e
+        LEFT JOIN game_details gd ON gd.event_id = e.id
+        LEFT JOIN mesas m ON m.event_id = e.id
+        WHERE  e.source_snapshot_id IS NOT NULL
+        GROUP  BY e.id
+        """
+    ).fetchall():
+        edge: dict = {
+            "type": r["type"],
             "id": int(r["id"]),
             "created_at": r["created_at"],
-            "from_id": int(r["source_snapshot"]),
-            "to_id": int(r["output_snapshot"]),
-        }
-        for r in conn.execute(
-            """
-            SELECT id, created_at, source_snapshot, output_snapshot
-            FROM   sync_events
-            WHERE  source_snapshot IS NOT NULL
-            """
-        ).fetchall()
-    ]
-
-    # ── Game edges ─────────────────────────────────────────────────────────────
-    game_edges: list[dict] = [
-        {
-            "type": "game",
-            "id": int(r["id"]),
-            "created_at": r["created_at"],
-            "from_id": int(r["input_snapshot_id"]),
+            "from_id": int(r["source_snapshot_id"]),
             "to_id": int(r["output_snapshot_id"]),
-            "intentos": int(r["intentos"]),
-            "mesa_count": int(r["mesa_count"]),
-            "espera_count": int(r["espera_count"]),
         }
-        for r in conn.execute(
-            """
-            SELECT ge.id, ge.created_at, ge.input_snapshot_id, ge.output_snapshot_id,
-                   ge.intentos,
-                   COUNT(DISTINCT m.id)  AS mesa_count,
-                   (SELECT COUNT(*) FROM waiting_list wl WHERE wl.game_event_id = ge.id)
-                                         AS espera_count
-            FROM   game_events ge
-            LEFT JOIN mesas m ON m.game_event_id = ge.id
-            GROUP  BY ge.id
-            """
-        ).fetchall()
-    ]
+        if r["type"] == "game":
+            edge["intentos"] = int(r["intentos"])
+            edge["mesa_count"] = int(r["mesa_count"])
+            edge["espera_count"] = int(r["espera_count"])
+        edges.append(edge)
 
     # ── from_id → [edges] sorted chronologically ──────────────────────────────
     from_to: dict[int, list[dict]] = {}
-    for edge in sync_edges + game_edges:
+    for edge in edges:
         from_to.setdefault(edge["from_id"], []).append(edge)
     for lst in from_to.values():
         lst.sort(key=lambda e: e["created_at"])
 
     # ── Root snapshots ─────────────────────────────────────────────────────────
     # A snapshot is a root if no edge with a non-null source points to it.
-    produced_ids: set[int] = {e["to_id"] for e in sync_edges + game_edges}
+    produced_ids: set[int] = {e["to_id"] for e in edges}
     root_ids = [sid for sid in sorted(snap_rows) if sid not in produced_ids]
 
     visited: set[int] = set()
@@ -163,26 +149,27 @@ def get_snapshot_detail(conn: sqlite3.Connection, snapshot_id: int) -> dict | No
     }
 
 
-def get_game_event_detail(conn: sqlite3.Connection, game_event_id: int) -> dict | None:
+def get_game_event_detail(conn: sqlite3.Connection, event_id: int) -> dict | None:
     """Returns full game event detail for the detail panel. None if not found."""
     ge = conn.execute(
         """
-        SELECT id, created_at, intentos, copypaste_text,
-               input_snapshot_id, output_snapshot_id
-        FROM   game_events
-        WHERE  id = ?
+        SELECT e.id, e.created_at, e.source_snapshot_id, e.output_snapshot_id,
+               gd.intentos, gd.copypaste_text
+        FROM   events e
+        JOIN   game_details gd ON gd.event_id = e.id
+        WHERE  e.id = ? AND e.type = 'game'
         """,
-        (game_event_id,),
+        (event_id,),
     ).fetchone()
     if not ge:
         return None
 
-    input_sid = int(ge["input_snapshot_id"])
+    input_sid = int(ge["source_snapshot_id"])
 
     mesas_data: list[dict] = []
     for mesa_row in conn.execute(
-        "SELECT id, numero, gm_player_id FROM mesas WHERE game_event_id = ? ORDER BY numero",
-        (game_event_id,),
+        "SELECT id, numero, gm_player_id FROM mesas WHERE event_id = ? ORDER BY numero",
+        (event_id,),
     ).fetchall():
         mesa_id = int(mesa_row["id"])
 
@@ -231,10 +218,10 @@ def get_game_event_detail(conn: sqlite3.Connection, game_event_id: int) -> dict 
             SELECT p.nombre, wl.cupos_faltantes
             FROM   waiting_list wl
             JOIN   players      p ON p.id = wl.player_id
-            WHERE  wl.game_event_id = ?
+            WHERE  wl.event_id = ?
             ORDER  BY wl.orden
             """,
-            (game_event_id,),
+            (event_id,),
         ).fetchall()
     ]
 

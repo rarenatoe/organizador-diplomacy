@@ -118,18 +118,19 @@ class TestDb(unittest.TestCase):
         snap2 = db.create_snapshot(self.conn, "notion_sync")
         eid = db.create_sync_event(self.conn, snap1, snap2)
         self.conn.commit()
-        row = self.conn.execute("SELECT * FROM sync_events WHERE id=?", (eid,)).fetchone()
+        row = self.conn.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone()
         self.assertIsNotNone(row)
-        self.assertEqual(row["source_snapshot"], snap1)
-        self.assertEqual(row["output_snapshot"], snap2)
+        self.assertEqual(row["source_snapshot_id"], snap1)
+        self.assertEqual(row["output_snapshot_id"], snap2)
+        self.assertEqual(row["type"], "sync")
 
     def test_sync_event_null_source(self):
         """First-ever sync has no source snapshot (leido=null)."""
         snap1 = db.create_snapshot(self.conn, "notion_sync")
         eid = db.create_sync_event(self.conn, None, snap1)
         self.conn.commit()
-        row = self.conn.execute("SELECT * FROM sync_events WHERE id=?", (eid,)).fetchone()
-        self.assertIsNone(row["source_snapshot"])
+        row = self.conn.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone()
+        self.assertIsNone(row["source_snapshot_id"])
 
     # ── build_chain_data (db_views) ───────────────────────────────────────────
 
@@ -203,7 +204,7 @@ class TestDb(unittest.TestCase):
         db.delete_snapshot_cascade(self.conn, snap2)
         self.conn.commit()
         self.assertIsNone(self.conn.execute(
-            "SELECT id FROM sync_events WHERE id=?", (eid,)
+            "SELECT id FROM events WHERE id=?", (eid,)
         ).fetchone())
         self.assertIsNone(self.conn.execute(
             "SELECT id FROM snapshots WHERE id=?", (snap2,)
@@ -245,7 +246,7 @@ class TestDb(unittest.TestCase):
         db.delete_snapshot_cascade(self.conn, snap2)
         self.conn.commit()
         self.assertIsNone(self.conn.execute(
-            "SELECT id FROM game_events WHERE id=?", (ge_id,)
+            "SELECT id FROM events WHERE id=?", (ge_id,)
         ).fetchone())
         self.assertIsNone(self.conn.execute(
             "SELECT id FROM mesas WHERE id=?", (mesa_id,)
@@ -399,6 +400,143 @@ class TestDb(unittest.TestCase):
         # Verify Alice's data was preserved
         self.assertEqual(players[0]["experiencia"], "Antiguo")
         self.assertEqual(players[0]["juegos_este_ano"], 5)
+
+
+    # ── Schema validation tests (seat belt for future issues) ─────────────
+
+    def test_foreign_key_constraints_point_to_events(self):
+        """
+        Seat belt: Verify that mesas and waiting_list tables have correct
+        foreign key constraints pointing to events(id), not old game_events.
+        This prevents the FOREIGN KEY constraint failure we encountered.
+        """
+        # Check mesas table foreign keys
+        mesas_fks = self.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='mesas'"
+        ).fetchone()
+        mesas_sql = mesas_fks[0] if mesas_fks else ""
+        self.assertIn("REFERENCES events(id)", mesas_sql,
+            "mesas table must have foreign key pointing to events(id)")
+        self.assertNotIn("REFERENCES game_events", mesas_sql,
+            "mesas table must NOT reference old game_events table")
+
+        # Check waiting_list table foreign keys
+        wl_fks = self.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='waiting_list'"
+        ).fetchone()
+        wl_sql = wl_fks[0] if wl_fks else ""
+        self.assertIn("REFERENCES events(id)", wl_sql,
+            "waiting_list table must have foreign key pointing to events(id)")
+        self.assertNotIn("REFERENCES game_events", wl_sql,
+            "waiting_list table must NOT reference old game_events table")
+
+    def test_unified_events_table_exists(self):
+        """
+        Seat belt: Verify that the unified events table exists with correct schema.
+        This ensures the migration from sync_events/game_events was successful.
+        """
+        events_table = self.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='events'"
+        ).fetchone()
+        self.assertIsNotNone(events_table, "events table must exist")
+        events_sql = events_table[0]
+        self.assertIn("type", events_sql, "events table must have type column")
+        self.assertIn("'sync'", events_sql, "events table must allow 'sync' type")
+        self.assertIn("'game'", events_sql, "events table must allow 'game' type")
+        self.assertIn("'edit'", events_sql, "events table must allow 'edit' type")
+        self.assertIn("source_snapshot_id", events_sql, "events table must have source_snapshot_id")
+        self.assertIn("output_snapshot_id", events_sql, "events table must have output_snapshot_id")
+
+    def test_game_details_table_exists(self):
+        """
+        Seat belt: Verify that game_details table exists with correct schema.
+        This ensures game-specific data is properly separated from events.
+        """
+        gd_table = self.conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='game_details'"
+        ).fetchone()
+        self.assertIsNotNone(gd_table, "game_details table must exist")
+        gd_sql = gd_table[0]
+        self.assertIn("event_id", gd_sql, "game_details must have event_id column")
+        self.assertIn("intentos", gd_sql, "game_details must have intentos column")
+        self.assertIn("copypaste_text", gd_sql, "game_details must have copypaste_text column")
+        self.assertIn("REFERENCES events(id)", gd_sql,
+            "game_details must have foreign key pointing to events(id)")
+
+    def test_old_tables_do_not_exist(self):
+        """
+        Seat belt: Verify that old sync_events and game_events tables do not exist.
+        This ensures the migration completed successfully.
+        """
+        old_tables = self.conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('sync_events', 'game_events')"
+        ).fetchall()
+        self.assertEqual(len(old_tables), 0,
+            f"Old tables must not exist after migration: {[t[0] for t in old_tables]}")
+
+    def test_game_event_creates_both_event_and_details(self):
+        """
+        Seat belt: Verify that creating a game event creates both
+        an entry in events table AND game_details table.
+        This ensures the unified schema works correctly.
+        """
+        snap1 = db.create_snapshot(self.conn, "notion_sync")
+        snap2 = db.create_snapshot(self.conn, "organizar")
+        ge_id = db_game.create_game_event(self.conn, snap1, snap2, 5, "test copypaste")
+        self.conn.commit()
+
+        # Check events table
+        event_row = self.conn.execute(
+            "SELECT * FROM events WHERE id=?", (ge_id,)
+        ).fetchone()
+        self.assertIsNotNone(event_row, "Event must exist in events table")
+        self.assertEqual(event_row["type"], "game")
+        self.assertEqual(event_row["source_snapshot_id"], snap1)
+        self.assertEqual(event_row["output_snapshot_id"], snap2)
+
+        # Check game_details table
+        details_row = self.conn.execute(
+            "SELECT * FROM game_details WHERE event_id=?", (ge_id,)
+        ).fetchone()
+        self.assertIsNotNone(details_row, "Game details must exist in game_details table")
+        self.assertEqual(details_row["intentos"], 5)
+        self.assertEqual(details_row["copypaste_text"], "test copypaste")
+
+    def test_mesa_insertion_with_valid_event_id(self):
+        """
+        Seat belt: Verify that inserting a mesa with a valid event_id works.
+        This ensures the foreign key constraint is correctly configured.
+        """
+        snap1 = db.create_snapshot(self.conn, "notion_sync")
+        snap2 = db.create_snapshot(self.conn, "organizar")
+        ge_id = db_game.create_game_event(self.conn, snap1, snap2, 1, "test")
+        self.conn.commit()
+
+        # This should NOT raise a FOREIGN KEY constraint error
+        try:
+            mesa_id = db_game.create_mesa(self.conn, ge_id, 1, None)
+            self.conn.commit()
+            self.assertIsNotNone(mesa_id, "Mesa should be created successfully")
+        except Exception as e:
+            self.fail(f"Mesa creation should not raise exception: {e}")
+
+    def test_waiting_list_insertion_with_valid_event_id(self):
+        """
+        Seat belt: Verify that inserting into waiting_list with a valid event_id works.
+        This ensures the foreign key constraint is correctly configured.
+        """
+        snap1 = db.create_snapshot(self.conn, "notion_sync")
+        snap2 = db.create_snapshot(self.conn, "organizar")
+        pid = db.get_or_create_player(self.conn, "Alice")
+        ge_id = db_game.create_game_event(self.conn, snap1, snap2, 1, "test")
+        self.conn.commit()
+
+        # This should NOT raise a FOREIGN KEY constraint error
+        try:
+            db_game.add_waiting_player(self.conn, ge_id, pid, 1, 2)
+            self.conn.commit()
+        except Exception as e:
+            self.fail(f"Waiting list insertion should not raise exception: {e}")
 
 
 if __name__ == "__main__":

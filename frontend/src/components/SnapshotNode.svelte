@@ -2,6 +2,7 @@
   import type { SnapshotNode } from "../types";
   import GameNode from "./GameNode.svelte";
   import SyncNode from "./SyncNode.svelte";
+  import EditNode from "./EditNode.svelte";
   import SnapshotNodeComponent from "./SnapshotNode.svelte";
 
   interface Props {
@@ -68,6 +69,8 @@
           <span class="arrow">→</span>
           {#if branch.edge.type === "sync"}
             <SyncNode node={branch.edge} />
+          {:else if branch.edge.type === "edit"}
+            <EditNode node={branch.edge} />
           {:else}
             <GameNode node={branch.edge} />
           {/if}

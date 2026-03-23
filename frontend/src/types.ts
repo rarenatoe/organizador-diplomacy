@@ -45,7 +45,15 @@ export interface SyncEdge {
   to_id: number;
 }
 
-export type EdgeNode = GameEdge | SyncEdge;
+export interface EditEdge {
+  type: "edit";
+  id: number;
+  created_at: string;
+  from_id: number;
+  to_id: number;
+}
+
+export type EdgeNode = GameEdge | SyncEdge | EditEdge;
 
 export interface Branch {
   edge: EdgeNode;

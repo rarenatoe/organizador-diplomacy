@@ -37,30 +37,37 @@ def create_game_event(
     intentos: int,
     copypaste_text: str,
 ) -> int:
-    """Inserts a game_events row. Does NOT commit."""
+    """Inserts a game event row and its game_details. Does NOT commit."""
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cur = conn.execute(
         """
-        INSERT INTO game_events
-            (created_at, input_snapshot_id, output_snapshot_id,
-             intentos, copypaste_text)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO events
+            (created_at, type, source_snapshot_id, output_snapshot_id)
+        VALUES (?, 'game', ?, ?)
         """,
-        (ts, input_snapshot_id, output_snapshot_id, intentos, copypaste_text),
+        (ts, input_snapshot_id, output_snapshot_id),
     )
-    return cur.lastrowid  # type: ignore[return-value]
+    event_id = cur.lastrowid
+    conn.execute(
+        """
+        INSERT INTO game_details (event_id, intentos, copypaste_text)
+        VALUES (?, ?, ?)
+        """,
+        (event_id, intentos, copypaste_text),
+    )
+    return event_id  # type: ignore[return-value]
 
 
 def create_mesa(
     conn: sqlite3.Connection,
-    game_event_id: int,
+    event_id: int,
     numero: int,
     gm_player_id: int | None,
 ) -> int:
     """Inserts a mesas row. Does NOT commit."""
     cur = conn.execute(
-        "INSERT INTO mesas (game_event_id, numero, gm_player_id) VALUES (?, ?, ?)",
-        (game_event_id, numero, gm_player_id),
+        "INSERT INTO mesas (event_id, numero, gm_player_id) VALUES (?, ?, ?)",
+        (event_id, numero, gm_player_id),
     )
     return cur.lastrowid  # type: ignore[return-value]
 
@@ -80,7 +87,7 @@ def add_mesa_player(
 
 def add_waiting_player(
     conn: sqlite3.Connection,
-    game_event_id: int,
+    event_id: int,
     player_id: int,
     orden: int,
     cupos_faltantes: int,
@@ -89,10 +96,10 @@ def add_waiting_player(
     conn.execute(
         """
         INSERT INTO waiting_list
-            (game_event_id, player_id, orden, cupos_faltantes)
+            (event_id, player_id, orden, cupos_faltantes)
         VALUES (?, ?, ?, ?)
         """,
-        (game_event_id, player_id, orden, cupos_faltantes),
+        (event_id, player_id, orden, cupos_faltantes),
     )
 
 
