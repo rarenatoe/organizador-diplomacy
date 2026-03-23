@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ChainData } from "../types";
+  import type { ChainData, SnapshotNode } from "../types";
   import { fetchChain } from "../api";
   import {
     setSnapshotCount,
@@ -8,7 +8,8 @@
     setActiveNodeId,
     setSelectedSnapshot,
   } from "../stores.svelte";
-  import SnapshotNode from "./SnapshotNode.svelte";
+  import SnapshotGroupNode from "./SnapshotGroupNode.svelte";
+  import { groupSnapshots } from "../groupSnapshots";
 
   interface Props {
     onopenSnapshot: (id: number) => void;
@@ -21,6 +22,10 @@
     $props();
 
   let loading = $state(true);
+  let localRoots = $state<SnapshotNode[]>([]);
+
+  // Now this correctly tracks changes because localRoots is a $state rune
+  let groupedRoots = $derived(groupSnapshots(localRoots));
 
   export async function loadChain(): Promise<void> {
     loading = true;
@@ -28,6 +33,7 @@
       const data = await fetchChain();
       setChainData(data);
       setSnapshotCount(data.roots?.length ?? 0);
+      localRoots = data.roots ?? [];
     } finally {
       loading = false;
     }
@@ -56,16 +62,16 @@
         <div class="icon">⏳</div>
         <p>Cargando...</p>
       </div>
-    {:else if !getChainData()?.roots?.length}
+    {:else if !localRoots.length}
       <div class="empty-state">
         <div class="icon">📂</div>
         <p>No hay snapshots en la DB.</p>
         <p>Ejecuta <em>Sync Notion</em> para comenzar.</p>
       </div>
     {:else}
-      {#each getChainData()?.roots ?? [] as root (root.id)}
-        <SnapshotNode
-          node={root}
+      {#each groupedRoots as group (group.versions[0]!.snapshot.id)}
+        <SnapshotGroupNode
+          {group}
           onselect={handleSelect}
           ondelete={handleDelete}
           onopenGame={onopenGame}

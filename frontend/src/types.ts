@@ -147,3 +147,15 @@ export interface ResolutionState {
   decisions: ResolutionDecision[];
   snapshotId: number | null;
 }
+
+// ── Snapshot Group types (UI transformation) ─────────────────────────────────
+
+export interface SnapshotVersion {
+  snapshot: SnapshotNode;
+  incomingEdge: SyncEdge | EditEdge | null; // The event that created THIS version (null for the root of the group)
+}
+
+export interface SnapshotGroup {
+  versions: SnapshotVersion[];
+  branches: Branch[]; // The branches emanating from the LAST version in this group
+}
