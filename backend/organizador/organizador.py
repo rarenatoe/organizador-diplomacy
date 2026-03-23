@@ -1,5 +1,6 @@
 from __future__ import annotations
 import random
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -209,20 +210,19 @@ def organizar_partidas(
     """
     Organiza una ronda de partidas.
 
-    Reads player data from the database (latest snapshot if snapshot_id is
-    None), runs the algorithm, and persists all results atomically:
+    Reads player data from the database, runs the algorithm, and persists
+    all results atomically:
       - output snapshot (updated juegos_este_ano + prioridad)
       - game_event with copypaste_text
       - mesas, mesa_players, waiting_list
+
+    snapshot_id is required — no default to latest.
     """
     conn = db.get_db(db.DB_PATH if directorio == DATA_DIR else directorio / "diplomacy.db")
 
-    # ── Resolve snapshot ─────────────────────────────────────────────────────
+    # ── Validate snapshot ────────────────────────────────────────────────────
     if snapshot_id is None:
-        snapshot_id = db.get_latest_snapshot_id(conn)
-    if snapshot_id is None:
-        print("⚠️  No hay snapshots en la base de datos.")
-        print("   Ejecuta primero: uv run python notion_sync.py")
+        print("❌  snapshot_id es requerido para operaciones de branching.", file=sys.stderr)
         conn.close()
         return
 

@@ -43,16 +43,13 @@ class TestApiRun:
         )
         assert resp.status_code == 200
 
-    def test_no_snapshot_key_accepted(self, client, monkeypatch):
-        """Omitting snapshot uses latest — should not 400."""
-        import subprocess
+    def test_run_organizar_missing_snapshot_returns_400(self, client):
+        """Omitting snapshot returns 400 — snapshot_id is required."""
         c, conn = client
-        monkeypatch.setattr(
-            subprocess, "run",
-            lambda *a, **kw: type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
-        )
         resp = c.post("/api/run/organizar", content_type="application/json")
-        assert resp.status_code == 200
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert "Snapshot selection required" in data["error"]
 
     def test_run_notion_sync_with_snapshot_passes_arg(self, client, monkeypatch):
         """Passing snapshot id to notion_sync forwards --snapshot to the subprocess."""
@@ -82,7 +79,11 @@ class TestApiRun:
             subprocess, "run",
             lambda *a, **kw: calls.append(a[0]) or type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
         )
-        resp = c.post("/api/run/organizar", content_type="application/json")
+        resp = c.post(
+            "/api/run/organizar",
+            data=json.dumps({"snapshot": 1}),
+            content_type="application/json",
+        )
         assert resp.status_code == 200
         assert "backend.organizador.organizador" in calls[0]
 
@@ -97,7 +98,11 @@ class TestApiRun:
         )
         for script in ("notion_sync", "organizar"):
             calls.clear()
-            c.post(f"/api/run/{script}", content_type="application/json")
+            c.post(
+                f"/api/run/{script}",
+                data=json.dumps({"snapshot": 1}),
+                content_type="application/json",
+            )
             assert "-m" in calls[0], f"{script}: expected '-m' flag in command"
             # Must NOT be a bare .py filename (that would trigger the relative-import error)
             assert not any(arg.endswith(".py") for arg in calls[0]), (
@@ -114,7 +119,11 @@ class TestApiRun:
             subprocess, "run",
             lambda *a, **kw: captured_kwargs.append(kw) or type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
         )
-        c.post("/api/run/notion_sync", content_type="application/json")
+        c.post(
+            "/api/run/notion_sync",
+            data=json.dumps({"snapshot": 1}),
+            content_type="application/json",
+        )
         assert captured_kwargs, "subprocess.run was not called"
         cwd = Path(captured_kwargs[0]["cwd"])
         # The cwd must be the project root, which contains pyproject.toml
@@ -134,10 +143,35 @@ class TestApiRun:
         )
         assert resp.status_code == 400
 
-    def test_run_notion_sync_no_snapshot_accepted(self, client, monkeypatch):
-        """Calling notion_sync without snapshot uses latest — should not 400."""
+    def test_run_notion_sync_missing_snapshot_returns_200_when_empty(self, client, monkeypatch):
+        """Calling notion_sync without snapshot returns 200 when DB is empty (first-time sync)."""
         import subprocess
+        from backend.db import db
+        
+        # Clear all snapshots to simulate first-time sync
         c, conn = client
+        conn.execute("DELETE FROM snapshot_players")
+        conn.execute("DELETE FROM snapshots")
+        conn.commit()
+        
+        monkeypatch.setattr(
+            subprocess, "run",
+            lambda *a, **kw: type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
+        )
+        resp = c.post("/api/run/notion_sync", content_type="application/json")
+        assert resp.status_code == 200
+
+    def test_run_notion_sync_first_time_no_snapshot_allowed(self, client, monkeypatch):
+        """First-time sync (empty DB) is allowed without snapshot ID."""
+        import subprocess
+        from backend.db import db
+        
+        # Clear all snapshots to simulate first-time sync
+        c, conn = client
+        conn.execute("DELETE FROM snapshot_players")
+        conn.execute("DELETE FROM snapshots")
+        conn.commit()
+        
         monkeypatch.setattr(
             subprocess, "run",
             lambda *a, **kw: type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),

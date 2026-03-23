@@ -5,6 +5,7 @@ import {
   deselectSnapshot,
   setSnapshotCount,
   getSyncButtonEnabled,
+  getOrganizarEnabled,
   getOrganizarLabel,
   setChainData,
   getChainData,
@@ -38,6 +39,11 @@ describe("stores.svelte", () => {
   });
 
   describe("syncButtonEnabled", () => {
+    it("getSyncButtonEnabled returns false when snapshotCount is -1 (loading state)", () => {
+      setSnapshotCount(-1);
+      expect(getSyncButtonEnabled()).toBe(false);
+    });
+
     it("enabled when no snapshots exist", () => {
       setSnapshotCount(0);
       expect(getSyncButtonEnabled()).toBe(true);
@@ -53,6 +59,43 @@ describe("stores.svelte", () => {
       setSnapshotCount(5);
       setSelectedSnapshot(1);
       expect(getSyncButtonEnabled()).toBe(true);
+    });
+
+    it("getSyncButtonEnabled returns false if data exists but none selected", () => {
+      setSnapshotCount(10);
+      deselectSnapshot();
+      expect(getSyncButtonEnabled()).toBe(false);
+    });
+
+    it("deselectSnapshot() followed by setSnapshotCount(1) returns false", () => {
+      deselectSnapshot();
+      setSnapshotCount(1);
+      expect(getSyncButtonEnabled()).toBe(false);
+    });
+  });
+
+  describe("organizarEnabled", () => {
+    it("disabled when no snapshot selected", () => {
+      deselectSnapshot();
+      expect(getOrganizarEnabled()).toBe(false);
+    });
+
+    it("enabled when snapshot is selected", () => {
+      setSelectedSnapshot(42);
+      expect(getOrganizarEnabled()).toBe(true);
+    });
+
+    it("getOrganizarEnabled returns false if no snapshot selected regardless of count", () => {
+      setSnapshotCount(100);
+      deselectSnapshot();
+      expect(getOrganizarEnabled()).toBe(false);
+    });
+  });
+
+  describe("organizarLabel with snapshot", () => {
+    it("setSelectedSnapshot(123) returns 'Organizar · #123'", () => {
+      setSelectedSnapshot(123);
+      expect(getOrganizarLabel()).toBe("Organizar · #123");
     });
   });
 

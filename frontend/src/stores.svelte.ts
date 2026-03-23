@@ -13,12 +13,12 @@ interface AppState {
   activeNodeId: string | null;
 }
 
-const state: AppState = {
+const state = $state<AppState>({
   selectedSnapshot: null,
-  snapshotCount: 0,
+  snapshotCount: -1, // -1 means loading/unknown state
   chainData: null,
   activeNodeId: null,
-};
+});
 
 // ── Convenience getters/setters ───────────────────────────────────────────────
 
@@ -47,7 +47,13 @@ export function setActiveNodeId(id: string | null): void {
 }
 
 export function getSyncButtonEnabled(): boolean {
+  // If -1, we don't know the state yet (still loading), so keep it disabled.
+  if (state.snapshotCount === -1) return false;
   return state.snapshotCount === 0 || state.selectedSnapshot !== null;
+}
+
+export function getOrganizarEnabled(): boolean {
+  return state.selectedSnapshot !== null;
 }
 
 export function getOrganizarLabel(): string {

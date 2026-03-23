@@ -2,6 +2,7 @@
   import {
     getSelectedSnapshot,
     getSyncButtonEnabled,
+    getOrganizarEnabled,
     getOrganizarLabel,
     deselectSnapshot,
   } from "../stores.svelte";
@@ -16,17 +17,10 @@
 
   let { onrefresh, onsync, onorganizar, syncing, running }: Props = $props();
 
-  let selectedSnapshot = $state(getSelectedSnapshot());
-  let syncButtonEnabled = $state(getSyncButtonEnabled());
-  let organizarLabel = $state(getOrganizarLabel());
   let disabled = $derived(syncing || running);
-
-  // Update reactive state when getters change
-  $effect(() => {
-    selectedSnapshot = getSelectedSnapshot();
-    syncButtonEnabled = getSyncButtonEnabled();
-    organizarLabel = getOrganizarLabel();
-  });
+  let syncButtonEnabled = $derived(getSyncButtonEnabled());
+  let organizarEnabled = $derived(getOrganizarEnabled());
+  let organizarLabel = $derived(getOrganizarLabel());
 </script>
 
 <header>
@@ -38,14 +32,17 @@
     class="btn btn-secondary"
     id="btn-sync"
     onclick={onsync}
-    disabled={!getSyncButtonEnabled() || disabled}>↻ Sync Notion</button
+    disabled={!syncButtonEnabled || disabled}
+    title={!syncButtonEnabled ? "Selecciona un snapshot en la cadena para sincronizar desde ese punto" : ""}
+    >↻ Sync Notion</button
   >
   <button
     class="btn btn-primary"
     id="btn-organizar"
     onclick={onorganizar}
-    {disabled}
-    >▶ <span id="organizar-label">{getOrganizarLabel()}</span></button
+    disabled={!organizarEnabled || disabled}
+    title={!organizarEnabled ? "Selecciona un snapshot en la cadena para organizar" : ""}
+    >▶ <span id="organizar-label">{organizarLabel}</span></button
   >
   {#if getSelectedSnapshot() !== null}
     <button

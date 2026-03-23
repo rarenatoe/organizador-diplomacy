@@ -115,6 +115,7 @@ export interface SyncDetectResult {
   notion_count: number;
   snapshot_count: number;
   similar_names: SimilarName[];
+  error?: string;
 }
 
 export interface MergePair {

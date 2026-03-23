@@ -15,8 +15,16 @@ import pytest
 # ── /api/sync/detect ──────────────────────────────────────────────────────────
 
 class TestApiSyncDetect:
+    def test_detect_missing_snapshot_returns_400(self, client):
+        """Omitting snapshot returns 400 — snapshot_id is required."""
+        c, conn = client
+        resp = c.post("/api/sync/detect", content_type="application/json")
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert "Snapshot selection required" in data["error"]
+
     def test_detect_returns_valid_json(self, client, monkeypatch):
-        """POST /api/sync/detect returns valid JSON with similar_names."""
+        """POST /api/sync/detect with snapshot returns valid JSON with similar_names."""
         import subprocess
         c, conn = client
         monkeypatch.setattr(
@@ -31,7 +39,11 @@ class TestApiSyncDetect:
                 "stderr": ""
             })(),
         )
-        resp = c.post("/api/sync/detect", content_type="application/json")
+        resp = c.post(
+            "/api/sync/detect",
+            data=json.dumps({"snapshot": 1}),
+            content_type="application/json",
+        )
         assert resp.status_code == 200
         data = resp.get_json()
         assert "similar_names" in data
@@ -78,22 +90,38 @@ class TestApiSyncDetect:
             subprocess, "run",
             lambda *a, **kw: type("R", (), {"returncode": 1, "stdout": "", "stderr": "error"})(),
         )
-        resp = c.post("/api/sync/detect", content_type="application/json")
+        resp = c.post(
+            "/api/sync/detect",
+            data=json.dumps({"snapshot": 1}),
+            content_type="application/json",
+        )
         assert resp.status_code == 500
 
 
 # ── /api/sync/confirm ─────────────────────────────────────────────────────────
 
 class TestApiSyncConfirm:
+    def test_confirm_missing_snapshot_returns_400(self, client):
+        """Omitting snapshot returns 400 — snapshot_id is required."""
+        c, conn = client
+        resp = c.post("/api/sync/confirm", content_type="application/json")
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert "Snapshot selection required" in data["error"]
+
     def test_confirm_returns_run_result(self, client, monkeypatch):
-        """POST /api/sync/confirm returns RunResult with returncode."""
+        """POST /api/sync/confirm with snapshot returns RunResult with returncode."""
         import subprocess
         c, conn = client
         monkeypatch.setattr(
             subprocess, "run",
             lambda *a, **kw: type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
         )
-        resp = c.post("/api/sync/confirm", content_type="application/json")
+        resp = c.post(
+            "/api/sync/confirm",
+            data=json.dumps({"snapshot": 1}),
+            content_type="application/json",
+        )
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["returncode"] == 0
@@ -110,7 +138,7 @@ class TestApiSyncConfirm:
         merges = [{"from": "John D.", "to": "John Doe"}]
         resp = c.post(
             "/api/sync/confirm",
-            data=json.dumps({"merges": merges}),
+            data=json.dumps({"snapshot": 1, "merges": merges}),
             content_type="application/json",
         )
         assert resp.status_code == 200

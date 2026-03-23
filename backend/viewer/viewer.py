@@ -131,6 +131,11 @@ def api_run(script: str):
     body = request.get_json(silent=True) or {}
     snapshot_id = body.get("snapshot")
 
+    # organizar always requires snapshot_id
+    # notion_sync allows empty snapshot_id (first-time sync exception handled in notion_sync.py)
+    if script == "organizar" and snapshot_id is None:
+        return jsonify({"error": "Snapshot selection required. Please click a snapshot node in the chain before syncing or organizing."}), 400
+
     if snapshot_id is not None and not isinstance(snapshot_id, int):
         return jsonify({"error": "snapshot must be an integer"}), 400
 
@@ -157,19 +162,20 @@ def api_run(script: str):
 def api_sync_detect():
     """
     Detect similar names between Notion and snapshot.
-    Body: {"snapshot": <int_id> or null}
+    Body: {"snapshot": <int_id>}
     Returns: {"notion_count", "snapshot_count", "similar_names": [...]}
     """
     cwd = PROJECT_ROOT
     body = request.get_json(silent=True) or {}
     snapshot_id = body.get("snapshot")
 
-    if snapshot_id is not None and not isinstance(snapshot_id, int):
+    if snapshot_id is None:
+        return jsonify({"error": "Snapshot selection required. Please click a snapshot node in the chain before syncing or organizing."}), 400
+
+    if not isinstance(snapshot_id, int):
         return jsonify({"error": "snapshot must be an integer"}), 400
 
-    cmd = ["uv", "run", "python", "-m", "backend.sync.notion_sync", "--detect-only"]
-    if snapshot_id is not None:
-        cmd += ["--snapshot", str(snapshot_id)]
+    cmd = ["uv", "run", "python", "-m", "backend.sync.notion_sync", "--detect-only", "--snapshot", str(snapshot_id)]
 
     result = subprocess.run(
         cmd,
@@ -202,7 +208,7 @@ def api_sync_detect():
 def api_sync_confirm():
     """
     Confirm sync with optional merges.
-    Body: {"snapshot": <int_id> or null, "merges": [{"from": "Name1", "to": "Name2"}, ...]}
+    Body: {"snapshot": <int_id>, "merges": [{"from": "Name1", "to": "Name2"}, ...]}
     Returns: {"returncode", "stdout", "stderr"}
     """
     cwd = PROJECT_ROOT
@@ -210,12 +216,13 @@ def api_sync_confirm():
     snapshot_id = body.get("snapshot")
     merges = body.get("merges", [])
 
-    if snapshot_id is not None and not isinstance(snapshot_id, int):
+    if snapshot_id is None:
+        return jsonify({"error": "Snapshot selection required. Please click a snapshot node in the chain before syncing or organizing."}), 400
+
+    if not isinstance(snapshot_id, int):
         return jsonify({"error": "snapshot must be an integer"}), 400
 
-    cmd = ["uv", "run", "python", "-m", "backend.sync.notion_sync"]
-    if snapshot_id is not None:
-        cmd += ["--snapshot", str(snapshot_id)]
+    cmd = ["uv", "run", "python", "-m", "backend.sync.notion_sync", "--snapshot", str(snapshot_id)]
 
     if merges:
         merges_json = json.dumps({"merges": merges}, ensure_ascii=False)

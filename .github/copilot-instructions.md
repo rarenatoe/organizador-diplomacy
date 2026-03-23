@@ -57,6 +57,11 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 - No inlined CSS/JS/magic strings — one format per file, centralized constants.
 - Large refactors warrant their own commit; don't combine with feature work.
 - Dead code: evaluate every file for unreachable branches, unused exports, redundant constants. Remove if safe — verify via full test suite before committing.
+- **Chain Integrity:** Every operation that creates a new snapshot (sync, organizar, edit) must have a source snapshot ID provided by the UI. Fallbacks to 'latest' are prohibited to prevent accidental branching. UI implementation detail: Always call store getters directly in Svelte templates (e.g., `{getGetter()}`) rather than copying store state into local component `$state` to avoid reactivity lag.
+- **Svelte 5 Reactivity:** Use `$state` rune for reactive state objects. Use `$derived` runes in components to track store getter changes. Use `$effect` for side effects. Never copy store values into local `$state` variables in components—use `$derived` instead.
+- **Loading States:** Use `-1` as sentinel value for "loading/unknown" state (e.g., `snapshotCount = -1`). This prevents buttons from flickering to "enabled" during initial load. Only transition to `0` when data is actually loaded.
+- **Error Handling:** Always check for null/undefined responses from backend before accessing properties. Show user-friendly error messages via toast notifications. Add null checks in async functions to prevent TypeError crashes.
+- **UI Feedback:** Add `title` attributes to disabled buttons explaining why they're disabled. This helps users understand the required action (e.g., "Selecciona un snapshot en la cadena para organizar").
 
 ## File size guideline
 **400-line soft limit per file.** When a file crosses this threshold:

@@ -130,6 +130,20 @@
     try {
       const detectData = await detectSync(getSelectedSnapshot());
 
+      // Handle null/undefined response
+      if (!detectData) {
+        toaster?.dismissAll();
+        toaster?.showErrorToast("Error: No se recibió respuesta del servidor");
+        return;
+      }
+
+      // Handle error response from backend before checking .similar_names
+      if (detectData.error) {
+        toaster?.dismissAll();
+        toaster?.showErrorToast(`Error: ${detectData.error}`);
+        return;
+      }
+
       if (detectData.similar_names.length === 0) {
         await handleSyncConfirm([], toastId);
       } else {

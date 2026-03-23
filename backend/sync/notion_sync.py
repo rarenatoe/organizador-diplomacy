@@ -381,10 +381,17 @@ def main() -> None:
     print(f"{len(pages)} jugador(es), {sum(conteo_por_jugador.values())} partida(s) en {año_actual}.")
 
     conn = db.get_db()
-    source_snapshot_id = (
-        args.snapshot if args.snapshot is not None
-        else db.get_latest_snapshot_id(conn)
-    )
+    source_snapshot_id = args.snapshot
+
+    # ── Require snapshot if database has existing data ────────────────────────
+    has_snapshots = conn.execute("SELECT 1 FROM snapshots LIMIT 1").fetchone() is not None
+    if source_snapshot_id is None and has_snapshots:
+        print("❌  Error: Snapshot ID is required because the database is not empty.", file=sys.stderr)
+        print("   You must specify which snapshot to branch from.", file=sys.stderr)
+        print("   Usa --snapshot <ID> para especificar el snapshot base.", file=sys.stderr)
+        conn.close()
+        sys.exit(1)
+
     existentes = _leer_snapshot_existente(conn, source_snapshot_id)
 
     # ── Parse merges if provided ──────────────────────────────────────────────

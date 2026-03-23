@@ -54,8 +54,24 @@ Each sync edge: `{type:"sync", id, created_at, from_id, to_id}`
 | `POST /api/snapshot/<int:id>/edit` | POST | `{"snapshot_id": new_id}` — creates new `manual` snapshot (200/400/404) |
 | `POST /api/run/<script>` | POST | `{returncode, stdout, stderr}` |
 
-`/api/run/organizar` body: `{"snapshot": <int_id>}` (omit to use latest).
+`/api/run/organizar` body: `{"snapshot": <int_id>}` — **Required: snapshot ID must be explicitly provided**.
 `/api/snapshot/<id>/edit` body: `{"players": [{nombre, prioridad, partidas_deseadas, partidas_gm}, …]}` — only listed players are included; omitting a player removes them from the next jornada.
+
+## No defaults rule
+Backend functions must never internally resolve 'latest' snapshots for state-changing operations. The caller is always responsible for providing an explicit snapshot ID.
+
+## Snapshot requirement rules
+- **organizar**: Always requires `snapshot_id`. Returns 400 if missing with message: "Snapshot selection required. Please click a snapshot node in the chain before syncing or organizing."
+- **notion_sync**: Requires `snapshot_id` when database has existing data. Allows missing `snapshot_id` only for first-time sync (empty database). Returns 400 if missing with same message as organizar.
+- **sync/detect**: Always requires `snapshot_id`. Returns 400 if missing.
+- **sync/confirm**: Always requires `snapshot_id`. Returns 400 if missing.
+- **First-time sync exception**: When database is empty (no snapshots), `notion_sync` without `--snapshot` is allowed to create the initial snapshot.
+
+## Error message format
+Use consistent error messages across all endpoints:
+- Missing snapshot: "Snapshot selection required. Please click a snapshot node in the chain before syncing or organizing."
+- Invalid snapshot type: "snapshot must be an integer"
+- Snapshot not found: "not found" (404)
 
 ## Testing rules (Python)
 Every new behavior → test in the corresponding file.
