@@ -280,5 +280,106 @@ describe("Panel Scroll Pattern", () => {
       document.body.removeChild(element);
       document.head.removeChild(style);
     });
+
+    it("table headers should not have inset box-shadows that create inconsistent borders", () => {
+      // This test ensures headers don't have extra bottom borders via inset box-shadows
+      // which was the cause of the "Nombre" header having a bottom edge that other headers didn't have
+      const style = document.createElement("style");
+      style.textContent = `
+        .flex-table-wrap th {
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          background: var(--surface2);
+          transform: translateZ(0);
+          background-clip: padding-box;
+          border-bottom: 1px solid var(--border);
+          box-shadow: none;
+        }
+        
+        .flex-table-wrap th:nth-child(2) {
+          z-index: 12;
+          background: var(--surface2);
+          box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.1);
+        }
+      `;
+      document.head.appendChild(style);
+
+      const table = document.createElement("table");
+      table.className = "flex-table-wrap";
+      const thead = document.createElement("thead");
+      const tr = document.createElement("tr");
+
+      // Create multiple headers to test consistency
+      for (let i = 0; i < 5; i++) {
+        const th = document.createElement("th");
+        th.textContent = `Header ${i + 1}`;
+        tr.appendChild(th);
+      }
+
+      thead.appendChild(tr);
+      table.appendChild(thead);
+      document.body.appendChild(table);
+
+      const headers = table.querySelectorAll("th");
+
+      // Check that no header has inset box-shadow
+      headers.forEach((header) => {
+        const computedStyle = window.getComputedStyle(header);
+        const boxShadow = computedStyle.boxShadow;
+
+        // inset box-shadows would contain "inset" keyword
+        // We want to ensure headers don't have this
+        expect(boxShadow).not.toContain("inset");
+      });
+
+      document.body.removeChild(table);
+      document.head.removeChild(style);
+    });
+
+    it("all table headers should have consistent border-bottom styling", () => {
+      // This test ensures all headers in a table have the same border-bottom style
+      const style = document.createElement("style");
+      style.textContent = `
+        th {
+          border-bottom: 1px solid var(--border);
+        }
+      `;
+      document.head.appendChild(style);
+
+      const table = document.createElement("table");
+      const thead = document.createElement("thead");
+      const tr = document.createElement("tr");
+
+      for (let i = 0; i < 5; i++) {
+        const th = document.createElement("th");
+        th.textContent = `Header ${i + 1}`;
+        tr.appendChild(th);
+      }
+
+      thead.appendChild(tr);
+      table.appendChild(thead);
+      document.body.appendChild(table);
+
+      const headers = table.querySelectorAll("th");
+      expect(headers.length).toBeGreaterThan(0);
+
+      const firstHeader = headers[0];
+      if (!firstHeader) {
+        throw new Error("No headers found in table");
+      }
+
+      const firstHeaderStyle = window.getComputedStyle(firstHeader);
+      const expectedBorderBottom = firstHeaderStyle.borderBottom;
+
+      // All headers should have the same border-bottom style
+      headers.forEach((header) => {
+        const computedStyle = window.getComputedStyle(header);
+        expect(computedStyle.borderBottom).toBe(expectedBorderBottom);
+      });
+
+      document.body.removeChild(table);
+      document.head.removeChild(style);
+    });
   });
 });

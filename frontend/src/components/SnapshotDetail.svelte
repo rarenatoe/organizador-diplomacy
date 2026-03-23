@@ -381,7 +381,7 @@
   .flex-table-wrap th:nth-child(2) {
     z-index: 12;
     background: var(--surface2);
-    box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.1), inset 0 -1px 0 var(--border);
+    box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.1);
   }
 
   .flex-table-wrap input[type="checkbox"] {
