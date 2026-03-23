@@ -19,7 +19,7 @@
   --accent:         #3b82f6;
   --danger:         #ef4444;
   --success:        #22c55e;
-  --panel-w:        460px;
+  --panel-w:        max(460px, 45vw);
   --hdr:            56px;
   --radius:         10px;
   --shadow:         0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
@@ -103,15 +103,8 @@ header h1 {
 .btn-ghost { background: transparent; color: var(--muted); border: none; font-size: 18px; padding: 4px 8px; border-radius: 6px; }
 .btn-ghost:hover { color: var(--text); background: var(--surface2); }
 
-/* ── Player name cell with rename button ── */
-.player-name-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: max-content; /* Permite que la celda empuje la tabla para scroll horizontal */
-}
+/* ── Player name ── */
 .player-name {
-  flex: 1;
   white-space: nowrap;
 }
 .btn-rename {
@@ -120,7 +113,6 @@ header h1 {
   padding: 2px 6px;
   opacity: 0.7;
   transition: opacity .15s;
-  margin-left: auto;
 }
 .btn-rename:hover {
   opacity: 1;
@@ -295,6 +287,47 @@ header h1 {
   /* Use standard border instead of box-shadow since we fixed the bleed */
   border-bottom: 1px solid var(--border);
   box-shadow: none;
+}
+
+/* Fix width for Column 1 (Checkbox) for reliable sticky offset calculation */
+.flex-table-wrap th:nth-child(1),
+.flex-table-wrap td:nth-child(1) {
+  width: 32px;
+  min-width: 32px;
+  padding: 6px 9px;
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  z-index: 5;
+}
+
+/* Make Column 2 (Nombre) sticky */
+.flex-table-wrap th:nth-child(2),
+.flex-table-wrap td:nth-child(2) {
+  position: sticky;
+  left: 32px; /* Offset exactly by Col 1's width */
+  background: var(--surface);
+  z-index: 5;
+  /* Subtle drop shadow to indicate depth over scrolling content */
+  box-shadow: 2px 0 4px -2px rgba(0,0,0,0.1);
+}
+
+/* Maintain hover background color on sticky columns */
+.flex-table-wrap tbody tr:hover td:nth-child(1),
+.flex-table-wrap tbody tr:hover td:nth-child(2) {
+  background: var(--surface2);
+}
+
+/* Top-Left Intersections (Headers) must sit above both scrolling axes */
+.flex-table-wrap th:nth-child(1) {
+  z-index: 12;
+  background: var(--surface2);
+}
+.flex-table-wrap th:nth-child(2) {
+  z-index: 12;
+  background: var(--surface2);
+  /* Combine the horizontal depth shadow and the vertical sticky border shadow */
+  box-shadow: 2px 0 4px -2px rgba(0,0,0,0.1), inset 0 -1px 0 var(--border);
 }
 
 .panel-footer {

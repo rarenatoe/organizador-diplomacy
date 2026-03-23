@@ -166,6 +166,7 @@
             <tr>
               <th></th>
               <th>Nombre</th>
+              <th></th>
               <th>Exp.</th>
               <th>Juegos</th>
               <th>Prior.</th>
@@ -189,16 +190,15 @@
                     title="Incluir"
                   /></td
                 >
-                <td
-                  ><span class="player-name-cell"
-                    ><span class="player-name">{nombre}</span><button
-                      class="btn-ghost btn-rename"
-                      title="Renombrar"
-                      onclick={() => handleRename(String(r["nombre"] ?? ""))}
-                      >✏️</button
-                    ></span
-                  ></td
-                >
+                <td><span class="player-name">{nombre}</span></td>
+                <td style="padding-left: 0; width: 32px;">
+                  <button
+                    class="btn-ghost btn-rename"
+                    title="Renombrar"
+                    onclick={() => handleRename(String(r["nombre"] ?? ""))}
+                    >✏️</button
+                  >
+                </td>
                 <td
                   ><span
                     style="font-size:10px;font-weight:700;color:{expColor};background:{expBg};padding:1px 6px;border-radius:4px"
