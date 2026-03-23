@@ -45,7 +45,7 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 
 ## After every feature or fix
 1. Run `uv run python -m pytest -q` — confirm all pass.
-2. Run `bun run build && bun run lint` — TypeScript must compile and lint clean.
+2. Run `bun run build && bun run lint && bun run typecheck` — TypeScript must compile, lint clean, and type-check clean. **Also check for Svelte errors/warnings in the VS Code Problems panel (svelte.svelte-vscode)** — fix any before committing.
 3. **Check file sizes**: `wc -l backend/*.py frontend/src/*.ts frontend/static/style.css | sort -rn` — refactor any file >400 LOC.
 4. Add/update tests in the relevant test file.
 5. Update the relevant instructions file if conventions, data model, or architecture changed.
@@ -65,6 +65,8 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 3. Python: add a new flat-layout file at root. TypeScript: add a new `src/*.ts` module (update file map and import graph in `typescript.instructions.md`).
 4. Run all tests + build + lint before committing the split.
 
+**Exception:** A file may safely exceed this limit if it represents a single, indivisible logical unit (e.g., a highly cohesive Class, Svelte Component, or complex pure function) that would lose clarity or context if artificially split.
+
 ## Frontend testing conventions
 - Use Vitest with `@testing-library/dom` for DOM testing
 - Mock external dependencies with `vi.mock()` at the top of test files
@@ -77,7 +79,9 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 - Use `flex: 1` for expandable content, `flex-shrink: 0` for fixed elements
 - Use `overflow: hidden; text-overflow: ellipsis; white-space: nowrap;` for text truncation
 - Use `margin-left: auto` to push elements to the right in flex containers
-- Never inline CSS in HTML — always use `static/style.css`
+- Use Svelte's native `<style>` blocks within `.svelte` files for component-specific styles to keep styling scoped and tied directly to the component.
+- Reserve `static/style.css` strictly for global variables (`:root`), body resets, and widely shared utility classes (e.g., `.btn`).
+- All CSS source files must be human-readable with properties written on multiple lines.
 - **Panel scroll pattern**: For panels with scrollable content + fixed buttons at bottom:
   - `.panel-body` → `display: flex; flex-direction: column; overflow: hidden;`
   - `.panel-scroll` → `flex: 1; overflow-y: auto; min-height: 0;`

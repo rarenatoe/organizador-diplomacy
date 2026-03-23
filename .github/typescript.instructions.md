@@ -32,7 +32,7 @@ applyTo: "frontend/src/**"
 ## UI conventions
 - `templates/index.html` is the production HTML served by Flask (copied from build output).
 - `src/index.html` is the Vite entry template with `<div id="app">` mount point.
-- All CSS in `static/style.css` — unchanged, import globally in `App.svelte`.
+- Component-specific CSS belongs in `<style>` blocks within the `.svelte` files. Global variables and utilities live in `static/style.css` imported in `App.svelte`.
 - **Click-to-select**: snapshot node click → `setSelectedSnapshot(id)` → `.csv-selected` green ring + button label "Organizar · #N".
 - Game node click → `openGame(id)` → fetches game detail, shows in SidePanel.
 - Sync node click → `openSync(id)` → fetches sync metadata, shows in SidePanel.

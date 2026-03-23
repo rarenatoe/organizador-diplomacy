@@ -94,3 +94,135 @@
     </div>
   </div>
 {/if}
+
+<style>
+  .resolution-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 150;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .resolution-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .resolution-card {
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 24px;
+    width: 420px;
+    max-width: 90vw;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .resolution-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .resolution-icon {
+    font-size: 20px;
+  }
+
+  .resolution-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .resolution-counter {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .resolution-pair {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .resolution-side {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .resolution-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+  }
+
+  .resolution-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  .resolution-name-notion {
+    color: var(--sync-dark);
+  }
+
+  .resolution-name-snapshot {
+    color: var(--report-dark);
+  }
+
+  .resolution-vs {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .resolution-similarity {
+    font-size: 12px;
+    font-weight: 600;
+    color: #f59e0b;
+    text-align: center;
+  }
+
+  .resolution-actions {
+    display: flex;
+    gap: 10px;
+  }
+
+  .resolution-actions .btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .resolution-footer {
+    display: flex;
+    justify-content: center;
+    padding-top: 4px;
+  }
+
+  .resolution-btn-stop {
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>

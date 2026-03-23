@@ -246,3 +246,182 @@
     >
   </div>
 {/if}
+
+<style>
+  .section {
+    margin-bottom: 22px;
+  }
+
+  .section-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .copy-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    width: 100%;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    transition: background 0.15s;
+  }
+
+  .copy-btn:hover {
+    background: var(--border);
+  }
+
+  :global(.copy-btn.ok) {
+    background: var(--success);
+    color: #fff;
+    border-color: var(--success);
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    min-width: max-content;
+  }
+
+  th {
+    background: var(--surface2);
+    padding: 7px 9px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 6px 9px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  tr:last-child td {
+    border-bottom: none;
+  }
+
+  tr:hover td {
+    background: var(--surface2);
+  }
+
+  .flex-table-wrap {
+    flex: 1;
+    overflow: auto;
+    min-height: 0;
+    margin: 0 18px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overscroll-behavior-y: none;
+  }
+
+  .flex-table-wrap th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--surface2);
+    transform: translateZ(0);
+    background-clip: padding-box;
+    border-bottom: 1px solid var(--border);
+    box-shadow: none;
+  }
+
+  .flex-table-wrap th:nth-child(1),
+  .flex-table-wrap td:nth-child(1) {
+    width: 32px;
+    min-width: 32px;
+    padding: 6px 9px;
+    position: sticky;
+    left: 0;
+    background: var(--surface);
+    z-index: 5;
+  }
+
+  .flex-table-wrap th:nth-child(2),
+  .flex-table-wrap td:nth-child(2) {
+    position: sticky;
+    left: 32px;
+    background: var(--surface);
+    z-index: 5;
+    box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.1);
+  }
+
+  .flex-table-wrap tbody tr:hover td:nth-child(1),
+  .flex-table-wrap tbody tr:hover td:nth-child(2) {
+    background: var(--surface2);
+  }
+
+  .flex-table-wrap th:nth-child(1) {
+    z-index: 12;
+    background: var(--surface2);
+  }
+
+  .flex-table-wrap th:nth-child(2) {
+    z-index: 12;
+    background: var(--surface2);
+    box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.1), inset 0 -1px 0 var(--border);
+  }
+
+  .flex-table-wrap input[type="checkbox"] {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    accent-color: var(--accent);
+  }
+
+  .flex-table-wrap input[type="number"] {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 12px;
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .flex-table-wrap input[type="number"]:focus {
+    outline: 2px solid var(--accent);
+    border-color: transparent;
+  }
+
+  tbody :global(tr.excluded) {
+    opacity: 0.35;
+  }
+
+  .player-name {
+    white-space: nowrap;
+  }
+
+  .btn-rename {
+    flex-shrink: 0;
+    font-size: 12px;
+    padding: 2px 6px;
+    opacity: 0.7;
+    transition: opacity 0.15s;
+  }
+
+  .btn-rename:hover {
+    opacity: 1;
+  }
+</style>

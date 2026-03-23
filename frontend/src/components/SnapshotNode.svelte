@@ -84,3 +84,149 @@
     </div>
   {/if}
 </div>
+
+<style>
+  .chain-row {
+    display: flex;
+    align-items: center;
+  }
+
+  .node {
+    cursor: pointer;
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    width: 156px;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    border: 2px solid transparent;
+    user-select: none;
+    position: relative;
+  }
+
+  .node:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  :global(.node.active) {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+  }
+
+  .node-csv {
+    background: var(--csv-bg);
+    border-color: var(--csv-border);
+  }
+
+  :global(.node-csv.latest-pending) {
+    background: var(--pending-bg);
+    border-color: var(--pending-border);
+  }
+
+  :global(.node.active.node-csv) {
+    border-color: var(--csv-border);
+  }
+
+  .node-delete-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 11px;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s;
+    padding: 2px 4px;
+    border-radius: 4px;
+    line-height: 1;
+  }
+
+  .node:hover .node-delete-btn,
+  :global(.node.active) .node-delete-btn {
+    opacity: 1;
+  }
+
+  .node-delete-btn:hover {
+    background: rgba(239, 68, 68, 0.15);
+  }
+
+  .node-icon {
+    font-size: 20px;
+    margin-bottom: 5px;
+  }
+
+  .node-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .node-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    word-break: break-all;
+    line-height: 1.4;
+  }
+
+  .node-meta {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+    line-height: 1.6;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 99px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-top: 5px;
+  }
+
+  :global(.badge-pending) {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid var(--pending-border);
+  }
+
+  .badge-latest {
+    background: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+  }
+
+  .arrow {
+    color: #9ca3af;
+    font-size: 18px;
+    padding: 0 6px;
+    flex-shrink: 0;
+    user-select: none;
+  }
+
+  .chain-fork {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .chain-branch {
+    display: flex;
+    align-items: center;
+  }
+
+  :global(.node-csv.csv-selected) {
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.4), var(--shadow-md);
+  }
+
+  :global(.node-csv.csv-selected) .node-label {
+    color: var(--success);
+  }
+</style>
