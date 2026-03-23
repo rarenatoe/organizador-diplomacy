@@ -195,6 +195,22 @@ class TestCalcularPartidasGM(unittest.TestCase):
             self.assertNotIn("GM1", sobrantes,
                              f"GM1 está en lista de espera en lugar de Multi (seed={seed})")
 
+    def test_jugador_sin_gm_no_es_reducido_como_gm(self):
+        """Para un no-GM con partidas_deseadas=2 el algoritmo genera ambos tickets.
+
+        Al dar a X el puntaje_prioridad más alto (juegos_ano=10 → weight 1.90),
+        su primer ticket se procesa DESPUÉS de los 12 jugadores normales (1.05).
+        Cuando llega el primer ticket de X los 12 cupos están repartidos [6,6];
+        va a una mesa → [7,6]. Su segundo ticket (weight 2.90) solo puede ir a la
+        otra mesa → [7,7]. X aparece siempre en exactamente 2 mesas distintas.
+        """
+        for seed in range(20):
+            random.seed(seed)
+            jugadores = _pool(12, juegos_ano=0) + [_j("X", juegos_ano=10, partidas_deseadas=2)]
+            res = _calcular_partidas(jugadores)
+            mesas_de_x = sum(1 for m in res.mesas if any(j.nombre == "X" for j in m.jugadores))
+            self.assertEqual(mesas_de_x, 2, f"X no aparece en 2 mesas distintas (seed={seed})")
+
 
 # ── Balanceo de liga y peso de participación ──────────────────────────────────
 

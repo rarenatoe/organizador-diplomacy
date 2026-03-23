@@ -312,22 +312,6 @@ def add_player_to_snapshot(
     return player_id
 
 
-def cleanup_orphaned_players(conn: sqlite3.Connection) -> int:
-    """
-    Deletes players from the players table that are not in any snapshot.
-    Returns the number of players deleted. Does NOT commit.
-    """
-    result = conn.execute(
-        """
-        DELETE FROM players
-        WHERE id NOT IN (
-            SELECT DISTINCT player_id FROM snapshot_players
-        )
-        """
-    )
-    return result.rowcount
-
-
 def get_snapshot_players(
     conn: sqlite3.Connection, snapshot_id: int
 ) -> list[dict]:
@@ -465,34 +449,60 @@ def create_manual_snapshot(
             int(e.get("partidas_gm",       base["partidas_gm"])),
         )
     # Insert edit event linking source to new snapshot
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    conn.execute(
-        """
-        INSERT INTO events (created_at, type, source_snapshot_id, output_snapshot_id)
-        VALUES (?, 'edit', ?, ?)
-        """,
-        (ts, source_snapshot_id, snap_id),
-    )
+    create_event(conn, "edit", source_snapshot_id, snap_id)
     return snap_id
 
 
-# ── Sync events ────────────────────────────────────────────────────────────────
+# ── Events (unified) ──────────────────────────────────────────────────────────
+
+def create_event(
+    conn: sqlite3.Connection,
+    event_type: str,
+    source_snapshot_id: int | None,
+    output_snapshot_id: int,
+    details: dict | None = None,
+) -> int:
+    """
+    Unified event creation helper. Inserts into the events table
+    and optionally into game_details if details are provided.
+
+    Args:
+        event_type: 'sync', 'game', or 'edit'
+        source_snapshot_id: ID of the input/source snapshot (None for first sync)
+        output_snapshot_id: ID of the output snapshot
+        details: Optional dict with game-specific fields (intentos, copypaste_text)
+
+    Returns the event ID. Does NOT commit.
+    """
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cur = conn.execute(
+        """
+        INSERT INTO events (created_at, type, source_snapshot_id, output_snapshot_id)
+        VALUES (?, ?, ?, ?)
+        """,
+        (ts, event_type, source_snapshot_id, output_snapshot_id),
+    )
+    event_id = cur.lastrowid
+
+    if details is not None:
+        conn.execute(
+            """
+            INSERT INTO game_details (event_id, intentos, copypaste_text)
+            VALUES (?, ?, ?)
+            """,
+            (event_id, details.get("intentos", 0), details.get("copypaste_text", "")),
+        )
+
+    return event_id  # type: ignore[return-value]
+
 
 def create_sync_event(
     conn: sqlite3.Connection,
     source_snapshot_id: int | None,
     output_snapshot_id: int,
 ) -> int:
-    """Inserts a sync event row. Does NOT commit."""
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cur = conn.execute(
-        """
-        INSERT INTO events (created_at, type, source_snapshot_id, output_snapshot_id)
-        VALUES (?, 'sync', ?, ?)
-        """,
-        (ts, source_snapshot_id, output_snapshot_id),
-    )
-    return cur.lastrowid  # type: ignore[return-value]
+    """Inserts a sync event row. Delegates to create_event. Does NOT commit."""
+    return create_event(conn, "sync", source_snapshot_id, output_snapshot_id)
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────────

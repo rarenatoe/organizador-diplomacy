@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { GameDetail } from "../types";
   import { fetchGame } from "../api";
+  import { esc } from "../utils";
 
   interface Props {
     id: number;
@@ -10,12 +11,6 @@
 
   let data = $state<GameDetail | null>(null);
   let loading = $state(true);
-
-  function esc(s: string | null | undefined): string {
-    const el = document.createElement("span");
-    el.textContent = s ?? "";
-    return el.innerHTML;
-  }
 
   async function loadGame(): Promise<void> {
     loading = true;

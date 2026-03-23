@@ -31,4 +31,6 @@ node_modules/
 # bun.lockb is committed (reproducible installs).
 # frontend/static/app.js is a build artifact — regenerate with: bun run build
 frontend/static/app.js
+frontend/static/index.css
+frontend/static/index.html
 

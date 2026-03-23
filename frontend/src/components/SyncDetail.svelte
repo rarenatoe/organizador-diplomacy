@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ChainData, SnapshotNode } from "../types";
   import { fetchChain } from "../api";
+  import { esc } from "../utils";
 
   interface Props {
     id: number;
@@ -14,12 +15,6 @@
     created_at: string;
   } | null>(null);
   let loading = $state(true);
-
-  function esc(s: string | null | undefined): string {
-    const el = document.createElement("span");
-    el.textContent = s ?? "";
-    return el.innerHTML;
-  }
 
   async function loadSyncInfo(): Promise<void> {
     loading = true;

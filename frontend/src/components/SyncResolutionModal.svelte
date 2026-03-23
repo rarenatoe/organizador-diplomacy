@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { SimilarName, ResolutionAction, MergePair } from "../types";
+  import { esc } from "../utils";
 
   interface Props {
     visible: boolean;
@@ -16,12 +17,6 @@
   let currentPair = $derived(pairs[currentIndex]);
   let total = $derived(pairs.length);
   let similarity = $derived(currentPair ? Math.round(currentPair.similarity * 100) : 0);
-
-  function esc(s: string): string {
-    const el = document.createElement("span");
-    el.textContent = s;
-    return el.innerHTML;
-  }
 
   function handleAction(action: ResolutionAction): void {
     if (!currentPair) return;

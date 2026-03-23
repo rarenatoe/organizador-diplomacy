@@ -20,10 +20,9 @@ from __future__ import annotations
 
 import sqlite3
 from collections import Counter
-from datetime import datetime
 from typing import TYPE_CHECKING
 
-from .db import add_snapshot_player, create_snapshot, get_snapshot_players
+from .db import add_snapshot_player, create_event, create_snapshot, get_snapshot_players
 
 if TYPE_CHECKING:
     from models import ResultadoPartidas
@@ -37,25 +36,11 @@ def create_game_event(
     intentos: int,
     copypaste_text: str,
 ) -> int:
-    """Inserts a game event row and its game_details. Does NOT commit."""
-    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cur = conn.execute(
-        """
-        INSERT INTO events
-            (created_at, type, source_snapshot_id, output_snapshot_id)
-        VALUES (?, 'game', ?, ?)
-        """,
-        (ts, input_snapshot_id, output_snapshot_id),
+    """Inserts a game event row and its game_details. Delegates to create_event. Does NOT commit."""
+    return create_event(
+        conn, "game", input_snapshot_id, output_snapshot_id,
+        details={"intentos": intentos, "copypaste_text": copypaste_text},
     )
-    event_id = cur.lastrowid
-    conn.execute(
-        """
-        INSERT INTO game_details (event_id, intentos, copypaste_text)
-        VALUES (?, ?, ?)
-        """,
-        (event_id, intentos, copypaste_text),
-    )
-    return event_id  # type: ignore[return-value]
 
 
 def create_mesa(
