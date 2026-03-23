@@ -46,10 +46,10 @@
   >
   {#if getSelectedSnapshot() !== null}
     <button
-      class="btn btn-ghost"
+      class="btn btn-secondary"
       id="btn-deselect"
-      title="Volver al CSV más reciente"
-      onclick={deselectSnapshot}>✕</button
+      title="Limpiar la selección actual"
+      onclick={deselectSnapshot}>✕ Limpiar selección</button
     >
   {/if}
 </header>

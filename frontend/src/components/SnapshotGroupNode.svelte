@@ -9,6 +9,11 @@
   import GameNode from "./GameNode.svelte";
   import SnapshotGroupNode from "./SnapshotGroupNode.svelte";
   import { groupSnapshots } from "../groupSnapshots";
+  import {
+    getSelectedSnapshot,
+    getActiveNodeId,
+    deselectSnapshot
+  } from "../stores.svelte";
 
   interface Props {
     group: SnapshotGroup;
@@ -93,6 +98,8 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="node node-group"
+    class:active={getActiveNodeId() === String(currentVersion.snapshot.id)}
+    class:csv-selected={getSelectedSnapshot() === currentVersion.snapshot.id}
     data-id={currentVersion.snapshot.id}
     data-type="snapshot-group"
     onclick={handleClick}
@@ -143,9 +150,22 @@
         currentVersion.snapshot.source
       )}
     </div>
-    {#if currentVersion.snapshot.is_latest}
-      <span class="badge badge-latest">Actual</span>
-    {/if}
+    
+    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;">
+      {#if currentVersion.snapshot.is_latest}
+        <span class="badge badge-latest" style="margin-top: 0;">Actual</span>
+      {/if}
+      {#if getSelectedSnapshot() === currentVersion.snapshot.id}
+        <button 
+          class="badge badge-selected" 
+          style="margin-top: 0; cursor: pointer; padding: 2px 6px;"
+          title="Snapshot seleccionado. Clic para quitar selección"
+          onclick={(e) => { e.stopPropagation(); deselectSnapshot(); }}
+        >
+          📌
+        </button>
+      {/if}
+    </div>
   </div>
 
   <!-- Branches -->
@@ -354,6 +374,16 @@
     background: #dbeafe;
     color: #1e40af;
     border: 1px solid #93c5fd;
+  }
+
+  .badge-selected {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #86efac;
+    transition: background 0.15s;
+  }
+  .badge-selected:hover {
+    background: #bbf7d0;
   }
 
   .arrow {

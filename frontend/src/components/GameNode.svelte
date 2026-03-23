@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { GameEdge } from "../types";
+  import { getActiveNodeId } from "../stores.svelte";
 
   interface Props {
     node: GameEdge;
@@ -12,7 +13,16 @@
   let time = $derived((node.created_at || "").split(" ")[1] ?? "");
 </script>
 
-<div class="node node-report" data-id={node.id} data-type="game" role="button" tabindex="0" onclick={() => onopen(node.id)} onkeydown={(e) => e.key === "Enter" && onopen(node.id)}>
+<div 
+  class="node node-report" 
+  class:active={getActiveNodeId() === String(node.id)}
+  data-id={node.id} 
+  data-type="game" 
+  role="button" 
+  tabindex="0" 
+  onclick={() => onopen(node.id)} 
+  onkeydown={(e) => e.key === "Enter" && onopen(node.id)}
+>
   <div class="node-icon">📊</div>
   <div class="node-label">Jornada</div>
   <div class="node-name">{date}</div>
