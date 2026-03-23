@@ -146,98 +146,100 @@
   <p style="color:var(--muted);font-size:12px;padding:4px 0">Cargando…</p>
 {:else if data}
   {@const rows = data.players ?? []}
-  <div class="section">
-    <div class="section-title">Snapshot #{id} · {sourceLabel(data.source)}</div>
-    <div class="node-meta" style="margin-bottom:8px">{esc(data.created_at)}</div>
-    <button class="copy-btn" onclick={copyCsv}>📋 Copiar tabla CSV</button>
-  </div>
-  <div class="section">
-    <div class="section-title" style="margin-bottom:6px">
-      Jugadores <span
-        style="color:var(--muted);font-weight:400;text-transform:none;font-size:11px"
-        >— desactiva para excluir de la siguiente jornada</span
-      >
+  <div class="panel-scroll">
+    <div class="section">
+      <div class="section-title">Snapshot #{id} · {sourceLabel(data.source)}</div>
+      <div class="node-meta" style="margin-bottom:8px">{esc(data.created_at)}</div>
+      <button class="copy-btn" onclick={copyCsv}>📋 Copiar tabla CSV</button>
     </div>
-    <div class="table-wrap">
-      <table id="snapshot-edit-table">
-        <thead>
-          <tr>
-            <th></th>
-            <th>Nombre</th>
-            <th>Exp.</th>
-            <th>Juegos</th>
-            <th>Prior.</th>
-            <th>Desea</th>
-            <th>GM</th>
-          </tr>
-        </thead>
-        <tbody onchange={handleCheckboxChange}>
-          {#each rows as r}
-            {@const nombre = esc(String(r["nombre"] ?? ""))}
-            {@const expColor =
-              r["experiencia"] === "Nuevo" ? "#713f12" : "#166534"}
-            {@const expBg =
-              r["experiencia"] === "Nuevo" ? "#fef9c3" : "#f0fdf4"}
-            <tr data-nombre={nombre}>
-              <td
-                ><input
-                  type="checkbox"
-                  class="player-keep"
-                  checked
-                  title="Incluir"
-                /></td
-              >
-              <td
-                ><span class="player-name-cell"
-                  ><span class="player-name">{nombre}</span><button
-                    class="btn-ghost btn-rename"
-                    title="Renombrar"
-                    onclick={() => handleRename(String(r["nombre"] ?? ""))}
-                    >✏️</button
-                  ></span
-                ></td
-              >
-              <td
-                ><span
-                  style="font-size:10px;font-weight:700;color:{expColor};background:{expBg};padding:1px 6px;border-radius:4px"
-                  >{esc(String(r["experiencia"] ?? ""))}</span
-                ></td
-              >
-              <td>{String(r["juegos_este_ano"] ?? "")}</td>
-              <td
-                ><input
-                  type="checkbox"
-                  class="player-prio"
-                  checked={r["prioridad"] === 1}
-                /></td
-              >
-              <td
-                ><input
-                  type="number"
-                  class="player-deseadas"
-                  value={String(r["partidas_deseadas"] ?? "1")}
-                  min="1"
-                  max="9"
-                  style="width:38px"
-                /></td
-              >
-              <td
-                ><input
-                  type="checkbox"
-                  class="player-gm"
-                  checked={(r["partidas_gm"] as number) > 0}
-                /></td
-              >
+    <div class="section">
+      <div class="section-title" style="margin-bottom:6px">
+        Jugadores <span
+          style="color:var(--muted);font-weight:400;text-transform:none;font-size:11px"
+          >— desactiva para excluir de la siguiente jornada</span
+        >
+      </div>
+      <div class="table-wrap">
+        <table id="snapshot-edit-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Nombre</th>
+              <th>Exp.</th>
+              <th>Juegos</th>
+              <th>Prior.</th>
+              <th>Desea</th>
+              <th>GM</th>
             </tr>
-          {/each}
-        </tbody>
-      </table>
+          </thead>
+          <tbody onchange={handleCheckboxChange}>
+            {#each rows as r}
+              {@const nombre = esc(String(r["nombre"] ?? ""))}
+              {@const expColor =
+                r["experiencia"] === "Nuevo" ? "#713f12" : "#166534"}
+              {@const expBg =
+                r["experiencia"] === "Nuevo" ? "#fef9c3" : "#f0fdf4"}
+              <tr data-nombre={nombre}>
+                <td
+                  ><input
+                    type="checkbox"
+                    class="player-keep"
+                    checked
+                    title="Incluir"
+                  /></td
+                >
+                <td
+                  ><span class="player-name-cell"
+                    ><span class="player-name">{nombre}</span><button
+                      class="btn-ghost btn-rename"
+                      title="Renombrar"
+                      onclick={() => handleRename(String(r["nombre"] ?? ""))}
+                      >✏️</button
+                    ></span
+                  ></td
+                >
+                <td
+                  ><span
+                    style="font-size:10px;font-weight:700;color:{expColor};background:{expBg};padding:1px 6px;border-radius:4px"
+                    >{esc(String(r["experiencia"] ?? ""))}</span
+                  ></td
+                >
+                <td>{String(r["juegos_este_ano"] ?? "")}</td>
+                <td
+                  ><input
+                    type="checkbox"
+                    class="player-prio"
+                    checked={r["prioridad"] === 1}
+                  /></td
+                >
+                <td
+                  ><input
+                    type="number"
+                    class="player-deseadas"
+                    value={String(r["partidas_deseadas"] ?? "1")}
+                    min="1"
+                    max="9"
+                    style="width:38px"
+                  /></td
+                >
+                <td
+                  ><input
+                    type="checkbox"
+                    class="player-gm"
+                    checked={(r["partidas_gm"] as number) > 0}
+                  /></td
+                >
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
-  <div class="section">
+  <div class="panel-footer">
     <button
       class="btn btn-secondary"
-      style="width:100%;margin-bottom:8px"
+      style="width:100%"
       onclick={handleAddPlayer}>➕ Agregar jugador</button
     >
     <button class="btn btn-primary" style="width:100%" onclick={handleApplyEdit}

@@ -39,6 +39,15 @@ body {
   overflow: hidden;
 }
 
+#app {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
 /* ── Header ── */
 header {
   height: var(--hdr);
@@ -99,12 +108,10 @@ header h1 {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
+  min-width: max-content; /* Permite que la celda empuje la tabla para scroll horizontal */
 }
 .player-name {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 .btn-rename {
@@ -242,7 +249,30 @@ header h1 {
   flex-shrink: 0;
 }
 .panel-header h2 { font-size: 14px; font-weight: 700; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.panel-body { flex: 1; overflow-y: auto; padding: 16px 18px; }
+.panel-body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* El scroll ahora lo manejará .panel-scroll */
+  flex: 1;
+  padding: 0; /* Quitamos el padding global del body */
+}
+
+.panel-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 16px 18px;
+}
+
+.panel-footer {
+  flex-shrink: 0;
+  padding: 16px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
 /* ── Sections inside panel ── */
 .section { margin-bottom: 22px; }
@@ -273,7 +303,7 @@ header h1 {
 
 /* ── CSV table ── */
 .table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: max-content; }
 th { background: var(--surface2); padding: 7px 9px; text-align: left; font-weight: 600; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid var(--border); white-space: nowrap; }
 td { padding: 6px 9px; border-bottom: 1px solid var(--border); }
 tr:last-child td { border-bottom: none; }
