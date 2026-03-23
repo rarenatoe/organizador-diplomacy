@@ -60,7 +60,7 @@ vi.mock("../stores.svelte", () => ({
 
 describe("Panel Scroll Pattern", () => {
   describe("SnapshotDetail", () => {
-    it("should have panel-scroll wrapper around content sections", async () => {
+    it("should use panel-body-fixed and flex-table-wrap for sticky table layout", async () => {
       const { container } = render(SnapshotDetail, {
         props: {
           id: 1,
@@ -75,12 +75,12 @@ describe("Panel Scroll Pattern", () => {
         expect(screen.queryByText("Cargando…")).toBeNull();
       });
 
-      const panelScroll = container.querySelector(".panel-scroll");
-      expect(panelScroll).toBeTruthy();
+      const fixedHeader = container.querySelector(".panel-body-fixed");
+      const tableWrap = container.querySelector(".flex-table-wrap");
 
-      // Verify sections are inside panel-scroll
-      const sections = panelScroll?.querySelectorAll(".section");
-      expect(sections?.length).toBeGreaterThanOrEqual(2);
+      expect(fixedHeader).toBeTruthy();
+      expect(tableWrap).toBeTruthy();
+      expect(container.querySelector(".panel-scroll")).toBeNull(); // Ensure old wrapper is gone
     });
 
     it("should have panel-footer outside panel-scroll with action buttons", async () => {

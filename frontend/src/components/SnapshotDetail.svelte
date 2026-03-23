@@ -146,21 +146,22 @@
   <p style="color:var(--muted);font-size:12px;padding:4px 0">Cargando…</p>
 {:else if data}
   {@const rows = data.players ?? []}
-  <div class="panel-scroll">
-    <div class="section">
+  <div class="panel-body-fixed">
+    <div class="section" style="margin-bottom: 16px;">
       <div class="section-title">Snapshot #{id} · {sourceLabel(data.source)}</div>
       <div class="node-meta" style="margin-bottom:8px">{esc(data.created_at)}</div>
       <button class="copy-btn" onclick={copyCsv}>📋 Copiar tabla CSV</button>
     </div>
-    <div class="section">
-      <div class="section-title" style="margin-bottom:6px">
-        Jugadores <span
-          style="color:var(--muted);font-weight:400;text-transform:none;font-size:11px"
-          >— desactiva para excluir de la siguiente jornada</span
-        >
-      </div>
-      <div class="table-wrap">
-        <table id="snapshot-edit-table">
+    <div class="section-title" style="margin-bottom:6px">
+      Jugadores <span
+        style="color:var(--muted);font-weight:400;text-transform:none;font-size:11px"
+        >— desactiva para excluir de la siguiente jornada</span
+      >
+    </div>
+  </div>
+
+  <div class="table-wrap flex-table-wrap">
+    <table id="snapshot-edit-table">
           <thead>
             <tr>
               <th></th>
@@ -233,8 +234,6 @@
             {/each}
           </tbody>
         </table>
-      </div>
-    </div>
   </div>
   <div class="panel-footer">
     <button

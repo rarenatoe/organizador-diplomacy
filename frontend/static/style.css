@@ -264,6 +264,33 @@ header h1 {
   padding: 16px 18px;
 }
 
+/* Container for the non-scrolling metadata at the top of the panel */
+.panel-body-fixed {
+  padding: 16px 18px 0;
+  flex-shrink: 0;
+}
+
+/* Modifier for table-wrap to take remaining space and scroll */
+.flex-table-wrap {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+  margin: 0 18px 16px; /* Align with standard panel padding */
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+/* Make table headers sticky inside the flex-table-wrap */
+.flex-table-wrap th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface2);
+  /* Replace standard border with inset shadow to prevent it from scrolling away in collapsed tables */
+  border-bottom: none;
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
 .panel-footer {
   flex-shrink: 0;
   padding: 16px 18px;
