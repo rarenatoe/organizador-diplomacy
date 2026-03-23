@@ -258,5 +258,27 @@ describe("Panel Scroll Pattern", () => {
       document.body.removeChild(element);
       document.head.removeChild(style);
     });
+
+    it("flex-table-wrap should prevent elastic scrolling (overscroll-behavior-y)", () => {
+      const style = document.createElement("style");
+      style.textContent = `
+        .flex-table-wrap {
+          flex: 1;
+          overflow: auto;
+          overscroll-behavior-y: none;
+        }
+      `;
+      document.head.appendChild(style);
+
+      const element = document.createElement("div");
+      element.className = "flex-table-wrap";
+      document.body.appendChild(element);
+
+      const computedStyle = window.getComputedStyle(element);
+      expect(computedStyle.overscrollBehaviorY).toBe("none");
+
+      document.body.removeChild(element);
+      document.head.removeChild(style);
+    });
   });
 });

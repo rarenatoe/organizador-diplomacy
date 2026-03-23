@@ -275,20 +275,26 @@ header h1 {
   flex: 1;
   overflow: auto;
   min-height: 0;
-  margin: 0 18px 16px; /* Align with standard panel padding */
+  margin: 0 18px 16px;
   border: 1px solid var(--border);
   border-radius: 8px;
+  /* PREVENT RUBBER-BANDING: This stops the OS bounce effect that causes the sticky glitch */
+  overscroll-behavior-y: none;
 }
 
-/* Make table headers sticky inside the flex-table-wrap */
+/* Make table headers perfectly sticky */
 .flex-table-wrap th {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 10;
   background: var(--surface2);
-  /* Replace standard border with inset shadow to prevent it from scrolling away in collapsed tables */
-  border-bottom: none;
-  box-shadow: inset 0 -1px 0 var(--border);
+  /* PREVENT VISUAL TEARING: Forces GPU acceleration for the sticky layer */
+  transform: translateZ(0);
+  /* Restricts background painting to avoid bleeding during scroll */
+  background-clip: padding-box;
+  /* Use standard border instead of box-shadow since we fixed the bleed */
+  border-bottom: 1px solid var(--border);
+  box-shadow: none;
 }
 
 .panel-footer {
