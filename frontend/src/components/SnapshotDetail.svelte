@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { SnapshotDetail, EditPlayerRow } from "../types";
   import { fetchSnapshot, editSnapshot, addPlayer, renamePlayer } from "../api";
-  import { setSelectedSnapshot } from "../stores.svelte";
+  import { setSelectedSnapshot, setActiveNodeId } from "../stores.svelte";
 
   interface Props {
     id: number;
@@ -91,6 +91,7 @@
     onchainUpdate();
     if (result.snapshot_id !== undefined) {
       setSelectedSnapshot(result.snapshot_id);
+      setActiveNodeId(String(result.snapshot_id));
       onopenSnapshot(result.snapshot_id);
     }
   }

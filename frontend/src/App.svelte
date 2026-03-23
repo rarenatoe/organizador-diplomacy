@@ -1,7 +1,8 @@
 <script lang="ts">
-  import type { RunResult, SyncDetectResult, MergePair, SnapshotNode } from "./types";
+  import type { RunResult, SyncDetectResult, MergePair } from "./types";
   import { runScript, detectSync, confirmSync, deleteSnapshot as apiDeleteSnapshot } from "./api";
-  import { getSelectedSnapshot, setActiveNodeId, deselectSnapshot } from "./stores.svelte";
+  import { getSelectedSnapshot, setSelectedSnapshot, setActiveNodeId, deselectSnapshot } from "./stores.svelte";
+  import { findLatestSnapshotId, findLatestGameId } from "./snapshotUtils";
   import Header from "./components/Header.svelte";
   import ChainViewer from "./components/ChainViewer.svelte";
   import SidePanel from "./components/SidePanel.svelte";
@@ -43,28 +44,6 @@
     organizar: "▶ Organizar",
   };
 
-  function findLatestGameId(roots: SnapshotNode[] | undefined): number | null {
-    let latestId: number | null = null;
-    let latestTime = 0;
-
-    function visit(node: SnapshotNode): void {
-      for (const branch of node.branches ?? []) {
-        if (branch.edge.type === "game") {
-          const time = new Date(branch.edge.created_at).getTime();
-          if (time > latestTime) {
-            latestTime = time;
-            latestId = branch.edge.id;
-          }
-        }
-        if (branch.output) visit(branch.output);
-      }
-    }
-
-    if (roots) {
-      for (const root of roots) visit(root);
-    }
-    return latestId;
-  }
 
   // Panel handlers
   function openPanel(title: string, type: typeof panelType, id: number): void {
@@ -180,6 +159,16 @@
       if (ok) {
         toaster?.showSuccessToast("Sync Notion completado");
         await chainViewer?.loadChain();
+
+        // Find and open the newly synced snapshot
+        const { fetchChain } = await import("./api");
+        const chainData = await fetchChain();
+        const snapId = findLatestSnapshotId(chainData.roots);
+        if (snapId !== null) {
+          setSelectedSnapshot(snapId);
+          setActiveNodeId(String(snapId));
+          openSnapshot(snapId);
+        }
       } else {
         toaster?.showErrorToast(
           `Error en Sync Notion: ${data.stderr ?? "desconocido"}`,
