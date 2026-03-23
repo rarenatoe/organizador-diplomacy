@@ -20,54 +20,28 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 ### Backend (`backend/`)
 | File | Role |
 |---|---|
-| `organizador.py` | Algorithm entry-point: `_calcular_partidas()`, `organizar_partidas()` |
+| `organizador.py` | Algorithm: `_calcular_partidas()`, `organizar_partidas()` |
 | `models.py` | Domain types: `Jugador`, `Mesa`, `ResultadoPartidas` |
-| `formatter.py` | Pure text generation: `_formatear_*`, `_construir_proyeccion` |
-| `utils.py` | Shared constants: `DIRECTORIO` |
-| `db.py` | SQLite schema, connection, snapshot/player/sync CRUD helpers |
-| `db_game.py` | Game-event persistence: `create_game_event`, `create_mesa`, `add_mesa_player`, `add_waiting_player`, `create_output_snapshot` |
-| `db_views.py` | Read-only query helpers for viewer: `build_chain_data`, `get_snapshot_detail`, `get_game_event_detail` |
-| `viewer.py` | Flask viewer: DB-backed REST API |
-| `notion_sync.py` | Notion → DB sync (content-addressed, no CSV files) |
-| `test_organizador.py` | Basic tests for `organizador.py` and `models.py` (correctness, balance, error, espera) |
-| `test_algoritmo.py` | Advanced algorithm tests (prioridad, GM rules, liga, peso de participación) |
-| `test_db.py` | Tests for `db.py`, `db_game.py` and `db_views.py` (`TestDb` class) |
-| `test_viewer.py` | Tests for `viewer.py` (in-memory SQLite via `db.get_db(":memory:")`) |
-| `test_notion_sync.py` | Tests for `notion_sync.py` (name similarity, normalization) |
+| `formatter.py` | Text generation: `_formatear_*`, `_construir_proyeccion` |
+| `db.py` | SQLite schema + CRUD helpers |
+| `db_game.py` | Game-event persistence |
+| `db_views.py` | Read-only queries for viewer |
+| `viewer.py` | Flask REST API |
+| `notion_sync.py` | Notion → DB sync |
+| `test_*.py` | Tests (co-located) |
 
 ### Frontend (`frontend/`)
 | Path | Role |
 |---|---|
-| `src/types.ts` | All TypeScript interfaces shared across the UI (domain types) |
-| `src/stores.svelte.ts` | Global Svelte 5 state using `$state` runes (selectedSnapshot, snapshotCount, chainData, activeNodeId) |
-| `src/api.ts` | Centralized API utility module (fetchChain, fetchSnapshot, fetchGame, runScript, detectSync, confirmSync, etc.) |
-| `src/main.ts` | Entry point: mounts App.svelte to DOM |
-| `src/App.svelte` | Main layout shell: Header, ChainViewer, SidePanel, Toaster, modals |
-| `src/components/Header.svelte` | Top bar with buttons (Refresh, Sync Notion, Organizar, Deselect) |
-| `src/components/ChainViewer.svelte` | Chain tree display, loads and renders snapshot nodes |
-| `src/components/SnapshotNode.svelte` | Recursive snapshot node with branches (uses self-import) |
-| `src/components/GameNode.svelte` | Game edge card component |
-| `src/components/SyncNode.svelte` | Sync edge card component |
-| `src/components/SidePanel.svelte` | Detail panel container with slide animation |
-| `src/components/SnapshotDetail.svelte` | Snapshot panel: player table, edit controls, CSV copy |
-| `src/components/GameDetail.svelte` | Game panel: mesa cards, waiting list, share text |
-| `src/components/SyncDetail.svelte` | Sync panel: metadata display |
-| `src/components/Toaster.svelte` | Toast notification system (syncing, success, error states) |
-| `src/components/SyncResolutionModal.svelte` | Sequential conflict resolution cards (Merge/Skip) |
-| `src/components/TerminalModal.svelte` | Script output modal with spinner |
-| `src/index.html` | Vite entry HTML template |
-| `static/style.css` | All CSS for the viewer UI (unchanged) |
-| `static/app.js` | Bundled output (Vite build). **Gitignored** — regenerate with `bun run build`. |
-| `templates/index.html` | Production HTML (copied from static/index.html by build script) |
+| `src/types.ts` | Shared TypeScript interfaces |
+| `src/stores.svelte.ts` | Global state (`$state` runes) |
+| `src/api.ts` | API utility module |
+| `src/App.svelte` | Main layout shell |
+| `src/components/*.svelte` | UI components |
+| `static/style.css` | All CSS |
+| `static/app.js` | Build artifact (gitignored) |
 
-### Data
-| File | Format | Git | Mutability |
-|---|---|---|---|
-| `diplomacy.db` | SQLite | ignored | runtime state — single source of truth |
-
-**One file, one format. No CSVs, no .txt reports, no metadata.json.**
-
-`static/app.js` is a build artifact and is gitignored. After cloning, run `bun install && bun run build` before starting the viewer.
+**One file, one format. No CSVs, no .txt reports.**
 
 ## After every feature or fix
 1. Run `uv run python -m pytest -q` — confirm all pass.
@@ -99,11 +73,15 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 - Test files: `frontend/src/*.test.ts`
 
 ## CSS conventions
-- Use flexbox for layout (e.g., `.player-name-cell` with `display: flex`)
+- **Favor flex layout** for all UI structure — use `display: flex` and `flex-direction: column` for panels, rows, and containers.
 - Use `flex: 1` for expandable content, `flex-shrink: 0` for fixed elements
 - Use `overflow: hidden; text-overflow: ellipsis; white-space: nowrap;` for text truncation
 - Use `margin-left: auto` to push elements to the right in flex containers
 - Never inline CSS in HTML — always use `static/style.css`
+- **Panel scroll pattern**: For panels with scrollable content + fixed buttons at bottom:
+  - `.panel-body` → `display: flex; flex-direction: column; overflow: hidden;`
+  - `.panel-scroll` → `flex: 1; overflow-y: auto; min-height: 0;`
+  - Wrap scrollable sections in `<div class="panel-scroll">`, keep buttons outside
 
 ## Ripple-effect checklist
 **Player field change** → `organizador.py` · `models.py` · `formatter.py` · `notion_sync.py` · `db.py` (schema + helpers) · `db_game.py` (game helpers) · `viewer.py` (API) · `test_organizador.py` (`_j()` + `_pool()`) · `test_algoritmo.py` (`_j()` + `_pool()`) · `test_db.py` (`TestDb`) · `test_viewer.py` (`_add_snapshot()` helper)

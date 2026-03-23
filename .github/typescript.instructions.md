@@ -43,10 +43,8 @@ applyTo: "frontend/src/**"
 - Use Vitest with `@testing-library/svelte` for component testing.
 - Test files co-located with components: `ComponentName.test.ts` next to `ComponentName.svelte`.
 - Mock API calls with `vi.mock('../api')`.
-- Test state management by importing from `stores.svelte.ts`.
 - Use `render()` from `@testing-library/svelte` to mount components in tests.
-- **Component typing in tests**: `render()` returns `any`-typed component. Avoid `as unknown as` double casts (code smell). Prefer using the component's exported methods directly or test via DOM queries instead of component instance.
-- Test exported component methods by accessing them through the rendered component, but be aware TypeScript won't infer their types from Svelte components.
+- **Component typing in tests**: `render()` returns `any`-typed component. Avoid `as unknown as` double casts (code smell). Prefer testing via DOM queries instead of component instance.
 
 ## Svelte 5 children pattern
 - For components with children, import `Snippet` type from "svelte" and declare `children: Snippet` in Props interface.
