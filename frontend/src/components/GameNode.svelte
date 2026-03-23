@@ -3,15 +3,16 @@
 
   interface Props {
     node: GameEdge;
+    onopen: (id: number) => void;
   }
 
-  let { node }: Props = $props();
+  let { node, onopen }: Props = $props();
 
   let date = $derived((node.created_at || "").split(" ")[0] ?? "");
   let time = $derived((node.created_at || "").split(" ")[1] ?? "");
 </script>
 
-<div class="node node-report" data-id={node.id} data-type="game">
+<div class="node node-report" data-id={node.id} data-type="game" role="button" tabindex="0" onclick={() => onopen(node.id)} onkeydown={(e) => e.key === "Enter" && onopen(node.id)}>
   <div class="node-icon">📊</div>
   <div class="node-label">Jornada</div>
   <div class="node-name">{date}</div>

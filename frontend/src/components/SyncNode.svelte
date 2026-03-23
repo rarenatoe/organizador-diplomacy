@@ -3,14 +3,15 @@
 
   interface Props {
     node: SyncEdge;
+    onopen: (id: number) => void;
   }
 
-  let { node }: Props = $props();
+  let { node, onopen }: Props = $props();
 
   let date = $derived((node.created_at || "").split(" ")[0] ?? "");
 </script>
 
-<div class="node node-sync" data-id={node.id} data-type="sync">
+<div class="node node-sync" data-id={node.id} data-type="sync" role="button" tabindex="0" onclick={() => onopen(node.id)} onkeydown={(e) => e.key === "Enter" && onopen(node.id)}>
   <div class="node-icon">☁️</div>
   <div class="node-label">Sync Notion</div>
   <div class="node-name">{date}</div>

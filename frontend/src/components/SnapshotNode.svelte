@@ -9,9 +9,11 @@
     node: SnapshotNode;
     onselect: (id: number) => void;
     ondelete: (id: number) => void;
+    onopenGame: (id: number) => void;
+    onopenSync: (id: number) => void;
   }
 
-  let { node, onselect, ondelete }: Props = $props();
+  let { node, onselect, ondelete, onopenGame, onopenSync }: Props = $props();
 
   let branches = $derived(node.branches ?? []);
 
@@ -68,11 +70,11 @@
         <div class="chain-branch">
           <span class="arrow">→</span>
           {#if branch.edge.type === "sync"}
-            <SyncNode node={branch.edge} />
+            <SyncNode node={branch.edge} onopen={onopenSync} />
           {:else if branch.edge.type === "edit"}
             <EditNode node={branch.edge} />
           {:else}
-            <GameNode node={branch.edge} />
+            <GameNode node={branch.edge} onopen={onopenGame} />
           {/if}
           {#if branch.output}
             <span class="arrow">→</span>
@@ -80,6 +82,8 @@
               node={branch.output}
               {onselect}
               {ondelete}
+              {onopenGame}
+              {onopenSync}
             />
           {/if}
         </div>

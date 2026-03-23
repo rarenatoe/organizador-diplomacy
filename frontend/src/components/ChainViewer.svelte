@@ -68,6 +68,8 @@
           node={root}
           onselect={handleSelect}
           ondelete={handleDelete}
+          onopenGame={onopenGame}
+          onopenSync={onopenSync}
         />
       {/each}
     {/if}
