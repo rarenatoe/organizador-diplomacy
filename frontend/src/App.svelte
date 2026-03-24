@@ -7,6 +7,7 @@
   import ChainViewer from "./components/ChainViewer.svelte";
   import SidePanel from "./components/SidePanel.svelte";
   import SnapshotDetail from "./components/SnapshotDetail.svelte";
+  import SnapshotDraft from "./components/SnapshotDraft.svelte";
   import GameDetail from "./components/GameDetail.svelte";
   import SyncDetail from "./components/SyncDetail.svelte";
   import Toaster from "./components/Toaster.svelte";
@@ -21,7 +22,7 @@
   // Panel state
   let panelOpen = $state(false);
   let panelTitle = $state("");
-  let panelType = $state<"snapshot" | "game" | "sync" | null>(null);
+  let panelType = $state<"snapshot" | "game" | "sync" | "draft" | null>(null);
   let panelId = $state<number | null>(null);
 
   // Modal state
@@ -70,6 +71,13 @@
 
   function openSync(id: number): void {
     openPanel("Sync Notion", "sync", id);
+  }
+
+  function openDraft(): void {
+    closePanel();
+    panelType = "draft";
+    panelOpen = true;
+    panelTitle = "Nueva Versión";
   }
 
   // Script execution
@@ -239,6 +247,7 @@
   onrefresh={() => chainViewer?.loadChain()}
   onsync={handleSync}
   onorganizar={() => handleRunScript("organizar")}
+  onnewVersion={openDraft}
   {syncing}
   {running}
 />
@@ -250,11 +259,18 @@
     onopenGame={openGame}
     onopenSync={openSync}
     ondeleteSnapshot={handleDeleteSnapshot}
+    onnewVersion={openDraft}
   />
   <SidePanel title={panelTitle} open={panelOpen} onclose={closePanel}>
     {#if panelType === "snapshot" && panelId !== null}
       <SnapshotDetail
         id={panelId}
+        onclose={closePanel}
+        onchainUpdate={handleChainUpdate}
+        onopenSnapshot={openSnapshot}
+      />
+    {:else if panelType === "draft"}
+      <SnapshotDraft
         onclose={closePanel}
         onchainUpdate={handleChainUpdate}
         onopenSnapshot={openSnapshot}

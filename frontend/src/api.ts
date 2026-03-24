@@ -32,6 +32,17 @@ export async function deleteSnapshot(id: number): Promise<DeleteResult> {
   return (await res.json()) as DeleteResult;
 }
 
+export async function createSnapshot(
+  players: EditPlayerRow[],
+): Promise<EditSnapshotResponse> {
+  const res = await fetch("/api/snapshot/new", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ players }),
+  });
+  return (await res.json()) as EditSnapshotResponse;
+}
+
 export async function editSnapshot(
   id: number,
   players: EditPlayerRow[],

@@ -102,9 +102,7 @@ describe("Panel Scroll Pattern", () => {
 
       // Verify action buttons are inside panel-footer
       const addButton = screen.getByText("➕ Agregar jugador");
-      const createButton = screen.getByText(
-        "✨ Crear snapshot manual con estos ajustes",
-      );
+      const createButton = screen.getByText("✨ Guardar como nueva versión");
 
       expect(panelFooter?.contains(addButton)).toBe(true);
       expect(panelFooter?.contains(createButton)).toBe(true);

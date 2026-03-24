@@ -11,11 +11,12 @@
     onrefresh: () => void;
     onsync: () => void;
     onorganizar: () => void;
+    onnewVersion: () => void;
     syncing: boolean;
     running: boolean;
   }
 
-  let { onrefresh, onsync, onorganizar, syncing, running }: Props = $props();
+  let { onrefresh, onsync, onorganizar, onnewVersion, syncing, running }: Props = $props();
 
   let disabled = $derived(syncing || running);
   let syncButtonEnabled = $derived(getSyncButtonEnabled());
@@ -27,6 +28,13 @@
   <h1>🎲 Organizador Diplomacy <span id="pending-badge">⏳ Sin jugar</span></h1>
   <button class="btn btn-secondary" id="btn-refresh" onclick={onrefresh}
     >⟳ Actualizar</button
+  >
+  <button
+    class="btn btn-secondary"
+    id="btn-new-version"
+    onclick={onnewVersion}
+    disabled={disabled}
+    >➕ Nueva Versión</button
   >
   <button
     class="btn btn-secondary"

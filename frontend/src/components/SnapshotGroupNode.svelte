@@ -143,7 +143,7 @@
 
     <!-- Snapshot Content -->
     <div class="node-icon">📋</div>
-    <div class="node-label">Snapshot #{currentVersion.snapshot.id}</div>
+    <div class="node-label">Versión #{currentVersion.snapshot.id}</div>
     <div class="node-name">{esc(currentVersion.snapshot.created_at)}</div>
     <div class="node-meta">
       {currentVersion.snapshot.player_count} jugadores · {sourceLabel(

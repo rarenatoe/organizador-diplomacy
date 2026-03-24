@@ -69,6 +69,30 @@ def api_delete_snapshot(snapshot_id: int):
         conn.close()
 
 
+@app.route("/api/snapshot/new", methods=["POST"])
+def api_create_snapshot():
+    """
+    Creates a new root 'manual' snapshot (no source snapshot).
+    Body: {"players": [{"nombre": ..., "experiencia": ..., "juegos_este_ano": ...,
+                        "prioridad": ..., "partidas_deseadas": ..., "partidas_gm": ...}, ...]}
+    Returns: {"snapshot_id": <new_id>}
+    """
+    conn = db.get_db()
+    try:
+        body = request.get_json(silent=True) or {}
+        players = body.get("players")
+        if not isinstance(players, list):
+            return jsonify({"error": "players must be a list"}), 400
+        new_id = db.create_root_manual_snapshot(conn, players)
+        conn.commit()
+        return jsonify({"snapshot_id": new_id})
+    except Exception as exc:
+        conn.rollback()
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        conn.close()
+
+
 @app.route("/api/snapshot/<int:snapshot_id>/edit", methods=["POST"])
 def api_edit_snapshot(snapshot_id: int):
     """

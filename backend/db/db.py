@@ -453,6 +453,42 @@ def create_manual_snapshot(
     return snap_id
 
 
+def create_root_manual_snapshot(
+    conn: sqlite3.Connection,
+    players_list: list[dict],
+) -> int:
+    """
+    Creates a new 'manual' root snapshot (no source snapshot).
+    This is used when creating a snapshot from scratch or from pasted CSV.
+
+    `players_list` is a list of dicts with keys:
+        nombre            str
+        experiencia       str   (default: 'Nuevo')
+        juegos_este_ano   int   (default: 0)
+        prioridad         int   (default: 0)
+        partidas_deseadas int   (default: 1)
+        partidas_gm       int   (default: 0)
+
+    Returns the new snapshot id. Does NOT commit.
+    Note: No event is created because this is a root node.
+    """
+    snap_id = create_snapshot(conn, "manual")
+    for player in players_list:
+        nombre = player.get("nombre", "")
+        if not nombre:
+            continue  # skip players without a name
+        player_id = get_or_create_player(conn, nombre)
+        add_snapshot_player(
+            conn, snap_id, player_id,
+            player.get("experiencia", "Nuevo"),
+            int(player.get("juegos_este_ano", 0)),
+            int(player.get("prioridad", 0)),
+            int(player.get("partidas_deseadas", 1)),
+            int(player.get("partidas_gm", 0)),
+        )
+    return snap_id
+
+
 # ── Events (unified) ──────────────────────────────────────────────────────────
 
 def create_event(

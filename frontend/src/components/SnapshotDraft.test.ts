@@ -1,0 +1,303 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/svelte";
+import SnapshotDraft from "./SnapshotDraft.svelte";
+
+// Mock the API module
+vi.mock("../api", () => ({
+  createSnapshot: vi.fn().mockResolvedValue({
+    snapshot_id: 123,
+  }),
+}));
+
+// Mock the utils module
+vi.mock("../utils", () => ({
+  parsePlayersCsv: vi.fn().mockReturnValue([
+    {
+      nombre: "Alice",
+      experiencia: "Nuevo",
+      juegos_este_ano: 0,
+      prioridad: 0,
+      partidas_deseadas: 1,
+      partidas_gm: 0,
+    },
+    {
+      nombre: "Bob",
+      experiencia: "Antiguo",
+      juegos_este_ano: 3,
+      prioridad: 1,
+      partidas_deseadas: 2,
+      partidas_gm: 1,
+    },
+  ]),
+}));
+
+// Mock the stores
+vi.mock("../stores.svelte", () => ({
+  setSelectedSnapshot: vi.fn(),
+  setActiveNodeId: vi.fn(),
+}));
+
+// Mock window.prompt
+const mockPrompt = vi.fn();
+vi.stubGlobal("prompt", mockPrompt);
+
+describe("SnapshotDraft", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders with empty state", () => {
+    const { container } = render(SnapshotDraft, {
+      props: {
+        onclose: () => {},
+        onchainUpdate: () => {},
+        onopenSnapshot: () => {},
+      },
+    });
+
+    expect(container.textContent).toContain("Nueva Versión");
+    expect(container.textContent).toContain("No hay jugadores en el borrador");
+  });
+
+  it("shows add player and paste CSV buttons", () => {
+    render(SnapshotDraft, {
+      props: {
+        onclose: () => {},
+        onchainUpdate: () => {},
+        onopenSnapshot: () => {},
+      },
+    });
+
+    expect(screen.getByText("➕ Agregar jugador")).toBeTruthy();
+    expect(screen.getByText("📥 Pegar CSV")).toBeTruthy();
+  });
+
+  it("adds a player when add button is clicked", async () => {
+    mockPrompt.mockReturnValue("Test Player");
+
+    const { container } = render(SnapshotDraft, {
+      props: {
+        onclose: () => {},
+        onchainUpdate: () => {},
+        onopenSnapshot: () => {},
+      },
+    });
+
+    const addButton = screen.getByText("➕ Agregar jugador");
+    await fireEvent.click(addButton);
+
+    expect(mockPrompt).toHaveBeenCalledWith("Nombre del nuevo jugador:");
+    expect(container.textContent).toContain("Test Player");
+  });
+
+  it("opens CSV modal when paste CSV button is clicked", async () => {
+    render(SnapshotDraft, {
+      props: {
+        onclose: () => {},
+        onchainUpdate: () => {},
+        onopenSnapshot: () => {},
+      },
+    });
+
+    const csvButton = screen.getByText("📥 Pegar CSV");
+    await fireEvent.click(csvButton);
+
+    expect(screen.getByText("Pegar CSV")).toBeTruthy();
+    expect(screen.getByPlaceholderText(/nombre,experiencia/)).toBeTruthy();
+  });
+
+  it("imports CSV when import button is clicked", async () => {
+    const { container } = render(SnapshotDraft, {
+      props: {
+        onclose: () => {},
+        onchainUpdate: () => {},
+        onopenSnapshot: () => {},
+      },
+    });
+
+    // Open CSV modal
+    const csvButton = screen.getByText("📥 Pegar CSV");
+    await fireEvent.click(csvButton);
+
+    // Type in textarea
+    const textarea = screen.getByPlaceholderText(/nombre,experiencia/);
+    await fireEvent.input(textarea, {
+      target: { value: "nombre,experiencia\nAlice,Nuevo\nBob,Antiguo" },
+    });
+
+    // Click import
+    const importButton = screen.getByText("Importar");
+    await fireEvent.click(importButton);
+
+    // Verify players were added
+    expect(container.textContent).toContain("Alice");
+    expect(container.textContent).toContain("Bob");
+  });
+
+  it("closes CSV modal when cancel button is clicked", async () => {
+    render(SnapshotDraft, {
+      props: {
+        onclose: () => {},
+        onchainUpdate: () => {},
+        onopenSnapshot: () => {},
+      },
+    });
+
+    // Open CSV modal
+    const csvButton = screen.getByText("📥 Pegar CSV");
+    await fireEvent.click(csvButton);
+
+    expect(screen.getByText("Pegar CSV")).toBeTruthy();
+
+    // Click cancel
+    const cancelButton = screen.getByText("Cancelar");
+    await fireEvent.click(cancelButton);
+
+    // Modal should be closed
+    expect(screen.queryByText("Pegar CSV")).toBeNull();
+  });
+
+  it("deletes a player when delete button is clicked", async () => {
+    mockPrompt.mockReturnValue("Test Player");
+
+    const { container } = render(SnapshotDraft, {
+      props: {
+        onclose: () => {},
+        onchainUpdate: () => {},
+        onopenSnapshot: () => {},
+      },
+    });
+
+    // Add a player
+    const addButton = screen.getByText("➕ Agregar jugador");
+    await fireEvent.click(addButton);
+
+    expect(container.textContent).toContain("Test Player");
+
+    // Delete the player
+    const deleteButton = container.querySelector(".btn-delete");
+    expect(deleteButton).toBeTruthy();
+    await fireEvent.click(deleteButton!);
+
+    // Player should be removed
+    expect(container.textContent).not.toContain("Test Player");
+  });
+
+  it("disables save button when no players", () => {
+    render(SnapshotDraft, {
+      props: {
+        onclose: () => {},
+        onchainUpdate: () => {},
+        onopenSnapshot: () => {},
+      },
+    });
+
+    const saveButton = screen.getByText("✨ Guardar nueva versión");
+    expect(saveButton.hasAttribute("disabled")).toBe(true);
+  });
+
+  it("enables save button when players exist", async () => {
+    mockPrompt.mockReturnValue("Test Player");
+
+    render(SnapshotDraft, {
+      props: {
+        onclose: () => {},
+        onchainUpdate: () => {},
+        onopenSnapshot: () => {},
+      },
+    });
+
+    // Add a player
+    const addButton = screen.getByText("➕ Agregar jugador");
+    await fireEvent.click(addButton);
+
+    const saveButton = screen.getByText("✨ Guardar nueva versión");
+    expect(saveButton.hasAttribute("disabled")).toBe(false);
+  });
+
+  it("calls createSnapshot when save button is clicked", async () => {
+    const { createSnapshot } = await import("../api");
+    const onclose = vi.fn();
+    const onchainUpdate = vi.fn();
+    const onopenSnapshot = vi.fn();
+
+    mockPrompt.mockReturnValue("Test Player");
+
+    render(SnapshotDraft, {
+      props: {
+        onclose,
+        onchainUpdate,
+        onopenSnapshot,
+      },
+    });
+
+    // Add a player
+    const addButton = screen.getByText("➕ Agregar jugador");
+    await fireEvent.click(addButton);
+
+    // Save
+    const saveButton = screen.getByText("✨ Guardar nueva versión");
+    await fireEvent.click(saveButton);
+
+    expect(createSnapshot).toHaveBeenCalledWith([
+      {
+        nombre: "Test Player",
+        prioridad: 0,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
+      },
+    ]);
+  });
+
+  it("updates player prioridad when checkbox is changed", async () => {
+    mockPrompt.mockReturnValue("Test Player");
+
+    const { container } = render(SnapshotDraft, {
+      props: {
+        onclose: () => {},
+        onchainUpdate: () => {},
+        onopenSnapshot: () => {},
+      },
+    });
+
+    // Add a player
+    const addButton = screen.getByText("➕ Agregar jugador");
+    await fireEvent.click(addButton);
+
+    // Find and click the prioridad checkbox
+    const prioCheckbox = container.querySelector(
+      'input[type="checkbox"]',
+    ) as HTMLInputElement;
+    expect(prioCheckbox).toBeTruthy();
+    await fireEvent.click(prioCheckbox);
+
+    // Checkbox should be checked
+    expect(prioCheckbox.checked).toBe(true);
+  });
+
+  it("updates player partidas_deseadas when number input is changed", async () => {
+    mockPrompt.mockReturnValue("Test Player");
+
+    const { container } = render(SnapshotDraft, {
+      props: {
+        onclose: () => {},
+        onchainUpdate: () => {},
+        onopenSnapshot: () => {},
+      },
+    });
+
+    // Add a player
+    const addButton = screen.getByText("➕ Agregar jugador");
+    await fireEvent.click(addButton);
+
+    // Find and change the deseadas input
+    const deseadasInput = container.querySelector(
+      'input[type="number"]',
+    ) as HTMLInputElement;
+    expect(deseadasInput).toBeTruthy();
+    await fireEvent.input(deseadasInput, { target: { value: "3" } });
+
+    // Input should have new value
+    expect(deseadasInput.value).toBe("3");
+  });
+});

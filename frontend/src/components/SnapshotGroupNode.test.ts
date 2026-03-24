@@ -49,7 +49,7 @@ describe("SnapshotGroupNode", () => {
 
     const nodeDiv = container.querySelector(".node-group");
     expect(nodeDiv).not.toBeNull();
-    expect(container.textContent).toContain("Snapshot #1");
+    expect(container.textContent).toContain("Versión #1");
   });
 
   it("has active class when activeNodeId matches snapshot id", () => {

@@ -92,6 +92,87 @@ class TestApiDeleteSnapshot:
         assert snap1 not in data["deleted"]
 
 
+class TestApiCreateSnapshot:
+    def test_create_new_snapshot_success(self, client):
+        """POST /api/snapshot/new creates a new root snapshot and returns the ID."""
+        c, conn = client
+        players_list = [
+            {"nombre": "Alice", "experiencia": "Nuevo", "juegos_este_ano": 0,
+             "prioridad": 0, "partidas_deseadas": 1, "partidas_gm": 0},
+            {"nombre": "Bob", "experiencia": "Antiguo", "juegos_este_ano": 3,
+             "prioridad": 1, "partidas_deseadas": 2, "partidas_gm": 1},
+        ]
+        resp = c.post(
+            "/api/snapshot/new",
+            data=json.dumps({"players": players_list}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "snapshot_id" in data
+        new_id = data["snapshot_id"]
+        
+        # Verify the snapshot was created with correct players
+        detail = c.get(f"/api/snapshot/{new_id}").get_json()
+        assert detail["source"] == "manual"
+        assert len(detail["players"]) == 2
+        player_names = {p["nombre"] for p in detail["players"]}
+        assert player_names == {"Alice", "Bob"}
+
+    def test_create_new_snapshot_empty_players(self, client):
+        """POST /api/snapshot/new with empty players list creates snapshot with no players."""
+        c, conn = client
+        resp = c.post(
+            "/api/snapshot/new",
+            data=json.dumps({"players": []}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "snapshot_id" in data
+        new_id = data["snapshot_id"]
+        
+        # Verify the snapshot was created with no players
+        detail = c.get(f"/api/snapshot/{new_id}").get_json()
+        assert detail["source"] == "manual"
+        assert len(detail["players"]) == 0
+
+    def test_create_new_snapshot_invalid_players_type_returns_400(self, client):
+        """POST /api/snapshot/new with invalid players type returns 400."""
+        c, conn = client
+        resp = c.post(
+            "/api/snapshot/new",
+            data=json.dumps({"players": "not_a_list"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+    def test_create_new_snapshot_applies_defaults(self, client):
+        """POST /api/snapshot/new applies default values for missing fields."""
+        c, conn = client
+        # Only provide nombre, omit other fields
+        players_list = [
+            {"nombre": "Charlie"},
+        ]
+        resp = c.post(
+            "/api/snapshot/new",
+            data=json.dumps({"players": players_list}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        new_id = resp.get_json()["snapshot_id"]
+        
+        # Verify defaults were applied
+        detail = c.get(f"/api/snapshot/{new_id}").get_json()
+        player = detail["players"][0]
+        assert player["nombre"] == "Charlie"
+        assert player["experiencia"] == "Nuevo"
+        assert player["juegos_este_ano"] == 0
+        assert player["prioridad"] == 0
+        assert player["partidas_deseadas"] == 1
+        assert player["partidas_gm"] == 0
+
+
 class TestApiEditSnapshot:
     def test_edit_creates_new_manual_snapshot(self, client):
         """POST /api/snapshot/<id>/edit returns 200 with new snapshot_id."""

@@ -243,7 +243,7 @@
       onclick={handleAddPlayer}>➕ Agregar jugador</button
     >
     <button class="btn btn-primary" style="width:100%" onclick={handleApplyEdit}
-      >✨ Crear snapshot manual con estos ajustes</button
+      >✨ Guardar como nueva versión</button
     >
   </div>
 {/if}

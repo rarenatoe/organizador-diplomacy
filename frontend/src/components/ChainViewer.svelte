@@ -16,9 +16,10 @@
     onopenGame: (id: number) => void;
     onopenSync: (id: number) => void;
     ondeleteSnapshot: (id: number) => void;
+    onnewVersion: () => void;
   }
 
-  let { onopenSnapshot, onopenGame, onopenSync, ondeleteSnapshot }: Props =
+  let { onopenSnapshot, onopenGame, onopenSync, ondeleteSnapshot, onnewVersion }: Props =
     $props();
 
   let loading = $state(true);
@@ -67,6 +68,9 @@
         <div class="icon">📂</div>
         <p>No hay snapshots en la DB.</p>
         <p>Ejecuta <em>Sync Notion</em> para comenzar.</p>
+        <button class="btn btn-primary" onclick={onnewVersion}>
+          ➕ Crear versión desde cero
+        </button>
       </div>
     {:else}
       {#each groupedRoots as group (group.versions[0]!.snapshot.id)}
