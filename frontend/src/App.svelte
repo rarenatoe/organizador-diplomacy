@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { RunResult, SyncDetectResult, MergePair } from "./types";
-  import { runScript, detectSync, confirmSync, deleteSnapshot as apiDeleteSnapshot } from "./api";
-  import { getSelectedSnapshot, setSelectedSnapshot, setActiveNodeId, deselectSnapshot } from "./stores.svelte";
+  import type { RunResult, EditPlayerRow } from "./types";
+  import { runScript, deleteSnapshot as apiDeleteSnapshot } from "./api";
+  import { setActiveNodeId } from "./stores.svelte";
   import { findLatestSnapshotId, findLatestGameId } from "./snapshotUtils";
   import Header from "./components/Header.svelte";
   import ChainViewer from "./components/ChainViewer.svelte";
@@ -11,7 +11,6 @@
   import GameDetail from "./components/GameDetail.svelte";
   import SyncDetail from "./components/SyncDetail.svelte";
   import Toaster from "./components/Toaster.svelte";
-  import SyncResolutionModal from "./components/SyncResolutionModal.svelte";
   import TerminalModal from "./components/TerminalModal.svelte";
   import "../static/style.css";
 
@@ -25,16 +24,18 @@
   let panelType = $state<"snapshot" | "game" | "sync" | "draft" | null>(null);
   let panelId = $state<number | null>(null);
 
+  // Draft state
+  let draftParentId = $state<number | null>(null);
+  let draftEventType = $state<"sync" | "manual" | "edit">("manual");
+  let draftAutoAction = $state<'notion' | 'csv' | null>(null);
+  let draftInitialPlayers = $state<EditPlayerRow[]>([]);
+
   // Modal state
   let modalVisible = $state(false);
   let modalTitle = $state("");
   let modalOutput = $state("");
   let modalIsError = $state(false);
   let modalLoading = $state(false);
-
-  // Resolution modal state
-  let resolutionVisible = $state(false);
-  let resolutionPairs = $state<SyncDetectResult["similar_names"]>([]);
 
   // Syncing/running state
   let syncing = $state(false);
@@ -63,21 +64,31 @@
 
   function openSnapshot(id: number): void {
     openPanel(`Snapshot #${id}`, "snapshot", id);
+    setActiveNodeId("snapshot-" + id);
   }
 
   function openGame(id: number): void {
     openPanel("Jornada", "game", id);
+    setActiveNodeId("game-" + id);
   }
 
   function openSync(id: number): void {
     openPanel("Sync Notion", "sync", id);
+    setActiveNodeId("sync-" + id);
   }
 
-  function openDraft(): void {
+  function openDraft(parentId: number | null = null, eventType: string = "manual", autoAction: 'notion' | 'csv' | null = null, players: EditPlayerRow[] = []): void {
     closePanel();
+    draftParentId = parentId;
+    draftEventType = eventType as "sync" | "manual" | "edit";
+    draftAutoAction = autoAction;
+    draftInitialPlayers = players;
     panelType = "draft";
     panelOpen = true;
-    panelTitle = "Nueva Versión";
+    panelTitle = parentId === null ? "Nueva Lista" : (eventType === 'sync' ? `Sincronizando #${parentId}` : `Editando #${parentId}`);
+    if (parentId !== null) {
+      setActiveNodeId("snapshot-" + parentId);
+    }
   }
 
   // Script execution
@@ -91,7 +102,7 @@
     running = true;
 
     try {
-      const data = await runScript(script, getSelectedSnapshot());
+      const data = await runScript(script, null);
       const ok = data.returncode === 0;
 
       if (ok && script === "organizar") {
@@ -130,89 +141,6 @@
     }
   }
 
-  // Sync flow
-  async function handleSync(): Promise<void> {
-    syncing = true;
-    const toastId = toaster?.showSyncingToast() ?? "";
-
-    try {
-      const detectData = await detectSync(getSelectedSnapshot());
-
-      // Handle null/undefined response
-      if (!detectData) {
-        toaster?.dismissAll();
-        toaster?.showErrorToast("Error: No se recibió respuesta del servidor");
-        return;
-      }
-
-      // Handle error response from backend before checking .similar_names
-      if (detectData.error) {
-        toaster?.dismissAll();
-        toaster?.showErrorToast(`Error: ${detectData.error}`);
-        return;
-      }
-
-      if (detectData.similar_names.length === 0) {
-        await handleSyncConfirm([], toastId);
-      } else {
-        toaster?.dismissAll();
-        resolutionPairs = detectData.similar_names;
-        resolutionVisible = true;
-      }
-    } catch (e) {
-      toaster?.dismissAll();
-      toaster?.showErrorToast(`Error de conexión: ${String(e)}`);
-    } finally {
-      syncing = false;
-    }
-  }
-
-  async function handleSyncConfirm(
-    merges: MergePair[],
-    toastId?: string,
-  ): Promise<void> {
-    const tid = toastId ?? (toaster?.showSyncingToast() ?? "");
-    syncing = true;
-
-    try {
-      const data = await confirmSync(getSelectedSnapshot(), merges);
-      const ok = data.returncode === 0;
-      toaster?.dismissAll();
-      if (ok) {
-        toaster?.showSuccessToast("Sync Notion completado");
-        await chainViewer?.loadChain();
-
-        // Find and open the newly synced snapshot
-        const { fetchChain } = await import("./api");
-        const chainData = await fetchChain();
-        const snapId = findLatestSnapshotId(chainData.roots);
-        if (snapId !== null) {
-          setSelectedSnapshot(snapId);
-          setActiveNodeId(String(snapId));
-          openSnapshot(snapId);
-        }
-      } else {
-        toaster?.showErrorToast(
-          `Error en Sync Notion: ${data.stderr ?? "desconocido"}`,
-        );
-      }
-    } catch (e) {
-      toaster?.dismissAll();
-      toaster?.showErrorToast(`Error de conexión: ${String(e)}`);
-    } finally {
-      syncing = false;
-    }
-  }
-
-  function handleResolutionComplete(merges: MergePair[]): void {
-    resolutionVisible = false;
-    void handleSyncConfirm(merges);
-  }
-
-  function handleResolutionCancel(): void {
-    resolutionVisible = false;
-  }
-
   // Delete snapshot
   async function handleDeleteSnapshot(id: number): Promise<void> {
     if (
@@ -227,10 +155,6 @@
         alert(`Error al eliminar: ${data.error}`);
         return;
       }
-      const selected = getSelectedSnapshot();
-      if (selected !== null && data.deleted.includes(selected)) {
-        deselectSnapshot();
-      }
       closePanel();
       await chainViewer?.loadChain();
     } catch (e) {
@@ -244,12 +168,7 @@
 </script>
 
 <Header
-  onrefresh={() => chainViewer?.loadChain()}
-  onsync={handleSync}
-  onorganizar={() => handleRunScript("organizar")}
-  onnewVersion={openDraft}
-  {syncing}
-  {running}
+  onnewdraft={() => openDraft()}
 />
 
 <div class="main">
@@ -259,7 +178,8 @@
     onopenGame={openGame}
     onopenSync={openSync}
     ondeleteSnapshot={handleDeleteSnapshot}
-    onnewVersion={openDraft}
+    onnewdraft={(options) => openDraft(null, "manual", options?.autoAction ?? null)}
+    panelOpen={panelOpen}
   />
   <SidePanel title={panelTitle} open={panelOpen} onclose={closePanel}>
     {#if panelType === "snapshot" && panelId !== null}
@@ -268,9 +188,15 @@
         onclose={closePanel}
         onchainUpdate={handleChainUpdate}
         onopenSnapshot={openSnapshot}
+        onopenGame={openGame}
+        oneditdraft={(parentId: number, eventType: string, autoAction?: 'notion' | 'csv') => openDraft(parentId, eventType, autoAction)}
       />
     {:else if panelType === "draft"}
       <SnapshotDraft
+        parentId={draftParentId}
+        initialPlayers={[]}
+        defaultEventType={draftEventType}
+        autoAction={draftAutoAction}
         onclose={closePanel}
         onchainUpdate={handleChainUpdate}
         onopenSnapshot={openSnapshot}
@@ -285,13 +211,6 @@
 
 <Toaster bind:this={toaster} />
 
-<SyncResolutionModal
-  visible={resolutionVisible}
-  pairs={resolutionPairs}
-  oncomplete={handleResolutionComplete}
-  oncancel={handleResolutionCancel}
-/>
-
 <TerminalModal
   visible={modalVisible}
   title={modalTitle}
@@ -300,3 +219,12 @@
   loading={modalLoading}
   onclose={() => (modalVisible = false)}
 />
+
+<style>
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+</style>

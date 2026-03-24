@@ -17,6 +17,10 @@ from flask import Flask, jsonify, render_template, request
 
 from backend.config import FLASK_TEMPLATE_DIR, FLASK_STATIC_DIR, PROJECT_ROOT
 from backend.db import db, db_views
+from backend.sync.notion_sync import _descargar_todos, _conteo_partidas_este_ano
+from dotenv import load_dotenv
+from notion_client import Client
+import os
 
 # Configure Flask to find templates and static in frontend/
 app = Flask(__name__, template_folder=str(FLASK_TEMPLATE_DIR), static_folder=str(FLASK_STATIC_DIR))
@@ -93,27 +97,120 @@ def api_create_snapshot():
         conn.close()
 
 
-@app.route("/api/snapshot/<int:snapshot_id>/edit", methods=["POST"])
-def api_edit_snapshot(snapshot_id: int):
+@app.route("/api/notion/fetch", methods=["GET"])
+def api_notion_fetch():
     """
-    Creates a new 'manual' snapshot branching from snapshot_id.
-    Body: {"players": [{"nombre": ..., "prioridad": ...,
-                        "partidas_deseadas": ..., "partidas_gm": ...}, ...]}
+    Fetches raw player data from Notion without writing to the database.
+    Returns: {"players": [{"nombre": "...", "experiencia": "Nuevo", "juegos_este_ano": 0}, ...]}
+    """
+    load_dotenv()
+    token = os.getenv("NOTION_TOKEN")
+    db_id = os.getenv("NOTION_DATABASE_ID")
+    part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
+
+    if not token or token.startswith("secret_XXX"):
+        return jsonify({"error": "NOTION_TOKEN not configured"}), 500
+    if not db_id or "XXX" in db_id:
+        return jsonify({"error": "NOTION_DATABASE_ID not configured"}), 500
+    if not part_db_id or "XXX" in part_db_id:
+        return jsonify({"error": "NOTION_PARTICIPACIONES_DB_ID not configured"}), 500
+
+    try:
+        from datetime import datetime
+        client = Client(auth=token)
+        año_actual = datetime.now().year
+
+        pages = _descargar_todos(client, db_id)
+        conteo_por_jugador = _conteo_partidas_este_ano(client, part_db_id, año_actual)
+
+        players: list[dict] = []
+        for page in pages:
+            props = page.get("properties", {})
+
+            # Nombre
+            nombre_prop = props.get("Nombre")
+            if not nombre_prop:
+                continue
+            nombre = "".join(p.get("plain_text", "") for p in nombre_prop.get("title", [])).strip()
+            if not nombre:
+                continue
+
+            # Experiencia
+            part_prop = props.get("Participaciones")
+            experiencia = "Antiguo" if part_prop and part_prop.get("relation") else "Nuevo"
+
+            # Juegos_Este_Ano
+            player_id = page["id"].replace("-", "")
+            juegos = conteo_por_jugador.get(player_id, 0)
+
+            players.append({
+                "nombre": nombre,
+                "experiencia": experiencia,
+                "juegos_este_ano": juegos,
+            })
+
+        return jsonify({"players": players})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/snapshot/save", methods=["POST"])
+def api_snapshot_save():
+    """
+    Unified endpoint to save a new snapshot from a player list.
+    Body: {"parent_id": int | null, "event_type": "manual" | "sync", "players": [...]}
     Returns: {"snapshot_id": <new_id>}
     """
     conn = db.get_db()
     try:
-        if not conn.execute(
-            "SELECT 1 FROM snapshots WHERE id = ?", (snapshot_id,)
-        ).fetchone():
-            return jsonify({"error": "not found"}), 404
         body = request.get_json(silent=True) or {}
+        parent_id = body.get("parent_id")
+        event_type = body.get("event_type", "manual")
         players = body.get("players")
+
         if not isinstance(players, list):
             return jsonify({"error": "players must be a list"}), 400
-        new_id = db.create_manual_snapshot(conn, snapshot_id, players)
+
+        if event_type not in ("manual", "sync"):
+            return jsonify({"error": "event_type must be 'manual' or 'sync'"}), 400
+
+        if parent_id is not None and not isinstance(parent_id, int):
+            return jsonify({"error": "parent_id must be an integer or null"}), 400
+
+        # Validate parent exists if provided
+        if parent_id is not None:
+            if not conn.execute(
+                "SELECT 1 FROM snapshots WHERE id = ?", (parent_id,)
+            ).fetchone():
+                return jsonify({"error": "parent snapshot not found"}), 404
+
+        # Create snapshot with appropriate source
+        source = "notion_sync" if event_type == "sync" else "manual"
+        snap_id = db.create_snapshot(conn, source)
+
+        # Add players with defaults for missing fields
+        for player in players:
+            nombre = player.get("nombre", "")
+            if not nombre:
+                continue
+            player_id = db.get_or_create_player(conn, nombre)
+            db.add_snapshot_player(
+                conn, snap_id, player_id,
+                player.get("experiencia", "Nuevo"),
+                int(player.get("juegos_este_ano", 0)),
+                int(player.get("prioridad", 0)),
+                int(player.get("partidas_deseadas", 1)),
+                int(player.get("partidas_gm", 0)),
+            )
+
+        # Create event linking parent to new snapshot if parent provided
+        # Map event_type to valid event types: 'sync' -> 'sync', 'manual' -> 'edit'
+        if parent_id is not None:
+            db_event_type = "sync" if event_type == "sync" else "edit"
+            db.create_event(conn, db_event_type, parent_id, snap_id)
+
         conn.commit()
-        return jsonify({"snapshot_id": new_id})
+        return jsonify({"snapshot_id": snap_id})
     except Exception as exc:
         conn.rollback()
         return jsonify({"error": str(exc)}), 500
@@ -182,88 +279,6 @@ def api_run(script: str):
     })
 
 
-@app.route("/api/sync/detect", methods=["POST"])
-def api_sync_detect():
-    """
-    Detect similar names between Notion and snapshot.
-    Body: {"snapshot": <int_id>}
-    Returns: {"notion_count", "snapshot_count", "similar_names": [...]}
-    """
-    cwd = PROJECT_ROOT
-    body = request.get_json(silent=True) or {}
-    snapshot_id = body.get("snapshot")
-
-    if snapshot_id is None:
-        return jsonify({"error": "Snapshot selection required. Please click a snapshot node in the chain before syncing or organizing."}), 400
-
-    if not isinstance(snapshot_id, int):
-        return jsonify({"error": "snapshot must be an integer"}), 400
-
-    cmd = ["uv", "run", "python", "-m", "backend.sync.notion_sync", "--detect-only", "--snapshot", str(snapshot_id)]
-
-    result = subprocess.run(
-        cmd,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        timeout=90,
-    )
-
-    if result.returncode != 0:
-        return jsonify({
-            "error": "Detection failed",
-            "stderr": result.stderr,
-        }), 500
-
-    try:
-        # Parse JSON from stdout (skip any non-JSON lines)
-        stdout = result.stdout
-        # Find the JSON output (starts with '{')
-        json_start = stdout.find("{")
-        if json_start == -1:
-            return jsonify({"error": "No JSON output from detection"}), 500
-        data = json.loads(stdout[json_start:])
-        return jsonify(data)
-    except json.JSONDecodeError as e:
-        return jsonify({"error": f"Failed to parse detection output: {e}"}), 500
-
-
-@app.route("/api/sync/confirm", methods=["POST"])
-def api_sync_confirm():
-    """
-    Confirm sync with optional merges.
-    Body: {"snapshot": <int_id>, "merges": [{"from": "Name1", "to": "Name2"}, ...]}
-    Returns: {"returncode", "stdout", "stderr"}
-    """
-    cwd = PROJECT_ROOT
-    body = request.get_json(silent=True) or {}
-    snapshot_id = body.get("snapshot")
-    merges = body.get("merges", [])
-
-    if snapshot_id is None:
-        return jsonify({"error": "Snapshot selection required. Please click a snapshot node in the chain before syncing or organizing."}), 400
-
-    if not isinstance(snapshot_id, int):
-        return jsonify({"error": "snapshot must be an integer"}), 400
-
-    cmd = ["uv", "run", "python", "-m", "backend.sync.notion_sync", "--snapshot", str(snapshot_id)]
-
-    if merges:
-        merges_json = json.dumps({"merges": merges}, ensure_ascii=False)
-        cmd += ["--merges", merges_json]
-
-    result = subprocess.run(
-        cmd,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        timeout=90,
-    )
-    return jsonify({
-        "returncode": result.returncode,
-        "stdout":     result.stdout,
-        "stderr":     result.stderr,
-    })
 
 
 @app.route("/api/player/rename", methods=["POST"])

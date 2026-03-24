@@ -7,32 +7,18 @@ import type { ChainData } from "./types";
 // ── State container ───────────────────────────────────────────────────────────
 
 interface AppState {
-  selectedSnapshot: number | null;
   snapshotCount: number;
   chainData: ChainData | null;
   activeNodeId: string | null;
 }
 
 const state = $state<AppState>({
-  selectedSnapshot: null,
   snapshotCount: -1, // -1 means loading/unknown state
   chainData: null,
   activeNodeId: null,
 });
 
 // ── Convenience getters/setters ───────────────────────────────────────────────
-
-export function getSelectedSnapshot(): number | null {
-  return state.selectedSnapshot;
-}
-
-export function setSelectedSnapshot(id: number): void {
-  state.selectedSnapshot = id;
-}
-
-export function deselectSnapshot(): void {
-  state.selectedSnapshot = null;
-}
 
 export function setSnapshotCount(count: number): void {
   state.snapshotCount = count;
@@ -44,22 +30,6 @@ export function setChainData(data: ChainData): void {
 
 export function setActiveNodeId(id: string | null): void {
   state.activeNodeId = id;
-}
-
-export function getSyncButtonEnabled(): boolean {
-  // If -1, we don't know the state yet (still loading), so keep it disabled.
-  if (state.snapshotCount === -1) return false;
-  return state.snapshotCount === 0 || state.selectedSnapshot !== null;
-}
-
-export function getOrganizarEnabled(): boolean {
-  return state.selectedSnapshot !== null;
-}
-
-export function getOrganizarLabel(): string {
-  return state.selectedSnapshot !== null
-    ? `Organizar · #${state.selectedSnapshot}`
-    : "Organizar";
 }
 
 export function getChainData(): ChainData | null {

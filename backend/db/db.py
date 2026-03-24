@@ -269,13 +269,46 @@ def rename_player(conn: sqlite3.Connection, old_name: str, new_name: str) -> boo
             (new_id, old_id)
         )
         
-        # Check if old player is now orphaned (no snapshots)
-        orphan_check = conn.execute(
-            "SELECT 1 FROM snapshot_players WHERE player_id = ?",
-            (old_id,)
-        ).fetchone()
+        # Also redirect game-related references.
+        # mesa_players has PK (mesa_id, player_id): if both old and new already
+        # appear in the same mesa, drop the old row before updating the rest.
+        conn.execute(
+            """DELETE FROM mesa_players
+               WHERE player_id = ? AND mesa_id IN (
+                   SELECT mesa_id FROM mesa_players WHERE player_id = ?
+               )""",
+            (old_id, new_id)
+        )
+        conn.execute(
+            "UPDATE mesa_players SET player_id = ? WHERE player_id = ?",
+            (new_id, old_id)
+        )
+        conn.execute(
+            "UPDATE mesas SET gm_player_id = ? WHERE gm_player_id = ?",
+            (new_id, old_id)
+        )
+        conn.execute(
+            "UPDATE waiting_list SET player_id = ? WHERE player_id = ?",
+            (new_id, old_id)
+        )
         
-        if not orphan_check:
+        # Check if old player is now fully orphaned (no references anywhere)
+        orphan_check = (
+            not conn.execute(
+                "SELECT 1 FROM snapshot_players WHERE player_id = ?", (old_id,)
+            ).fetchone()
+            and not conn.execute(
+                "SELECT 1 FROM mesas WHERE gm_player_id = ?", (old_id,)
+            ).fetchone()
+            and not conn.execute(
+                "SELECT 1 FROM mesa_players WHERE player_id = ?", (old_id,)
+            ).fetchone()
+            and not conn.execute(
+                "SELECT 1 FROM waiting_list WHERE player_id = ?", (old_id,)
+            ).fetchone()
+        )
+        
+        if orphan_check:
             # Old player is orphaned - delete it
             conn.execute("DELETE FROM players WHERE id = ?", (old_id,))
         

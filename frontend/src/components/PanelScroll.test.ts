@@ -67,6 +67,8 @@ describe("Panel Scroll Pattern", () => {
           onclose: () => {},
           onchainUpdate: () => {},
           onopenSnapshot: () => {},
+          onopenGame: () => {},
+          oneditdraft: () => {},
         },
       });
 
@@ -90,6 +92,8 @@ describe("Panel Scroll Pattern", () => {
           onclose: () => {},
           onchainUpdate: () => {},
           onopenSnapshot: () => {},
+          onopenGame: () => {},
+          oneditdraft: () => {},
         },
       });
 
@@ -101,11 +105,13 @@ describe("Panel Scroll Pattern", () => {
       expect(panelFooter).toBeTruthy();
 
       // Verify action buttons are inside panel-footer
-      const addButton = screen.getByText("➕ Agregar jugador");
-      const createButton = screen.getByText("✨ Guardar como nueva versión");
+      const editButton = screen.getByText("📝 Editar");
+      const syncButton = screen.getByText("↻ Sincronizar Notion");
+      const organizarButton = screen.getByText("▶ Organizar Partidas");
 
-      expect(panelFooter?.contains(addButton)).toBe(true);
-      expect(panelFooter?.contains(createButton)).toBe(true);
+      expect(panelFooter?.contains(editButton)).toBe(true);
+      expect(panelFooter?.contains(syncButton)).toBe(true);
+      expect(panelFooter?.contains(organizarButton)).toBe(true);
     });
 
     it("should not have section class on panel-footer", async () => {
@@ -115,6 +121,8 @@ describe("Panel Scroll Pattern", () => {
           onclose: () => {},
           onchainUpdate: () => {},
           onopenSnapshot: () => {},
+          onopenGame: () => {},
+          oneditdraft: () => {},
         },
       });
 

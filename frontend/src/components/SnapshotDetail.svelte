@@ -1,19 +1,28 @@
 <script lang="ts">
-  import type { SnapshotDetail, EditPlayerRow } from "../types";
-  import { fetchSnapshot, editSnapshot, addPlayer, renamePlayer } from "../api";
-  import { setSelectedSnapshot, setActiveNodeId } from "../stores.svelte";
+  import type { SnapshotDetail, EditPlayerRow, SimilarName, MergePair } from "../types";
+  import { fetchSnapshot, runScript, renamePlayer, fetchChain, fetchNotionPlayers, saveSnapshot } from "../api";
+  import { findLatestGameId } from "../snapshotUtils";
+  import { setActiveNodeId } from "../stores.svelte";
+  import { detectSimilarNames } from "../syncUtils";
+  import SyncResolutionModal from "./SyncResolutionModal.svelte";
 
   interface Props {
     id: number;
     onclose: () => void;
     onchainUpdate: () => void;
     onopenSnapshot: (id: number) => void;
+    onopenGame: (id: number) => void;
+    oneditdraft: (parentId: number, eventType: string, autoAction?: 'notion' | 'csv') => void;
   }
 
-  let { id, onclose, onchainUpdate, onopenSnapshot }: Props = $props();
+  let { id, onclose, onchainUpdate, onopenSnapshot, onopenGame, oneditdraft }: Props = $props();
 
   let data = $state<SnapshotDetail | null>(null);
   let loading = $state(true);
+  let isSyncing = $state(false);
+  let resolutionVisible = $state(false);
+  let resolutionPairs = $state<SimilarName[]>([]);
+  let fetchedNotionPlayers = $state<any[]>([]);
 
   const CSV_COLS = [
     "nombre",
@@ -64,35 +73,21 @@
     await navigator.clipboard.writeText(getCsvText());
   }
 
-  async function handleApplyEdit(): Promise<void> {
-    const table = document.getElementById("snapshot-edit-table");
-    if (!table || !data) return;
-    const players: EditPlayerRow[] = [];
-    table.querySelectorAll<HTMLTableRowElement>("tbody tr").forEach((tr) => {
-      const keep = tr.querySelector<HTMLInputElement>(".player-keep");
-      if (!keep?.checked) return;
-      const nombre = tr.dataset["nombre"] ?? "";
-      const prio = tr.querySelector<HTMLInputElement>(".player-prio");
-      const deseadas = tr.querySelector<HTMLInputElement>(".player-deseadas");
-      const gm = tr.querySelector<HTMLInputElement>(".player-gm");
-      players.push({
-        nombre,
-        prioridad: prio?.checked ? 1 : 0,
-        partidas_deseadas: parseInt(deseadas?.value ?? "1", 10),
-        partidas_gm: gm?.checked ? 1 : 0,
-      });
-    });
-    const result = await editSnapshot(id, players);
-    if (result.error) {
-      alert(`Error: ${result.error}`);
-      return;
-    }
-    onclose();
-    onchainUpdate();
-    if (result.snapshot_id !== undefined) {
-      setSelectedSnapshot(result.snapshot_id);
-      setActiveNodeId(String(result.snapshot_id));
-      onopenSnapshot(result.snapshot_id);
+  async function handleOrganizar(): Promise<void> {
+    try {
+      await runScript("organizar", id);
+      await loadSnapshot();
+      onchainUpdate();
+      
+      // Fetch chain and find the latest game to open
+      const chainData = await fetchChain();
+      const gameId = findLatestGameId(chainData.roots);
+      if (gameId !== null) {
+        setActiveNodeId("game-" + gameId);
+        onopenGame(gameId);
+      }
+    } catch (e) {
+      alert(`Error: ${String(e)}`);
     }
   }
 
@@ -100,42 +95,107 @@
     const newName = prompt(`Renombrar jugador "${oldName}" a:`, oldName);
     if (!newName || newName === oldName) return;
     const result = await renamePlayer(oldName, newName);
-    if (result.error) {
-      alert(`Error: ${result.error}`);
-      return;
-    }
+    if (result.error) { alert(`Error: ${result.error}`); return; }
     await loadSnapshot();
     onchainUpdate();
   }
 
-  async function handleAddPlayer(): Promise<void> {
-    const nombre = prompt("Nombre del nuevo jugador:");
-    if (!nombre) return;
-    const experiencia = prompt("Experiencia (Nuevo/Antiguo):", "Nuevo");
-    if (!experiencia) return;
-    const juegosStr = prompt("Juegos este año:", "0");
-    const juegos = parseInt(juegosStr ?? "0", 10);
-    const result = await addPlayer(id, {
-      nombre,
-      experiencia,
-      juegos_este_ano: juegos,
-      prioridad: 0,
-      partidas_deseadas: 1,
-      partidas_gm: 0,
+  async function handleDirectSync(): Promise<void> {
+    isSyncing = true;
+    try {
+      const response = await fetchNotionPlayers();
+      if (response.error) {
+        alert(`Error: ${response.error}`);
+        return;
+      }
+
+      fetchedNotionPlayers = response.players;
+
+      // Detect similar names between Notion and current snapshot
+      const notionNames = response.players.map((p: any) => p.nombre);
+      const currentNames = (data?.players ?? []).map((p: any) => String(p["nombre"]));
+      const similar = detectSimilarNames(notionNames, currentNames, 0.75);
+
+      if (similar.length > 0) {
+        // Show resolution modal
+        resolutionPairs = similar;
+        resolutionVisible = true;
+      } else {
+        // No conflicts, merge directly
+        await executeSyncMerge([]);
+      }
+    } catch (e) {
+      alert(`Error de conexión: ${String(e)}`);
+    } finally {
+      isSyncing = false;
+    }
+  }
+
+  async function executeSyncMerge(merges: MergePair[]): Promise<void> {
+    const mergeMap = new Map(merges.map((m) => [m.from, m.to]));
+    const currentRows = data?.players ?? [];
+
+    // Update existing players with Notion data (Strict Roster Rule: only update existing)
+    const mergedPlayers = currentRows.map((row: any) => {
+      const currentName = String(row["nombre"]);
+      const notionName = mergeMap.get(currentName) || currentName;
+      const notionPlayer = fetchedNotionPlayers.find(
+        (p: any) => p.nombre === notionName
+      );
+      if (notionPlayer) {
+        return {
+          nombre: notionName,
+          experiencia: notionPlayer.experiencia,
+          juegos_este_ano: notionPlayer.juegos_este_ano,
+          prioridad: Number(row["prioridad"]),
+          partidas_deseadas: Number(row["partidas_deseadas"]),
+          partidas_gm: Number(row["partidas_gm"]),
+        };
+      }
+      return {
+        nombre: currentName,
+        experiencia: String(row["experiencia"]),
+        juegos_este_ano: Number(row["juegos_este_ano"]),
+        prioridad: Number(row["prioridad"]),
+        partidas_deseadas: Number(row["partidas_deseadas"]),
+        partidas_gm: Number(row["partidas_gm"]),
+      };
     });
-    if (result.error) {
-      alert(`Error: ${result.error}`);
-      return;
+
+    try {
+      const result = await saveSnapshot({
+        parent_id: id,
+        event_type: "sync",
+        players: mergedPlayers,
+      });
+
+      if (result.error) {
+        alert(`Error: ${result.error}`);
+        return;
+      }
+
+      onchainUpdate();
+      if (result.snapshot_id !== undefined) {
+        setActiveNodeId(String(result.snapshot_id));
+        onopenSnapshot(result.snapshot_id);
+      }
+    } catch (e) {
+      alert(`Error de conexión: ${String(e)}`);
+    } finally {
+      resolutionVisible = false;
+      resolutionPairs = [];
+      fetchedNotionPlayers = [];
     }
-    await loadSnapshot();
-    onchainUpdate();
   }
 
-  function handleCheckboxChange(e: Event): void {
-    const cb = (e.target as Element).closest<HTMLInputElement>(".player-keep");
-    if (!cb) return;
-    const tr = cb.closest("tr");
-    if (tr) tr.classList.toggle("excluded", !cb.checked);
+  function handleResolutionComplete(merges: MergePair[]): void {
+    void executeSyncMerge(merges);
+  }
+
+  function handleResolutionCancel(): void {
+    resolutionVisible = false;
+    resolutionPairs = [];
+    fetchedNotionPlayers = [];
   }
 
   $effect(() => {
@@ -162,10 +222,9 @@
   </div>
 
   <div class="table-wrap flex-table-wrap">
-    <table id="snapshot-edit-table">
+    <table>
           <thead>
             <tr>
-              <th></th>
               <th>Nombre</th>
               <th></th>
               <th>Exp.</th>
@@ -175,30 +234,21 @@
               <th>GM</th>
             </tr>
           </thead>
-          <tbody onchange={handleCheckboxChange}>
-            {#each rows as r}
+          <tbody>
+            {#each rows as r (r["nombre"])}
               {@const nombre = esc(String(r["nombre"] ?? ""))}
               {@const expColor =
                 r["experiencia"] === "Nuevo" ? "#713f12" : "#166534"}
               {@const expBg =
                 r["experiencia"] === "Nuevo" ? "#fef9c3" : "#f0fdf4"}
-              <tr data-nombre={nombre}>
-                <td
-                  ><input
-                    type="checkbox"
-                    class="player-keep"
-                    checked
-                    title="Incluir"
-                  /></td
-                >
+              <tr>
                 <td><span class="player-name">{nombre}</span></td>
                 <td style="padding-left: 0; width: 32px;">
                   <button
                     class="btn-ghost btn-rename"
                     title="Renombrar"
                     onclick={() => handleRename(String(r["nombre"] ?? ""))}
-                    >✏️</button
-                  >
+                  >✏️</button>
                 </td>
                 <td
                   ><span
@@ -207,30 +257,9 @@
                   ></td
                 >
                 <td>{String(r["juegos_este_ano"] ?? "")}</td>
-                <td
-                  ><input
-                    type="checkbox"
-                    class="player-prio"
-                    checked={r["prioridad"] === 1}
-                  /></td
-                >
-                <td
-                  ><input
-                    type="number"
-                    class="player-deseadas"
-                    value={String(r["partidas_deseadas"] ?? "1")}
-                    min="1"
-                    max="9"
-                    style="width:38px"
-                  /></td
-                >
-                <td
-                  ><input
-                    type="checkbox"
-                    class="player-gm"
-                    checked={(r["partidas_gm"] as number) > 0}
-                  /></td
-                >
+                <td>{r["prioridad"] === 1 ? "✓" : ""}</td>
+                <td>{String(r["partidas_deseadas"] ?? "1")}</td>
+                <td>{(r["partidas_gm"] as number) > 0 ? "✓" : ""}</td>
               </tr>
             {/each}
           </tbody>
@@ -240,13 +269,28 @@
     <button
       class="btn btn-secondary"
       style="width:100%"
-      onclick={handleAddPlayer}>➕ Agregar jugador</button
-    >
-    <button class="btn btn-primary" style="width:100%" onclick={handleApplyEdit}
-      >✨ Guardar como nueva versión</button
-    >
+      onclick={() => oneditdraft(id, 'manual')}
+    >📝 Editar</button>
+    <button
+      class="btn btn-secondary"
+      style="width:100%"
+      onclick={handleDirectSync}
+      disabled={isSyncing}
+    >{isSyncing ? "⏳ Sincronizando..." : "↻ Sincronizar Notion"}</button>
+    <button
+      class="btn btn-primary"
+      style="width:100%"
+      onclick={handleOrganizar}
+    >▶ Organizar Partidas</button>
   </div>
 {/if}
+
+<SyncResolutionModal
+  visible={resolutionVisible}
+  pairs={resolutionPairs}
+  oncomplete={handleResolutionComplete}
+  oncancel={handleResolutionCancel}
+/>
 
 <style>
   .section {
@@ -383,31 +427,6 @@
     z-index: 12;
     background: var(--surface2);
     box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.1);
-  }
-
-  .flex-table-wrap input[type="checkbox"] {
-    width: 14px;
-    height: 14px;
-    cursor: pointer;
-    accent-color: var(--accent);
-  }
-
-  .flex-table-wrap input[type="number"] {
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 2px 4px;
-    font-size: 12px;
-    background: var(--surface);
-    color: var(--text);
-  }
-
-  .flex-table-wrap input[type="number"]:focus {
-    outline: 2px solid var(--accent);
-    border-color: transparent;
-  }
-
-  tbody :global(tr.excluded) {
-    opacity: 0.35;
   }
 
   .player-name {

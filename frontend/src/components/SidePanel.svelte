@@ -35,6 +35,8 @@
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
+    position: relative;
+    z-index: 50;
   }
 
   .panel.open {

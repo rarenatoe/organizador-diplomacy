@@ -1,65 +1,19 @@
 <script lang="ts">
-  import {
-    getSelectedSnapshot,
-    getSyncButtonEnabled,
-    getOrganizarEnabled,
-    getOrganizarLabel,
-    deselectSnapshot,
-  } from "../stores.svelte";
-
   interface Props {
-    onrefresh: () => void;
-    onsync: () => void;
-    onorganizar: () => void;
-    onnewVersion: () => void;
-    syncing: boolean;
-    running: boolean;
+    onnewdraft: () => void;
   }
 
-  let { onrefresh, onsync, onorganizar, onnewVersion, syncing, running }: Props = $props();
-
-  let disabled = $derived(syncing || running);
-  let syncButtonEnabled = $derived(getSyncButtonEnabled());
-  let organizarEnabled = $derived(getOrganizarEnabled());
-  let organizarLabel = $derived(getOrganizarLabel());
+  let { onnewdraft }: Props = $props();
 </script>
 
 <header>
   <h1>🎲 Organizador Diplomacy <span id="pending-badge">⏳ Sin jugar</span></h1>
-  <button class="btn btn-secondary" id="btn-refresh" onclick={onrefresh}
-    >⟳ Actualizar</button
-  >
-  <button
-    class="btn btn-secondary"
-    id="btn-new-version"
-    onclick={onnewVersion}
-    disabled={disabled}
-    >➕ Nueva Versión</button
-  >
-  <button
-    class="btn btn-secondary"
-    id="btn-sync"
-    onclick={onsync}
-    disabled={!syncButtonEnabled || disabled}
-    title={!syncButtonEnabled ? "Selecciona un snapshot en la cadena para sincronizar desde ese punto" : ""}
-    >↻ Sync Notion</button
-  >
   <button
     class="btn btn-primary"
-    id="btn-organizar"
-    onclick={onorganizar}
-    disabled={!organizarEnabled || disabled}
-    title={!organizarEnabled ? "Selecciona un snapshot en la cadena para organizar" : ""}
-    >▶ <span id="organizar-label">{organizarLabel}</span></button
+    id="btn-new-version"
+    onclick={onnewdraft}
+    >➕ Nueva Lista</button
   >
-  {#if getSelectedSnapshot() !== null}
-    <button
-      class="btn btn-secondary"
-      id="btn-deselect"
-      title="Limpiar la selección actual"
-      onclick={deselectSnapshot}>✕ Limpiar selección</button
-    >
-  {/if}
 </header>
 
 <style>

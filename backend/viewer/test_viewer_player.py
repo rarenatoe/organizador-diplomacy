@@ -82,6 +82,64 @@ class TestApiPlayerRename:
         )
         assert resp.status_code == 400
 
+    def test_rename_player_with_game_history_succeeds(self, client):
+        """Renaming a player who is a GM or mesa participant must not raise FOREIGN KEY error."""
+        from backend.db import db_game
+        c, conn = client
+        # Set up: Alice in a snapshot and also as GM of a game
+        snap1 = db.create_snapshot(conn, "notion_sync")
+        snap2 = db.create_snapshot(conn, "organizar")
+        pid1 = db.get_or_create_player(conn, "Alice")
+        pid2 = db.get_or_create_player(conn, "Bob")
+        db.add_snapshot_player(conn, snap1, pid1, "Antiguo", 0, 0, 1, 0)
+        db.add_snapshot_player(conn, snap2, pid2, "Antiguo", 0, 0, 1, 0)
+        event_id = db_game.create_game_event(conn, snap1, snap2, 1, "")
+        mesa_id = db_game.create_mesa(conn, event_id, 1, pid1)  # Alice is GM
+        conn.commit()
+
+        resp = c.post(
+            "/api/player/rename",
+            data=json.dumps({"old_name": "Alice", "new_name": "Bob"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["success"] is True
+
+        # GM reference should now point to Bob
+        gm_row = conn.execute(
+            "SELECT gm_player_id FROM mesas WHERE id = ?", (mesa_id,)
+        ).fetchone()
+        assert gm_row["gm_player_id"] == pid2
+
+    def test_rename_player_with_mesa_player_record_succeeds(self, client):
+        """Renaming a player who played in a game mesa must not raise FOREIGN KEY error."""
+        from backend.db import db_game
+        c, conn = client
+        snap1 = db.create_snapshot(conn, "notion_sync")
+        snap2 = db.create_snapshot(conn, "organizar")
+        pid1 = db.get_or_create_player(conn, "Charlie")
+        pid2 = db.get_or_create_player(conn, "Dave")
+        db.add_snapshot_player(conn, snap1, pid1, "Antiguo", 0, 0, 1, 0)
+        db.add_snapshot_player(conn, snap2, pid2, "Antiguo", 0, 0, 1, 0)
+        event_id = db_game.create_game_event(conn, snap1, snap2, 1, "")
+        mesa_id = db_game.create_mesa(conn, event_id, 1, None)
+        db_game.add_mesa_player(conn, mesa_id, pid1, 1)  # Charlie played
+        conn.commit()
+
+        resp = c.post(
+            "/api/player/rename",
+            data=json.dumps({"old_name": "Charlie", "new_name": "Dave"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["success"] is True
+
+        # Mesa player record should now point to Dave
+        mp_row = conn.execute(
+            "SELECT player_id FROM mesa_players WHERE mesa_id = ?", (mesa_id,)
+        ).fetchone()
+        assert mp_row["player_id"] == pid2
+
 
 # ── /api/snapshot/<id>/add-player ─────────────────────────────────────────────
 

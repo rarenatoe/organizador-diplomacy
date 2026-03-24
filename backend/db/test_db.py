@@ -401,8 +401,122 @@ class TestDb(unittest.TestCase):
         self.assertEqual(players[0]["experiencia"], "Antiguo")
         self.assertEqual(players[0]["juegos_este_ano"], 5)
 
+    def test_rename_player_with_gm_role_succeeds(self):
+        """Renaming a player who is a game GM transfers the GM record to new player."""
+        from backend.db import db_game
+        snap1 = db.create_snapshot(self.conn, "notion_sync")
+        snap2 = db.create_snapshot(self.conn, "organizar")
+        pid1 = db.get_or_create_player(self.conn, "Alice")
+        pid2 = db.get_or_create_player(self.conn, "Bob")
+        db.add_snapshot_player(self.conn, snap1, pid1, "Antiguo", 0, 0, 1, 0)
+        event_id = db_game.create_game_event(self.conn, snap1, snap2, 1, "")
+        mesa_id = db_game.create_mesa(self.conn, event_id, 1, pid1)  # Alice is GM
+        self.conn.commit()
+
+        result = db.rename_player(self.conn, "Alice", "Bob")
+        self.conn.commit()
+
+        self.assertTrue(result)
+        # GM reference moved to Bob (pid2)
+        gm_row = self.conn.execute(
+            "SELECT gm_player_id FROM mesas WHERE id = ?", (mesa_id,)
+        ).fetchone()
+        self.assertEqual(gm_row["gm_player_id"], pid2)
+        # Alice's player record was deleted (fully orphaned)
+        alice_row = self.conn.execute(
+            "SELECT id FROM players WHERE id = ?", (pid1,)
+        ).fetchone()
+        self.assertIsNone(alice_row)
+
+    def test_rename_player_with_mesa_player_record_succeeds(self):
+        """Renaming a player who appeared in a game table transfers the mesa record."""
+        from backend.db import db_game
+        snap1 = db.create_snapshot(self.conn, "notion_sync")
+        snap2 = db.create_snapshot(self.conn, "organizar")
+        pid1 = db.get_or_create_player(self.conn, "Alice")
+        pid2 = db.get_or_create_player(self.conn, "Bob")
+        db.add_snapshot_player(self.conn, snap1, pid1, "Antiguo", 0, 0, 1, 0)
+        event_id = db_game.create_game_event(self.conn, snap1, snap2, 1, "")
+        mesa_id = db_game.create_mesa(self.conn, event_id, 1, None)
+        db_game.add_mesa_player(self.conn, mesa_id, pid1, 1)  # Alice played in this mesa
+        self.conn.commit()
+
+        result = db.rename_player(self.conn, "Alice", "Bob")
+        self.conn.commit()
+
+        self.assertTrue(result)
+        # Mesa player record now points to Bob (pid2)
+        mp_row = self.conn.execute(
+            "SELECT player_id FROM mesa_players WHERE mesa_id = ?", (mesa_id,)
+        ).fetchone()
+        self.assertEqual(mp_row["player_id"], pid2)
+        # Alice's player record was deleted
+        alice_row = self.conn.execute(
+            "SELECT id FROM players WHERE id = ?", (pid1,)
+        ).fetchone()
+        self.assertIsNone(alice_row)
+
+    def test_rename_player_with_waiting_list_record_succeeds(self):
+        """Renaming a player on the waiting list transfers the waiting list record."""
+        from backend.db import db_game
+        snap1 = db.create_snapshot(self.conn, "notion_sync")
+        snap2 = db.create_snapshot(self.conn, "organizar")
+        pid1 = db.get_or_create_player(self.conn, "Alice")
+        pid2 = db.get_or_create_player(self.conn, "Bob")
+        db.add_snapshot_player(self.conn, snap1, pid1, "Antiguo", 0, 0, 1, 0)
+        event_id = db_game.create_game_event(self.conn, snap1, snap2, 1, "")
+        db_game.add_waiting_player(self.conn, event_id, pid1, 1, 1)  # Alice on waiting list
+        self.conn.commit()
+
+        result = db.rename_player(self.conn, "Alice", "Bob")
+        self.conn.commit()
+
+        self.assertTrue(result)
+        # Waiting list record now points to Bob (pid2)
+        wl_row = self.conn.execute(
+            "SELECT player_id FROM waiting_list WHERE event_id = ?", (event_id,)
+        ).fetchone()
+        self.assertEqual(wl_row["player_id"], pid2)
+        # Alice's player record was deleted
+        alice_row = self.conn.execute(
+            "SELECT id FROM players WHERE id = ?", (pid1,)
+        ).fetchone()
+        self.assertIsNone(alice_row)
+
+    def test_rename_player_not_orphaned_when_still_in_game(self):
+        """If old player is still referenced in games after rename, they are NOT deleted."""
+        from backend.db import db_game
+        # Alice is in snap1 AND in a game mesa; Bob is in snap2 only.
+        snap1 = db.create_snapshot(self.conn, "notion_sync")
+        snap2 = db.create_snapshot(self.conn, "notion_sync")
+        snap3 = db.create_snapshot(self.conn, "organizar")
+        pid1 = db.get_or_create_player(self.conn, "Alice")
+        pid2 = db.get_or_create_player(self.conn, "Bob")
+        # Alice in snap1 only, Bob in snap2 only
+        db.add_snapshot_player(self.conn, snap1, pid1, "Antiguo", 0, 0, 1, 0)
+        db.add_snapshot_player(self.conn, snap2, pid2, "Antiguo", 0, 0, 1, 0)
+        # Alice also appears as GM in a game event (from snap1 → snap3)
+        event_id = db_game.create_game_event(self.conn, snap1, snap3, 1, "")
+        mesa_id = db_game.create_mesa(self.conn, event_id, 1, pid1)
+        self.conn.commit()
+
+        # Rename Alice → Bob; Bob is in snap2, Alice is in snap1 (different snaps → allowed)
+        result = db.rename_player(self.conn, "Alice", "Bob")
+        self.conn.commit()
+
+        self.assertTrue(result)
+        # After rename, snap1's player is now Bob
+        players = db.get_snapshot_players(self.conn, snap1)
+        self.assertEqual(players[0]["nombre"], "Bob")
+        # The mesa GM is now Bob (pid2)
+        gm_row = self.conn.execute(
+            "SELECT gm_player_id FROM mesas WHERE id = ?", (mesa_id,)
+        ).fetchone()
+        self.assertEqual(gm_row["gm_player_id"], pid2)
+
 
     # ── Schema validation tests (seat belt for future issues) ─────────────
+
 
     def test_foreign_key_constraints_point_to_events(self):
         """

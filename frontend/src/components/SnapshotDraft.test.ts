@@ -7,6 +7,9 @@ vi.mock("../api", () => ({
   createSnapshot: vi.fn().mockResolvedValue({
     snapshot_id: 123,
   }),
+  saveSnapshot: vi.fn().mockResolvedValue({
+    snapshot_id: 123,
+  }),
 }));
 
 // Mock the utils module
@@ -49,6 +52,9 @@ describe("SnapshotDraft", () => {
   it("renders with empty state", () => {
     const { container } = render(SnapshotDraft, {
       props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
         onclose: () => {},
         onchainUpdate: () => {},
         onopenSnapshot: () => {},
@@ -62,6 +68,9 @@ describe("SnapshotDraft", () => {
   it("shows add player and paste CSV buttons", () => {
     render(SnapshotDraft, {
       props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
         onclose: () => {},
         onchainUpdate: () => {},
         onopenSnapshot: () => {},
@@ -77,6 +86,9 @@ describe("SnapshotDraft", () => {
 
     const { container } = render(SnapshotDraft, {
       props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
         onclose: () => {},
         onchainUpdate: () => {},
         onopenSnapshot: () => {},
@@ -87,12 +99,19 @@ describe("SnapshotDraft", () => {
     await fireEvent.click(addButton);
 
     expect(mockPrompt).toHaveBeenCalledWith("Nombre del nuevo jugador:");
-    expect(container.textContent).toContain("Test Player");
+    const nameInput = container.querySelector(
+      ".player-name-input",
+    ) as HTMLInputElement;
+    expect(nameInput).toBeTruthy();
+    expect(nameInput.value).toBe("Test Player");
   });
 
   it("opens CSV modal when paste CSV button is clicked", async () => {
     render(SnapshotDraft, {
       props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
         onclose: () => {},
         onchainUpdate: () => {},
         onopenSnapshot: () => {},
@@ -109,6 +128,9 @@ describe("SnapshotDraft", () => {
   it("imports CSV when import button is clicked", async () => {
     const { container } = render(SnapshotDraft, {
       props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
         onclose: () => {},
         onchainUpdate: () => {},
         onopenSnapshot: () => {},
@@ -129,14 +151,19 @@ describe("SnapshotDraft", () => {
     const importButton = screen.getByText("Importar");
     await fireEvent.click(importButton);
 
-    // Verify players were added
-    expect(container.textContent).toContain("Alice");
-    expect(container.textContent).toContain("Bob");
+    // Verify players were added by checking input values
+    const nameInputs = container.querySelectorAll(".player-name-input");
+    expect(nameInputs.length).toBe(2);
+    expect((nameInputs[0] as HTMLInputElement).value).toBe("Alice");
+    expect((nameInputs[1] as HTMLInputElement).value).toBe("Bob");
   });
 
   it("closes CSV modal when cancel button is clicked", async () => {
     render(SnapshotDraft, {
       props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
         onclose: () => {},
         onchainUpdate: () => {},
         onopenSnapshot: () => {},
@@ -162,6 +189,9 @@ describe("SnapshotDraft", () => {
 
     const { container } = render(SnapshotDraft, {
       props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
         onclose: () => {},
         onchainUpdate: () => {},
         onopenSnapshot: () => {},
@@ -172,27 +202,35 @@ describe("SnapshotDraft", () => {
     const addButton = screen.getByText("➕ Agregar jugador");
     await fireEvent.click(addButton);
 
-    expect(container.textContent).toContain("Test Player");
+    const nameInput = container.querySelector(
+      ".player-name-input",
+    ) as HTMLInputElement;
+    expect(nameInput).toBeTruthy();
+    expect(nameInput.value).toBe("Test Player");
 
     // Delete the player
     const deleteButton = container.querySelector(".btn-delete");
     expect(deleteButton).toBeTruthy();
     await fireEvent.click(deleteButton!);
 
-    // Player should be removed
-    expect(container.textContent).not.toContain("Test Player");
+    // Player should be removed - no name input should exist
+    const nameInputs = container.querySelectorAll(".player-name-input");
+    expect(nameInputs.length).toBe(0);
   });
 
   it("disables save button when no players", () => {
     render(SnapshotDraft, {
       props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
         onclose: () => {},
         onchainUpdate: () => {},
         onopenSnapshot: () => {},
       },
     });
 
-    const saveButton = screen.getByText("✨ Guardar nueva versión");
+    const saveButton = screen.getByText("✨ Guardar Nueva Lista");
     expect(saveButton.hasAttribute("disabled")).toBe(true);
   });
 
@@ -201,6 +239,9 @@ describe("SnapshotDraft", () => {
 
     render(SnapshotDraft, {
       props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
         onclose: () => {},
         onchainUpdate: () => {},
         onopenSnapshot: () => {},
@@ -211,12 +252,12 @@ describe("SnapshotDraft", () => {
     const addButton = screen.getByText("➕ Agregar jugador");
     await fireEvent.click(addButton);
 
-    const saveButton = screen.getByText("✨ Guardar nueva versión");
+    const saveButton = screen.getByText("✨ Guardar Nueva Lista");
     expect(saveButton.hasAttribute("disabled")).toBe(false);
   });
 
-  it("calls createSnapshot when save button is clicked", async () => {
-    const { createSnapshot } = await import("../api");
+  it("calls saveSnapshot when save button is clicked", async () => {
+    const { saveSnapshot } = await import("../api");
     const onclose = vi.fn();
     const onchainUpdate = vi.fn();
     const onopenSnapshot = vi.fn();
@@ -225,6 +266,9 @@ describe("SnapshotDraft", () => {
 
     render(SnapshotDraft, {
       props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
         onclose,
         onchainUpdate,
         onopenSnapshot,
@@ -236,17 +280,23 @@ describe("SnapshotDraft", () => {
     await fireEvent.click(addButton);
 
     // Save
-    const saveButton = screen.getByText("✨ Guardar nueva versión");
+    const saveButton = screen.getByText("✨ Guardar Nueva Lista");
     await fireEvent.click(saveButton);
 
-    expect(createSnapshot).toHaveBeenCalledWith([
-      {
-        nombre: "Test Player",
-        prioridad: 0,
-        partidas_deseadas: 1,
-        partidas_gm: 0,
-      },
-    ]);
+    expect(saveSnapshot).toHaveBeenCalledWith({
+      parent_id: null,
+      event_type: "manual",
+      players: [
+        {
+          nombre: "Test Player",
+          experiencia: "Nuevo",
+          juegos_este_ano: 0,
+          prioridad: 0,
+          partidas_deseadas: 1,
+          partidas_gm: 0,
+        },
+      ],
+    });
   });
 
   it("updates player prioridad when checkbox is changed", async () => {
@@ -254,6 +304,9 @@ describe("SnapshotDraft", () => {
 
     const { container } = render(SnapshotDraft, {
       props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
         onclose: () => {},
         onchainUpdate: () => {},
         onopenSnapshot: () => {},
@@ -280,6 +333,9 @@ describe("SnapshotDraft", () => {
 
     const { container } = render(SnapshotDraft, {
       props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
         onclose: () => {},
         onchainUpdate: () => {},
         onopenSnapshot: () => {},

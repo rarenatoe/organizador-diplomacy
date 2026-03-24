@@ -6,7 +6,6 @@
     setChainData,
     getChainData,
     setActiveNodeId,
-    setSelectedSnapshot,
   } from "../stores.svelte";
   import SnapshotGroupNode from "./SnapshotGroupNode.svelte";
   import { groupSnapshots } from "../groupSnapshots";
@@ -16,10 +15,11 @@
     onopenGame: (id: number) => void;
     onopenSync: (id: number) => void;
     ondeleteSnapshot: (id: number) => void;
-    onnewVersion: () => void;
+    onnewdraft: (options?: { autoAction?: 'notion' | 'csv' }) => void;
+    panelOpen?: boolean;
   }
 
-  let { onopenSnapshot, onopenGame, onopenSync, ondeleteSnapshot, onnewVersion }: Props =
+  let { onopenSnapshot, onopenGame, onopenSync, ondeleteSnapshot, onnewdraft, panelOpen = false }: Props =
     $props();
 
   let loading = $state(true);
@@ -41,8 +41,6 @@
   }
 
   function handleSelect(id: number): void {
-    setActiveNodeId(String(id));
-    setSelectedSnapshot(id);
     onopenSnapshot(id);
   }
 
@@ -57,7 +55,7 @@
 </script>
 
 <div class="chain-area">
-  <div id="chain">
+  <div id="chain" class:panel-open={panelOpen}>
     {#if loading}
       <div class="empty-state">
         <div class="icon">⏳</div>
@@ -67,10 +65,18 @@
       <div class="empty-state">
         <div class="icon">📂</div>
         <p>No hay snapshots en la DB.</p>
-        <p>Ejecuta <em>Sync Notion</em> para comenzar.</p>
-        <button class="btn btn-primary" onclick={onnewVersion}>
-          ➕ Crear versión desde cero
-        </button>
+        <p>Comienza importando jugadores o creando una versión desde cero.</p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+          <button class="btn btn-primary" onclick={() => onnewdraft({ autoAction: 'notion' })}>
+            ☁️ Importar de Notion
+          </button>
+          <button class="btn btn-secondary" onclick={() => onnewdraft({ autoAction: 'csv' })}>
+            📥 Pegar CSV
+          </button>
+          <button class="btn btn-secondary" onclick={() => onnewdraft()}>
+            📝 Crear desde cero
+          </button>
+        </div>
       </div>
     {:else}
       {#each groupedRoots as group (group.versions[0]!.snapshot.id)}
@@ -119,5 +125,11 @@
 
   .empty-state p {
     font-size: 13px;
+  }
+
+  :global(#chain.panel-open .node:not(.active)) {
+    opacity: 0.4;
+    filter: grayscale(60%);
+    box-shadow: none;
   }
 </style>

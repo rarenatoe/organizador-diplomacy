@@ -1,9 +1,14 @@
 // eslint.config.ts — flat config for ESLint 10 + typescript-eslint v8
 import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
+import svelte from "eslint-plugin-svelte";
 
 export default defineConfig([
-  ...tseslint.configs.strictTypeChecked,
+  // TypeScript files configuration
+  ...tseslint.configs.strictTypeChecked.map((config) => ({
+    ...config,
+    files: ["frontend/src/**/*.ts"],
+  })),
   {
     files: ["frontend/src/**/*.ts"],
     languageOptions: {
@@ -31,6 +36,27 @@ export default defineConfig([
         "error",
         { ignoreArrowShorthand: true },
       ],
+    },
+  },
+  // Svelte files configuration with proper TypeScript support
+  ...svelte.configs["flat/recommended"].map((config) => ({
+    ...config,
+    files: ["frontend/src/**/*.svelte"],
+  })),
+  {
+    files: ["frontend/src/**/*.svelte"],
+    languageOptions: {
+      parserOptions: {
+        parser: tseslint.parser,
+      },
+    },
+    rules: {
+      // Disable TypeScript rules that require type information for Svelte files
+      "@typescript-eslint/no-floating-promises": "off",
+      "@typescript-eslint/restrict-template-expressions": "off",
+      "@typescript-eslint/no-confusing-void-expression": "off",
+      // The flat/recommended config already includes a11y rules
+      // Additional custom rules can be added here if needed
     },
   },
 ]);

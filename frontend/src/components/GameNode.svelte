@@ -15,7 +15,7 @@
 
 <div 
   class="node node-report" 
-  class:active={getActiveNodeId() === String(node.id)}
+  class:active={getActiveNodeId() === "game-" + String(node.id)}
   data-id={node.id} 
   data-type="game" 
   role="button" 
@@ -50,6 +50,7 @@
 
   :global(.node.active) {
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    z-index: 45;
   }
 
   .node-report {

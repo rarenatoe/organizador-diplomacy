@@ -1,16 +1,23 @@
 <script lang="ts">
-  import type { EditPlayerRow } from "../types";
-  import { createSnapshot } from "../api";
+  import { untrack } from "svelte";
+  import type { EditPlayerRow, SimilarName, MergePair } from "../types";
+  import { createSnapshot, saveSnapshot, fetchNotionPlayers } from "../api";
   import { parsePlayersCsv } from "../utils";
-  import { setSelectedSnapshot, setActiveNodeId } from "../stores.svelte";
+  import { detectSimilarNames } from "../syncUtils";
+  import { setActiveNodeId } from "../stores.svelte";
+  import SyncResolutionModal from "./SyncResolutionModal.svelte";
 
   interface Props {
+    parentId: number | null;
+    initialPlayers: EditPlayerRow[];
+    defaultEventType: "manual" | "sync" | "edit";
+    autoAction?: 'notion' | 'csv' | null;
     onclose: () => void;
     onchainUpdate: () => void;
     onopenSnapshot: (id: number) => void;
   }
 
-  let { onclose, onchainUpdate, onopenSnapshot }: Props = $props();
+  let { parentId, initialPlayers, defaultEventType, autoAction = null, onclose, onchainUpdate, onopenSnapshot }: Props = $props();
 
   interface DraftPlayer {
     nombre: string;
@@ -21,10 +28,35 @@
     partidas_gm: number;
   }
 
-  let draftPlayers = $state<DraftPlayer[]>([]);
+  let draftPlayers = $state(untrack(() => initialPlayers.map((p) => ({
+    nombre: p.nombre,
+    experiencia: p.experiencia ?? "Nuevo",
+    juegos_este_ano: p.juegos_este_ano ?? 0,
+    prioridad: p.prioridad,
+    partidas_deseadas: p.partidas_deseadas,
+    partidas_gm: p.partidas_gm,
+  }))));
+  let eventType = $state(untrack(() => defaultEventType));
   let showCsvModal = $state(false);
   let csvText = $state("");
   let saving = $state(false);
+  let isImporting = $state(false);
+  let resolutionVisible = $state(false);
+  let resolutionPairs = $state<SimilarName[]>([]);
+  let fetchedNotionPlayers = $state<any[]>([]);
+
+  // Auto-action on mount
+  let autoActionExecuted = $state(false);
+  $effect(() => {
+    if (!autoActionExecuted && autoAction) {
+      autoActionExecuted = true;
+      if (autoAction === 'notion') {
+        handleImportNotion();
+      } else if (autoAction === 'csv') {
+        showCsvModal = true;
+      }
+    }
+  });
 
   function esc(s: string | null | undefined): string {
     const el = document.createElement("span");
@@ -68,6 +100,93 @@
     showCsvModal = false;
   }
 
+  async function handleImportNotion(): Promise<void> {
+    isImporting = true;
+    try {
+      const response = await fetchNotionPlayers();
+      if (response.error) {
+        alert(`Error: ${response.error}`);
+        return;
+      }
+
+      fetchedNotionPlayers = response.players;
+
+      // Detect similar names between Notion and current draft
+      const notionNames = response.players.map((p: any) => p.nombre);
+      const draftNames = draftPlayers.map((p) => p.nombre);
+      const similar = detectSimilarNames(notionNames, draftNames, 0.75);
+
+      if (similar.length > 0) {
+        // Show resolution modal
+        resolutionPairs = similar;
+        resolutionVisible = true;
+      } else {
+        // No conflicts, merge directly
+        mergeNotionPlayers([]);
+      }
+    } catch (e) {
+      alert(`Error de conexión: ${String(e)}`);
+    } finally {
+      isImporting = false;
+    }
+  }
+
+  function mergeNotionPlayers(merges: MergePair[]): void {
+    const mergeMap = new Map(merges.map((m) => [m.from, m.to]));
+
+    // Update existing players with Notion data
+    const updatedPlayers = draftPlayers.map((player) => {
+      const notionName = mergeMap.get(player.nombre) || player.nombre;
+      const notionPlayer = fetchedNotionPlayers.find(
+        (p: any) => p.nombre === notionName
+      );
+      if (notionPlayer) {
+        return {
+          ...player,
+          nombre: notionName,
+          experiencia: notionPlayer.experiencia,
+          juegos_este_ano: notionPlayer.juegos_este_ano,
+        };
+      }
+      return player;
+    });
+
+    // Strict Roster Rule: Only add new players if creating from scratch (parentId === null)
+    if (parentId === null) {
+      const existingNames = new Set(updatedPlayers.map((p) => p.nombre));
+      const newPlayers = fetchedNotionPlayers
+        .filter((p: any) => !existingNames.has(p.nombre))
+        .map((p: any) => ({
+          nombre: p.nombre,
+          experiencia: p.experiencia,
+          juegos_este_ano: p.juegos_este_ano,
+          prioridad: 0,
+          partidas_deseadas: 1,
+          partidas_gm: 0,
+        }));
+
+      draftPlayers = [...updatedPlayers, ...newPlayers];
+    } else {
+      // When updating existing list, only update existing players
+      draftPlayers = updatedPlayers;
+    }
+
+    eventType = "sync";
+    resolutionVisible = false;
+    resolutionPairs = [];
+    fetchedNotionPlayers = [];
+  }
+
+  function handleResolutionComplete(merges: MergePair[]): void {
+    mergeNotionPlayers(merges);
+  }
+
+  function handleResolutionCancel(): void {
+    resolutionVisible = false;
+    resolutionPairs = [];
+    fetchedNotionPlayers = [];
+  }
+
   async function handleSave(): Promise<void> {
     if (draftPlayers.length === 0) {
       alert("Agrega al menos un jugador antes de guardar");
@@ -78,19 +197,27 @@
     try {
       const players: EditPlayerRow[] = draftPlayers.map((p) => ({
         nombre: p.nombre,
+        experiencia: p.experiencia,
+        juegos_este_ano: p.juegos_este_ano,
         prioridad: p.prioridad,
         partidas_deseadas: p.partidas_deseadas,
         partidas_gm: p.partidas_gm,
       }));
-      const result = await createSnapshot(players);
+
+      const result = await saveSnapshot({
+        parent_id: parentId,
+        event_type: eventType,
+        players,
+      });
+
       if (result.error) {
         alert(`Error: ${result.error}`);
         return;
       }
+
       onclose();
       onchainUpdate();
       if (result.snapshot_id !== undefined) {
-        setSelectedSnapshot(result.snapshot_id);
         setActiveNodeId(String(result.snapshot_id));
         onopenSnapshot(result.snapshot_id);
       }
@@ -126,9 +253,18 @@
       <button class="btn btn-secondary" onclick={handleAddPlayer}>
         ➕ Agregar jugador
       </button>
-      <button class="btn btn-secondary" onclick={() => (showCsvModal = true)}>
-        📥 Pegar CSV
-      </button>
+      {#if parentId === null}
+        <button class="btn btn-secondary" onclick={() => (showCsvModal = true)}>
+          📥 Pegar CSV
+        </button>
+        <button
+          class="btn btn-secondary"
+          onclick={handleImportNotion}
+          disabled={isImporting}
+        >
+          {isImporting ? "⏳ Importando..." : "☁️ Importar de Notion"}
+        </button>
+      {/if}
     </div>
   </div>
   <div class="section-title" style="margin-bottom: 6px;">
@@ -151,13 +287,13 @@
         </tr>
       </thead>
       <tbody>
-        {#each draftPlayers as player, i}
+        {#each draftPlayers as player, i (i)}
           {@const expColor =
             player.experiencia === "Nuevo" ? "#713f12" : "#166534"}
           {@const expBg =
             player.experiencia === "Nuevo" ? "#fef9c3" : "#f0fdf4"}
           <tr>
-            <td><span class="player-name">{esc(player.nombre)}</span></td>
+            <td><input type="text" class="player-name-input" bind:value={player.nombre} placeholder="Nombre del jugador" /></td>
             <td>
               <span
                 style="font-size:10px;font-weight:700;color:{expColor};background:{expBg};padding:1px 6px;border-radius:4px"
@@ -227,7 +363,7 @@
     disabled={saving || draftPlayers.length === 0}
     title={draftPlayers.length === 0 ? "Agrega al menos un jugador para guardar" : ""}
   >
-    {saving ? "Guardando..." : "✨ Guardar nueva versión"}
+    {saving ? "Guardando..." : (eventType === 'sync' ? '✨ Guardar Sincronización' : (parentId ? '✨ Guardar Edición' : '✨ Guardar Nueva Lista'))}
   </button>
 </div>
 
@@ -257,6 +393,13 @@
     </div>
   </div>
 {/if}
+
+<SyncResolutionModal
+  visible={resolutionVisible}
+  pairs={resolutionPairs}
+  oncomplete={handleResolutionComplete}
+  oncancel={handleResolutionCancel}
+/>
 
 <style>
   .section {
@@ -353,8 +496,22 @@
     border-color: transparent;
   }
 
-  .player-name {
-    white-space: nowrap;
+  .player-name-input {
+    border: none;
+    background: transparent;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    width: 100%;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: border-color 0.15s;
+  }
+
+  .player-name-input:focus {
+    outline: none;
+    border: 1px solid var(--accent);
+    background: var(--surface);
   }
 
   .btn-delete {

@@ -173,61 +173,216 @@ class TestApiCreateSnapshot:
         assert player["partidas_gm"] == 0
 
 
-class TestApiEditSnapshot:
-    def test_edit_creates_new_manual_snapshot(self, client):
-        """POST /api/snapshot/<id>/edit returns 200 with new snapshot_id."""
+class TestApiSnapshotSave:
+    def test_save_creates_manual_snapshot(self, client):
+        """POST /api/snapshot/save with event_type='manual' creates a manual snapshot."""
         c, conn = client
-        snap_id = _add_snapshot(conn, players=3)
-        conn.commit()
-        names = [p["nombre"] for p in db.get_snapshot_players(conn, snap_id)]
         players_list = [
-            {"nombre": n, "prioridad": 0, "partidas_deseadas": 1, "partidas_gm": 0}
-            for n in names
+            {"nombre": "Alice", "experiencia": "Nuevo", "juegos_este_ano": 0},
+            {"nombre": "Bob", "experiencia": "Antiguo", "juegos_este_ano": 3},
         ]
         resp = c.post(
-            f"/api/snapshot/{snap_id}/edit",
-            data=json.dumps({"players": players_list}),
+            "/api/snapshot/save",
+            data=json.dumps({"event_type": "manual", "players": players_list}),
             content_type="application/json",
         )
         assert resp.status_code == 200
         data = resp.get_json()
         assert "snapshot_id" in data
-        assert data["snapshot_id"] != snap_id
+        new_id = data["snapshot_id"]
 
-    def test_edit_nonexistent_snapshot_returns_404(self, client):
-        c, conn = client
-        resp = c.post(
-            "/api/snapshot/9999/edit",
-            data=json.dumps({"players": []}),
-            content_type="application/json",
-        )
-        assert resp.status_code == 404
+        # Verify the snapshot was created with correct source
+        detail = c.get(f"/api/snapshot/{new_id}").get_json()
+        assert detail["source"] == "manual"
+        assert len(detail["players"]) == 2
 
-    def test_edit_invalid_players_type_returns_400(self, client):
+    def test_save_creates_sync_snapshot(self, client):
+        """POST /api/snapshot/save with event_type='sync' creates a notion_sync snapshot."""
         c, conn = client
-        snap_id = _add_snapshot(conn)
-        conn.commit()
+        players_list = [{"nombre": "Charlie", "experiencia": "Nuevo", "juegos_este_ano": 0}]
         resp = c.post(
-            f"/api/snapshot/{snap_id}/edit",
-            data=json.dumps({"players": "not_a_list"}),
-            content_type="application/json",
-        )
-        assert resp.status_code == 400
-
-    def test_edit_new_snapshot_has_manual_source(self, client):
-        """The snapshot created by the edit endpoint has source='manual'."""
-        c, conn = client
-        snap_id = _add_snapshot(conn, players=1)
-        conn.commit()
-        names = [p["nombre"] for p in db.get_snapshot_players(conn, snap_id)]
-        resp = c.post(
-            f"/api/snapshot/{snap_id}/edit",
-            data=json.dumps({"players": [
-                {"nombre": names[0], "prioridad": 0, "partidas_deseadas": 1, "partidas_gm": 0}
-            ]}),
+            "/api/snapshot/save",
+            data=json.dumps({"event_type": "sync", "players": players_list}),
             content_type="application/json",
         )
         assert resp.status_code == 200
         new_id = resp.get_json()["snapshot_id"]
+
         detail = c.get(f"/api/snapshot/{new_id}").get_json()
-        assert detail["source"] == "manual"
+        assert detail["source"] == "notion_sync"
+
+    def test_save_with_parent_creates_event(self, client):
+        """POST /api/snapshot/save with parent_id creates an event linking parent to new snapshot."""
+        c, conn = client
+        parent_id = _add_snapshot(conn, players=2)
+        conn.commit()
+
+        players_list = [{"nombre": "Dave", "experiencia": "Nuevo", "juegos_este_ano": 0}]
+        resp = c.post(
+            "/api/snapshot/save",
+            data=json.dumps({"parent_id": parent_id, "event_type": "manual", "players": players_list}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        new_id = resp.get_json()["snapshot_id"]
+
+        # Verify event was created
+        event = conn.execute(
+            "SELECT type, source_snapshot_id, output_snapshot_id FROM events WHERE output_snapshot_id = ?",
+            (new_id,)
+        ).fetchone()
+        assert event is not None
+        assert event["type"] == "edit"  # 'manual' event_type maps to 'edit' in DB
+        assert event["source_snapshot_id"] == parent_id
+        assert event["output_snapshot_id"] == new_id
+
+    def test_save_without_parent_no_event(self, client):
+        """POST /api/snapshot/save without parent_id creates no event."""
+        c, conn = client
+        players_list = [{"nombre": "Eve", "experiencia": "Nuevo", "juegos_este_ano": 0}]
+        resp = c.post(
+            "/api/snapshot/save",
+            data=json.dumps({"event_type": "manual", "players": players_list}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        new_id = resp.get_json()["snapshot_id"]
+
+        # Verify no event was created
+        event = conn.execute(
+            "SELECT 1 FROM events WHERE output_snapshot_id = ?",
+            (new_id,)
+        ).fetchone()
+        assert event is None
+
+    def test_save_applies_defaults(self, client):
+        """POST /api/snapshot/save applies default values for missing fields."""
+        c, conn = client
+        players_list = [{"nombre": "Frank"}]
+        resp = c.post(
+            "/api/snapshot/save",
+            data=json.dumps({"event_type": "manual", "players": players_list}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        new_id = resp.get_json()["snapshot_id"]
+
+        detail = c.get(f"/api/snapshot/{new_id}").get_json()
+        player = detail["players"][0]
+        assert player["nombre"] == "Frank"
+        assert player["experiencia"] == "Nuevo"
+        assert player["juegos_este_ano"] == 0
+        assert player["prioridad"] == 0
+        assert player["partidas_deseadas"] == 1
+        assert player["partidas_gm"] == 0
+
+    def test_save_invalid_players_type_returns_400(self, client):
+        c, conn = client
+        resp = c.post(
+            "/api/snapshot/save",
+            data=json.dumps({"event_type": "manual", "players": "not_a_list"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+    def test_save_invalid_event_type_returns_400(self, client):
+        c, conn = client
+        resp = c.post(
+            "/api/snapshot/save",
+            data=json.dumps({"event_type": "invalid", "players": []}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+
+    def test_save_nonexistent_parent_returns_404(self, client):
+        c, conn = client
+        resp = c.post(
+            "/api/snapshot/save",
+            data=json.dumps({"parent_id": 9999, "event_type": "manual", "players": []}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 404
+
+
+class TestApiNotionFetch:
+    def test_fetch_returns_players_list(self, client, monkeypatch):
+        """GET /api/notion/fetch returns players from Notion."""
+        c, conn = client
+
+        # Mock the Notion Client class at the import location
+        class MockClient:
+            def __init__(self, auth=None):
+                self.auth = auth
+
+            class databases:
+                @staticmethod
+                def retrieve(database_id=None):
+                    return {"data_sources": [{"id": "ds-1"}]}
+
+            class data_sources:
+                @staticmethod
+                def query(**kwargs):
+                    return {
+                        "results": [
+                            {
+                                "id": "page-1",
+                                "properties": {
+                                    "Nombre": {"title": [{"plain_text": "Alice"}]},
+                                    "Participaciones": {"relation": []},
+                                },
+                            },
+                            {
+                                "id": "page-2",
+                                "properties": {
+                                    "Nombre": {"title": [{"plain_text": "Bob"}]},
+                                    "Participaciones": {"relation": [{"id": "rel-1"}]},
+                                },
+                            },
+                        ],
+                        "has_more": False,
+                    }
+
+        # Patch at the viewer module level where Client is imported
+        monkeypatch.setattr("backend.viewer.viewer.Client", MockClient)
+        monkeypatch.setenv("NOTION_TOKEN", "secret_test")
+        monkeypatch.setenv("NOTION_DATABASE_ID", "db-test")
+        monkeypatch.setenv("NOTION_PARTICIPACIONES_DB_ID", "part-test")
+
+        resp = c.get("/api/notion/fetch")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "players" in data
+        assert len(data["players"]) == 2
+
+        # Verify player data
+        players = {p["nombre"]: p for p in data["players"]}
+        assert players["Alice"]["experiencia"] == "Nuevo"
+        assert players["Alice"]["juegos_este_ano"] == 0
+        assert players["Bob"]["experiencia"] == "Antiguo"
+        assert players["Bob"]["juegos_este_ano"] == 0  # Mock returns 0 for conteo
+
+    def test_fetch_missing_token_returns_500(self, client, monkeypatch):
+        """GET /api/notion/fetch returns 500 if NOTION_TOKEN is not configured."""
+        c, conn = client
+        # Mock load_dotenv to not load .env file
+        monkeypatch.setattr("backend.viewer.viewer.load_dotenv", lambda: None)
+        monkeypatch.delenv("NOTION_TOKEN", raising=False)
+        monkeypatch.setenv("NOTION_DATABASE_ID", "db-test")
+        monkeypatch.setenv("NOTION_PARTICIPACIONES_DB_ID", "part-test")
+
+        resp = c.get("/api/notion/fetch")
+        assert resp.status_code == 500
+        assert "NOTION_TOKEN" in resp.get_json()["error"]
+
+    def test_fetch_missing_database_id_returns_500(self, client, monkeypatch):
+        """GET /api/notion/fetch returns 500 if NOTION_DATABASE_ID is not configured."""
+        c, conn = client
+        # Mock load_dotenv to not load .env file
+        monkeypatch.setattr("backend.viewer.viewer.load_dotenv", lambda: None)
+        monkeypatch.setenv("NOTION_TOKEN", "secret_test")
+        monkeypatch.delenv("NOTION_DATABASE_ID", raising=False)
+        monkeypatch.setenv("NOTION_PARTICIPACIONES_DB_ID", "part-test")
+
+        resp = c.get("/api/notion/fetch")
+        assert resp.status_code == 500
+        assert "NOTION_DATABASE_ID" in resp.get_json()["error"]

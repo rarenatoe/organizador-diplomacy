@@ -95,14 +95,27 @@ export interface DeleteResult {
 
 export interface EditPlayerRow {
   nombre: string;
+  experiencia?: string;
+  juegos_este_ano?: number;
   prioridad: number;
   partidas_deseadas: number;
   partidas_gm: number;
 }
 
-export interface EditSnapshotResponse {
-  snapshot_id?: number;
+export interface SnapshotSaveResponse {
+  snapshot_id: number;
   error?: string;
+}
+
+export interface NotionFetchResponse {
+  players: NotionPlayer[];
+  error?: string;
+}
+
+export interface NotionPlayer {
+  nombre: string;
+  experiencia: string;
+  juegos_este_ano: number;
 }
 
 export interface SimilarName {

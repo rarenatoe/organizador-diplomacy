@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import type {
     SnapshotGroup,
     SnapshotVersion,
@@ -10,9 +11,7 @@
   import SnapshotGroupNode from "./SnapshotGroupNode.svelte";
   import { groupSnapshots } from "../groupSnapshots";
   import {
-    getSelectedSnapshot,
-    getActiveNodeId,
-    deselectSnapshot
+    getActiveNodeId
   } from "../stores.svelte";
 
   interface Props {
@@ -25,12 +24,10 @@
 
   let { group, onselect, ondelete, onopenGame, onopenSync }: Props = $props();
 
-  let currentIndex = $state(0);
-
-  // Initialize and keep currentIndex synced when group changes
-  $effect(() => {
-    currentIndex = group.versions.length - 1;
-  });
+  // `untrack` reads the initial prop value without creating a reactive
+  // dependency — avoids `state_referenced_locally` while initialising to the
+  // last (latest) version.  User nav (handlePrev / handleNext) can override.
+  let currentIndex = $state(untrack(() => group.versions.length - 1));
 
   let currentVersion = $derived(group.versions[currentIndex]!);
 
@@ -44,13 +41,6 @@
     if (source === "notion_sync") return "☁️ Notion Sync";
     if (source === "organizar") return "▶ Organizar";
     return "📥 Manual";
-  }
-
-  function edgeBadgeLabel(version: SnapshotVersion): string {
-    if (!version.incomingEdge) return "📥 Base";
-    if (version.incomingEdge.type === "sync") return "☁️ Sync Notion";
-    if (version.incomingEdge.type === "edit") return "✏️ Editado";
-    return "";
   }
 
   function handlePrev(e: MouseEvent): void {
@@ -98,8 +88,7 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="node node-group"
-    class:active={getActiveNodeId() === String(currentVersion.snapshot.id)}
-    class:csv-selected={getSelectedSnapshot() === currentVersion.snapshot.id}
+    class:active={getActiveNodeId() === "snapshot-" + String(currentVersion.snapshot.id)}
     data-id={currentVersion.snapshot.id}
     data-type="snapshot-group"
     onclick={handleClick}
@@ -136,11 +125,6 @@
       </div>
     {/if}
 
-    <!-- Event Badge -->
-    <div class="edge-badge">
-      {edgeBadgeLabel(currentVersion)}
-    </div>
-
     <!-- Snapshot Content -->
     <div class="node-icon">📋</div>
     <div class="node-label">Versión #{currentVersion.snapshot.id}</div>
@@ -154,16 +138,6 @@
     <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;">
       {#if currentVersion.snapshot.is_latest}
         <span class="badge badge-latest" style="margin-top: 0;">Actual</span>
-      {/if}
-      {#if getSelectedSnapshot() === currentVersion.snapshot.id}
-        <button 
-          class="badge badge-selected" 
-          style="margin-top: 0; cursor: pointer; padding: 2px 6px;"
-          title="Snapshot seleccionado. Clic para quitar selección"
-          onclick={(e) => { e.stopPropagation(); deselectSnapshot(); }}
-        >
-          📌
-        </button>
       {/if}
     </div>
   </div>
@@ -228,6 +202,7 @@
 
   :global(.node.active) {
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    z-index: 45;
   }
 
   .node-group {
@@ -310,20 +285,6 @@
     letter-spacing: 0.3px;
   }
 
-  .edge-badge {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 99px;
-    font-size: 9px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    margin-bottom: 6px;
-    background: var(--surface2);
-    color: var(--muted);
-    border: 1px solid var(--border);
-  }
-
   .node-icon {
     font-size: 20px;
     margin-bottom: 5px;
@@ -374,16 +335,6 @@
     background: #dbeafe;
     color: #1e40af;
     border: 1px solid #93c5fd;
-  }
-
-  .badge-selected {
-    background: #dcfce7;
-    color: #166534;
-    border: 1px solid #86efac;
-    transition: background 0.15s;
-  }
-  .badge-selected:hover {
-    background: #bbf7d0;
   }
 
   .arrow {

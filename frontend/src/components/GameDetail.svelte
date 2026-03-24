@@ -70,7 +70,7 @@
               {/if}
             </div>
             <ul class="player-list">
-              {#each mesa.jugadores as j, i}
+              {#each mesa.jugadores as j, i (j.nombre)}
                 <li>
                   <span class="p-num">{i + 1}.</span>
                   <span class="p-name">{esc(j.nombre)}</span>
@@ -95,7 +95,7 @@
       {@const waitTxt = waiting.map((w) => w.nombre).join("\n")}
       <div class="section">
         <div class="section-title">Lista de espera</div>
-        {#each waiting as w}
+        {#each waiting as w (w.nombre)}
           <div class="waiting-item">
             <span class="waiting-name">{esc(w.nombre)}</span>
             <span class="waiting-cupos">{esc(w.cupos)}</span>
