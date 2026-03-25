@@ -10,6 +10,7 @@ vi.mock("../api", () => ({
   saveSnapshot: vi.fn().mockResolvedValue({
     snapshot_id: 123,
   }),
+  fetchNotionPlayers: vi.fn().mockResolvedValue({ players: [] }),
 }));
 
 // Mock the utils module
@@ -36,7 +37,6 @@ vi.mock("../utils", () => ({
 
 // Mock the stores
 vi.mock("../stores.svelte", () => ({
-  setSelectedSnapshot: vi.fn(),
   setActiveNodeId: vi.fn(),
 }));
 
@@ -58,6 +58,7 @@ describe("SnapshotDraft", () => {
         onClose: () => {},
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -74,6 +75,7 @@ describe("SnapshotDraft", () => {
         onClose: () => {},
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -92,6 +94,7 @@ describe("SnapshotDraft", () => {
         onClose: () => {},
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -115,6 +118,7 @@ describe("SnapshotDraft", () => {
         onClose: () => {},
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -134,6 +138,7 @@ describe("SnapshotDraft", () => {
         onClose: () => {},
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -153,6 +158,7 @@ describe("SnapshotDraft", () => {
         onClose: () => {},
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -186,6 +192,7 @@ describe("SnapshotDraft", () => {
         onClose: () => {},
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -214,6 +221,7 @@ describe("SnapshotDraft", () => {
         onClose: () => {},
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -246,6 +254,7 @@ describe("SnapshotDraft", () => {
         onClose: () => {},
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -264,6 +273,7 @@ describe("SnapshotDraft", () => {
         onClose: () => {},
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -291,6 +301,7 @@ describe("SnapshotDraft", () => {
         onClose,
         onChainUpdate,
         onOpenSnapshot,
+        onShowError: () => {},
       },
     });
 
@@ -329,6 +340,7 @@ describe("SnapshotDraft", () => {
         onClose: () => {},
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -373,6 +385,7 @@ describe("SnapshotDraft", () => {
         onClose: () => {},
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -393,6 +406,7 @@ describe("SnapshotDraft", () => {
         onClose: () => {},
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -409,5 +423,56 @@ describe("SnapshotDraft", () => {
 
     // Input should have new value
     expect(deseadasInput.value).toBe("3");
+  });
+
+  it("calls onShowError when importing CSV yields no valid players", async () => {
+    const { parsePlayersCsv } = await import("../utils");
+    (parsePlayersCsv as ReturnType<typeof vi.fn>).mockReturnValueOnce([]);
+
+    const onShowError = vi.fn();
+    render(SnapshotDraft, {
+      props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
+        onShowError,
+      },
+    });
+
+    await fireEvent.click(screen.getByText("📥 Pegar CSV"));
+    const textarea = screen.getByPlaceholderText(/nombre,experiencia/);
+    await fireEvent.input(textarea, {
+      target: { value: "bad,csv" },
+    });
+    await fireEvent.click(screen.getByText("Importar"));
+
+    expect(onShowError).toHaveBeenCalledWith(
+      "Aviso / Error",
+      "No se encontraron jugadores válidos en el CSV",
+    );
+  });
+
+  it("calls onShowError when saving with no players", async () => {
+    const onShowError = vi.fn();
+    render(SnapshotDraft, {
+      props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
+        onShowError,
+      },
+    });
+
+    await fireEvent.click(screen.getByText("✨ Guardar Nueva Lista"));
+    expect(onShowError).toHaveBeenCalledWith(
+      "Aviso / Error",
+      "Agrega al menos un jugador antes de guardar",
+    );
   });
 });

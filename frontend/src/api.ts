@@ -36,6 +36,7 @@ export async function createSnapshot(
 ): Promise<SnapshotSaveResponse> {
   const res = await fetch("/api/snapshot/new", {
     method: "POST",
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ players }),
   });
@@ -49,6 +50,7 @@ export async function saveSnapshot(payload: {
 }): Promise<SnapshotSaveResponse> {
   const res = await fetch("/api/snapshot/save", {
     method: "POST",
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
@@ -75,6 +77,7 @@ export async function renamePlayer(
 ): Promise<{ error?: string }> {
   const res = await fetch("/api/player/rename", {
     method: "POST",
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ old_name: oldName, new_name: newName }),
   });
@@ -89,6 +92,7 @@ export async function runScript(
 ): Promise<RunResult> {
   const init: RequestInit = { method: "POST" };
   if (snapshotId !== null) {
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
     init.headers = { "Content-Type": "application/json" };
     init.body = JSON.stringify({ snapshot: snapshotId });
   }

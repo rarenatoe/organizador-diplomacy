@@ -47,7 +47,7 @@ describe("SnapshotGroupNode", () => {
   });
 
   it("has active class when activeNodeId matches snapshot id", () => {
-    setActiveNodeId("snapshot-1");
+    setActiveNodeId(1);
     const onSelect = vi.fn();
     const onDelete = vi.fn();
     const onOpenGame = vi.fn();
@@ -69,7 +69,7 @@ describe("SnapshotGroupNode", () => {
   });
 
   it("does not have active class when activeNodeId does not match", () => {
-    setActiveNodeId("99");
+    setActiveNodeId(99);
     const onSelect = vi.fn();
     const onDelete = vi.fn();
     const onOpenGame = vi.fn();

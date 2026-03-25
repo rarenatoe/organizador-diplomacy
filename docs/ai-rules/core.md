@@ -1,13 +1,26 @@
-<!-- GENERATED FILE: DO NOT EDIT DIRECTLY -->
-<!-- Source of truth: docs/ai-rules/*.md -->
+---
+id: core
+title: Project-Wide AI Instructions
+scope: project
+priority: 100
+outputs:
+  copilot: .github/copilot-instructions.md
+  cline: .clinerules
+  trae: .trae/rules/core.md
+toolNotes:
+  copilot: Base instructions read before scoped files.
+  cline: Main entrypoint for Cline-compatible agents.
+  trae: Project-wide rules, always applied.
+---
+
 # Copilot Instructions — Organizador Diplomacy
 
 ## Stack
 Python 3.13 · uv · Flask 3 · pytest · notion-client · python-dotenv · SQLite (stdlib)
 TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecked`) · Vitest 4 · @testing-library/dom
 
-> Scoped instructions: `python.instructions.md` (applyTo `backend/**/*.py`) and
-> `typescript.instructions.md` (applyTo `frontend/src/**`) contain language-specific detail.
+> Scoped instructions: `python.md` (applyTo `backend/**/*.py`) and
+> `typescript.md` (applyTo `frontend/src/**`) contain language-specific detail.
 
 ## Directory layout
 ```
@@ -71,7 +84,7 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 **400-line soft limit per file.** When a file crosses this threshold:
 1. Identify logical responsibility boundaries (not arbitrary line counts).
 2. Extract the cohesive sub-domain into a new file with a single-responsibility name.
-3. Python: add a new flat-layout file at root. TypeScript: add a new `src/*.ts` module (update file map and import graph in `typescript.instructions.md`).
+3. Python: add a new flat-layout file at root. TypeScript: add a new `src/*.ts` module (update file map and import graph in `typescript.md`).
 4. Run all tests + build + lint before committing the split.
 
 **Exception:** A file may safely exceed this limit if it represents a single, indivisible logical unit (e.g., a highly cohesive Class, Svelte Component, or complex pure function) that would lose clarity or context if artificially split.
@@ -99,8 +112,8 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 ## Ripple-effect checklist
 **Player field change** → `organizador.py` · `models.py` · `formatter.py` · `notion_sync.py` · `db.py` (schema + helpers) · `db_game.py` (game helpers) · `viewer.py` (API) · `test_organizador.py` (`_j()` + `_pool()`) · `test_algoritmo.py` (`_j()` + `_pool()`) · `test_db.py` (`TestDb`) · `test_viewer.py` (`_add_snapshot()` helper)
 **New Flask route** → `TestApi*` class in `test_viewer.py` with 200 + 400 + 404 coverage.
-**Chain algorithm change** → update `db_views.py` · `TestApiChain` in `test_viewer.py` (use `roots` tree, not `nodes` flat list) · `TestDb` in `test_db.py` · "Chain lineage" section in `python.instructions.md`.
-**DB schema change** → update `_SCHEMA` in `db.py` · all affected helpers · `test_db.py` `TestDb` · `test_viewer.py` fixtures · `python.instructions.md`.
+**Chain algorithm change** → update `db_views.py` · `TestApiChain` in `test_viewer.py` (use `roots` tree, not `nodes` flat list) · `TestDb` in `test_db.py` · "Chain lineage" section in `python.md`.
+**DB schema change** → update `_SCHEMA` in `db.py` · all affected helpers · `test_db.py` `TestDb` · `test_viewer.py` fixtures · `python.md`.
 **UI logic change** → edit relevant `src/*.ts` module + `bun run build`. **New domain type** → add to `src/types.ts`. **Style change** → edit `static/style.css`. Never re-inline into `index.html`.
 **Frontend test** → add to `frontend/src/*.test.ts` · mock dependencies with `vi.mock()` · export tested functions.
 

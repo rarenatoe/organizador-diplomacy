@@ -89,7 +89,7 @@
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="node node-group"
-      class:active={getActiveNodeId() === "snapshot-" + String(currentVersion.snapshot.id)}
+      class:active={getActiveNodeId() === currentVersion.snapshot.id}
       data-id={currentVersion.snapshot.id}
       data-type="snapshot-group"
       onclick={handleClick}

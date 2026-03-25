@@ -1,7 +1,16 @@
-<!-- GENERATED FILE: DO NOT EDIT DIRECTLY -->
-<!-- Source of truth: docs/ai-rules/*.md -->
 ---
-applyTo: "backend/**/*.py"
+id: python
+title: Python Scoped Instructions
+scope: language
+applyTo:
+  - backend/**/*.py
+priority: 80
+outputs:
+  copilot: .github/python.instructions.md
+  trae: .trae/rules/python.md
+toolNotes:
+  copilot: Scoped instructions for Python changes.
+  trae: Auto-attached for backend/**/*.py files.
 ---
 
 ## Python code conventions

@@ -13,9 +13,10 @@
     onOpenSnapshot: (id: number) => void;
     onOpenGame: (id: number) => void;
     onEditDraft: (parentId: number, eventType: string, autoAction?: 'notion' | 'csv' | null, players?: EditPlayerRow[]) => void;
+    onShowError: (title: string, output: string) => void;
   }
 
-  let { id, onClose, onChainUpdate, onOpenSnapshot, onOpenGame, onEditDraft }: Props = $props();
+  let { id, onClose, onChainUpdate, onOpenSnapshot, onOpenGame, onEditDraft, onShowError }: Props = $props();
 
   let data = $state<SnapshotDetail | null>(null);
   let loading = $state(true);
@@ -80,7 +81,14 @@
 
   async function handleOrganizar(): Promise<void> {
     try {
-      await runScript("organizar", id);
+      const res = await runScript("organizar", id);
+      if (
+        res.returncode !== 0 ||
+        (res.stdout && res.stdout.includes("No hay suficientes"))
+      ) {
+        onShowError("Error al organizar", res.stdout || res.stderr || "Error desconocido");
+        return;
+      }
       await loadSnapshot();
       onChainUpdate();
       
@@ -88,11 +96,11 @@
       const chainData = await fetchChain();
       const gameId = findLatestGameId(chainData.roots);
       if (gameId !== null) {
-        setActiveNodeId("game-" + gameId);
+        setActiveNodeId(gameId);
         onOpenGame(gameId);
       }
     } catch (e) {
-      alert(`Error: ${String(e)}`);
+      onShowError("Error de conexión", String(e));
     }
   }
 
@@ -110,7 +118,7 @@
     try {
       const response = await fetchNotionPlayers();
       if (response.error) {
-        alert(`Error: ${response.error}`);
+        onShowError("Error de Sincronización", response.error || "Error desconocido");
         return;
       }
 
@@ -130,7 +138,7 @@
         await executeSyncMerge([]);
       }
     } catch (e) {
-      alert(`Error de conexión: ${String(e)}`);
+      onShowError("Error de conexión", String(e));
     } finally {
       isSyncing = false;
     }
@@ -175,17 +183,17 @@
       });
 
       if (result.error) {
-        alert(`Error: ${result.error}`);
+        onShowError("Error de Sincronización", result.error || "Error desconocido");
         return;
       }
 
       onChainUpdate();
       if (result.snapshot_id !== undefined) {
-        setActiveNodeId(String(result.snapshot_id));
+        setActiveNodeId(result.snapshot_id as number);
         onOpenSnapshot(result.snapshot_id);
       }
     } catch (e) {
-      alert(`Error de conexión: ${String(e)}`);
+      onShowError("Error de conexión", String(e));
     } finally {
       resolutionVisible = false;
       resolutionPairs = [];

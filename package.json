@@ -4,6 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "ai-rules:generate": "bun run scripts/generate-ai-instructions.ts",
+    "ai-rules:check": "bun run ai-rules:generate && git diff --exit-code -- .github .clinerules .trae",
     "build": "cd frontend && npx vite build && cp static/index.html templates/",
     "dev": "cd frontend && npx vite",
     "typecheck": "tsc --noEmit",
@@ -35,10 +37,12 @@
     "eslint": "10.1.0",
     "eslint-plugin-svelte": "^3.16.0",
     "jsdom": "^29.0.1",
+    "lefthook": "^2.1.4",
     "svelte": "^5.54.1",
     "typescript": "5.9.3",
     "typescript-eslint": "8.57.1",
     "vite": "^8.0.1",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.0",
+    "yaml": "^2.8.3"
   }
 }

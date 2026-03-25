@@ -58,9 +58,6 @@ Object.defineProperty(navigator, "clipboard", {
   writable: true,
 });
 
-// Mock window.alert
-vi.stubGlobal("alert", vi.fn());
-
 describe("SnapshotDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -80,6 +77,7 @@ describe("SnapshotDetail", () => {
         onOpenSnapshot: () => {},
         onOpenGame: () => {},
         onEditDraft: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -108,6 +106,7 @@ describe("SnapshotDetail", () => {
         onOpenSnapshot: () => {},
         onOpenGame: () => {},
         onEditDraft,
+        onShowError: () => {},
       },
     });
 
@@ -161,6 +160,7 @@ describe("SnapshotDetail", () => {
         onOpenSnapshot: () => {},
         onOpenGame: () => {},
         onEditDraft,
+        onShowError: () => {},
       },
     });
 
@@ -202,6 +202,7 @@ describe("SnapshotDetail", () => {
         onOpenSnapshot: () => {},
         onOpenGame: () => {},
         onEditDraft,
+        onShowError: () => {},
       },
     });
 
@@ -237,6 +238,7 @@ describe("SnapshotDetail", () => {
         onOpenSnapshot: () => {},
         onOpenGame: () => {},
         onEditDraft: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -267,6 +269,7 @@ describe("SnapshotDetail", () => {
         onOpenSnapshot: () => {},
         onOpenGame: () => {},
         onEditDraft: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -310,6 +313,7 @@ describe("SnapshotDetail", () => {
         onOpenSnapshot: () => {},
         onOpenGame: () => onOpenGameMock(),
         onEditDraft: () => {},
+        onShowError: () => {},
       },
     });
 
@@ -333,6 +337,94 @@ describe("SnapshotDetail", () => {
     });
 
     // Restore fake timers for other tests
+    vi.useFakeTimers();
+  });
+
+  it("calls onShowError and stops when organizar returns non-zero", async () => {
+    vi.useRealTimers();
+
+    const api = await import("../api");
+    (api.runScript as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      returncode: 1,
+      stdout: "No hay suficientes jugadores",
+      stderr: "",
+    });
+
+    const onChainUpdateMock = vi.fn();
+    const onOpenGameMock = vi.fn();
+    const onShowErrorMock = vi.fn();
+
+    render(SnapshotDetail, {
+      props: {
+        id: 1,
+        onClose: () => {},
+        onChainUpdate: onChainUpdateMock,
+        onOpenSnapshot: () => {},
+        onOpenGame: onOpenGameMock,
+        onEditDraft: () => {},
+        onShowError: onShowErrorMock,
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Cargando…")).toBeNull();
+    });
+
+    await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
+
+    await waitFor(() => {
+      expect(onShowErrorMock).toHaveBeenCalledWith(
+        "Error al organizar",
+        "No hay suficientes jugadores",
+      );
+    });
+    expect(onChainUpdateMock).not.toHaveBeenCalled();
+    expect(onOpenGameMock).not.toHaveBeenCalled();
+
+    vi.useFakeTimers();
+  });
+
+  it('calls onShowError and stops when organizar stdout includes "No hay suficientes"', async () => {
+    vi.useRealTimers();
+
+    const api = await import("../api");
+    (api.runScript as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      returncode: 0,
+      stdout: "No hay suficientes mesas para organizar",
+      stderr: "",
+    });
+
+    const onChainUpdateMock = vi.fn();
+    const onOpenGameMock = vi.fn();
+    const onShowErrorMock = vi.fn();
+
+    render(SnapshotDetail, {
+      props: {
+        id: 1,
+        onClose: () => {},
+        onChainUpdate: onChainUpdateMock,
+        onOpenSnapshot: () => {},
+        onOpenGame: onOpenGameMock,
+        onEditDraft: () => {},
+        onShowError: onShowErrorMock,
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Cargando…")).toBeNull();
+    });
+
+    await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
+
+    await waitFor(() => {
+      expect(onShowErrorMock).toHaveBeenCalledWith(
+        "Error al organizar",
+        "No hay suficientes mesas para organizar",
+      );
+    });
+    expect(onChainUpdateMock).not.toHaveBeenCalled();
+    expect(onOpenGameMock).not.toHaveBeenCalled();
+
     vi.useFakeTimers();
   });
 });

@@ -15,9 +15,10 @@
     onClose: () => void;
     onChainUpdate: () => void;
     onOpenSnapshot: (id: number) => void;
+    onShowError: (title: string, output: string) => void;
   }
 
-  let { parentId, initialPlayers, defaultEventType, autoAction = null, onClose, onChainUpdate, onOpenSnapshot }: Props = $props();
+  let { parentId, initialPlayers, defaultEventType, autoAction = null, onClose, onChainUpdate, onOpenSnapshot, onShowError }: Props = $props();
 
   interface DraftPlayer {
     nombre: string;
@@ -87,7 +88,7 @@
   function handleImportCsv(): void {
     const parsed = parsePlayersCsv(csvText);
     if (parsed.length === 0) {
-      alert("No se encontraron jugadores válidos en el CSV");
+      onShowError("Aviso / Error", "No se encontraron jugadores válidos en el CSV");
       return;
     }
     draftPlayers = [...draftPlayers, ...parsed];
@@ -105,7 +106,7 @@
     try {
       const response = await fetchNotionPlayers();
       if (response.error) {
-        alert(`Error: ${response.error}`);
+        onShowError("Aviso / Error", `Error: ${response.error}`);
         return;
       }
 
@@ -125,7 +126,7 @@
         mergeNotionPlayers([]);
       }
     } catch (e) {
-      alert(`Error de conexión: ${String(e)}`);
+      onShowError("Error de conexión", String(e));
     } finally {
       isImporting = false;
     }
@@ -189,7 +190,7 @@
 
   async function handleSave(): Promise<void> {
     if (draftPlayers.length === 0) {
-      alert("Agrega al menos un jugador antes de guardar");
+      onShowError("Aviso / Error", "Agrega al menos un jugador antes de guardar");
       return;
     }
 
@@ -211,18 +212,18 @@
       });
 
       if (result.error) {
-        alert(`Error: ${result.error}`);
+        onShowError("Aviso / Error", `Error: ${result.error}`);
         return;
       }
 
       onClose();
       onChainUpdate();
       if (result.snapshot_id !== undefined) {
-        setActiveNodeId(String(result.snapshot_id));
+        setActiveNodeId(result.snapshot_id as number);
         onOpenSnapshot(result.snapshot_id);
       }
     } catch (e) {
-      alert(`Error de conexión: ${String(e)}`);
+      onShowError("Error de conexión", String(e));
     } finally {
       saving = false;
     }

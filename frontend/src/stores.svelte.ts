@@ -9,7 +9,7 @@ import type { ChainData } from "./types";
 interface AppState {
   snapshotCount: number;
   chainData: ChainData | null;
-  activeNodeId: string | null;
+  activeNodeId: number | null;
 }
 
 const state = $state<AppState>({
@@ -28,7 +28,7 @@ export function setChainData(data: ChainData): void {
   state.chainData = data;
 }
 
-export function setActiveNodeId(id: string | null): void {
+export function setActiveNodeId(id: number | null): void {
   state.activeNodeId = id;
 }
 
@@ -36,6 +36,6 @@ export function getChainData(): ChainData | null {
   return state.chainData;
 }
 
-export function getActiveNodeId(): string | null {
+export function getActiveNodeId(): number | null {
   return state.activeNodeId;
 }

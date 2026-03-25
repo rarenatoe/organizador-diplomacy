@@ -1,7 +1,16 @@
-<!-- GENERATED FILE: DO NOT EDIT DIRECTLY -->
-<!-- Source of truth: docs/ai-rules/*.md -->
 ---
-applyTo: "frontend/src/**"
+id: typescript
+title: TypeScript + Svelte Scoped Instructions
+scope: language
+applyTo:
+  - frontend/src/**
+priority: 80
+outputs:
+  copilot: .github/typescript.instructions.md
+  trae: .trae/rules/typescript.md
+toolNotes:
+  copilot: Scoped instructions for frontend TS/Svelte changes.
+  trae: Auto-attached for frontend/src/** files.
 ---
 
 ## Svelte 5 conventions

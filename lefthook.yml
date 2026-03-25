@@ -1,0 +1,5 @@
+pre-commit:
+  commands:
+    ai-rules:
+      glob: "docs/ai-rules/*.md"
+      run: bun run ai-rules:generate && git add .github/ .clinerules .trae/

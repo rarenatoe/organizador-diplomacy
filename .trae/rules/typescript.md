@@ -1,7 +1,8 @@
 <!-- GENERATED FILE: DO NOT EDIT DIRECTLY -->
 <!-- Source of truth: docs/ai-rules/*.md -->
 ---
-applyTo: "frontend/src/**"
+description: TypeScript + Svelte Scoped Instructions
+globs: frontend/src/**
 ---
 
 ## Svelte 5 conventions

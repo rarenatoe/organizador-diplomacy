@@ -43,12 +43,12 @@ describe("stores.svelte", () => {
     });
 
     it("setActiveNodeId sets the value", () => {
-      setActiveNodeId("game-123");
-      expect(getActiveNodeId()).toBe("game-123");
+      setActiveNodeId(123);
+      expect(getActiveNodeId()).toBe(123);
     });
 
     it("setActiveNodeId(null) clears the value", () => {
-      setActiveNodeId("game-123");
+      setActiveNodeId(123);
       setActiveNodeId(null);
       expect(getActiveNodeId()).toBeNull();
     });

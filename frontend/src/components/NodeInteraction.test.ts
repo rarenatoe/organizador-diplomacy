@@ -35,7 +35,7 @@ describe("Node Interaction Seatbelts", () => {
   });
 
   it("GameNode has active class when activeNodeId matches", () => {
-    setActiveNodeId("game-42");
+    setActiveNodeId(42);
     const onOpen = vi.fn();
     const { container } = render(GameNode, {
       props: {
@@ -59,7 +59,7 @@ describe("Node Interaction Seatbelts", () => {
   });
 
   it("GameNode does not have active class when activeNodeId does not match", () => {
-    setActiveNodeId("99");
+    setActiveNodeId(99);
     const onOpen = vi.fn();
     const { container } = render(GameNode, {
       props: {

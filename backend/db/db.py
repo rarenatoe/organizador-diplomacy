@@ -51,13 +51,18 @@ _SCHEMA = """
 PRAGMA foreign_keys = ON;
 PRAGMA journal_mode = WAL;
 
+CREATE TABLE IF NOT EXISTS graph_nodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    entity_type TEXT NOT NULL CHECK(entity_type IN ('snapshot', 'event'))
+);
+
 CREATE TABLE IF NOT EXISTS players (
     id     INTEGER PRIMARY KEY,
     nombre TEXT    UNIQUE NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS snapshots (
-    id         INTEGER PRIMARY KEY,
+    id         INTEGER PRIMARY KEY REFERENCES graph_nodes(id) ON DELETE CASCADE,
     created_at TEXT    NOT NULL,
     source     TEXT    NOT NULL CHECK(source IN ('notion_sync', 'organizar', 'manual'))
 );
@@ -74,7 +79,7 @@ CREATE TABLE IF NOT EXISTS snapshot_players (
 );
 
 CREATE TABLE IF NOT EXISTS events (
-    id                 INTEGER PRIMARY KEY,
+    id                 INTEGER PRIMARY KEY REFERENCES graph_nodes(id) ON DELETE CASCADE,
     created_at         TEXT    NOT NULL,
     type               TEXT    NOT NULL CHECK(type IN ('sync', 'game', 'edit')),
     source_snapshot_id INTEGER REFERENCES snapshots(id),
@@ -376,11 +381,13 @@ def create_snapshot(
 ) -> int:
     """Inserts a new snapshot row. Does NOT commit."""
     ts = created_at or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cur = conn.execute(
-        "INSERT INTO snapshots (created_at, source) VALUES (?, ?)",
-        (ts, source),
+    node_cur = conn.execute("INSERT INTO graph_nodes (entity_type) VALUES ('snapshot')")
+    global_id = int(node_cur.lastrowid)  # type: ignore[arg-type]
+    conn.execute(
+        "INSERT INTO snapshots (id, created_at, source) VALUES (?, ?, ?)",
+        (global_id, ts, source),
     )
-    return cur.lastrowid  # type: ignore[return-value]
+    return global_id
 
 
 def add_snapshot_player(
@@ -544,25 +551,25 @@ def create_event(
     Returns the event ID. Does NOT commit.
     """
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cur = conn.execute(
+    node_cur = conn.execute("INSERT INTO graph_nodes (entity_type) VALUES ('event')")
+    global_id = int(node_cur.lastrowid)  # type: ignore[arg-type]
+    conn.execute(
         """
-        INSERT INTO events (created_at, type, source_snapshot_id, output_snapshot_id)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO events (id, created_at, type, source_snapshot_id, output_snapshot_id)
+        VALUES (?, ?, ?, ?, ?)
         """,
-        (ts, event_type, source_snapshot_id, output_snapshot_id),
+        (global_id, ts, event_type, source_snapshot_id, output_snapshot_id),
     )
-    event_id = cur.lastrowid
-
     if details is not None:
         conn.execute(
             """
             INSERT INTO game_details (event_id, intentos, copypaste_text)
             VALUES (?, ?, ?)
             """,
-            (event_id, details.get("intentos", 0), details.get("copypaste_text", "")),
+            (global_id, details.get("intentos", 0), details.get("copypaste_text", "")),
         )
 
-    return event_id  # type: ignore[return-value]
+    return global_id
 
 
 def create_sync_event(
@@ -603,14 +610,16 @@ def delete_snapshot_cascade(
                 stack.append(out)
 
     # ── Delete events that produced each snapshot ────────────────────────────
-    # ON DELETE CASCADE handles game_details, mesas, mesa_players, waiting_list
+    event_ids: set[int] = set()
     for sid in all_ids:
-        conn.execute("DELETE FROM events WHERE output_snapshot_id = ?", (sid,))
+        for row in conn.execute(
+            "SELECT id FROM events WHERE output_snapshot_id = ?",
+            (sid,),
+        ).fetchall():
+            event_ids.add(int(row[0]))
 
-    # ── Delete snapshot players and snapshots ────────────────────────────────
-    for sid in all_ids:
-        conn.execute("DELETE FROM snapshot_players WHERE snapshot_id = ?", (sid,))
-    for sid in all_ids:
-        conn.execute("DELETE FROM snapshots WHERE id = ?", (sid,))
+    # Delete graph nodes only; ON DELETE CASCADE clears dependent rows.
+    for gid in sorted(all_ids | event_ids):
+        conn.execute("DELETE FROM graph_nodes WHERE id = ?", (gid,))
 
     return sorted(all_ids)

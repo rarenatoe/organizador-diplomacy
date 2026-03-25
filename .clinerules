@@ -1,27 +1,261 @@
-# Project Conventions
+<!-- GENERATED FILE: DO NOT EDIT DIRECTLY -->
+<!-- Source of truth: docs/ai-rules/*.md -->
 
-This project uses scoped instruction files. Read the relevant one before working on code in that area.
+# Copilot Instructions — Organizador Diplomacy
 
-## Instruction Files
+## Stack
+Python 3.13 · uv · Flask 3 · pytest · notion-client · python-dotenv · SQLite (stdlib)
+TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecked`) · Vitest 4 · @testing-library/dom
 
-| Scope | File | Applies to |
+> Scoped instructions: `python.md` (applyTo `backend/**/*.py`) and
+> `typescript.md` (applyTo `frontend/src/**`) contain language-specific detail.
+
+## Directory layout
+```
+.
+├── backend/            Python source, tests, DB, Flask server
+├── frontend/           TypeScript source, UI bundles, templates
+└── [config files]      pyproject.toml, package.json, tsconfig.json, etc.
+```
+
+## File map
+
+### Backend (`backend/`)
+| File | Role |
+|---|---|
+| `organizador.py` | Algorithm: `_calcular_partidas()`, `organizar_partidas()` |
+| `models.py` | Domain types: `Jugador`, `Mesa`, `ResultadoPartidas` |
+| `formatter.py` | Text generation: `_formatear_*`, `_construir_proyeccion` |
+| `db.py` | SQLite schema + CRUD helpers |
+| `db_game.py` | Game-event persistence |
+| `db_views.py` | Read-only queries for viewer |
+| `viewer.py` | Flask REST API |
+| `notion_sync.py` | Notion → DB sync |
+| `test_*.py` | Tests (co-located) |
+
+### Frontend (`frontend/`)
+| Path | Role |
+|---|---|
+| `src/types.ts` | Shared TypeScript interfaces |
+| `src/stores.svelte.ts` | Global state (`$state` runes) |
+| `src/api.ts` | API utility module |
+| `src/App.svelte` | Main layout shell |
+| `src/components/*.svelte` | UI components |
+| `static/style.css` | All CSS |
+| `static/app.js` | Build artifact (gitignored) |
+
+**One file, one format. No CSVs, no .txt reports.**
+
+## After every feature or fix
+1. Run `uv run python -m pytest -q` — confirm all pass.
+2. Run `bun run build && bun run lint && bun run typecheck` — TypeScript must compile, lint clean, and type-check clean. **Also check for Svelte errors/warnings in the VS Code Problems panel (svelte.svelte-vscode)** — fix any before committing.
+3. **Check file sizes**: `wc -l backend/*.py frontend/src/*.ts frontend/static/style.css | sort -rn` — refactor any file >400 LOC.
+4. Add/update tests in the relevant test file.
+5. Update the relevant instructions file if conventions, data model, or architecture changed.
+6. Commit: `feat:` · `fix:` · `refactor:` · `test:` prefix.
+
+## Principles
+- **AI Governance**: Rules are managed in `docs/ai-rules/` and generated via `scripts/generate-ai-instructions.ts`. Never edit generated files (e.g., `.trae/rules/*.md`, `.github/*.instructions.md`) directly.
+- **Graph Node Hierarchy**: The database uses a centralized `graph_nodes` table to manage global IDs and ensure data integrity via recursive cascading deletes.
+- Maintainability over expediency: design for extensibility and clarity.
+- Tests required for every new behavior. Documentation must stay current.
+- No inlined CSS/JS/magic strings — one format per file, centralized constants.
+- Large refactors warrant their own commit; don't combine with feature work.
+- Dead code: evaluate every file for unreachable branches, unused exports, redundant constants. Remove if safe — verify via full test suite before committing.
+- **Chain Integrity:** Every operation that creates a new snapshot (sync, organizar, edit) must have a source snapshot ID provided by the UI. Fallbacks to 'latest' are prohibited to prevent accidental branching. UI implementation detail: Always call store getters directly in Svelte templates (e.g., `{getGetter()}`) rather than copying store state into local component `$state` to avoid reactivity lag.
+- **Svelte 5 Reactivity:** Use `$state` rune for reactive state objects. Use `$derived` runes in components to track store getter changes. Use `$effect` for side effects. Never copy store values into local `$state` variables in components—use `$derived` instead.
+- **Loading States:** Use `-1` as sentinel value for "loading/unknown" state (e.g., `snapshotCount = -1`). This prevents buttons from flickering to "enabled" during initial load. Only transition to `0` when data is actually loaded.
+- **Error Handling:** Always check for null/undefined responses from backend before accessing properties. Show user-friendly error messages via toast notifications. Add null checks in async functions to prevent TypeError crashes.
+- **UI Feedback:** Add `title` attributes to disabled buttons explaining why they're disabled. This helps users understand the required action (e.g., "Selecciona un snapshot en la cadena para organizar").
+
+## File size guideline
+**400-line soft limit per file.** When a file crosses this threshold:
+1. Identify logical responsibility boundaries (not arbitrary line counts).
+2. Extract the cohesive sub-domain into a new file with a single-responsibility name.
+3. Python: add a new flat-layout file at root. TypeScript: add a new `src/*.ts` module (update file map and import graph in `typescript.md`).
+4. Run all tests + build + lint before committing the split.
+
+**Exception:** A file may safely exceed this limit if it represents a single, indivisible logical unit (e.g., a highly cohesive Class, Svelte Component, or complex pure function) that would lose clarity or context if artificially split.
+
+## Frontend testing conventions
+- Use Vitest with `@testing-library/dom` for DOM testing
+- Mock external dependencies with `vi.mock()` at the top of test files
+- Export functions that need testing (e.g., `showRenameDialog`, `showAddPlayerDialog`)
+- Wrap module-level DOM access in conditional checks for test environment compatibility
+- Test files: `frontend/src/*.test.ts`
+
+## CSS conventions
+- **Favor flex layout** for all UI structure — use `display: flex` and `flex-direction: column` for panels, rows, and containers.
+- Use `flex: 1` for expandable content, `flex-shrink: 0` for fixed elements
+- Use `overflow: hidden; text-overflow: ellipsis; white-space: nowrap;` for text truncation
+- Use `margin-left: auto` to push elements to the right in flex containers
+- Use Svelte's native `<style>` blocks within `.svelte` files for component-specific styles to keep styling scoped and tied directly to the component.
+- Reserve `static/style.css` strictly for global variables (`:root`), body resets, and widely shared utility classes (e.g., `.btn`).
+- All CSS source files must be human-readable with properties written on multiple lines.
+- **Panel scroll pattern**: For panels with scrollable content + fixed buttons at bottom:
+  - `.panel-body` → `display: flex; flex-direction: column; overflow: hidden;`
+  - `.panel-scroll` → `flex: 1; overflow-y: auto; min-height: 0;`
+  - Wrap scrollable sections in `<div class="panel-scroll">`, keep buttons outside
+
+## Ripple-effect checklist
+**Player field change** → `organizador.py` · `models.py` · `formatter.py` · `notion_sync.py` · `db.py` (schema + helpers) · `db_game.py` (game helpers) · `viewer.py` (API) · `test_organizador.py` (`_j()` + `_pool()`) · `test_algoritmo.py` (`_j()` + `_pool()`) · `test_db.py` (`TestDb`) · `test_viewer.py` (`_add_snapshot()` helper)
+**New Flask route** → `TestApi*` class in `test_viewer.py` with 200 + 400 + 404 coverage.
+**Chain algorithm change** → update `db_views.py` · `TestApiChain` in `test_viewer.py` (use `roots` tree, not `nodes` flat list) · `TestDb` in `test_db.py` · "Chain lineage" section in `python.md`.
+**DB schema change** → update `_SCHEMA` in `db.py` · all affected helpers · `test_db.py` `TestDb` · `test_viewer.py` fixtures · `python.md`.
+**UI logic change** → edit relevant `src/*.ts` module + `bun run build`. **New domain type** → add to `src/types.ts`. **Style change** → edit `static/style.css`. Never re-inline into `index.html`.
+**Frontend test** → add to `frontend/src/*.test.ts` · mock dependencies with `vi.mock()` · export tested functions.
+
+Tests live at root alongside source — flat layout is intentional for this project size.
+
+## Python Scoped Instructions (backend/**/*.py)
+
+## Python code conventions
+- Type hints on **all** function signatures. `Path` everywhere (no raw strings).
+- No `input()` — non-interactive. `print()` → stdout; `print(..., file=sys.stderr)` → errors.
+- Code section separators: `# ── Title ────────────────────────────────────────────`
+
+## Data model — SQLite schema (`db.py`)
+
+```sql
+graph_nodes (id PRIMARY KEY, entity_type CHECK IN ('snapshot', 'event'))
+players (id, nombre UNIQUE)
+snapshots (id FK references graph_nodes, created_at, source CHECK IN ('notion_sync','organizar','manual'))
+snapshot_players (snapshot_id FK, player_id FK, experiencia, juegos_este_ano, prioridad, partidas_deseadas, partidas_gm, PK(snapshot_id, player_id))
+events (id FK references graph_nodes, created_at, type CHECK IN ('sync', 'game', 'edit'), source_snapshot_id FK, output_snapshot_id FK)
+game_details (event_id FK references events, intentos, copypaste_text)
+mesas (id, game_event_id FK, numero, gm_player_id FK nullable)
+mesa_players (mesa_id FK, player_id FK, orden, PK(mesa_id, player_id))
+waiting_list (id, game_event_id FK, player_id FK, orden, cupos_faltantes)
+```
+
+**Graph Node Hierarchy Pattern**: All snapshots and events are descendants of the `graph_nodes` table. This allows for:
+1.  **Global Unique IDs**: Snapshots and events never share an ID, simplifying UI routing and store logic.
+2.  **Recursive Cascade**: Deleting a record from `graph_nodes` triggers `ON DELETE CASCADE` across all dependent tables (e.g., `snapshot_players`, `game_details`, `mesas`).
+3.  **Atomic Deletes**: `delete_snapshot_cascade` identifies the subtree of nodes and deletes them from `graph_nodes` in a single transaction.
+
+Key helpers:
+- `db.py`: `get_db()`, `get_or_create_player()`, `create_snapshot()`, `add_snapshot_player()`, `get_snapshot_players()`, `get_latest_snapshot_id()`, `snapshots_have_same_roster()`, `create_sync_event()`, `create_game_event()`, `create_output_snapshot()`, `create_manual_snapshot()`, `delete_snapshot_cascade()`
+- `db_game.py`: `create_game_event()`, `create_mesa()`, `add_mesa_player()`, `add_waiting_player()`, `create_output_snapshot()`
+- `db_views.py`: `build_chain_data()` → DFS tree, `get_snapshot_detail()`, `get_game_event_detail()`
+
+## Chain lineage (`build_chain_data` in `db_views.py`)
+Returns `{"roots": [...]}` — a **tree**, not a flat list.
+Each snapshot node: `{type:"snapshot", id, created_at, source, player_count, is_latest, branches: [{edge, output}, ...]}`
+Each game edge: `{type:"game", id, created_at, from_id, to_id, intentos, mesa_count, espera_count}`
+Each sync edge: `{type:"sync", id, created_at, from_id, to_id}`
+
+- Root snapshots = snapshots not produced by any edge.
+- `from_to[from_id]` = edges sorted by `created_at` (chronological).
+- Walk: each snapshot owns its branches; each branch is `{edge, output: snapshot_node|null}`.
+- Safety net: snapshots unreachable from roots are appended as additional roots.
+- **Never use a flat `nodes` list** — that caused the bug where report_B from csv_0001 rendered as a child of csv_0002.
+
+## Notion Sync behavior (important UX distinction)
+`notion_sync.py` is a **fresh pull from Notion** — it always reads `Nombre`, `Experiencia`, `Juegos_Este_Ano` from Notion.
+- **Strict Roster Rule:** It only updates players already present in the selected snapshot. It does **NOT** import new players from Notion. Local players not found in Notion are preserved.
+- **Merge Name Support:** Accepts a `--merges` JSON argument to map local names to Notion names (e.g., "Kur" -> "Kurt"). Merged players adopt the Notion name and update their stats while preserving local configs.
+- Preserves `prioridad`, `partidas_deseadas`, `partidas_gm` from the **selected snapshot** (or latest if none is selected).
+
+## Flask API (`viewer.py`)
+| Route | Method | Response |
 |---|---|---|
-| Project-wide | `.github/copilot-instructions.md` | Stack, directory layout, file map, principles, workflow |
-| Python | `.github/python.instructions.md` | `backend/**/*.py` — type hints, DB schema, API routes, testing rules |
-| TypeScript | `.github/typescript.instructions.md` | `frontend/src/**` — module responsibilities, import graph, UI conventions |
+| `GET /api/chain` | GET | `{"roots": [...]}` tree |
+| `GET /api/snapshot/<int:id>` | GET | snapshot detail (200/404) |
+| `DELETE /api/snapshot/<int:id>` | DELETE | `{"deleted": [id, ...]}` (200/404) |
+| `GET /api/game/<int:id>` | GET | game event detail (200/404) |
+| `GET /api/snapshots` | GET | `{"snapshots": [{id, created_at, source}, ...]}` |
+| `POST /api/snapshot/<int:id>/edit` | POST | `{"snapshot_id": new_id}` — creates new `manual` snapshot (200/400/404) |
+| `POST /api/run/<script>` | POST | `{returncode, stdout, stderr}` |
 
-## When to read what
+`/api/run/organizar` body: `{"snapshot": <int_id>}` — **Required: snapshot ID must be explicitly provided**.
+`/api/snapshot/<id>/edit` body: `{"players": [{nombre, prioridad, partidas_deseadas, partidas_gm}, ...]}` — only listed players are included; omitting a player removes them from the next jornada.
 
-- **Starting a new task?** → Read `.github/copilot-instructions.md` first for project context.
-- **Editing Python?** → Read `.github/python.instructions.md` for conventions.
-- **Editing TypeScript?** → Read `.github/typescript.instructions.md` for conventions.
-- **Changing DB schema or API?** → Both `copilot-instructions.md` (ripple-effect checklist) and `python.instructions.md` (schema + helpers).
+## No defaults rule
+Backend functions must never internally resolve 'latest' snapshots for state-changing operations. The caller is always responsible for providing an explicit snapshot ID.
 
-## Quick reference
+## Snapshot requirement rules
+- **organizar**: Always requires `snapshot_id`. Returns 400 if missing with message: "Snapshot selection required. Please click a snapshot node in the chain before syncing or organizing."
+- **notion_sync**: Requires `snapshot_id` when database has existing data. Allows missing `snapshot_id` only for first-time sync (empty database). Returns 400 if missing with same message as organizar.
+- **sync/detect**: Always requires `snapshot_id`. Returns 400 if missing.
+- **sync/confirm**: Always requires `snapshot_id`. Returns 400 if missing.
+- **First-time sync exception**: When database is empty (no snapshots), `notion_sync` without `--snapshot` is allowed to create the initial snapshot.
 
-- Python 3.13 + uv · Flask 3 · pytest · SQLite
-- TypeScript 5 (strict) + bun · ESLint 9
-- Tests required for every new behavior.
-- 400-line soft limit per file.
-- Run `uv run python -m pytest -q` after Python changes.
-- Run `bun run build && bun run lint` after TypeScript changes.
+## Error message format
+Use consistent error messages across all endpoints:
+- Missing snapshot: "Snapshot selection required. Please click a snapshot node in the chain before syncing or organizing."
+- Invalid snapshot type: "snapshot must be an integer"
+- Snapshot not found: "not found" (404)
+
+## Testing rules (Python)
+Every new behavior → test in the corresponding file.
+- New function → happy path + edge case (empty/zero) + invalid input.
+- New Flask route → 200 success + 400 invalid input + 404 missing resource.
+- New business rule → test name/docstring names the rule explicitly.
+- Bug fix → regression test that would have caught it **before** the fix.
+
+| Module | Test location |
+|---|---|
+| `organizador/organizador.py` · `organizador/models.py` (basic) | `organizador/test_organizador.py` |
+| `organizador/organizador.py` (priority, GM, liga) | `organizador/test_algoritmo.py` |
+| `db/db.py` · `db/db_game.py` · `db/db_views.py` | `db/test_db.py` → `TestDb` class |
+| `viewer/viewer.py` | `viewer/test_viewer.py` (in-memory DB via `db.get_db(":memory:")`) |
+| `sync/notion_sync.py` | manual/integration only (requires Notion API key) |
+
+## TypeScript + Svelte Scoped Instructions (frontend/src/**)
+
+## Svelte 5 conventions
+- All domain interfaces live in `src/types.ts` — export everything from there.
+- Use Svelte 5 runes: `$state` for reactive state, `$derived` for computed values, `$effect` for side effects, `$props` for component props.
+- State management: `src/stores.svelte.ts` — class-based `AppState` with `$state` runes, exported as singleton `appState`. Use getter/setter functions (e.g., `getSelectedSnapshot()`, `setSelectedSnapshot()`).
+- API layer: `src/api.ts` — centralized fetch calls (fetchChain, fetchSnapshot, fetchGame, runScript, detectSync, confirmSync, etc.).
+- Component structure: `src/components/*.svelte` — each component is a single `.svelte` file with `<script>`, markup, and optional `<style>` blocks.
+- Import graph (no cycles): `App.svelte` → components, stores, api. Components → stores, api, types. Stores → types only.
+
+## Svelte component conventions
+- Use `$props()` to declare component props with TypeScript interfaces.
+- Use `$state` for local reactive state within components.
+- Use `$derived` for computed values (e.g., `let disabled = $derived(syncing || running)`).
+- Use `$effect(() => { ... })` for side effects (e.g., loading data on mount).
+- Use `$bindable()` for two-way binding when needed.
+- **Error Handling**: Async actions in components should use an `onShowError(title, output)` callback to display errors in the main App modal.
+- Event handling: use `onclick={handler}` directly in markup (not `addEventListener`).
+- Use `{#if}`, `{#each}`, `{#await}` blocks for control flow.
+- Use `{@render children()}` for slot content (not `<slot>` — deprecated in Svelte 5).
+- For recursive components, use self-imports (e.g., `import SnapshotNode from './SnapshotNode.svelte'`) instead of `<svelte:self>`.
+
+## Build & tooling
+- Vite builds from `src/index.html` entry point → `static/` output directory.
+- Run `bun run build` to build with Vite and copy `index.html` to `templates/`.
+- Run `bun run dev` for development server with HMR.
+- Run `bun run typecheck` for type-only check.
+- Run `bun run lint` — ESLint strict.
+- **Rules Generation**: Run `bun run ai-rules:generate` (alias for `bun run scripts/generate-ai-instructions.ts`) to propagate changes from `docs/ai-rules/` to the rest of the workspace.
+- Svelte files use `<script lang="ts">` for TypeScript support.
+
+## UI conventions
+- `templates/index.html` is the production HTML served by Flask (copied from build output).
+- `src/index.html` is the Vite entry template with `<div id="app">` mount point.
+- Component-specific CSS belongs in `<style>` blocks within the `.svelte` files. Global variables and utilities live in `static/style.css` imported in `App.svelte`.
+- **Global IDs**: Selection and routing use raw numeric IDs from the `graph_nodes` backend table.
+- **Click-to-select**: snapshot node click → `setSelectedSnapshot(id)` → `.csv-selected` green ring + button label "Organizar · #N".
+- Game node click → `openGame(id)` → fetches game detail, shows in SidePanel.
+- Sync node click → `openSync(id)` → fetches sync metadata, shows in SidePanel.
+- `handleRunScript("organizar")` reads selection from stores. `deselectSnapshot()` resets.
+- `SnapshotNode.svelte` renders the chain recursively using self-import — branches stacked vertically.
+
+## Testing conventions
+- Use Vitest with `@testing-library/svelte` for component testing.
+- Test files co-located with components: `ComponentName.test.ts` next to `ComponentName.svelte`.
+- Mock API calls with `vi.mock('../api')`.
+- Use `render()` from `@testing-library/svelte` to mount components in tests.
+- **Component typing in tests**: `render()` returns `any`-typed component. Avoid `as unknown as` double casts (code smell). Prefer testing via DOM queries instead of component instance.
+
+## Svelte 5 children pattern
+- For components with children, import `Snippet` type from "svelte" and declare `children: Snippet` in Props interface.
+- Use `{@render children()}` in template (not `<slot />` — deprecated).
+
+## Naming Conventions
+- **Variables & Functions:** Always use `camelCase`.
+- **Svelte 5 Event Props:** Custom event handlers passed as component props MUST use strict `camelCase` starting with "on" (e.g., `onNewDraft`, `onChainUpdate`, `onOpenSnapshot` — *never* `onnewdraft`). Native DOM events remain all-lowercase (e.g., `onclick`, `onkeydown`).
+- **Domain Types:** Use `PascalCase` for Interfaces and Types.
+- **Backend API Mapping:** Object properties mapped directly from the backend JSON API (like `created_at`, `juegos_este_ano`) are the **only** permitted exceptions where `snake_case` is allowed in TypeScript.

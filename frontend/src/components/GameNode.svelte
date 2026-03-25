@@ -15,7 +15,7 @@
 
 <div 
   class="node node-report" 
-  class:active={getActiveNodeId() === "game-" + String(node.id)}
+  class:active={getActiveNodeId() === node.id}
   data-id={node.id} 
   data-type="game" 
   role="button" 

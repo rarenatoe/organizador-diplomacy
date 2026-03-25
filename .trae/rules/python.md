@@ -1,7 +1,8 @@
 <!-- GENERATED FILE: DO NOT EDIT DIRECTLY -->
 <!-- Source of truth: docs/ai-rules/*.md -->
 ---
-applyTo: "backend/**/*.py"
+description: Python Scoped Instructions
+globs: backend/**/*.py
 ---
 
 ## Python code conventions
