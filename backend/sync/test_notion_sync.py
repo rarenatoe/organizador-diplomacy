@@ -14,7 +14,62 @@ from .notion_sync import (
     _normalize_name,
     _similarity,
     _detect_similar_names,
+    _paginas_a_filas,
 )
+
+
+# ── Data Transformation ───────────────────────────────────────────────────────
+
+class TestPaginasAFilas:
+    def test_handles_reduced_payload(self):
+        """
+        Tests that _paginas_a_filas correctly processes pages even when only 
+        the filtered properties are present (payload reduction).
+        """
+        # Page with only Nombre and Participaciones (reduced payload)
+        pages = [
+            {
+                "id": "player-1-uuid",
+                "properties": {
+                    "Nombre": {"title": [{"plain_text": "Alice"}]},
+                    "Participaciones": {"relation": [{"id": "rel1"}]},
+                }
+            }
+        ]
+        existentes = {}
+        conteo_por_jugador = {"player1uuid": 3}
+        
+        filas = _paginas_a_filas(pages, existentes, conteo_por_jugador)
+        
+        assert len(filas) == 1
+        fila = filas[0]
+        assert fila["Nombre"] == "Alice"
+        assert fila["Experiencia"] == "Antiguo"
+        assert fila["Juegos_Este_Ano"] == 3
+        # Default values should be applied
+        assert fila["prioridad"] == 0
+        assert fila["partidas_deseadas"] == 1
+        assert fila["partidas_gm"] == 0
+
+    def test_handles_missing_optional_properties(self):
+        """Tests that it doesn't crash if Participaciones is missing from properties."""
+        pages = [
+            {
+                "id": "player-2-uuid",
+                "properties": {
+                    "Nombre": {"title": [{"plain_text": "Bob"}]},
+                    # Participaciones missing
+                }
+            }
+        ]
+        existentes = {}
+        conteo_por_jugador = {}
+        
+        filas = _paginas_a_filas(pages, existentes, conteo_por_jugador)
+        
+        assert len(filas) == 1
+        assert filas[0]["Nombre"] == "Bob"
+        assert filas[0]["Experiencia"] == "Nuevo" # Default when missing relation
 
 
 # ── Name normalization ────────────────────────────────────────────────────────

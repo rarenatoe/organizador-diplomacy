@@ -45,63 +45,45 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 
 **One file, one format. No CSVs, no .txt reports.**
 
-## After every feature or fix
-1. Run `uv run python -m pytest -q` — confirm all pass.
-2. Run `bun run build && bun run lint && bun run typecheck` — TypeScript must compile, lint clean, and type-check clean. **Also check for Svelte errors/warnings in the VS Code Problems panel (svelte.svelte-vscode)** — fix any before committing.
-3. **Check file sizes**: `wc -l backend/*.py frontend/src/*.ts frontend/static/style.css | sort -rn` — refactor any file >400 LOC.
-4. Add/update tests in the relevant test file.
-5. Update the relevant instructions file if conventions, data model, or architecture changed.
-6. Commit: `feat:` · `fix:` · `refactor:` · `test:` prefix.
+## Workflow
+1. Run `uv run python -m pytest -q`.
+2. Run `bun run build && bun run lint && bun run typecheck`. Check Svelte Problems in VS Code.
+3. Refactor files >400 LOC.
+4. Update/add tests for changes.
+5. Update instructions if architecture/data model changed.
+6. Commit: `feat:` · `fix:` · `refactor:` · `test:`.
 
 ## Principles
-- **AI Governance**: Rules are managed in `docs/ai-rules/` and generated via `scripts/generate-ai-instructions.ts`. Never edit generated files (e.g., `.trae/rules/*.md`, `.github/*.instructions.md`) directly.
-- **Graph Node Hierarchy**: The database uses a centralized `graph_nodes` table to manage global IDs and ensure data integrity via recursive cascading deletes.
-- Maintainability over expediency: design for extensibility and clarity.
-- Tests required for every new behavior. Documentation must stay current.
-- No inlined CSS/JS/magic strings — one format per file, centralized constants.
-- Large refactors warrant their own commit; don't combine with feature work.
-- Dead code: evaluate every file for unreachable branches, unused exports, redundant constants. Remove if safe — verify via full test suite before committing.
-- **Chain Integrity:** Every operation that creates a new snapshot (sync, organizar, edit) must have a source snapshot ID provided by the UI. Fallbacks to 'latest' are prohibited to prevent accidental branching. UI implementation detail: Always call store getters directly in Svelte templates (e.g., `{getGetter()}`) rather than copying store state into local component `$state` to avoid reactivity lag.
-- **Svelte 5 Reactivity:** Use `$state` rune for reactive state objects. Use `$derived` runes in components to track store getter changes. Use `$effect` for side effects. Never copy store values into local `$state` variables in components—use `$derived` instead.
-- **Loading States:** Use `-1` as sentinel value for "loading/unknown" state (e.g., `snapshotCount = -1`). This prevents buttons from flickering to "enabled" during initial load. Only transition to `0` when data is actually loaded.
-- **Error Handling:** Always check for null/undefined responses from backend before accessing properties. Show user-friendly error messages via toast notifications. Add null checks in async functions to prevent TypeError crashes.
-- **UI Feedback:** Add `title` attributes to disabled buttons explaining why they're disabled. This helps users understand the required action (e.g., "Selecciona un snapshot en la cadena para organizar").
+- **Governance**: Rules in `docs/ai-rules/`, generated via `scripts/generate-ai-instructions.ts`. No direct edits to `.trae/rules/*.md`.
+- **Database**: Centralized `graph_nodes` table for global IDs and cascading deletes.
+- **Testing**: Tests required for new behavior and modifications.
+- **Integrity**: Snapshots require explicit source snapshot ID. UI uses store getters directly in templates.
+- **Reactivity**: Svelte 5 `$state`, `$derived`, `$effect`. No local copies of store state.
+- **Loading**: Use `-1` for unknown state; `0` when loaded.
+- **Errors**: Check for null/undefined backend responses. UI toast for errors.
+- **UI**: `title` attributes on disabled buttons for feedback.
 
-## File size guideline
-**400-line soft limit per file.** When a file crosses this threshold:
-1. Identify logical responsibility boundaries (not arbitrary line counts).
-2. Extract the cohesive sub-domain into a new file with a single-responsibility name.
-3. Python: add a new flat-layout file at root. TypeScript: add a new `src/*.ts` module (update file map and import graph in `typescript.instructions.md`).
-4. Run all tests + build + lint before committing the split.
+## File Size
+400-line soft limit. Extract sub-domains into new files. Exception: highly cohesive indivisible units.
 
-**Exception:** A file may safely exceed this limit if it represents a single, indivisible logical unit (e.g., a highly cohesive Class, Svelte Component, or complex pure function) that would lose clarity or context if artificially split.
+## Testing
+- Vitest + `@testing-library/dom` for DOM tests.
+- Mock dependencies with `vi.mock()`.
+- Export testable functions.
+- Test files: `frontend/src/*.test.ts`.
 
-## Frontend testing conventions
-- Use Vitest with `@testing-library/dom` for DOM testing
-- Mock external dependencies with `vi.mock()` at the top of test files
-- Export functions that need testing (e.g., `showRenameDialog`, `showAddPlayerDialog`)
-- Wrap module-level DOM access in conditional checks for test environment compatibility
-- Test files: `frontend/src/*.test.ts`
+## CSS
+- Flex layout for panels, rows, containers.
+- `overflow: hidden; text-overflow: ellipsis; white-space: nowrap;` for truncation.
+- Scoped `<style>` in `.svelte` files.
+- `static/style.css` for variables, resets, utility classes.
+- Scroll pattern: `.panel-body` (flex column, hidden) + `.panel-scroll` (flex 1, auto scroll).
 
-## CSS conventions
-- **Favor flex layout** for all UI structure — use `display: flex` and `flex-direction: column` for panels, rows, and containers.
-- Use `flex: 1` for expandable content, `flex-shrink: 0` for fixed elements
-- Use `overflow: hidden; text-overflow: ellipsis; white-space: nowrap;` for text truncation
-- Use `margin-left: auto` to push elements to the right in flex containers
-- Use Svelte's native `<style>` blocks within `.svelte` files for component-specific styles to keep styling scoped and tied directly to the component.
-- Reserve `static/style.css` strictly for global variables (`:root`), body resets, and widely shared utility classes (e.g., `.btn`).
-- All CSS source files must be human-readable with properties written on multiple lines.
-- **Panel scroll pattern**: For panels with scrollable content + fixed buttons at bottom:
-  - `.panel-body` → `display: flex; flex-direction: column; overflow: hidden;`
-  - `.panel-scroll` → `flex: 1; overflow-y: auto; min-height: 0;`
-  - Wrap scrollable sections in `<div class="panel-scroll">`, keep buttons outside
-
-## Ripple-effect checklist
-**Player field change** → `organizador.py` · `models.py` · `formatter.py` · `notion_sync.py` · `db.py` (schema + helpers) · `db_game.py` (game helpers) · `viewer.py` (API) · `test_organizador.py` (`_j()` + `_pool()`) · `test_algoritmo.py` (`_j()` + `_pool()`) · `test_db.py` (`TestDb`) · `test_viewer.py` (`_add_snapshot()` helper)
-**New Flask route** → `TestApi*` class in `test_viewer.py` with 200 + 400 + 404 coverage.
-**Chain algorithm change** → update `db_views.py` · `TestApiChain` in `test_viewer.py` (use `roots` tree, not `nodes` flat list) · `TestDb` in `test_db.py` · "Chain lineage" section in `python.instructions.md`.
-**DB schema change** → update `_SCHEMA` in `db.py` · all affected helpers · `test_db.py` `TestDb` · `test_viewer.py` fixtures · `python.instructions.md`.
-**UI logic change** → edit relevant `src/*.ts` module + `bun run build`. **New domain type** → add to `src/types.ts`. **Style change** → edit `static/style.css`. Never re-inline into `index.html`.
-**Frontend test** → add to `frontend/src/*.test.ts` · mock dependencies with `vi.mock()` · export tested functions.
+## Ripple Effect
+- **Player change**: Update `organizador.py`, `models.py`, `formatter.py`, `notion_sync.py`, `db.py`, `db_game.py`, `viewer.py`, tests.
+- **Flask route**: Update `test_viewer.py` (200, 400, 404).
+- **Algorithm**: Update `db_views.py`, `test_viewer.py`, `test_db.py`.
+- **Schema**: Update `db.py`, `test_db.py`, `test_viewer.py`.
+- **UI**: Update `src/*.ts`, `static/style.css`, `types.ts`.
 
 Tests live at root alongside source — flat layout is intentional for this project size.

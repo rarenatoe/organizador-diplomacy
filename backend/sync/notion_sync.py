@@ -35,6 +35,7 @@ Requisitos:
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import sys
 from datetime import datetime
@@ -217,12 +218,32 @@ def _conteo_partidas_este_ano(
         )
     ds_id: str = data_sources[0]["id"]
 
+    # Payload reduction: get property IDs for "Temporada" and "Jugador"
+    prop_ids: list[str] = []
+    props = db_info.get("properties", {})
+    for name in ["Temporada", "Jugador"]:
+        if name in props:
+            prop_ids.append(props[name]["id"])
+
     conteo: dict[str, int] = {}
     sin_temporada = 0
     cursor: str | None = None
 
     while True:
-        kwargs: dict = {"data_source_id": ds_id, "result_type": "page"}
+        kwargs: dict = {
+            "data_source_id": ds_id,
+            "result_type": "page",
+            "filter": {
+                "property": "Temporada",
+                "rollup": {
+                    "number": {
+                        "equals": año
+                    }
+                }
+            }
+        }
+        if prop_ids:
+            kwargs["filter_properties"] = prop_ids
         if cursor:
             kwargs["start_cursor"] = cursor
         response = client.data_sources.query(**kwargs)
@@ -321,10 +342,22 @@ def _descargar_todos(client: Client, database_id: str) -> list[dict]:
         )
     data_source_id: str = data_sources[0]["id"]
 
+    # Payload reduction: get property IDs for "Nombre" and "Participaciones"
+    prop_ids: list[str] = []
+    props = db_info.get("properties", {})
+    for name in ["Nombre", "Participaciones"]:
+        if name in props:
+            prop_ids.append(props[name]["id"])
+
     pages: list[dict] = []
     cursor: str | None = None
     while True:
-        kwargs: dict = {"data_source_id": data_source_id, "result_type": "page"}
+        kwargs: dict = {
+            "data_source_id": data_source_id,
+            "result_type": "page",
+        }
+        if prop_ids:
+            kwargs["filter_properties"] = prop_ids
         if cursor:
             kwargs["start_cursor"] = cursor
         response = client.data_sources.query(**kwargs)
@@ -373,8 +406,12 @@ def main() -> None:
 
     print("⟳  Conectando a Notion...", end=" ", flush=True)
     try:
-        pages = _descargar_todos(client, db_id)
-        conteo_por_jugador = _conteo_partidas_este_ano(client, part_db_id, año_actual)
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_pages = executor.submit(_descargar_todos, client, db_id)
+            future_conteo = executor.submit(_conteo_partidas_este_ano, client, part_db_id, año_actual)
+            
+            pages = future_pages.result()
+            conteo_por_jugador = future_conteo.result()
     except APIResponseError as e:
         print(f"\n❌  Error de API Notion: {e}", file=sys.stderr)
         sys.exit(1)
