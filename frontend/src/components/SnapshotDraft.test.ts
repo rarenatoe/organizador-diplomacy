@@ -125,6 +125,25 @@ describe("SnapshotDraft", () => {
     expect(screen.getByPlaceholderText(/nombre,experiencia/)).toBeTruthy();
   });
 
+  it("autofocuses textarea when CSV modal opens", async () => {
+    render(SnapshotDraft, {
+      props: {
+        parentId: null,
+        initialPlayers: [],
+        defaultEventType: "manual",
+        onclose: () => {},
+        onchainUpdate: () => {},
+        onopenSnapshot: () => {},
+      },
+    });
+
+    const csvButton = screen.getByText("📥 Pegar CSV");
+    await fireEvent.click(csvButton);
+
+    const textarea = screen.getByPlaceholderText(/nombre,experiencia/);
+    expect(document.activeElement).toBe(textarea);
+  });
+
   it("imports CSV when import button is clicked", async () => {
     const { container } = render(SnapshotDraft, {
       props: {

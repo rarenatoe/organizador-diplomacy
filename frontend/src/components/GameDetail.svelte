@@ -11,6 +11,7 @@
 
   let data = $state<GameDetail | null>(null);
   let loading = $state(true);
+  let copiedId = $state<string | null>(null);
 
   async function loadGame(): Promise<void> {
     loading = true;
@@ -21,8 +22,12 @@
     }
   }
 
-  async function copyText(text: string): Promise<void> {
+  async function copyText(text: string, buttonId: string): Promise<void> {
     await navigator.clipboard.writeText(text);
+    copiedId = buttonId;
+    setTimeout(() => {
+      if (copiedId === buttonId) copiedId = null;
+    }, 1500);
   }
 
   $effect(() => {
@@ -50,8 +55,8 @@
       </div>
     </div>
     <div class="section">
-      <button class="copy-btn" onclick={() => copyText(data?.copypaste ?? "")}
-        >📋 Copiar lista para compartir</button
+      <button class="copy-btn" class:ok={copiedId === 'share'} onclick={() => copyText(data?.copypaste ?? "", 'share')}
+        >{copiedId === 'share' ? "✅ Copiado" : "📋 Copiar lista para compartir"}</button
       >
       <div class="share-pre" style="margin-top:8px">{esc(data?.copypaste)}</div>
     </div>
@@ -84,8 +89,10 @@
             </ul>
             <button
               class="copy-btn"
+              class:ok={copiedId === 'players-' + mesa.numero}
               style="margin-top:9px"
-              onclick={() => copyText(playersTxt)}>📋 Copiar jugadores</button
+              onclick={() => copyText(playersTxt, 'players-' + mesa.numero)}
+              >{copiedId === 'players-' + mesa.numero ? "✅ Copiado" : "📋 Copiar jugadores"}</button
             >
           </div>
         {/each}
@@ -101,8 +108,8 @@
             <span class="waiting-cupos">{esc(w.cupos)}</span>
           </div>
         {/each}
-        <button class="copy-btn" onclick={() => copyText(waitTxt)}
-          >📋 Copiar lista de espera</button
+        <button class="copy-btn" class:ok={copiedId === 'waiting'} onclick={() => copyText(waitTxt, 'waiting')}
+          >{copiedId === 'waiting' ? "✅ Copiado" : "📋 Copiar lista de espera"}</button
         >
       </div>
     {/if}

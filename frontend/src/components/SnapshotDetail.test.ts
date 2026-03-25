@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import SnapshotDetail from "./SnapshotDetail.svelte";
 
@@ -64,6 +64,11 @@ vi.stubGlobal("alert", vi.fn());
 describe("SnapshotDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("renders snapshot details with players", async () => {
@@ -251,6 +256,42 @@ describe("SnapshotDetail", () => {
         "nombre,experiencia,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm",
       ),
     );
+  });
+
+  it("shows copy feedback when CSV copy button is clicked", async () => {
+    render(SnapshotDetail, {
+      props: {
+        id: 1,
+        onclose: () => {},
+        onchainUpdate: () => {},
+        onopenSnapshot: () => {},
+        onopenGame: () => {},
+        oneditdraft: () => {},
+      },
+    });
+
+    // Wait for loading to complete
+    await waitFor(() => {
+      expect(screen.queryByText("Cargando…")).toBeNull();
+    });
+
+    // Find the copy button
+    const copyButton = screen.getByText("📋 Copiar tabla CSV");
+    await fireEvent.click(copyButton);
+
+    // Verify button text changes to "✅ Copiado"
+    expect(screen.getByText("✅ Copiado")).toBeTruthy();
+
+    // Verify button has 'ok' class
+    expect(copyButton.classList.contains("ok")).toBe(true);
+
+    // Fast-forward time by 1500ms
+    vi.advanceTimersByTime(1500);
+
+    // Verify button reverts to original text
+    await waitFor(() => {
+      expect(screen.getByText("📋 Copiar tabla CSV")).toBeTruthy();
+    });
   });
 
   it("calls onchainUpdate after successful organizar", async () => {

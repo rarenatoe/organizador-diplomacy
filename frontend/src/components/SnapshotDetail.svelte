@@ -23,6 +23,7 @@
   let resolutionVisible = $state(false);
   let resolutionPairs = $state<SimilarName[]>([]);
   let fetchedNotionPlayers = $state<any[]>([]);
+  let csvCopied = $state(false);
 
   const CSV_COLS = [
     "nombre",
@@ -71,6 +72,10 @@
 
   async function copyCsv(): Promise<void> {
     await navigator.clipboard.writeText(getCsvText());
+    csvCopied = true;
+    setTimeout(() => {
+      csvCopied = false;
+    }, 1500);
   }
 
   async function handleOrganizar(): Promise<void> {
@@ -211,7 +216,9 @@
     <div class="section" style="margin-bottom: 16px;">
       <div class="section-title">Snapshot #{id} · {sourceLabel(data.source)}</div>
       <div class="node-meta" style="margin-bottom:8px">{esc(data.created_at)}</div>
-      <button class="copy-btn" onclick={copyCsv}>📋 Copiar tabla CSV</button>
+      <button class="copy-btn" class:ok={csvCopied} onclick={copyCsv}>
+        {csvCopied ? "✅ Copiado" : "📋 Copiar tabla CSV"}
+      </button>
     </div>
     <div class="section-title" style="margin-bottom:6px">
       Jugadores <span

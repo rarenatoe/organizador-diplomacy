@@ -241,6 +241,10 @@
     updated[index]![field] = parseInt(input.value, 10) || 0;
     draftPlayers = updated;
   }
+
+  function autofocus(node: HTMLTextAreaElement) {
+    node.focus();
+  }
 </script>
 
 <div class="panel-body-fixed">
@@ -378,6 +382,7 @@
         juegos_este_ano, prioridad, partidas_deseadas, partidas_gm
       </p>
       <textarea
+        use:autofocus
         bind:value={csvText}
         placeholder="nombre,experiencia,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm&#10;Alice,Nuevo,0,0,1,0&#10;Bob,Antiguo,3,1,2,1"
         rows="10"
