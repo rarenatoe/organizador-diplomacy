@@ -129,86 +129,9 @@ def get_db(path: Path | str = DB_PATH) -> sqlite3.Connection:
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     
-    # Check if old tables exist and migrate
-    _migrate_old_schema(conn)
-    
     conn.executescript(_SCHEMA)
     conn.commit()
     return conn
-
-
-def _migrate_old_schema(conn: sqlite3.Connection) -> None:
-    """Migrate data from old sync_events/game_events tables to unified events table."""
-    # Check if old tables exist
-    old_tables = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('sync_events', 'game_events')"
-    ).fetchall()
-    
-    if not old_tables:
-        return  # No old tables, nothing to migrate
-    
-    # Create new tables if they don't exist yet
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS events (
-            id                 INTEGER PRIMARY KEY,
-            created_at         TEXT    NOT NULL,
-            type               TEXT    NOT NULL CHECK(type IN ('sync', 'game', 'edit')),
-            source_snapshot_id INTEGER REFERENCES snapshots(id),
-            output_snapshot_id INTEGER NOT NULL REFERENCES snapshots(id)
-        );
-        
-        CREATE TABLE IF NOT EXISTS game_details (
-            event_id       INTEGER PRIMARY KEY REFERENCES events(id) ON DELETE CASCADE,
-            intentos       INTEGER NOT NULL,
-            copypaste_text TEXT    NOT NULL DEFAULT ''
-        );
-    """)
-    
-    # Migrate sync_events to events
-    try:
-        conn.execute("""
-            INSERT OR IGNORE INTO events (id, created_at, type, source_snapshot_id, output_snapshot_id)
-            SELECT id, created_at, 'sync', source_snapshot, output_snapshot
-            FROM sync_events
-        """)
-    except sqlite3.OperationalError:
-        pass  # Table might not exist or columns might be different
-    
-    # Migrate game_events to events and game_details
-    try:
-        conn.execute("""
-            INSERT OR IGNORE INTO events (id, created_at, type, source_snapshot_id, output_snapshot_id)
-            SELECT id, created_at, 'game', input_snapshot_id, output_snapshot_id
-            FROM game_events
-        """)
-        conn.execute("""
-            INSERT OR IGNORE INTO game_details (event_id, intentos, copypaste_text)
-            SELECT id, intentos, copypaste_text
-            FROM game_events
-        """)
-    except sqlite3.OperationalError:
-        pass  # Table might not exist or columns might be different
-    
-    # Update mesas table to use event_id instead of game_event_id
-    try:
-        # Check if game_event_id column exists
-        cols = conn.execute("PRAGMA table_info(mesas)").fetchall()
-        col_names = [c[1] for c in cols]
-        if 'game_event_id' in col_names and 'event_id' not in col_names:
-            conn.execute("ALTER TABLE mesas RENAME COLUMN game_event_id TO event_id")
-    except sqlite3.OperationalError:
-        pass
-    
-    # Update waiting_list table to use event_id instead of game_event_id
-    try:
-        cols = conn.execute("PRAGMA table_info(waiting_list)").fetchall()
-        col_names = [c[1] for c in cols]
-        if 'game_event_id' in col_names and 'event_id' not in col_names:
-            conn.execute("ALTER TABLE waiting_list RENAME COLUMN game_event_id TO event_id")
-    except sqlite3.OperationalError:
-        pass
-    
-    conn.commit()
 
 
 # ── Players ────────────────────────────────────────────────────────────────────
@@ -587,15 +510,6 @@ def delete_snapshot_cascade(
     conn: sqlite3.Connection,
     snapshot_id: int,
 ) -> list[int]:
-    """
-    Deletes a snapshot and all downstream snapshots/events reachable from it
-    (DFS over events.source_snapshot_id).
-    Also deletes the event that produced snapshot_id (if any).
-
-    Returns the sorted list of snapshot IDs that were deleted.
-    Does NOT commit.
-    """
-    # ── Collect target + all descendants ──────────────────────────────────────
     all_ids: set[int] = {snapshot_id}
     stack = [snapshot_id]
     while stack:
@@ -609,7 +523,6 @@ def delete_snapshot_cascade(
                 all_ids.add(out)
                 stack.append(out)
 
-    # ── Delete events that produced each snapshot ────────────────────────────
     event_ids: set[int] = set()
     for sid in all_ids:
         for row in conn.execute(
@@ -618,8 +531,11 @@ def delete_snapshot_cascade(
         ).fetchall():
             event_ids.add(int(row[0]))
 
-    # Delete graph nodes only; ON DELETE CASCADE clears dependent rows.
-    for gid in sorted(all_ids | event_ids):
+    # Delete graph nodes only; ON DELETE CASCADE clears dependent rows safely.
+    # We sort in reverse (highest IDs first) because events are always created
+    # AFTER their output snapshots. Deleting the event first avoids foreign
+    # key constraint errors on `output_snapshot_id`.
+    for gid in sorted(all_ids | event_ids, reverse=True):
         conn.execute("DELETE FROM graph_nodes WHERE id = ?", (gid,))
 
     return sorted(all_ids)

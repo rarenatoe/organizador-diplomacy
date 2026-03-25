@@ -520,9 +520,8 @@ class TestDb(unittest.TestCase):
 
     def test_foreign_key_constraints_point_to_events(self):
         """
-        Seat belt: Verify that mesas and waiting_list tables have correct
-        foreign key constraints pointing to events(id), not old game_events.
-        This prevents the FOREIGN KEY constraint failure we encountered.
+        Verify that mesas and waiting_list tables have correct
+        foreign key constraints pointing to events(id).
         """
         # Check mesas table foreign keys
         mesas_fks = self.conn.execute(
@@ -531,8 +530,6 @@ class TestDb(unittest.TestCase):
         mesas_sql = mesas_fks[0] if mesas_fks else ""
         self.assertIn("REFERENCES events(id)", mesas_sql,
             "mesas table must have foreign key pointing to events(id)")
-        self.assertNotIn("REFERENCES game_events", mesas_sql,
-            "mesas table must NOT reference old game_events table")
 
         # Check waiting_list table foreign keys
         wl_fks = self.conn.execute(
@@ -541,13 +538,10 @@ class TestDb(unittest.TestCase):
         wl_sql = wl_fks[0] if wl_fks else ""
         self.assertIn("REFERENCES events(id)", wl_sql,
             "waiting_list table must have foreign key pointing to events(id)")
-        self.assertNotIn("REFERENCES game_events", wl_sql,
-            "waiting_list table must NOT reference old game_events table")
 
     def test_unified_events_table_exists(self):
         """
-        Seat belt: Verify that the unified events table exists with correct schema.
-        This ensures the migration from sync_events/game_events was successful.
+        Verify that the unified events table exists with correct schema.
         """
         events_table = self.conn.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='events'"
@@ -560,11 +554,11 @@ class TestDb(unittest.TestCase):
         self.assertIn("'edit'", events_sql, "events table must allow 'edit' type")
         self.assertIn("source_snapshot_id", events_sql, "events table must have source_snapshot_id")
         self.assertIn("output_snapshot_id", events_sql, "events table must have output_snapshot_id")
+        self.assertIn("ON DELETE CASCADE", events_sql, "events table must have ON DELETE CASCADE")
 
     def test_game_details_table_exists(self):
         """
-        Seat belt: Verify that game_details table exists with correct schema.
-        This ensures game-specific data is properly separated from events.
+        Verify that game_details table exists with correct schema.
         """
         gd_table = self.conn.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='game_details'"
@@ -576,17 +570,6 @@ class TestDb(unittest.TestCase):
         self.assertIn("copypaste_text", gd_sql, "game_details must have copypaste_text column")
         self.assertIn("REFERENCES events(id)", gd_sql,
             "game_details must have foreign key pointing to events(id)")
-
-    def test_old_tables_do_not_exist(self):
-        """
-        Seat belt: Verify that old sync_events and game_events tables do not exist.
-        This ensures the migration completed successfully.
-        """
-        old_tables = self.conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('sync_events', 'game_events')"
-        ).fetchall()
-        self.assertEqual(len(old_tables), 0,
-            f"Old tables must not exist after migration: {[t[0] for t in old_tables]}")
 
     def test_game_event_creates_both_event_and_details(self):
         """
