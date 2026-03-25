@@ -12,7 +12,7 @@
     onchainUpdate: () => void;
     onopenSnapshot: (id: number) => void;
     onopenGame: (id: number) => void;
-    oneditdraft: (parentId: number, eventType: string, autoAction?: 'notion' | 'csv') => void;
+    oneditdraft: (parentId: number, eventType: string, autoAction?: 'notion' | 'csv' | null, players?: EditPlayerRow[]) => void;
   }
 
   let { id, onclose, onchainUpdate, onopenSnapshot, onopenGame, oneditdraft }: Props = $props();
@@ -269,7 +269,17 @@
     <button
       class="btn btn-secondary"
       style="width:100%"
-      onclick={() => oneditdraft(id, 'manual')}
+      onclick={() => {
+        const playersToEdit = (data?.players || []).map((p: any) => ({
+          nombre: String(p.nombre || ""),
+          experiencia: String(p.experiencia || "Nuevo"),
+          juegos_este_ano: Number(p.juegos_este_ano || 0),
+          prioridad: Number(p.prioridad || 0),
+          partidas_deseadas: Number(p.partidas_deseadas ?? 1),
+          partidas_gm: Number(p.partidas_gm || 0)
+        }));
+        oneditdraft(id, 'manual', null, playersToEdit);
+      }}
     >📝 Editar</button>
     <button
       class="btn btn-secondary"

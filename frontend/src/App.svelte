@@ -189,12 +189,12 @@
         onchainUpdate={handleChainUpdate}
         onopenSnapshot={openSnapshot}
         onopenGame={openGame}
-        oneditdraft={(parentId: number, eventType: string, autoAction?: 'notion' | 'csv') => openDraft(parentId, eventType, autoAction)}
+        oneditdraft={(parentId: number, eventType: string, autoAction?: 'notion' | 'csv' | null, players?: EditPlayerRow[]) => openDraft(parentId, eventType, autoAction ?? null, players ?? [])}
       />
     {:else if panelType === "draft"}
       <SnapshotDraft
         parentId={draftParentId}
-        initialPlayers={[]}
+        initialPlayers={draftInitialPlayers}
         defaultEventType={draftEventType}
         autoAction={draftAutoAction}
         onclose={closePanel}

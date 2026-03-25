@@ -328,6 +328,41 @@ describe("SnapshotDraft", () => {
     expect(prioCheckbox.checked).toBe(true);
   });
 
+  it("pre-populates players from initialPlayers prop", () => {
+    const { container } = render(SnapshotDraft, {
+      props: {
+        parentId: 1,
+        initialPlayers: [
+          {
+            nombre: "Alice",
+            experiencia: "Nuevo",
+            juegos_este_ano: 0,
+            prioridad: 0,
+            partidas_deseadas: 1,
+            partidas_gm: 0,
+          },
+          {
+            nombre: "Bob",
+            experiencia: "Antiguo",
+            juegos_este_ano: 3,
+            prioridad: 1,
+            partidas_deseadas: 2,
+            partidas_gm: 1,
+          },
+        ],
+        defaultEventType: "manual",
+        onclose: () => {},
+        onchainUpdate: () => {},
+        onopenSnapshot: () => {},
+      },
+    });
+
+    const nameInputs = container.querySelectorAll(".player-name-input");
+    expect(nameInputs.length).toBe(2);
+    expect((nameInputs[0] as HTMLInputElement).value).toBe("Alice");
+    expect((nameInputs[1] as HTMLInputElement).value).toBe("Bob");
+  });
+
   it("updates player partidas_deseadas when number input is changed", async () => {
     mockPrompt.mockReturnValue("Test Player");
 
