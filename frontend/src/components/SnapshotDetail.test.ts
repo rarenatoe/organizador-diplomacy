@@ -295,6 +295,9 @@ describe("SnapshotDetail", () => {
   });
 
   it("calls onchainUpdate after successful organizar", async () => {
+    // Use real timers for this test to avoid async issues
+    vi.useRealTimers();
+
     const api = await import("../api");
     const onchainUpdateMock = vi.fn(() => {});
     const onopenGameMock = vi.fn(() => {});
@@ -320,11 +323,16 @@ describe("SnapshotDetail", () => {
     await fireEvent.click(organizarButton);
 
     // Verify runScript was called
-    expect(api.runScript).toHaveBeenCalledWith("organizar", 1);
+    await waitFor(() => {
+      expect(api.runScript).toHaveBeenCalledWith("organizar", 1);
+    });
 
     // Verify onchainUpdate was called
     await waitFor(() => {
       expect(onchainUpdateMock).toHaveBeenCalledTimes(1);
     });
+
+    // Restore fake timers for other tests
+    vi.useFakeTimers();
   });
 });

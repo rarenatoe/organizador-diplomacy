@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { clickOutside } from "../clickOutside";
 
   interface Props {
     title: string;
@@ -11,7 +12,14 @@
   let { title, open, onclose, children }: Props = $props();
 </script>
 
-<aside class="panel" class:open>
+<aside 
+  class="panel" 
+  class:open 
+  use:clickOutside={{
+    ignoreSelectors: ['.node', 'header', '.modal-overlay', '.toast'],
+    callback: () => { if (open) onclose(); }
+  }}
+>
   <div class="panel-inner">
     <div class="panel-header">
       <h2 id="panel-title">{title}</h2>
