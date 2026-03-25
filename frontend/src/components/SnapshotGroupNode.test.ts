@@ -165,8 +165,8 @@ describe("SnapshotGroupNode", () => {
       },
     });
 
-    const paginationHeader = container.querySelector(".pagination-header");
-    expect(paginationHeader).not.toBeNull();
+    const paginationPill = container.querySelector(".pagination-pill");
+    expect(paginationPill).not.toBeNull();
     expect(container.textContent).toContain("v3 de 3");
   });
 
@@ -181,8 +181,117 @@ describe("SnapshotGroupNode", () => {
       },
     });
 
-    const paginationHeader = container.querySelector(".pagination-header");
-    expect(paginationHeader).toBeNull();
+    const paginationPill = container.querySelector(".pagination-pill");
+    expect(paginationPill).toBeNull();
+  });
+
+  it("pagination-pill is a sibling of node-group, not a child", () => {
+    const { container } = render(SnapshotGroupNode, {
+      props: {
+        group: multiVersionGroup,
+        onselect: vi.fn(),
+        ondelete: vi.fn(),
+        onopenGame: vi.fn(),
+        onopenSync: vi.fn(),
+      },
+    });
+
+    const nodeGroup = container.querySelector(".node-group");
+    const paginationPill = container.querySelector(".pagination-pill");
+    expect(nodeGroup).not.toBeNull();
+    expect(paginationPill).not.toBeNull();
+    // pagination-pill must NOT be a descendant of node-group
+    expect(nodeGroup!.contains(paginationPill)).toBe(false);
+    // both must share the same parent (.node-wrapper)
+    expect(nodeGroup!.parentElement).toBe(paginationPill!.parentElement);
+  });
+
+  it("node-wrapper wraps node-group and is present in the DOM", () => {
+    const { container } = render(SnapshotGroupNode, {
+      props: {
+        group: mockGroup,
+        onselect: vi.fn(),
+        ondelete: vi.fn(),
+        onopenGame: vi.fn(),
+        onopenSync: vi.fn(),
+      },
+    });
+
+    const nodeWrapper = container.querySelector(".node-wrapper");
+    expect(nodeWrapper).not.toBeNull();
+    const nodeGroup = container.querySelector(".node-group");
+    expect(nodeGroup).not.toBeNull();
+    expect(nodeWrapper!.contains(nodeGroup)).toBe(true);
+  });
+
+  it("shows badge-latest badge when is_latest is true", () => {
+    const { container } = render(SnapshotGroupNode, {
+      props: {
+        group: mockGroup, // mockGroup has is_latest: true
+        onselect: vi.fn(),
+        ondelete: vi.fn(),
+        onopenGame: vi.fn(),
+        onopenSync: vi.fn(),
+      },
+    });
+
+    const badges = container.querySelector(".node-badges");
+    expect(badges).not.toBeNull();
+    const latestBadge = container.querySelector(".badge-latest");
+    expect(latestBadge).not.toBeNull();
+    expect(latestBadge!.textContent).toContain("Actual");
+  });
+
+  it("hides badge-latest badge when is_latest is false", () => {
+    const groupNotLatest = {
+      versions: [
+        {
+          snapshot: {
+            type: "snapshot" as const,
+            id: 99,
+            created_at: "2024-06-01 09:00:00",
+            source: "manual",
+            player_count: 3,
+            is_latest: false,
+          },
+          incomingEdge: null,
+        },
+      ],
+      branches: [],
+    };
+
+    const { container } = render(SnapshotGroupNode, {
+      props: {
+        group: groupNotLatest,
+        onselect: vi.fn(),
+        ondelete: vi.fn(),
+        onopenGame: vi.fn(),
+        onopenSync: vi.fn(),
+      },
+    });
+
+    const latestBadge = container.querySelector(".badge-latest");
+    expect(latestBadge).toBeNull();
+    // node-badges container still renders (empty)
+    const badges = container.querySelector(".node-badges");
+    expect(badges).not.toBeNull();
+  });
+
+  it("node-badges is inside node-group", () => {
+    const { container } = render(SnapshotGroupNode, {
+      props: {
+        group: mockGroup,
+        onselect: vi.fn(),
+        ondelete: vi.fn(),
+        onopenGame: vi.fn(),
+        onopenSync: vi.fn(),
+      },
+    });
+
+    const nodeGroup = container.querySelector(".node-group");
+    const nodeBadges = container.querySelector(".node-badges");
+    expect(nodeBadges).not.toBeNull();
+    expect(nodeGroup!.contains(nodeBadges)).toBe(true);
   });
 
   it("initialises showing the latest (last) version", () => {

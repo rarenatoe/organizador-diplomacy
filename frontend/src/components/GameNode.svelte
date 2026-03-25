@@ -35,6 +35,9 @@
     border-radius: var(--radius);
     padding: 14px 16px;
     width: 156px;
+    min-height: 160px;
+    display: flex;
+    flex-direction: column;
     flex-shrink: 0;
     box-shadow: var(--shadow);
     transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;

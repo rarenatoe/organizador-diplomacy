@@ -84,25 +84,41 @@
 </script>
 
 <div class="chain-row">
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="node node-group"
-    class:active={getActiveNodeId() === "snapshot-" + String(currentVersion.snapshot.id)}
-    data-id={currentVersion.snapshot.id}
-    data-type="snapshot-group"
-    onclick={handleClick}
-  >
-    <button
-      class="node-delete-btn"
-      data-snapshot-id={currentVersion.snapshot.id}
-      title="Eliminar snapshot"
-      onclick={handleDelete}>🗑</button
+  <div class="node-wrapper">
+    <!-- svelte-ignore a11y_click_events_have_key_events -->
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      class="node node-group"
+      class:active={getActiveNodeId() === "snapshot-" + String(currentVersion.snapshot.id)}
+      data-id={currentVersion.snapshot.id}
+      data-type="snapshot-group"
+      onclick={handleClick}
     >
+      <button
+        class="node-delete-btn"
+        data-snapshot-id={currentVersion.snapshot.id}
+        title="Eliminar snapshot"
+        onclick={handleDelete}>🗑</button
+      >
 
-    <!-- Pagination Header -->
+      <div class="node-icon">📋</div>
+      <div class="node-label">Versión #{currentVersion.snapshot.id}</div>
+      <div class="node-name">{esc(currentVersion.snapshot.created_at)}</div>
+      <div class="node-meta">
+        {currentVersion.snapshot.player_count} jugadores · {sourceLabel(
+          currentVersion.snapshot.source
+        )}
+      </div>
+      
+      <div class="node-badges">
+        {#if currentVersion.snapshot.is_latest}
+          <span class="badge badge-latest">Actual</span>
+        {/if}
+      </div>
+    </div>
+
     {#if group.versions.length > 1}
-      <div class="pagination-header">
+      <div class="pagination-pill">
         <button
           class="pagination-btn"
           onclick={handlePrev}
@@ -124,22 +140,6 @@
         </button>
       </div>
     {/if}
-
-    <!-- Snapshot Content -->
-    <div class="node-icon">📋</div>
-    <div class="node-label">Versión #{currentVersion.snapshot.id}</div>
-    <div class="node-name">{esc(currentVersion.snapshot.created_at)}</div>
-    <div class="node-meta">
-      {currentVersion.snapshot.player_count} jugadores · {sourceLabel(
-        currentVersion.snapshot.source
-      )}
-    </div>
-    
-    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;">
-      {#if currentVersion.snapshot.is_latest}
-        <span class="badge badge-latest" style="margin-top: 0;">Actual</span>
-      {/if}
-    </div>
   </div>
 
   <!-- Branches -->
@@ -187,6 +187,9 @@
     border-radius: var(--radius);
     padding: 14px 16px;
     width: 180px;
+    min-height: 160px;
+    display: flex;
+    flex-direction: column;
     flex-shrink: 0;
     box-shadow: var(--shadow);
     transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
@@ -243,33 +246,47 @@
     background: rgba(239, 68, 68, 0.15);
   }
 
-  .pagination-header {
+  .node-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .pagination-pill {
+    position: absolute;
+    bottom: -14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--border);
+    justify-content: center;
+    padding: 2px 6px;
+    gap: 6px;
+    box-shadow: var(--shadow);
+    z-index: 50;
   }
 
   .pagination-btn {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    width: 24px;
-    height: 24px;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 15px;
     font-weight: 600;
     color: var(--text);
     transition: background 0.15s, opacity 0.15s;
   }
 
   .pagination-btn:hover:not(:disabled) {
-    background: var(--border);
+    background: var(--surface2);
   }
 
   .pagination-btn:disabled {
@@ -279,10 +296,11 @@
 
   .pagination-label {
     font-size: 10px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.3px;
+    user-select: none;
   }
 
   .node-icon {
@@ -312,6 +330,14 @@
     color: var(--muted);
     margin-top: 6px;
     line-height: 1.6;
+  }
+
+  .node-badges {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: auto;
+    min-height: 18px;
   }
 
   .badge {
