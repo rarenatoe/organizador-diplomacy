@@ -4,10 +4,10 @@
 
   interface Props {
     node: GameEdge;
-    onopen: (id: number) => void;
+    onOpen: (id: number) => void;
   }
 
-  let { node, onopen }: Props = $props();
+  let { node, onOpen }: Props = $props();
 
   let date = $derived((node.created_at || "").split(" ")[0] ?? "");
   let time = $derived((node.created_at || "").split(" ")[1] ?? "");
@@ -20,8 +20,8 @@
   data-type="game" 
   role="button" 
   tabindex="0" 
-  onclick={() => onopen(node.id)} 
-  onkeydown={(e) => e.key === "Enter" && onopen(node.id)}
+  onclick={() => onOpen(node.id)} 
+  onkeydown={(e) => e.key === "Enter" && onOpen(node.id)}
 >
   <div class="node-icon">📊</div>
   <div class="node-label">Jornada</div>

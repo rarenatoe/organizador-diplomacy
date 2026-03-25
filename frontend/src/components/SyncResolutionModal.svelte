@@ -5,11 +5,11 @@
   interface Props {
     visible: boolean;
     pairs: SimilarName[];
-    oncomplete: (merges: MergePair[]) => void;
-    oncancel: () => void;
+    onComplete: (merges: MergePair[]) => void;
+    onCancel: () => void;
   }
 
-  let { visible, pairs, oncomplete, oncancel }: Props = $props();
+  let { visible, pairs, onComplete, onCancel }: Props = $props();
 
   let currentIndex = $state(0);
   let decisions = $state<{ pair: SimilarName; action: ResolutionAction }[]>([]);
@@ -28,12 +28,12 @@
       const merges: MergePair[] = decisions
         .filter((d) => d.action === "merge")
         .map((d) => ({ from: d.pair.snapshot, to: d.pair.notion }));
-      oncomplete(merges);
+      onComplete(merges);
     }
   }
 
   function handleStop(): void {
-    oncancel();
+    onCancel();
   }
 
   // Reset state when modal becomes visible

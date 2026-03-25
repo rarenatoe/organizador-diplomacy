@@ -75,11 +75,11 @@ describe("SnapshotDetail", () => {
     render(SnapshotDetail, {
       props: {
         id: 1,
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
-        onopenGame: () => {},
-        oneditdraft: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
+        onOpenGame: () => {},
+        onEditDraft: () => {},
       },
     });
 
@@ -97,17 +97,17 @@ describe("SnapshotDetail", () => {
     expect(screen.getByText("Bob")).toBeTruthy();
   });
 
-  it("passes current players to oneditdraft when edit button is clicked", async () => {
-    const oneditdraft = vi.fn();
+  it("passes current players to onEditDraft when edit button is clicked", async () => {
+    const onEditDraft = vi.fn();
 
     render(SnapshotDetail, {
       props: {
         id: 1,
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
-        onopenGame: () => {},
-        oneditdraft,
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
+        onOpenGame: () => {},
+        onEditDraft,
       },
     });
 
@@ -120,9 +120,9 @@ describe("SnapshotDetail", () => {
     const editButton = screen.getByText("📝 Editar");
     await fireEvent.click(editButton);
 
-    // Verify oneditdraft was called with correct parameters
-    expect(oneditdraft).toHaveBeenCalledTimes(1);
-    expect(oneditdraft).toHaveBeenCalledWith(1, "manual", null, [
+    // Verify onEditDraft was called with correct parameters
+    expect(onEditDraft).toHaveBeenCalledTimes(1);
+    expect(onEditDraft).toHaveBeenCalledWith(1, "manual", null, [
       {
         nombre: "Alice",
         experiencia: "Nuevo",
@@ -151,16 +151,16 @@ describe("SnapshotDetail", () => {
       players: [],
     });
 
-    const oneditdraft = vi.fn();
+    const onEditDraft = vi.fn();
 
     render(SnapshotDetail, {
       props: {
         id: 2,
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
-        onopenGame: () => {},
-        oneditdraft,
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
+        onOpenGame: () => {},
+        onEditDraft,
       },
     });
 
@@ -173,9 +173,9 @@ describe("SnapshotDetail", () => {
     const editButton = screen.getByText("📝 Editar");
     await fireEvent.click(editButton);
 
-    // Verify oneditdraft was called with empty array
-    expect(oneditdraft).toHaveBeenCalledTimes(1);
-    expect(oneditdraft).toHaveBeenCalledWith(2, "manual", null, []);
+    // Verify onEditDraft was called with empty array
+    expect(onEditDraft).toHaveBeenCalledTimes(1);
+    expect(onEditDraft).toHaveBeenCalledWith(2, "manual", null, []);
   });
 
   it("handles players with missing fields gracefully", async () => {
@@ -192,16 +192,16 @@ describe("SnapshotDetail", () => {
       ],
     });
 
-    const oneditdraft = vi.fn();
+    const onEditDraft = vi.fn();
 
     render(SnapshotDetail, {
       props: {
         id: 3,
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
-        onopenGame: () => {},
-        oneditdraft,
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
+        onOpenGame: () => {},
+        onEditDraft,
       },
     });
 
@@ -214,9 +214,9 @@ describe("SnapshotDetail", () => {
     const editButton = screen.getByText("📝 Editar");
     await fireEvent.click(editButton);
 
-    // Verify oneditdraft was called with default values for missing fields
-    expect(oneditdraft).toHaveBeenCalledTimes(1);
-    expect(oneditdraft).toHaveBeenCalledWith(3, "manual", null, [
+    // Verify onEditDraft was called with default values for missing fields
+    expect(onEditDraft).toHaveBeenCalledTimes(1);
+    expect(onEditDraft).toHaveBeenCalledWith(3, "manual", null, [
       {
         nombre: "Charlie",
         experiencia: "Nuevo",
@@ -232,11 +232,11 @@ describe("SnapshotDetail", () => {
     render(SnapshotDetail, {
       props: {
         id: 1,
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
-        onopenGame: () => {},
-        oneditdraft: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
+        onOpenGame: () => {},
+        onEditDraft: () => {},
       },
     });
 
@@ -262,11 +262,11 @@ describe("SnapshotDetail", () => {
     render(SnapshotDetail, {
       props: {
         id: 1,
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
-        onopenGame: () => {},
-        oneditdraft: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
+        onOpenGame: () => {},
+        onEditDraft: () => {},
       },
     });
 
@@ -294,22 +294,22 @@ describe("SnapshotDetail", () => {
     });
   });
 
-  it("calls onchainUpdate after successful organizar", async () => {
+  it("calls onChainUpdate after successful organizar", async () => {
     // Use real timers for this test to avoid async issues
     vi.useRealTimers();
 
     const api = await import("../api");
-    const onchainUpdateMock = vi.fn(() => {});
-    const onopenGameMock = vi.fn(() => {});
+    const onChainUpdateMock = vi.fn(() => {});
+    const onOpenGameMock = vi.fn(() => {});
 
     render(SnapshotDetail, {
       props: {
         id: 1,
-        onclose: () => {},
-        onchainUpdate: () => onchainUpdateMock(),
-        onopenSnapshot: () => {},
-        onopenGame: () => onopenGameMock(),
-        oneditdraft: () => {},
+        onClose: () => {},
+        onChainUpdate: () => onChainUpdateMock(),
+        onOpenSnapshot: () => {},
+        onOpenGame: () => onOpenGameMock(),
+        onEditDraft: () => {},
       },
     });
 
@@ -327,9 +327,9 @@ describe("SnapshotDetail", () => {
       expect(api.runScript).toHaveBeenCalledWith("organizar", 1);
     });
 
-    // Verify onchainUpdate was called
+    // Verify onChainUpdate was called
     await waitFor(() => {
-      expect(onchainUpdateMock).toHaveBeenCalledTimes(1);
+      expect(onChainUpdateMock).toHaveBeenCalledTimes(1);
     });
 
     // Restore fake timers for other tests

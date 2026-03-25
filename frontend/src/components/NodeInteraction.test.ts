@@ -8,8 +8,8 @@ describe("Node Interaction Seatbelts", () => {
     setActiveNodeId(null);
   });
 
-  it("GameNode triggers onopen with correct ID when clicked", async () => {
-    const onopen = vi.fn();
+  it("GameNode triggers onOpen with correct ID when clicked", async () => {
+    const onOpen = vi.fn();
     const { container } = render(GameNode, {
       props: {
         node: {
@@ -22,7 +22,7 @@ describe("Node Interaction Seatbelts", () => {
           mesa_count: 1,
           espera_count: 0,
         },
-        onopen,
+        onOpen,
       },
     });
 
@@ -30,13 +30,13 @@ describe("Node Interaction Seatbelts", () => {
     expect(nodeDiv).not.toBeNull();
     await fireEvent.click(nodeDiv!);
 
-    expect(onopen).toHaveBeenCalledTimes(1);
-    expect(onopen).toHaveBeenCalledWith(42);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onOpen).toHaveBeenCalledWith(42);
   });
 
   it("GameNode has active class when activeNodeId matches", () => {
     setActiveNodeId("game-42");
-    const onopen = vi.fn();
+    const onOpen = vi.fn();
     const { container } = render(GameNode, {
       props: {
         node: {
@@ -49,7 +49,7 @@ describe("Node Interaction Seatbelts", () => {
           mesa_count: 1,
           espera_count: 0,
         },
-        onopen,
+        onOpen,
       },
     });
 
@@ -60,7 +60,7 @@ describe("Node Interaction Seatbelts", () => {
 
   it("GameNode does not have active class when activeNodeId does not match", () => {
     setActiveNodeId("99");
-    const onopen = vi.fn();
+    const onOpen = vi.fn();
     const { container } = render(GameNode, {
       props: {
         node: {
@@ -73,7 +73,7 @@ describe("Node Interaction Seatbelts", () => {
           mesa_count: 1,
           espera_count: 0,
         },
-        onopen,
+        onOpen,
       },
     });
 
@@ -84,7 +84,7 @@ describe("Node Interaction Seatbelts", () => {
 
   it("GameNode does not have active class when activeNodeId is null", () => {
     setActiveNodeId(null);
-    const onopen = vi.fn();
+    const onOpen = vi.fn();
     const { container } = render(GameNode, {
       props: {
         node: {
@@ -97,7 +97,7 @@ describe("Node Interaction Seatbelts", () => {
           mesa_count: 1,
           espera_count: 0,
         },
-        onopen,
+        onOpen,
       },
     });
 

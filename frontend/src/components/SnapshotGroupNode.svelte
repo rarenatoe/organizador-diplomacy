@@ -16,13 +16,13 @@
 
   interface Props {
     group: SnapshotGroup;
-    onselect: (id: number) => void;
-    ondelete: (id: number) => void;
-    onopenGame: (id: number) => void;
-    onopenSync: (id: number) => void;
+    onSelect: (id: number) => void;
+    onDelete: (id: number) => void;
+    onOpenGame: (id: number) => void;
+    onOpenSync: (id: number) => void;
   }
 
-  let { group, onselect, ondelete, onopenGame, onopenSync }: Props = $props();
+  let { group, onSelect, onDelete, onOpenGame, onOpenSync }: Props = $props();
 
   // `untrack` reads the initial prop value without creating a reactive
   // dependency — avoids `state_referenced_locally` while initialising to the
@@ -47,7 +47,7 @@
     e.stopPropagation();
     if (currentIndex > 0) {
       currentIndex -= 1;
-      onselect(group.versions[currentIndex]!.snapshot.id);
+      onSelect(group.versions[currentIndex]!.snapshot.id);
     }
   }
 
@@ -55,17 +55,17 @@
     e.stopPropagation();
     if (currentIndex < group.versions.length - 1) {
       currentIndex += 1;
-      onselect(group.versions[currentIndex]!.snapshot.id);
+      onSelect(group.versions[currentIndex]!.snapshot.id);
     }
   }
 
   function handleDelete(e: MouseEvent): void {
     e.stopPropagation();
-    ondelete(currentVersion.snapshot.id);
+    onDelete(currentVersion.snapshot.id);
   }
 
   function handleClick(): void {
-    onselect(currentVersion.snapshot.id);
+    onSelect(currentVersion.snapshot.id);
   }
 
   // Group branches for recursive rendering
@@ -149,25 +149,25 @@
         <div class="chain-branch">
           <span class="arrow">→</span>
           {#if branch.edge.type === "game"}
-            <GameNode node={branch.edge} onopen={onopenGame} />
+            <GameNode node={branch.edge} onOpen={onOpenGame} />
             {#if branch.group}
               <span class="arrow">→</span>
               <SnapshotGroupNode
                 group={branch.group}
-                {onselect}
-                {ondelete}
-                {onopenGame}
-                {onopenSync}
+                {onSelect}
+                {onDelete}
+                {onOpenGame}
+                {onOpenSync}
               />
             {/if}
           {:else if branch.group}
             <!-- sync/edit edges are absorbed as incomingEdge of child group -->
             <SnapshotGroupNode
               group={branch.group}
-              {onselect}
-              {ondelete}
-              {onopenGame}
-              {onopenSync}
+              {onSelect}
+              {onDelete}
+              {onOpenGame}
+              {onOpenSync}
             />
           {/if}
         </div>

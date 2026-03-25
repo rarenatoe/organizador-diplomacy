@@ -1,9 +1,9 @@
 <script lang="ts">
   interface Props {
-    onnewdraft: () => void;
+    onNewDraft: () => void;
   }
 
-  let { onnewdraft }: Props = $props();
+  let { onNewDraft }: Props = $props();
 </script>
 
 <header>
@@ -11,7 +11,7 @@
   <button
     class="btn btn-primary"
     id="btn-new-version"
-    onclick={onnewdraft}
+    onclick={onNewDraft}
     >➕ Nueva Lista</button
   >
 </header>

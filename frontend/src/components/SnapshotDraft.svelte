@@ -12,12 +12,12 @@
     initialPlayers: EditPlayerRow[];
     defaultEventType: "manual" | "sync" | "edit";
     autoAction?: 'notion' | 'csv' | null;
-    onclose: () => void;
-    onchainUpdate: () => void;
-    onopenSnapshot: (id: number) => void;
+    onClose: () => void;
+    onChainUpdate: () => void;
+    onOpenSnapshot: (id: number) => void;
   }
 
-  let { parentId, initialPlayers, defaultEventType, autoAction = null, onclose, onchainUpdate, onopenSnapshot }: Props = $props();
+  let { parentId, initialPlayers, defaultEventType, autoAction = null, onClose, onChainUpdate, onOpenSnapshot }: Props = $props();
 
   interface DraftPlayer {
     nombre: string;
@@ -215,11 +215,11 @@
         return;
       }
 
-      onclose();
-      onchainUpdate();
+      onClose();
+      onChainUpdate();
       if (result.snapshot_id !== undefined) {
         setActiveNodeId(String(result.snapshot_id));
-        onopenSnapshot(result.snapshot_id);
+        onOpenSnapshot(result.snapshot_id);
       }
     } catch (e) {
       alert(`Error de conexión: ${String(e)}`);
@@ -402,8 +402,8 @@
 <SyncResolutionModal
   visible={resolutionVisible}
   pairs={resolutionPairs}
-  oncomplete={handleResolutionComplete}
-  oncancel={handleResolutionCancel}
+  onComplete={handleResolutionComplete}
+  onCancel={handleResolutionCancel}
 />
 
 <style>

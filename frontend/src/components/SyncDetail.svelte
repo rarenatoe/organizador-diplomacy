@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { ChainData, SnapshotNode } from "../types";
   import { fetchChain } from "../api";
+  import type { SnapshotNode } from "../types";
   import { esc } from "../utils";
 
   interface Props {

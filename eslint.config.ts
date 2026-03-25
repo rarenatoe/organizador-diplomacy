@@ -17,6 +17,37 @@ export default defineConfig([
       },
     },
     rules: {
+      "@typescript-eslint/naming-convention": [
+        "error",
+        {
+          selector: "default",
+          format: ["camelCase"],
+          leadingUnderscore: "allow",
+        },
+        {
+          selector: "typeLike",
+          format: ["PascalCase"],
+        },
+        {
+          selector: "variable",
+          format: ["camelCase", "UPPER_CASE", "PascalCase"],
+        },
+        {
+          selector: "property",
+          format: ["camelCase", "snake_case"],
+          leadingUnderscore: "allow",
+        },
+        {
+          selector: "parameter",
+          format: ["camelCase", "PascalCase"],
+          leadingUnderscore: "allow",
+        },
+        {
+          // Svelte component imports use PascalCase (e.g. `import Header from './Header.svelte'`)
+          selector: "import",
+          format: ["camelCase", "PascalCase"],
+        },
+      ],
       // Allow void operator to intentionally ignore floating promises
       // (e.g. `void loadChain()` in event handlers)
       "@typescript-eslint/no-floating-promises": [

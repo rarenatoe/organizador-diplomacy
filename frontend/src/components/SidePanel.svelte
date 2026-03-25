@@ -5,11 +5,11 @@
   interface Props {
     title: string;
     open: boolean;
-    onclose: () => void;
+    onClose: () => void;
     children: Snippet;
   }
 
-  let { title, open, onclose, children }: Props = $props();
+  let { title, open, onClose, children }: Props = $props();
 </script>
 
 <aside 
@@ -17,13 +17,13 @@
   class:open 
   use:clickOutside={{
     ignoreSelectors: ['.node', 'header', '.modal-overlay', '.toast'],
-    callback: () => { if (open) onclose(); }
+    callback: () => { if (open) onClose(); }
   }}
 >
   <div class="panel-inner">
     <div class="panel-header">
       <h2 id="panel-title">{title}</h2>
-      <button class="btn btn-ghost" id="btn-close-panel" onclick={onclose}
+      <button class="btn btn-ghost" id="btn-close-panel" onclick={onClose}
         >✕</button
       >
     </div>

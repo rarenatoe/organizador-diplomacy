@@ -8,14 +8,14 @@
 
   interface Props {
     id: number;
-    onclose: () => void;
-    onchainUpdate: () => void;
-    onopenSnapshot: (id: number) => void;
-    onopenGame: (id: number) => void;
-    oneditdraft: (parentId: number, eventType: string, autoAction?: 'notion' | 'csv' | null, players?: EditPlayerRow[]) => void;
+    onClose: () => void;
+    onChainUpdate: () => void;
+    onOpenSnapshot: (id: number) => void;
+    onOpenGame: (id: number) => void;
+    onEditDraft: (parentId: number, eventType: string, autoAction?: 'notion' | 'csv' | null, players?: EditPlayerRow[]) => void;
   }
 
-  let { id, onclose, onchainUpdate, onopenSnapshot, onopenGame, oneditdraft }: Props = $props();
+  let { id, onClose, onChainUpdate, onOpenSnapshot, onOpenGame, onEditDraft }: Props = $props();
 
   let data = $state<SnapshotDetail | null>(null);
   let loading = $state(true);
@@ -82,14 +82,14 @@
     try {
       await runScript("organizar", id);
       await loadSnapshot();
-      onchainUpdate();
+      onChainUpdate();
       
       // Fetch chain and find the latest game to open
       const chainData = await fetchChain();
       const gameId = findLatestGameId(chainData.roots);
       if (gameId !== null) {
         setActiveNodeId("game-" + gameId);
-        onopenGame(gameId);
+        onOpenGame(gameId);
       }
     } catch (e) {
       alert(`Error: ${String(e)}`);
@@ -102,7 +102,7 @@
     const result = await renamePlayer(oldName, newName);
     if (result.error) { alert(`Error: ${result.error}`); return; }
     await loadSnapshot();
-    onchainUpdate();
+    onChainUpdate();
   }
 
   async function handleDirectSync(): Promise<void> {
@@ -179,10 +179,10 @@
         return;
       }
 
-      onchainUpdate();
+      onChainUpdate();
       if (result.snapshot_id !== undefined) {
         setActiveNodeId(String(result.snapshot_id));
-        onopenSnapshot(result.snapshot_id);
+        onOpenSnapshot(result.snapshot_id);
       }
     } catch (e) {
       alert(`Error de conexión: ${String(e)}`);
@@ -285,7 +285,7 @@
           partidas_deseadas: Number(p.partidas_deseadas ?? 1),
           partidas_gm: Number(p.partidas_gm || 0)
         }));
-        oneditdraft(id, 'manual', null, playersToEdit);
+        onEditDraft(id, 'manual', null, playersToEdit);
       }}
     >📝 Editar</button>
     <button
@@ -305,8 +305,8 @@
 <SyncResolutionModal
   visible={resolutionVisible}
   pairs={resolutionPairs}
-  oncomplete={handleResolutionComplete}
-  oncancel={handleResolutionCancel}
+  onComplete={handleResolutionComplete}
+  onCancel={handleResolutionCancel}
 />
 
 <style>

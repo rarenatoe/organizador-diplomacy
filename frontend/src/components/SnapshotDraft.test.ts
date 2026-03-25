@@ -55,9 +55,9 @@ describe("SnapshotDraft", () => {
         parentId: null,
         initialPlayers: [],
         defaultEventType: "manual",
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
       },
     });
 
@@ -71,9 +71,9 @@ describe("SnapshotDraft", () => {
         parentId: null,
         initialPlayers: [],
         defaultEventType: "manual",
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
       },
     });
 
@@ -89,9 +89,9 @@ describe("SnapshotDraft", () => {
         parentId: null,
         initialPlayers: [],
         defaultEventType: "manual",
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
       },
     });
 
@@ -112,9 +112,9 @@ describe("SnapshotDraft", () => {
         parentId: null,
         initialPlayers: [],
         defaultEventType: "manual",
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
       },
     });
 
@@ -131,9 +131,9 @@ describe("SnapshotDraft", () => {
         parentId: null,
         initialPlayers: [],
         defaultEventType: "manual",
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
       },
     });
 
@@ -150,9 +150,9 @@ describe("SnapshotDraft", () => {
         parentId: null,
         initialPlayers: [],
         defaultEventType: "manual",
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
       },
     });
 
@@ -183,9 +183,9 @@ describe("SnapshotDraft", () => {
         parentId: null,
         initialPlayers: [],
         defaultEventType: "manual",
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
       },
     });
 
@@ -211,9 +211,9 @@ describe("SnapshotDraft", () => {
         parentId: null,
         initialPlayers: [],
         defaultEventType: "manual",
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
       },
     });
 
@@ -243,9 +243,9 @@ describe("SnapshotDraft", () => {
         parentId: null,
         initialPlayers: [],
         defaultEventType: "manual",
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
       },
     });
 
@@ -261,9 +261,9 @@ describe("SnapshotDraft", () => {
         parentId: null,
         initialPlayers: [],
         defaultEventType: "manual",
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
       },
     });
 
@@ -277,9 +277,9 @@ describe("SnapshotDraft", () => {
 
   it("calls saveSnapshot when save button is clicked", async () => {
     const { saveSnapshot } = await import("../api");
-    const onclose = vi.fn();
-    const onchainUpdate = vi.fn();
-    const onopenSnapshot = vi.fn();
+    const onClose = vi.fn();
+    const onChainUpdate = vi.fn();
+    const onOpenSnapshot = vi.fn();
 
     mockPrompt.mockReturnValue("Test Player");
 
@@ -288,9 +288,9 @@ describe("SnapshotDraft", () => {
         parentId: null,
         initialPlayers: [],
         defaultEventType: "manual",
-        onclose,
-        onchainUpdate,
-        onopenSnapshot,
+        onClose,
+        onChainUpdate,
+        onOpenSnapshot,
       },
     });
 
@@ -326,9 +326,9 @@ describe("SnapshotDraft", () => {
         parentId: null,
         initialPlayers: [],
         defaultEventType: "manual",
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
       },
     });
 
@@ -370,9 +370,9 @@ describe("SnapshotDraft", () => {
           },
         ],
         defaultEventType: "manual",
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
       },
     });
 
@@ -390,9 +390,9 @@ describe("SnapshotDraft", () => {
         parentId: null,
         initialPlayers: [],
         defaultEventType: "manual",
-        onclose: () => {},
-        onchainUpdate: () => {},
-        onopenSnapshot: () => {},
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
       },
     });
 

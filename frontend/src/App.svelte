@@ -168,28 +168,28 @@
 </script>
 
 <Header
-  onnewdraft={() => openDraft()}
+  onNewDraft={() => openDraft()}
 />
 
 <div class="main">
   <ChainViewer
     bind:this={chainViewer}
-    onopenSnapshot={openSnapshot}
-    onopenGame={openGame}
-    onopenSync={openSync}
-    ondeleteSnapshot={handleDeleteSnapshot}
-    onnewdraft={(options) => openDraft(null, "manual", options?.autoAction ?? null)}
+    onOpenSnapshot={openSnapshot}
+    onOpenGame={openGame}
+    onOpenSync={openSync}
+    onDeleteSnapshot={handleDeleteSnapshot}
+    onNewDraft={(options) => openDraft(null, "manual", options?.autoAction ?? null)}
     panelOpen={panelOpen}
   />
-  <SidePanel title={panelTitle} open={panelOpen} onclose={closePanel}>
+  <SidePanel title={panelTitle} open={panelOpen} onClose={closePanel}>
     {#if panelType === "snapshot" && panelId !== null}
       <SnapshotDetail
         id={panelId}
-        onclose={closePanel}
-        onchainUpdate={handleChainUpdate}
-        onopenSnapshot={openSnapshot}
-        onopenGame={openGame}
-        oneditdraft={(parentId: number, eventType: string, autoAction?: 'notion' | 'csv' | null, players?: EditPlayerRow[]) => openDraft(parentId, eventType, autoAction ?? null, players ?? [])}
+        onClose={closePanel}
+        onChainUpdate={handleChainUpdate}
+        onOpenSnapshot={openSnapshot}
+        onOpenGame={openGame}
+        onEditDraft={(parentId: number, eventType: string, autoAction?: 'notion' | 'csv' | null, players?: EditPlayerRow[]) => openDraft(parentId, eventType, autoAction ?? null, players ?? [])}
       />
     {:else if panelType === "draft"}
       <SnapshotDraft
@@ -197,9 +197,9 @@
         initialPlayers={draftInitialPlayers}
         defaultEventType={draftEventType}
         autoAction={draftAutoAction}
-        onclose={closePanel}
-        onchainUpdate={handleChainUpdate}
-        onopenSnapshot={openSnapshot}
+        onClose={closePanel}
+        onChainUpdate={handleChainUpdate}
+        onOpenSnapshot={openSnapshot}
       />
     {:else if panelType === "game" && panelId !== null}
       <GameDetail id={panelId} />
@@ -217,7 +217,7 @@
   output={modalOutput}
   isError={modalIsError}
   loading={modalLoading}
-  onclose={() => (modalVisible = false)}
+  onClose={() => (modalVisible = false)}
 />
 
 <style>

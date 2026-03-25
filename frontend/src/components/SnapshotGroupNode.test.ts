@@ -26,18 +26,18 @@ describe("SnapshotGroupNode", () => {
   };
 
   it("renders snapshot node correctly", () => {
-    const onselect = vi.fn();
-    const ondelete = vi.fn();
-    const onopenGame = vi.fn();
-    const onopenSync = vi.fn();
+    const onSelect = vi.fn();
+    const onDelete = vi.fn();
+    const onOpenGame = vi.fn();
+    const onOpenSync = vi.fn();
 
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: mockGroup,
-        onselect,
-        ondelete,
-        onopenGame,
-        onopenSync,
+        onSelect,
+        onDelete,
+        onOpenGame,
+        onOpenSync,
       },
     });
 
@@ -48,18 +48,18 @@ describe("SnapshotGroupNode", () => {
 
   it("has active class when activeNodeId matches snapshot id", () => {
     setActiveNodeId("snapshot-1");
-    const onselect = vi.fn();
-    const ondelete = vi.fn();
-    const onopenGame = vi.fn();
-    const onopenSync = vi.fn();
+    const onSelect = vi.fn();
+    const onDelete = vi.fn();
+    const onOpenGame = vi.fn();
+    const onOpenSync = vi.fn();
 
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: mockGroup,
-        onselect,
-        ondelete,
-        onopenGame,
-        onopenSync,
+        onSelect,
+        onDelete,
+        onOpenGame,
+        onOpenSync,
       },
     });
 
@@ -70,18 +70,18 @@ describe("SnapshotGroupNode", () => {
 
   it("does not have active class when activeNodeId does not match", () => {
     setActiveNodeId("99");
-    const onselect = vi.fn();
-    const ondelete = vi.fn();
-    const onopenGame = vi.fn();
-    const onopenSync = vi.fn();
+    const onSelect = vi.fn();
+    const onDelete = vi.fn();
+    const onOpenGame = vi.fn();
+    const onOpenSync = vi.fn();
 
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: mockGroup,
-        onselect,
-        ondelete,
-        onopenGame,
-        onopenSync,
+        onSelect,
+        onDelete,
+        onOpenGame,
+        onOpenSync,
       },
     });
 
@@ -90,19 +90,19 @@ describe("SnapshotGroupNode", () => {
     expect(nodeDiv!.classList.contains("active")).toBe(false);
   });
 
-  it("clicking node triggers onselect", async () => {
-    const onselect = vi.fn();
-    const ondelete = vi.fn();
-    const onopenGame = vi.fn();
-    const onopenSync = vi.fn();
+  it("clicking node triggers onSelect", async () => {
+    const onSelect = vi.fn();
+    const onDelete = vi.fn();
+    const onOpenGame = vi.fn();
+    const onOpenSync = vi.fn();
 
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: mockGroup,
-        onselect,
-        ondelete,
-        onopenGame,
-        onopenSync,
+        onSelect,
+        onDelete,
+        onOpenGame,
+        onOpenSync,
       },
     });
 
@@ -111,8 +111,8 @@ describe("SnapshotGroupNode", () => {
 
     await fireEvent.click(nodeDiv!);
 
-    expect(onselect).toHaveBeenCalledTimes(1);
-    expect(onselect).toHaveBeenCalledWith(1);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(1);
   });
 
   const multiVersionGroup = {
@@ -158,10 +158,10 @@ describe("SnapshotGroupNode", () => {
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: multiVersionGroup,
-        onselect: vi.fn(),
-        ondelete: vi.fn(),
-        onopenGame: vi.fn(),
-        onopenSync: vi.fn(),
+        onSelect: vi.fn(),
+        onDelete: vi.fn(),
+        onOpenGame: vi.fn(),
+        onOpenSync: vi.fn(),
       },
     });
 
@@ -174,10 +174,10 @@ describe("SnapshotGroupNode", () => {
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: mockGroup,
-        onselect: vi.fn(),
-        ondelete: vi.fn(),
-        onopenGame: vi.fn(),
-        onopenSync: vi.fn(),
+        onSelect: vi.fn(),
+        onDelete: vi.fn(),
+        onOpenGame: vi.fn(),
+        onOpenSync: vi.fn(),
       },
     });
 
@@ -189,10 +189,10 @@ describe("SnapshotGroupNode", () => {
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: multiVersionGroup,
-        onselect: vi.fn(),
-        ondelete: vi.fn(),
-        onopenGame: vi.fn(),
-        onopenSync: vi.fn(),
+        onSelect: vi.fn(),
+        onDelete: vi.fn(),
+        onOpenGame: vi.fn(),
+        onOpenSync: vi.fn(),
       },
     });
 
@@ -210,10 +210,10 @@ describe("SnapshotGroupNode", () => {
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: mockGroup,
-        onselect: vi.fn(),
-        ondelete: vi.fn(),
-        onopenGame: vi.fn(),
-        onopenSync: vi.fn(),
+        onSelect: vi.fn(),
+        onDelete: vi.fn(),
+        onOpenGame: vi.fn(),
+        onOpenSync: vi.fn(),
       },
     });
 
@@ -228,10 +228,10 @@ describe("SnapshotGroupNode", () => {
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: mockGroup, // mockGroup has is_latest: true
-        onselect: vi.fn(),
-        ondelete: vi.fn(),
-        onopenGame: vi.fn(),
-        onopenSync: vi.fn(),
+        onSelect: vi.fn(),
+        onDelete: vi.fn(),
+        onOpenGame: vi.fn(),
+        onOpenSync: vi.fn(),
       },
     });
 
@@ -263,10 +263,10 @@ describe("SnapshotGroupNode", () => {
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: groupNotLatest,
-        onselect: vi.fn(),
-        ondelete: vi.fn(),
-        onopenGame: vi.fn(),
-        onopenSync: vi.fn(),
+        onSelect: vi.fn(),
+        onDelete: vi.fn(),
+        onOpenGame: vi.fn(),
+        onOpenSync: vi.fn(),
       },
     });
 
@@ -281,10 +281,10 @@ describe("SnapshotGroupNode", () => {
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: mockGroup,
-        onselect: vi.fn(),
-        ondelete: vi.fn(),
-        onopenGame: vi.fn(),
-        onopenSync: vi.fn(),
+        onSelect: vi.fn(),
+        onDelete: vi.fn(),
+        onOpenGame: vi.fn(),
+        onOpenSync: vi.fn(),
       },
     });
 
@@ -298,10 +298,10 @@ describe("SnapshotGroupNode", () => {
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: multiVersionGroup,
-        onselect: vi.fn(),
-        ondelete: vi.fn(),
-        onopenGame: vi.fn(),
-        onopenSync: vi.fn(),
+        onSelect: vi.fn(),
+        onDelete: vi.fn(),
+        onOpenGame: vi.fn(),
+        onOpenSync: vi.fn(),
       },
     });
 
@@ -311,14 +311,14 @@ describe("SnapshotGroupNode", () => {
   });
 
   it("navigates to previous version when prev button is clicked", async () => {
-    const onselect = vi.fn();
+    const onSelect = vi.fn();
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: multiVersionGroup,
-        onselect,
-        ondelete: vi.fn(),
-        onopenGame: vi.fn(),
-        onopenSync: vi.fn(),
+        onSelect,
+        onDelete: vi.fn(),
+        onOpenGame: vi.fn(),
+        onOpenSync: vi.fn(),
       },
     });
 
@@ -331,17 +331,17 @@ describe("SnapshotGroupNode", () => {
 
     expect(container.textContent).toContain("Versión #11");
     expect(container.textContent).toContain("v2 de 3");
-    expect(onselect).toHaveBeenCalledWith(11);
+    expect(onSelect).toHaveBeenCalledWith(11);
   });
 
   it("disables prev button on first version and next button on last version", async () => {
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: multiVersionGroup,
-        onselect: vi.fn(),
-        ondelete: vi.fn(),
-        onopenGame: vi.fn(),
-        onopenSync: vi.fn(),
+        onSelect: vi.fn(),
+        onDelete: vi.fn(),
+        onOpenGame: vi.fn(),
+        onOpenSync: vi.fn(),
       },
     });
 
@@ -363,14 +363,14 @@ describe("SnapshotGroupNode", () => {
   });
 
   it("navigates forward with next button", async () => {
-    const onselect = vi.fn();
+    const onSelect = vi.fn();
     const { container } = render(SnapshotGroupNode, {
       props: {
         group: multiVersionGroup,
-        onselect,
-        ondelete: vi.fn(),
-        onopenGame: vi.fn(),
-        onopenSync: vi.fn(),
+        onSelect,
+        onDelete: vi.fn(),
+        onOpenGame: vi.fn(),
+        onOpenSync: vi.fn(),
       },
     });
 
@@ -382,12 +382,12 @@ describe("SnapshotGroupNode", () => {
     // Go to v1
     await fireEvent.click(prevBtn);
     await fireEvent.click(prevBtn);
-    onselect.mockClear();
+    onSelect.mockClear();
 
     // Now navigate forward
     await fireEvent.click(nextBtn);
 
     expect(container.textContent).toContain("Versión #11");
-    expect(onselect).toHaveBeenCalledWith(11);
+    expect(onSelect).toHaveBeenCalledWith(11);
   });
 });

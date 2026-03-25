@@ -4,11 +4,11 @@ import Header from "./Header.svelte";
 
 describe("Header", () => {
   it("renders header correctly", () => {
-    const onnewdraft = vi.fn();
+    const onNewDraft = vi.fn();
 
     const { container } = render(Header, {
       props: {
-        onnewdraft,
+        onNewDraft,
       },
     });
 
@@ -16,11 +16,11 @@ describe("Header", () => {
   });
 
   it("shows Nueva Versión button", () => {
-    const onnewdraft = vi.fn();
+    const onNewDraft = vi.fn();
 
     const { container } = render(Header, {
       props: {
-        onnewdraft,
+        onNewDraft,
       },
     });
 
@@ -29,12 +29,12 @@ describe("Header", () => {
     expect(newVersionButton!.textContent).toContain("Nueva Lista");
   });
 
-  it("clicking Nueva Versión button calls onnewdraft", async () => {
-    const onnewdraft = vi.fn();
+  it("clicking Nueva Versión button calls onNewDraft", async () => {
+    const onNewDraft = vi.fn();
 
     const { container } = render(Header, {
       props: {
-        onnewdraft,
+        onNewDraft,
       },
     });
 
@@ -43,15 +43,15 @@ describe("Header", () => {
 
     await fireEvent.click(newVersionButton!);
 
-    expect(onnewdraft).toHaveBeenCalledTimes(1);
+    expect(onNewDraft).toHaveBeenCalledTimes(1);
   });
 
   it("Nueva Versión button uses btn-primary class", () => {
-    const onnewdraft = vi.fn();
+    const onNewDraft = vi.fn();
 
     const { container } = render(Header, {
       props: {
-        onnewdraft,
+        onNewDraft,
       },
     });
 

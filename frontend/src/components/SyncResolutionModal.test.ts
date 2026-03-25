@@ -13,8 +13,8 @@ describe("SyncResolutionModal.svelte", () => {
       props: {
         visible: false,
         pairs: mockPairs,
-        oncomplete: vi.fn(),
-        oncancel: vi.fn(),
+        onComplete: vi.fn(),
+        onCancel: vi.fn(),
       },
     });
 
@@ -26,8 +26,8 @@ describe("SyncResolutionModal.svelte", () => {
       props: {
         visible: true,
         pairs: mockPairs,
-        oncomplete: vi.fn(),
-        oncancel: vi.fn(),
+        onComplete: vi.fn(),
+        onCancel: vi.fn(),
       },
     });
 
@@ -40,8 +40,8 @@ describe("SyncResolutionModal.svelte", () => {
       props: {
         visible: true,
         pairs: mockPairs,
-        oncomplete: vi.fn(),
-        oncancel: vi.fn(),
+        onComplete: vi.fn(),
+        onCancel: vi.fn(),
       },
     });
 
@@ -54,8 +54,8 @@ describe("SyncResolutionModal.svelte", () => {
       props: {
         visible: true,
         pairs: mockPairs,
-        oncomplete: vi.fn(),
-        oncancel: vi.fn(),
+        onComplete: vi.fn(),
+        onCancel: vi.fn(),
       },
     });
 
@@ -67,23 +67,23 @@ describe("SyncResolutionModal.svelte", () => {
       props: {
         visible: true,
         pairs: mockPairs,
-        oncomplete: vi.fn(),
-        oncancel: vi.fn(),
+        onComplete: vi.fn(),
+        onCancel: vi.fn(),
       },
     });
 
     expect(container.textContent).toContain("95% similar");
   });
 
-  it("calls oncomplete with merges when all resolved", async () => {
-    const oncomplete = vi.fn();
+  it("calls onComplete with merges when all resolved", async () => {
+    const onComplete = vi.fn();
     const firstPair = mockPairs[0]!;
     const { container } = render(SyncResolutionModal, {
       props: {
         visible: true,
         pairs: [firstPair],
-        oncomplete,
-        oncancel: vi.fn(),
+        onComplete,
+        onCancel: vi.fn(),
       },
     });
 
@@ -91,20 +91,20 @@ describe("SyncResolutionModal.svelte", () => {
     const mergeBtn = container.querySelector(".resolution-btn-merge");
     await fireEvent.click(mergeBtn!);
 
-    expect(oncomplete).toHaveBeenCalledWith([
+    expect(onComplete).toHaveBeenCalledWith([
       { from: "Juan Perez", to: "Juan Pérez" },
     ]);
   });
 
-  it("calls oncomplete with empty array when all skipped", async () => {
-    const oncomplete = vi.fn();
+  it("calls onComplete with empty array when all skipped", async () => {
+    const onComplete = vi.fn();
     const firstPair = mockPairs[0]!;
     const { container } = render(SyncResolutionModal, {
       props: {
         visible: true,
         pairs: [firstPair],
-        oncomplete,
-        oncancel: vi.fn(),
+        onComplete,
+        onCancel: vi.fn(),
       },
     });
 
@@ -112,24 +112,24 @@ describe("SyncResolutionModal.svelte", () => {
     const skipBtn = container.querySelector(".resolution-btn-skip");
     await fireEvent.click(skipBtn!);
 
-    expect(oncomplete).toHaveBeenCalledWith([]);
+    expect(onComplete).toHaveBeenCalledWith([]);
   });
 
-  it("calls oncancel when stop button clicked", async () => {
-    const oncancel = vi.fn();
+  it("calls onCancel when stop button clicked", async () => {
+    const onCancel = vi.fn();
     const { container } = render(SyncResolutionModal, {
       props: {
         visible: true,
         pairs: mockPairs,
-        oncomplete: vi.fn(),
-        oncancel,
+        onComplete: vi.fn(),
+        onCancel,
       },
     });
 
     const stopBtn = container.querySelector(".resolution-btn-stop");
     await fireEvent.click(stopBtn!);
 
-    expect(oncancel).toHaveBeenCalled();
+    expect(onCancel).toHaveBeenCalled();
   });
 
   it("advances to next conflict after action", async () => {
@@ -137,8 +137,8 @@ describe("SyncResolutionModal.svelte", () => {
       props: {
         visible: true,
         pairs: mockPairs,
-        oncomplete: vi.fn(),
-        oncancel: vi.fn(),
+        onComplete: vi.fn(),
+        onCancel: vi.fn(),
       },
     });
 

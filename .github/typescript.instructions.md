@@ -49,3 +49,9 @@ applyTo: "frontend/src/**"
 ## Svelte 5 children pattern
 - For components with children, import `Snippet` type from "svelte" and declare `children: Snippet` in Props interface.
 - Use `{@render children()}` in template (not `<slot />` — deprecated).
+
+## Naming Conventions
+- **Variables & Functions:** Always use `camelCase`.
+- **Svelte 5 Event Props:** Custom event handlers passed as component props MUST use strict `camelCase` starting with "on" (e.g., `onNewDraft`, `onChainUpdate`, `onOpenSnapshot` — *never* `onnewdraft`). Native DOM events remain all-lowercase (e.g., `onclick`, `onkeydown`).
+- **Domain Types:** Use `PascalCase` for Interfaces and Types.
+- **Backend API Mapping:** Object properties mapped directly from the backend JSON API (like `created_at`, `juegos_este_ano`) are the **only** permitted exceptions where `snake_case` is allowed in TypeScript.

@@ -1,25 +1,24 @@
 <script lang="ts">
-  import type { ChainData, SnapshotNode } from "../types";
+  import type { SnapshotNode } from "../types";
   import { fetchChain } from "../api";
   import {
     setSnapshotCount,
     setChainData,
-    getChainData,
     setActiveNodeId,
   } from "../stores.svelte";
   import SnapshotGroupNode from "./SnapshotGroupNode.svelte";
   import { groupSnapshots } from "../groupSnapshots";
 
   interface Props {
-    onopenSnapshot: (id: number) => void;
-    onopenGame: (id: number) => void;
-    onopenSync: (id: number) => void;
-    ondeleteSnapshot: (id: number) => void;
-    onnewdraft: (options?: { autoAction?: 'notion' | 'csv' }) => void;
+    onOpenSnapshot: (id: number) => void;
+    onOpenGame: (id: number) => void;
+    onOpenSync: (id: number) => void;
+    onDeleteSnapshot: (id: number) => void;
+    onNewDraft: (options?: { autoAction?: 'notion' | 'csv' }) => void;
     panelOpen?: boolean;
   }
 
-  let { onopenSnapshot, onopenGame, onopenSync, ondeleteSnapshot, onnewdraft, panelOpen = false }: Props =
+  let { onOpenSnapshot, onOpenGame, onOpenSync, onDeleteSnapshot, onNewDraft, panelOpen = false }: Props =
     $props();
 
   let loading = $state(true);
@@ -41,11 +40,11 @@
   }
 
   function handleSelect(id: number): void {
-    onopenSnapshot(id);
+    onOpenSnapshot(id);
   }
 
   function handleDelete(id: number): void {
-    ondeleteSnapshot(id);
+    onDeleteSnapshot(id);
   }
 
   // Load chain on mount
@@ -67,13 +66,13 @@
         <p>No hay snapshots en la DB.</p>
         <p>Comienza importando jugadores o creando una versión desde cero.</p>
         <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
-          <button class="btn btn-primary" onclick={() => onnewdraft({ autoAction: 'notion' })}>
+          <button class="btn btn-primary" onclick={() => onNewDraft({ autoAction: 'notion' })}>
             ☁️ Importar de Notion
           </button>
-          <button class="btn btn-secondary" onclick={() => onnewdraft({ autoAction: 'csv' })}>
+          <button class="btn btn-secondary" onclick={() => onNewDraft({ autoAction: 'csv' })}>
             📥 Pegar CSV
           </button>
-          <button class="btn btn-secondary" onclick={() => onnewdraft()}>
+          <button class="btn btn-secondary" onclick={() => onNewDraft()}>
             📝 Crear desde cero
           </button>
         </div>
@@ -82,10 +81,10 @@
       {#each groupedRoots as group (group.versions[0]!.snapshot.id)}
         <SnapshotGroupNode
           {group}
-          onselect={handleSelect}
-          ondelete={handleDelete}
-          onopenGame={onopenGame}
-          onopenSync={onopenSync}
+          onSelect={handleSelect}
+          onDelete={handleDelete}
+          onOpenGame={onOpenGame}
+          onOpenSync={onOpenSync}
         />
       {/each}
     {/if}

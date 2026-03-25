@@ -64,11 +64,11 @@ describe("Panel Scroll Pattern", () => {
       const { container } = render(SnapshotDetail, {
         props: {
           id: 1,
-          onclose: () => {},
-          onchainUpdate: () => {},
-          onopenSnapshot: () => {},
-          onopenGame: () => {},
-          oneditdraft: () => {},
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onEditDraft: () => {},
         },
       });
 
@@ -89,11 +89,11 @@ describe("Panel Scroll Pattern", () => {
       const { container } = render(SnapshotDetail, {
         props: {
           id: 1,
-          onclose: () => {},
-          onchainUpdate: () => {},
-          onopenSnapshot: () => {},
-          onopenGame: () => {},
-          oneditdraft: () => {},
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onEditDraft: () => {},
         },
       });
 
@@ -118,11 +118,11 @@ describe("Panel Scroll Pattern", () => {
       const { container } = render(SnapshotDetail, {
         props: {
           id: 1,
-          onclose: () => {},
-          onchainUpdate: () => {},
-          onopenSnapshot: () => {},
-          onopenGame: () => {},
-          oneditdraft: () => {},
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onEditDraft: () => {},
         },
       });
 

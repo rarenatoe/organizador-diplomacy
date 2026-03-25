@@ -5,10 +5,10 @@
     output: string;
     isError: boolean;
     loading: boolean;
-    onclose: () => void;
+    onClose: () => void;
   }
 
-  let { visible, title, output, isError, loading, onclose }: Props = $props();
+  let { visible, title, output, isError, loading, onClose }: Props = $props();
 </script>
 
 {#if visible}
@@ -26,7 +26,7 @@
       </div>
       <div class="modal-out" class:err={isError} id="modal-out">{output}</div>
       <div class="modal-foot">
-        <button class="btn btn-secondary" onclick={onclose} disabled={loading}
+        <button class="btn btn-secondary" onclick={onClose} disabled={loading}
           >Cerrar</button
         >
       </div>

@@ -16,13 +16,13 @@ describe("SidePanel", () => {
   });
 
   it("renders panel with title", () => {
-    const onclose = vi.fn();
+    const onClose = vi.fn();
 
     const { container: panelContainer } = render(SidePanel, {
       props: {
         title: "Test Panel",
         open: true,
-        onclose,
+        onClose,
         children: vi.fn(),
       },
       target: container,
@@ -31,14 +31,14 @@ describe("SidePanel", () => {
     expect(panelContainer.textContent).toContain("Test Panel");
   });
 
-  it("has close button that calls onclose", async () => {
-    const onclose = vi.fn();
+  it("has close button that calls onClose", async () => {
+    const onClose = vi.fn();
 
     const { container: panelContainer } = render(SidePanel, {
       props: {
         title: "Test Panel",
         open: true,
-        onclose,
+        onClose,
         children: vi.fn(),
       },
       target: container,
@@ -49,17 +49,17 @@ describe("SidePanel", () => {
 
     await fireEvent.click(closeButton!);
 
-    expect(onclose).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   it("applies open class when open prop is true", () => {
-    const onclose = vi.fn();
+    const onClose = vi.fn();
 
     const { container: panelContainer } = render(SidePanel, {
       props: {
         title: "Test Panel",
         open: true,
-        onclose,
+        onClose,
         children: vi.fn(),
       },
       target: container,
@@ -71,13 +71,13 @@ describe("SidePanel", () => {
   });
 
   it("does not apply open class when open prop is false", () => {
-    const onclose = vi.fn();
+    const onClose = vi.fn();
 
     const { container: panelContainer } = render(SidePanel, {
       props: {
         title: "Test Panel",
         open: false,
-        onclose,
+        onClose,
         children: vi.fn(),
       },
       target: container,
@@ -89,13 +89,13 @@ describe("SidePanel", () => {
   });
 
   it("uses clickOutside action with correct ignore selectors", () => {
-    const onclose = vi.fn();
+    const onClose = vi.fn();
 
     const { container: panelContainer } = render(SidePanel, {
       props: {
         title: "Test Panel",
         open: true,
-        onclose,
+        onClose,
         children: vi.fn(),
       },
       target: container,
@@ -109,14 +109,14 @@ describe("SidePanel", () => {
     expect(aside!.classList.contains("panel")).toBe(true);
   });
 
-  it("calls onclose when clicking outside panel", async () => {
-    const onclose = vi.fn();
+  it("calls onClose when clicking outside panel", async () => {
+    const onClose = vi.fn();
 
     render(SidePanel, {
       props: {
         title: "Test Panel",
         open: true,
-        onclose,
+        onClose,
         children: vi.fn(),
       },
       target: container,
@@ -130,18 +130,18 @@ describe("SidePanel", () => {
     // Click outside the panel
     await fireEvent.click(outsideElement);
 
-    // onclose should be called because panel is open
-    expect(onclose).toHaveBeenCalledTimes(1);
+    // onClose should be called because panel is open
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("does NOT call onclose when clicking inside panel", async () => {
-    const onclose = vi.fn();
+  it("does NOT call onClose when clicking inside panel", async () => {
+    const onClose = vi.fn();
 
     const { container: panelContainer } = render(SidePanel, {
       props: {
         title: "Test Panel",
         open: true,
-        onclose,
+        onClose,
         children: vi.fn(),
       },
       target: container,
@@ -153,18 +153,18 @@ describe("SidePanel", () => {
 
     await fireEvent.click(panelHeader!);
 
-    // onclose should NOT be called because click was inside panel
-    expect(onclose).not.toHaveBeenCalled();
+    // onClose should NOT be called because click was inside panel
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("does NOT call onclose when clicking on ignored selector (.node)", async () => {
-    const onclose = vi.fn();
+  it("does NOT call onClose when clicking on ignored selector (.node)", async () => {
+    const onClose = vi.fn();
 
     render(SidePanel, {
       props: {
         title: "Test Panel",
         open: true,
-        onclose,
+        onClose,
         children: vi.fn(),
       },
       target: container,
@@ -178,18 +178,18 @@ describe("SidePanel", () => {
     // Click on the ignored element
     await fireEvent.click(nodeElement);
 
-    // onclose should NOT be called because .node is in ignoreSelectors
-    expect(onclose).not.toHaveBeenCalled();
+    // onClose should NOT be called because .node is in ignoreSelectors
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("does NOT call onclose when clicking on ignored selector (header)", async () => {
-    const onclose = vi.fn();
+  it("does NOT call onClose when clicking on ignored selector (header)", async () => {
+    const onClose = vi.fn();
 
     render(SidePanel, {
       props: {
         title: "Test Panel",
         open: true,
-        onclose,
+        onClose,
         children: vi.fn(),
       },
       target: container,
@@ -202,18 +202,18 @@ describe("SidePanel", () => {
     // Click on the ignored element
     await fireEvent.click(headerElement);
 
-    // onclose should NOT be called because header is in ignoreSelectors
-    expect(onclose).not.toHaveBeenCalled();
+    // onClose should NOT be called because header is in ignoreSelectors
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("does NOT call onclose when clicking on ignored selector (.modal-overlay)", async () => {
-    const onclose = vi.fn();
+  it("does NOT call onClose when clicking on ignored selector (.modal-overlay)", async () => {
+    const onClose = vi.fn();
 
     render(SidePanel, {
       props: {
         title: "Test Panel",
         open: true,
-        onclose,
+        onClose,
         children: vi.fn(),
       },
       target: container,
@@ -227,18 +227,18 @@ describe("SidePanel", () => {
     // Click on the ignored element
     await fireEvent.click(modalElement);
 
-    // onclose should NOT be called because .modal-overlay is in ignoreSelectors
-    expect(onclose).not.toHaveBeenCalled();
+    // onClose should NOT be called because .modal-overlay is in ignoreSelectors
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("does NOT call onclose when clicking on ignored selector (.toast)", async () => {
-    const onclose = vi.fn();
+  it("does NOT call onClose when clicking on ignored selector (.toast)", async () => {
+    const onClose = vi.fn();
 
     render(SidePanel, {
       props: {
         title: "Test Panel",
         open: true,
-        onclose,
+        onClose,
         children: vi.fn(),
       },
       target: container,
@@ -252,18 +252,18 @@ describe("SidePanel", () => {
     // Click on the ignored element
     await fireEvent.click(toastElement);
 
-    // onclose should NOT be called because .toast is in ignoreSelectors
-    expect(onclose).not.toHaveBeenCalled();
+    // onClose should NOT be called because .toast is in ignoreSelectors
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("does NOT call onclose when panel is closed (open=false)", async () => {
-    const onclose = vi.fn();
+  it("does NOT call onClose when panel is closed (open=false)", async () => {
+    const onClose = vi.fn();
 
     render(SidePanel, {
       props: {
         title: "Test Panel",
         open: false,
-        onclose,
+        onClose,
         children: vi.fn(),
       },
       target: container,
@@ -276,7 +276,7 @@ describe("SidePanel", () => {
     // Click outside the panel
     await fireEvent.click(outsideElement);
 
-    // onclose should NOT be called because panel is already closed
-    expect(onclose).not.toHaveBeenCalled();
+    // onClose should NOT be called because panel is already closed
+    expect(onClose).not.toHaveBeenCalled();
   });
 });
