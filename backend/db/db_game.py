@@ -128,6 +128,13 @@ def create_output_snapshot(
             1 if nombre in nombres_en_espera else 0,
             p["partidas_deseadas"],
             0,  # partidas_gm reset
+            p["c_england"],
+            p["c_france"],
+            p["c_germany"],
+            p["c_italy"],
+            p["c_austria"],
+            p["c_russia"],
+            p["c_turkey"],
         )
 
     return snap_id

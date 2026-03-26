@@ -22,15 +22,31 @@ class Jugador:
         prioridad: str,
         partidas_deseadas: str | int,
         partidas_gm: str | int = 0,
+        c_england: int = 0,
+        c_france: int = 0,
+        c_germany: int = 0,
+        c_italy: int = 0,
+        c_austria: int = 0,
+        c_russia: int = 0,
+        c_turkey: int = 0,
     ) -> None:
         self.nombre: str = nombre
         self.es_nuevo: bool = (experiencia.strip().lower() == "nuevo")
         self.juegos_ano: int = int(juegos_ano)
-        self.tiene_prioridad: bool = (prioridad.strip().lower() == "true")
+        self.tiene_prioridad: bool = (str(prioridad).strip().lower() == "true" or prioridad == 1)
         self.partidas_deseadas: int = int(partidas_deseadas)
         # How many tables this player will referee as GM (0 = not a GM).
         # The algorithm assigns which specific table(s) automatically.
         self.partidas_gm: int = int(partidas_gm)
+        
+        # Country history counts
+        self.c_england: int = int(c_england)
+        self.c_france: int = int(c_france)
+        self.c_germany: int = int(c_germany)
+        self.c_italy: int = int(c_italy)
+        self.c_austria: int = int(c_austria)
+        self.c_russia: int = int(c_russia)
+        self.c_turkey: int = int(c_turkey)
 
     @property
     def puntaje_prioridad(self) -> float:

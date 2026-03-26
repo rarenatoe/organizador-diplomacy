@@ -21,6 +21,7 @@ from notion_client import Client
 from backend.config import FLASK_STATIC_DIR, FLASK_TEMPLATE_DIR, PROJECT_ROOT
 from backend.db import db, db_views
 from backend.sync.notion_sync import conteo_partidas_este_ano, descargar_todos, _detect_similar_names
+from backend.sync.cache_daemon import start_background_sync, update_notion_cache
 
 # Configure Flask to find templates and static in frontend/
 app = Flask(__name__, template_folder=str(FLASK_TEMPLATE_DIR), static_folder=str(FLASK_STATIC_DIR))
@@ -100,68 +101,35 @@ def api_create_snapshot():
 @app.route("/api/notion/fetch", methods=["POST"])
 def api_notion_fetch():
     """
-    Fetches raw player data from Notion without writing to the database.
+    Fetches raw player data from the local notion_cache table.
     Optionally detects similar names if snapshot_names is provided in body.
     Body: {"snapshot_names": ["Name1", "Name2", ...]}
-    Returns: {"players": [...], "similar_names": [...]}
+    Returns: {"players": [...], "similar_names": [...], "last_updated": "..."}
     """
-    load_dotenv()
-    token = os.getenv("NOTION_TOKEN")
-    db_id = os.getenv("NOTION_DATABASE_ID")
-    part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
-
-    if not token or token.startswith("secret_XXX"):
-        return jsonify({"error": "NOTION_TOKEN not configured"}), 500
-    if not db_id or "XXX" in db_id:
-        return jsonify({"error": "NOTION_DATABASE_ID not configured"}), 500
-    if not part_db_id or "XXX" in part_db_id:
-        return jsonify({"error": "NOTION_PARTICIPACIONES_DB_ID not configured"}), 500
-
+    conn = db.get_db()
     try:
         body = request.get_json(silent=True) or {}
         snapshot_names = body.get("snapshot_names", [])
 
-        from datetime import datetime
-        client = Client(auth=token)
-        año_actual = datetime.now().year
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_pages = executor.submit(descargar_todos, client, db_id)
-            future_conteo = executor.submit(conteo_partidas_este_ano, client, part_db_id, año_actual)
-            
-            pages = future_pages.result()
-            conteo_por_jugador = future_conteo.result()
+        rows = conn.execute("SELECT * FROM notion_cache ORDER BY nombre").fetchall()
+        if not rows:
+            return jsonify({"players": [], "similar_names": [], "last_updated": None})
 
         players: list[dict] = []
-        for page in pages:
-            props = page.get("properties", {})
-
-            # Nombre
-            nombre_prop = props.get("Nombre")
-            if not nombre_prop:
-                continue
-            nombre = "".join(p.get("plain_text", "") for p in nombre_prop.get("title", [])).strip()
-            if not nombre:
-                continue
-
-            # Experiencia
-            part_prop = props.get("Participaciones")
-            experiencia = "Antiguo" if part_prop and part_prop.get("relation") else "Nuevo"
-
-            # Alias
-            alias_prop = props.get("Alias")
-            alias_text = "".join(p.get("plain_text", "") for p in alias_prop.get("rich_text", [])) if alias_prop else ""
-            alias_list = [a.strip() for a in alias_text.split(",") if a.strip()]
-
-            # Juegos_Este_Ano
-            player_id = page["id"].replace("-", "")
-            juegos = conteo_por_jugador.get(player_id, 0)
-
+        last_updated = rows[0]["last_updated"] if rows else None
+        
+        for r in rows:
             players.append({
-                "nombre": nombre,
-                "experiencia": experiencia,
-                "juegos_este_ano": juegos,
-                "alias": alias_list,
+                "nombre":          r["nombre"],
+                "experiencia":     r["experiencia"],
+                "juegos_este_ano": r["juegos_este_ano"],
+                "c_england":       r["c_england"],
+                "c_france":        r["c_france"],
+                "c_germany":       r["c_germany"],
+                "c_italy":         r["c_italy"],
+                "c_austria":       r["c_austria"],
+                "c_russia":        r["c_russia"],
+                "c_turkey":        r["c_turkey"],
             })
 
         similar_names = []
@@ -170,10 +138,38 @@ def api_notion_fetch():
 
         return jsonify({
             "players": players,
-            "similar_names": similar_names
+            "similar_names": similar_names,
+            "last_updated": last_updated
         })
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+    finally:
+        conn.close()
+
+
+@app.route("/api/notion/force_refresh", methods=["POST"])
+def api_notion_force_refresh():
+    """
+    Manually triggers a Notion cache update synchronously.
+    Returns: {"success": true, "message": "..."}
+    """
+    load_dotenv()
+    token      = os.getenv("NOTION_TOKEN")
+    db_id      = os.getenv("NOTION_DATABASE_ID")
+    part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
+
+    if not all([token, db_id, part_db_id]) or token.startswith("secret_XXX"):
+        return jsonify({"error": "Notion credentials not configured"}), 500
+
+    client = Client(auth=token)
+    conn = db.get_db()
+    try:
+        update_notion_cache(conn, client, db_id, part_db_id)
+        return jsonify({"success": True, "message": "Cache updated successfully"})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+    finally:
+        conn.close()
 
 
 @app.route("/api/snapshot/save", methods=["POST"])
@@ -384,6 +380,7 @@ def api_add_player(snapshot_id: int):
 
 def main() -> None:
     """Start the Flask development server with auto-open browser."""
+    start_background_sync()
     threading.Timer(0.8, lambda: webbrowser.open("http://127.0.0.1:5001")).start()
     app.run(debug=False, port=5001)
 

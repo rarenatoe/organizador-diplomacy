@@ -63,7 +63,7 @@ class TestDb(unittest.TestCase):
         """Players inserted via add_snapshot_player are returned by get_snapshot_players."""
         snap_id = db.create_snapshot(self.conn, "notion_sync")
         pid = db.get_or_create_player(self.conn, "Alice")
-        db.add_snapshot_player(self.conn, snap_id, pid, "Antiguo", 3, 0, 2, 0)
+        db.add_snapshot_player(self.conn, snap_id, pid, "Antiguo", 3, 0, 2, 0, 1, 2, 3, 4, 5, 6, 7)
         self.conn.commit()
         players = db.get_snapshot_players(self.conn, snap_id)
         self.assertEqual(len(players), 1)
@@ -71,6 +71,34 @@ class TestDb(unittest.TestCase):
         self.assertEqual(players[0]["experiencia"], "Antiguo")
         self.assertEqual(players[0]["juegos_este_ano"], 3)
         self.assertEqual(players[0]["partidas_deseadas"], 2)
+        self.assertEqual(players[0]["c_england"], 1)
+        self.assertEqual(players[0]["c_france"], 2)
+        self.assertEqual(players[0]["c_germany"], 3)
+        self.assertEqual(players[0]["c_italy"], 4)
+        self.assertEqual(players[0]["c_austria"], 5)
+        self.assertEqual(players[0]["c_russia"], 6)
+        self.assertEqual(players[0]["c_turkey"], 7)
+
+    def test_notion_cache_roundtrip(self):
+        """Data can be inserted and retrieved from notion_cache."""
+        last_updated = "2026-03-26 12:00:00"
+        self.conn.execute(
+            """
+            INSERT INTO notion_cache 
+            (notion_id, nombre, experiencia, juegos_este_ano, 
+             c_england, c_france, c_germany, c_italy, 
+             c_austria, c_russia, c_turkey, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("nid1", "Alice", "Antiguo", 5, 1, 0, 0, 0, 0, 0, 0, last_updated)
+        )
+        self.conn.commit()
+        
+        row = self.conn.execute("SELECT * FROM notion_cache WHERE notion_id = ?", ("nid1",)).fetchone()
+        self.assertIsNotNone(row)
+        self.assertEqual(row["nombre"], "Alice")
+        self.assertEqual(row["c_england"], 1)
+        self.assertEqual(row["last_updated"], last_updated)
 
     def test_empty_snapshot_returns_empty_list(self):
         snap_id = db.create_snapshot(self.conn, "organizar")
@@ -86,10 +114,18 @@ class TestDb(unittest.TestCase):
         """snapshots_have_same_roster returns True when Notion data matches the snapshot."""
         snap_id = db.create_snapshot(self.conn, "notion_sync")
         pid = db.get_or_create_player(self.conn, "Alice")
-        db.add_snapshot_player(self.conn, snap_id, pid, "Antiguo", 2, 0, 1, 0)
+        db.add_snapshot_player(self.conn, snap_id, pid, "Antiguo", 2, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0)
         self.conn.commit()
-        notion_rows = [{"Nombre": "Alice", "Experiencia": "Antiguo", "Juegos_Este_Ano": 2}]
+        notion_rows = [{"Nombre": "Alice", "Experiencia": "Antiguo", "Juegos_Este_Ano": 2, "c_england": 1}]
         self.assertTrue(db.snapshots_have_same_roster(self.conn, snap_id, notion_rows))
+
+    def test_different_countries_returns_false(self):
+        snap_id = db.create_snapshot(self.conn, "notion_sync")
+        pid = db.get_or_create_player(self.conn, "Alice")
+        db.add_snapshot_player(self.conn, snap_id, pid, "Antiguo", 2, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0)
+        self.conn.commit()
+        notion_rows = [{"Nombre": "Alice", "Experiencia": "Antiguo", "Juegos_Este_Ano": 2, "c_england": 5}]
+        self.assertFalse(db.snapshots_have_same_roster(self.conn, snap_id, notion_rows))
 
     def test_different_juegos_returns_false(self):
         snap_id = db.create_snapshot(self.conn, "notion_sync")

@@ -319,84 +319,68 @@ class TestApiSnapshotSave:
 
 
 class TestApiNotionFetch:
-    def test_fetch_returns_players_list(self, client, monkeypatch):
-        """GET /api/notion/fetch returns players from Notion."""
+    def test_fetch_returns_players_from_cache(self, client):
+        """POST /api/notion/fetch returns players from notion_cache."""
         c, conn = client
+        
+        # Populate notion_cache
+        conn.execute(
+            """
+            INSERT INTO notion_cache 
+            (notion_id, nombre, experiencia, juegos_este_ano, last_updated)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            ("id-1", "Alice", "Nuevo", 0, "2026-03-26 12:00:00")
+        )
+        conn.execute(
+            """
+            INSERT INTO notion_cache 
+            (notion_id, nombre, experiencia, juegos_este_ano, last_updated)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            ("id-2", "Bob", "Antiguo", 3, "2026-03-26 12:00:00")
+        )
+        conn.commit()
 
-        # Mock the Notion Client class at the import location
-        class MockClient:
-            def __init__(self, auth=None):
-                self.auth = auth
-
-            class databases:
-                @staticmethod
-                def retrieve(database_id=None):
-                    return {"data_sources": [{"id": "ds-1"}]}
-
-            class data_sources:
-                @staticmethod
-                def query(**kwargs):
-                    return {
-                        "results": [
-                            {
-                                "id": "page-1",
-                                "properties": {
-                                    "Nombre": {"title": [{"plain_text": "Alice"}]},
-                                    "Participaciones": {"relation": []},
-                                },
-                            },
-                            {
-                                "id": "page-2",
-                                "properties": {
-                                    "Nombre": {"title": [{"plain_text": "Bob"}]},
-                                    "Participaciones": {"relation": [{"id": "rel-1"}]},
-                                },
-                            },
-                        ],
-                        "has_more": False,
-                    }
-
-        # Patch at the viewer module level where Client is imported
-        monkeypatch.setattr("backend.viewer.viewer.Client", MockClient)
-        monkeypatch.setenv("NOTION_TOKEN", "secret_test")
-        monkeypatch.setenv("NOTION_DATABASE_ID", "db-test")
-        monkeypatch.setenv("NOTION_PARTICIPACIONES_DB_ID", "part-test")
-
-        resp = c.get("/api/notion/fetch")
+        resp = c.post("/api/notion/fetch", data=json.dumps({}), content_type="application/json")
         assert resp.status_code == 200
         data = resp.get_json()
         assert "players" in data
         assert len(data["players"]) == 2
+        assert data["last_updated"] == "2026-03-26 12:00:00"
 
         # Verify player data
         players = {p["nombre"]: p for p in data["players"]}
         assert players["Alice"]["experiencia"] == "Nuevo"
         assert players["Alice"]["juegos_este_ano"] == 0
         assert players["Bob"]["experiencia"] == "Antiguo"
-        assert players["Bob"]["juegos_este_ano"] == 0  # Mock returns 0 for conteo
+        assert players["Bob"]["juegos_este_ano"] == 3
 
-    def test_fetch_missing_token_returns_500(self, client, monkeypatch):
-        """GET /api/notion/fetch returns 500 if NOTION_TOKEN is not configured."""
+    def test_fetch_empty_cache_returns_empty_list(self, client):
+        """POST /api/notion/fetch returns empty list if cache is empty."""
         c, conn = client
-        # Mock load_dotenv to not load .env file
-        monkeypatch.setattr("backend.viewer.viewer.load_dotenv", lambda: None)
-        monkeypatch.delenv("NOTION_TOKEN", raising=False)
+        resp = c.post("/api/notion/fetch", data=json.dumps({}), content_type="application/json")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["players"] == []
+        assert data["last_updated"] is None
+
+    def test_force_refresh_triggers_update(self, client, monkeypatch):
+        """POST /api/notion/force_refresh calls update_notion_cache."""
+        c, conn = client
+        
+        # Mock update_notion_cache
+        updated = False
+        def mock_update(*args, **kwargs):
+            nonlocal updated
+            updated = True
+            
+        monkeypatch.setattr("backend.viewer.viewer.update_notion_cache", mock_update)
+        monkeypatch.setenv("NOTION_TOKEN", "secret_test")
         monkeypatch.setenv("NOTION_DATABASE_ID", "db-test")
         monkeypatch.setenv("NOTION_PARTICIPACIONES_DB_ID", "part-test")
 
-        resp = c.get("/api/notion/fetch")
-        assert resp.status_code == 500
-        assert "NOTION_TOKEN" in resp.get_json()["error"]
-
-    def test_fetch_missing_database_id_returns_500(self, client, monkeypatch):
-        """GET /api/notion/fetch returns 500 if NOTION_DATABASE_ID is not configured."""
-        c, conn = client
-        # Mock load_dotenv to not load .env file
-        monkeypatch.setattr("backend.viewer.viewer.load_dotenv", lambda: None)
-        monkeypatch.setenv("NOTION_TOKEN", "secret_test")
-        monkeypatch.delenv("NOTION_DATABASE_ID", raising=False)
-        monkeypatch.setenv("NOTION_PARTICIPACIONES_DB_ID", "part-test")
-
-        resp = c.get("/api/notion/fetch")
-        assert resp.status_code == 500
-        assert "NOTION_DATABASE_ID" in resp.get_json()["error"]
+        resp = c.post("/api/notion/force_refresh")
+        assert resp.status_code == 200
+        assert updated is True
+        assert resp.get_json()["success"] is True

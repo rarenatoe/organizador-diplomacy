@@ -75,7 +75,29 @@ CREATE TABLE IF NOT EXISTS snapshot_players (
     prioridad         INTEGER NOT NULL DEFAULT 0,   -- 0/1 boolean
     partidas_deseadas INTEGER NOT NULL DEFAULT 1,
     partidas_gm       INTEGER NOT NULL DEFAULT 0,
+    c_england         INTEGER NOT NULL DEFAULT 0,
+    c_france          INTEGER NOT NULL DEFAULT 0,
+    c_germany         INTEGER NOT NULL DEFAULT 0,
+    c_italy           INTEGER NOT NULL DEFAULT 0,
+    c_austria         INTEGER NOT NULL DEFAULT 0,
+    c_russia          INTEGER NOT NULL DEFAULT 0,
+    c_turkey          INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (snapshot_id, player_id)
+);
+
+CREATE TABLE IF NOT EXISTS notion_cache (
+    notion_id       TEXT PRIMARY KEY,
+    nombre          TEXT NOT NULL,
+    experiencia     TEXT NOT NULL CHECK(experiencia IN ('Nuevo', 'Antiguo')),
+    juegos_este_ano INTEGER NOT NULL DEFAULT 0,
+    c_england       INTEGER NOT NULL DEFAULT 0,
+    c_france        INTEGER NOT NULL DEFAULT 0,
+    c_germany       INTEGER NOT NULL DEFAULT 0,
+    c_italy         INTEGER NOT NULL DEFAULT 0,
+    c_austria       INTEGER NOT NULL DEFAULT 0,
+    c_russia        INTEGER NOT NULL DEFAULT 0,
+    c_turkey        INTEGER NOT NULL DEFAULT 0,
+    last_updated    TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -259,6 +281,13 @@ def add_player_to_snapshot(
     prioridad: int = 0,
     partidas_deseadas: int = 1,
     partidas_gm: int = 0,
+    c_england: int = 0,
+    c_france: int = 0,
+    c_germany: int = 0,
+    c_italy: int = 0,
+    c_austria: int = 0,
+    c_russia: int = 0,
+    c_turkey: int = 0,
 ) -> int:
     """
     Adds a player to a snapshot. Creates the player if they don't exist.
@@ -268,7 +297,9 @@ def add_player_to_snapshot(
     add_snapshot_player(
         conn, snapshot_id, player_id,
         experiencia, juegos_este_ano,
-        prioridad, partidas_deseadas, partidas_gm
+        prioridad, partidas_deseadas, partidas_gm,
+        c_england, c_france, c_germany, c_italy,
+        c_austria, c_russia, c_turkey
     )
     return player_id
 
@@ -279,12 +310,16 @@ def get_snapshot_players(
     """
     Returns all players in a snapshot as a list of dicts, ordered by nombre.
     Each dict has: nombre, experiencia, juegos_este_ano, prioridad,
-                   partidas_deseadas, partidas_gm
+                   partidas_deseadas, partidas_gm,
+                   c_england, c_france, c_germany, c_italy,
+                   c_austria, c_russia, c_turkey
     """
     rows = conn.execute(
         """
         SELECT p.nombre, sp.experiencia, sp.juegos_este_ano, sp.prioridad,
-               sp.partidas_deseadas, sp.partidas_gm
+               sp.partidas_deseadas, sp.partidas_gm,
+               sp.c_england, sp.c_france, sp.c_germany, sp.c_italy,
+               sp.c_austria, sp.c_russia, sp.c_turkey
         FROM   snapshot_players sp
         JOIN   players          p  ON p.id = sp.player_id
         WHERE  sp.snapshot_id = ?
@@ -322,17 +357,28 @@ def add_snapshot_player(
     prioridad: int,
     partidas_deseadas: int,
     partidas_gm: int,
+    c_england: int = 0,
+    c_france: int = 0,
+    c_germany: int = 0,
+    c_italy: int = 0,
+    c_austria: int = 0,
+    c_russia: int = 0,
+    c_turkey: int = 0,
 ) -> None:
     """Inserts one snapshot_players row. Does NOT commit."""
     conn.execute(
         """
         INSERT INTO snapshot_players
             (snapshot_id, player_id, experiencia, juegos_este_ano,
-             prioridad, partidas_deseadas, partidas_gm)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+             prioridad, partidas_deseadas, partidas_gm,
+             c_england, c_france, c_germany, c_italy,
+             c_austria, c_russia, c_turkey)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (snapshot_id, player_id, experiencia, juegos_este_ano,
-         prioridad, partidas_deseadas, partidas_gm),
+         prioridad, partidas_deseadas, partidas_gm,
+         c_england, c_france, c_germany, c_italy,
+         c_austria, c_russia, c_turkey),
     )
 
 
@@ -350,7 +396,8 @@ def snapshots_have_same_roster(
 ) -> bool:
     """
     Returns True if the Notion-fetched rows match the snapshot's data for
-    the three fields Notion controls: Nombre, Experiencia, Juegos_Este_Ano.
+    the fields Notion controls: Nombre, Experiencia, Juegos_Este_Ano,
+    and the 7 country history columns.
 
     If True, notion_sync can skip creating a new snapshot.
     """
@@ -366,6 +413,15 @@ def snapshots_have_same_roster(
             return False
         if ex["juegos_este_ano"] != int(row["Juegos_Este_Ano"]):
             return False
+        
+        # Check country columns
+        countries = [
+            "c_england", "c_france", "c_germany", "c_italy",
+            "c_austria", "c_russia", "c_turkey"
+        ]
+        for c in countries:
+            if ex[c] != int(row.get(c, 0)):
+                return False
     return True
 
 
@@ -387,7 +443,7 @@ def create_manual_snapshot(
 
     Players omitted from `edits` are excluded from the new snapshot.
     Fields not supplied default to the source snapshot value.
-    experiencia and juegos_este_ano are always copied unchanged.
+    experiencia, juegos_este_ano, and country counts are always copied unchanged.
 
     Returns the new snapshot id. Does NOT commit.
     """
@@ -410,6 +466,9 @@ def create_manual_snapshot(
             int(e.get("prioridad",         base["prioridad"])),
             int(e.get("partidas_deseadas", base["partidas_deseadas"])),
             int(e.get("partidas_gm",       base["partidas_gm"])),
+            base["c_england"], base["c_france"], base["c_germany"],
+            base["c_italy"], base["c_austria"], base["c_russia"],
+            base["c_turkey"]
         )
     # Insert edit event linking source to new snapshot
     create_event(conn, "edit", source_snapshot_id, snap_id)
@@ -431,6 +490,8 @@ def create_root_manual_snapshot(
         prioridad         int   (default: 0)
         partidas_deseadas int   (default: 1)
         partidas_gm       int   (default: 0)
+        c_england         int   (default: 0)
+        ...
 
     Returns the new snapshot id. Does NOT commit.
     Note: No event is created because this is a root node.
@@ -448,6 +509,13 @@ def create_root_manual_snapshot(
             int(player.get("prioridad", 0)),
             int(player.get("partidas_deseadas", 1)),
             int(player.get("partidas_gm", 0)),
+            int(player.get("c_england", 0)),
+            int(player.get("c_france", 0)),
+            int(player.get("c_germany", 0)),
+            int(player.get("c_italy", 0)),
+            int(player.get("c_austria", 0)),
+            int(player.get("c_russia", 0)),
+            int(player.get("c_turkey", 0)),
         )
     return snap_id
 

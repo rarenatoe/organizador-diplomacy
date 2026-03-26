@@ -303,7 +303,7 @@ class TestSyncBehavior:
 
     def _simulate_sync_logic(self, existentes, notion_players, merges=None, is_first_sync=False):
         """Helper to simulate the exact row-building logic from notion_sync.py"""
-        from .notion_sync import FIELD_DEFAULTS, _find_notion_player, _normalize_name
+        from .notion_sync import FIELD_DEFAULTS, _find_notion_player, _normalize_name, COUNTRY_PROPS
         if merges is None:
             merges = {}
         
@@ -327,6 +327,7 @@ class TestSyncBehavior:
                             "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
                             "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
                             "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
+                            **{c: notion_data.get(c, 0) for c in COUNTRY_PROPS},
                         })
                         continue
                 
@@ -340,6 +341,7 @@ class TestSyncBehavior:
                         "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
                         "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
                         "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
+                        **{c: notion_data.get(c, 0) for c in COUNTRY_PROPS},
                     })
                 # 3. Not in Notion (Preserved locally)
                 elif nombre not in merges:
@@ -350,6 +352,7 @@ class TestSyncBehavior:
                         "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
                         "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
                         "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
+                        **{c: existente.get(c, 0) for c in COUNTRY_PROPS},
                     })
         else:
             # First ever sync
@@ -361,17 +364,18 @@ class TestSyncBehavior:
                     "prioridad":         FIELD_DEFAULTS["prioridad"],
                     "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
                     "partidas_gm":       FIELD_DEFAULTS["partidas_gm"],
+                    **{c: notion_data.get(c, 0) for c in COUNTRY_PROPS},
                 })
         return filas
 
     def test_players_not_in_notion_are_preserved(self):
         """Regression test: Local players not in Notion must not be deleted."""
         existentes = {
-            "Andy": {"nombre": "Andy", "experiencia": "Antiguo", "juegos_este_ano": 2, "prioridad": 0, "partidas_deseadas": 2, "partidas_gm": 1},
+            "Andy": {"nombre": "Andy", "experiencia": "Antiguo", "juegos_este_ano": 2, "prioridad": 0, "partidas_deseadas": 2, "partidas_gm": 1, "c_england": 1},
             "Charlie": {"nombre": "Charlie", "experiencia": "Antiguo", "juegos_este_ano": 0, "prioridad": 0, "partidas_deseadas": 2, "partidas_gm": 0},
         }
         notion_players = {
-            "andy": {"nombre": "Andy", "experiencia": "Antiguo", "juegos": 1},
+            "andy": {"nombre": "Andy", "experiencia": "Antiguo", "juegos": 1, "c_england": 2},
         }
         
         filas = self._simulate_sync_logic(existentes, notion_players)
@@ -383,8 +387,26 @@ class TestSyncBehavior:
         
         andy_row = next(f for f in filas if f["Nombre"] == "Andy")
         assert andy_row["Juegos_Este_Ano"] == 1 # Updated from Notion
+        assert andy_row["c_england"] == 2 # Updated from Notion
+        
         charlie_row = next(f for f in filas if f["Nombre"] == "Charlie")
         assert charlie_row["Juegos_Este_Ano"] == 0 # Preserved from local
+
+    def test_country_stats_extraction(self):
+        """Test that country stats are correctly extracted and updated."""
+        from .notion_sync import _extraer_numero
+        
+        # Mock property with number
+        prop_num = {"type": "number", "number": 5}
+        assert _extraer_numero(prop_num) == 5
+        
+        # Mock property with formula
+        prop_formula = {"type": "formula", "formula": {"type": "number", "number": 3}}
+        assert _extraer_numero(prop_formula) == 3
+        
+        # Mock empty or invalid
+        assert _extraer_numero({}) == 0
+        assert _extraer_numero(None) == 0
 
     def test_new_notion_players_are_ignored(self):
         """Regression test: New players in Notion must NOT be added to an existing snapshot."""

@@ -57,7 +57,30 @@ FIELD_DEFAULTS: dict[str, int] = {
     "partidas_gm":       0,
 }
 
+# ── Country property mapping ──────────────────────────────────────────────────
+
+COUNTRY_PROPS: dict[str, str] = {
+    "c_england": "∀ 🇬🇧",
+    "c_france":  "∀ 🇫🇷",
+    "c_germany": "∀ 🇩🇪",
+    "c_italy":   "∀ 🇮🇹",
+    "c_austria": "∀ 🇦🇹",
+    "c_russia":  "∀ 🇷🇺",
+    "c_turkey":  "∀ 🇹🇷",
+}
+
 # ── Helpers de extracción ─────────────────────────────────────────────────────
+
+def _extraer_numero(prop: dict) -> int:
+    """Extrae un número de una propiedad number o formula."""
+    if not prop:
+        return 0
+    if prop.get("type") == "number":
+        return int(prop.get("number") or 0)
+    if prop.get("type") == "formula":
+        return int(prop.get("formula", {}).get("number") or 0)
+    return 0
+
 
 def _extraer_nombre(prop: dict) -> str:
     """Extrae texto plano de una propiedad title."""
@@ -373,10 +396,11 @@ def descargar_todos(
         )
     data_source_id: str = data_sources[0]["id"]
 
-    # Payload reduction: get property IDs for "Nombre", "Participaciones" and "Alias"
+    # Payload reduction: get property IDs for required fields
     prop_ids: list[str] = []
     props = db_info.get("properties", {})
-    for name in ["Nombre", "Participaciones", "Alias"]:
+    required_names = ["Nombre", "Participaciones", "Alias"] + list(COUNTRY_PROPS.values())
+    for name in required_names:
         if name in props:
             prop_ids.append(props[name]["id"])
 
@@ -510,11 +534,19 @@ def main() -> None:
         alias_text = "".join(p.get("plain_text", "") for p in alias_prop.get("rich_text", [])) if alias_prop else ""
         alias_list = [a.strip().lower() for a in alias_text.split(",") if a.strip()]
         
+        # Country history extraction
+        countries_data = {
+            key: _extraer_numero(props.get(notion_name, {}))
+            for key, notion_name in COUNTRY_PROPS.items()
+        }
+        
         notion_players[_normalize_name(nombre)] = {
+            "notion_id": page["id"],
             "nombre": nombre,
             "experiencia": experiencia,
             "juegos": juegos,
             "alias": alias_list,
+            **countries_data,
         }
     
     # ── Detect-only mode: output similar names as JSON ────────────────────────
@@ -555,6 +587,7 @@ def main() -> None:
                         "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
                         "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
                         "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
+                        **{c: notion_data[c] for c in COUNTRY_PROPS},
                     })
                     continue
             
@@ -568,6 +601,7 @@ def main() -> None:
                     "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
                     "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
                     "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
+                    **{c: notion_data[c] for c in COUNTRY_PROPS},
                 })
             elif nombre not in merges:
                 # 3. Keep existing data (player not in Notion and not merged)
@@ -578,6 +612,7 @@ def main() -> None:
                     "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
                     "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
                     "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
+                    **{c: existente.get(c, 0) for c in COUNTRY_PROPS},
                 })
 
     else:
@@ -590,6 +625,7 @@ def main() -> None:
                 "prioridad":         FIELD_DEFAULTS["prioridad"],
                 "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
                 "partidas_gm":       FIELD_DEFAULTS["partidas_gm"],
+                **{c: notion_data[c] for c in COUNTRY_PROPS},
             })
 
     nuevos = [f["Nombre"] for f in filas if f["Nombre"] not in existentes]
@@ -624,6 +660,13 @@ def main() -> None:
                 fila["prioridad"],
                 fila["partidas_deseadas"],
                 fila["partidas_gm"],
+                fila["c_england"],
+                fila["c_france"],
+                fila["c_germany"],
+                fila["c_italy"],
+                fila["c_austria"],
+                fila["c_russia"],
+                fila["c_turkey"],
             )
         db.create_sync_event(conn, source_snapshot_id, snap_id)
         conn.commit()
