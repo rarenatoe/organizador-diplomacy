@@ -1,10 +1,11 @@
 <script lang="ts">
-  import type { SnapshotDetail, EditPlayerRow, SimilarName, MergePair, NotionPlayer } from "../types";
+  import type { SnapshotDetail, EditPlayerRow, SimilarName, MergePair, NotionPlayer, OrganizarValidation } from "../types";
   import { fetchSnapshot, runScript, renamePlayer, fetchChain, fetchNotionPlayers, saveSnapshot } from "../api";
   import { findLatestGameId } from "../snapshotUtils";
   import { setActiveNodeId } from "../stores.svelte";
-  import { detectSimilarNames, normalizeName } from "../syncUtils";
+  import { detectSimilarNames, normalizeName, validateOrganizar } from "../syncUtils";
   import SyncResolutionModal from "./SyncResolutionModal.svelte";
+  import OrganizarConfirmModal from "./OrganizarConfirmModal.svelte";
 
   interface Props {
     id: number;
@@ -25,6 +26,9 @@
   let resolutionPairs = $state<SimilarName[]>([]);
   let fetchedNotionPlayers = $state<NotionPlayer[]>([]);
   let csvCopied = $state(false);
+
+  let showConfirm = $state(false);
+  let validation = $state<OrganizarValidation | null>(null);
 
   const CSV_COLS = [
     "nombre",
@@ -80,6 +84,23 @@
   }
 
   async function handleOrganizar(): Promise<void> {
+    if (!data?.players) return;
+
+    if (data.players.length < 7) {
+      onShowError("Error al organizar", "Se necesitan al menos 7 jugadores para organizar partidas.");
+      return;
+    }
+
+    validation = validateOrganizar(data.players);
+    if (validation) {
+      showConfirm = true;
+    } else {
+      await executeOrganizar();
+    }
+  }
+
+  async function executeOrganizar(): Promise<void> {
+    showConfirm = false;
     try {
       const res = await runScript("organizar", id);
       if (
@@ -326,6 +347,27 @@
   pairs={resolutionPairs}
   onComplete={handleResolutionComplete}
   onCancel={handleResolutionCancel}
+/>
+
+<OrganizarConfirmModal
+  visible={showConfirm}
+  validation={validation}
+  onConfirm={executeOrganizar}
+  onEdit={() => {
+    showConfirm = false;
+    const playersToEdit = (data?.players || []).map((p) => ({
+      nombre: p.nombre,
+      experiencia: p.experiencia ?? "Nuevo",
+      juegos_este_ano: p.juegos_este_ano ?? 0,
+      prioridad: p.prioridad ?? 0,
+      partidas_deseadas: p.partidas_deseadas ?? 1,
+      partidas_gm: p.partidas_gm ?? 0
+    }));
+    onEditDraft(id, 'manual', null, playersToEdit);
+  }}
+  onCancel={() => {
+    showConfirm = false;
+  }}
 />
 
 <style>

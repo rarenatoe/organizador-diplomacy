@@ -125,6 +125,15 @@ export interface SimilarName {
   similarity: number;
 }
 
+export interface OrganizarValidation {
+  isAllOnes: boolean;
+  gmShortage: {
+    required: number;
+    assigned: number;
+  } | null;
+  excludedPlayers: string[];
+}
+
 export interface SyncDetectResult {
   notion_count: number;
   snapshot_count: number;

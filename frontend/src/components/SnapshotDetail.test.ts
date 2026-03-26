@@ -10,7 +10,7 @@ vi.mock("../api", () => ({
     source: "manual",
     players: [
       {
-        nombre: "Alice",
+        nombre: "P1",
         experiencia: "Nuevo",
         juegos_este_ano: 0,
         prioridad: 0,
@@ -18,12 +18,52 @@ vi.mock("../api", () => ({
         partidas_gm: 0,
       },
       {
-        nombre: "Bob",
+        nombre: "P2",
         experiencia: "Antiguo",
         juegos_este_ano: 3,
         prioridad: 1,
         partidas_deseadas: 2,
         partidas_gm: 1,
+      },
+      {
+        nombre: "P3",
+        experiencia: "Nuevo",
+        juegos_este_ano: 0,
+        prioridad: 0,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
+      },
+      {
+        nombre: "P4",
+        experiencia: "Nuevo",
+        juegos_este_ano: 0,
+        prioridad: 0,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
+      },
+      {
+        nombre: "P5",
+        experiencia: "Nuevo",
+        juegos_este_ano: 0,
+        prioridad: 0,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
+      },
+      {
+        nombre: "P6",
+        experiencia: "Nuevo",
+        juegos_este_ano: 0,
+        prioridad: 0,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
+      },
+      {
+        nombre: "P7",
+        experiencia: "Nuevo",
+        juegos_este_ano: 0,
+        prioridad: 0,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
       },
     ],
   }),
@@ -42,6 +82,8 @@ vi.mock("../stores.svelte", () => ({
 // Mock the syncUtils
 vi.mock("../syncUtils", () => ({
   detectSimilarNames: vi.fn().mockReturnValue([]),
+  normalizeName: vi.fn((s: string) => s.toLowerCase()),
+  validateOrganizar: vi.fn().mockReturnValue(null),
 }));
 
 // Mock the snapshotUtils
@@ -91,8 +133,8 @@ describe("SnapshotDetail", () => {
     expect(screen.getByText(/📥 Manual/)).toBeTruthy();
 
     // Verify players are displayed
-    expect(screen.getByText("Alice")).toBeTruthy();
-    expect(screen.getByText("Bob")).toBeTruthy();
+    expect(screen.getByText("P1")).toBeTruthy();
+    expect(screen.getByText("P2")).toBeTruthy();
   });
 
   it("passes current players to onEditDraft when edit button is clicked", async () => {
@@ -123,7 +165,7 @@ describe("SnapshotDetail", () => {
     expect(onEditDraft).toHaveBeenCalledTimes(1);
     expect(onEditDraft).toHaveBeenCalledWith(1, "manual", null, [
       {
-        nombre: "Alice",
+        nombre: "P1",
         experiencia: "Nuevo",
         juegos_este_ano: 0,
         prioridad: 0,
@@ -131,12 +173,52 @@ describe("SnapshotDetail", () => {
         partidas_gm: 0,
       },
       {
-        nombre: "Bob",
+        nombre: "P2",
         experiencia: "Antiguo",
         juegos_este_ano: 3,
         prioridad: 1,
         partidas_deseadas: 2,
         partidas_gm: 1,
+      },
+      {
+        nombre: "P3",
+        experiencia: "Nuevo",
+        juegos_este_ano: 0,
+        prioridad: 0,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
+      },
+      {
+        nombre: "P4",
+        experiencia: "Nuevo",
+        juegos_este_ano: 0,
+        prioridad: 0,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
+      },
+      {
+        nombre: "P5",
+        experiencia: "Nuevo",
+        juegos_este_ano: 0,
+        prioridad: 0,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
+      },
+      {
+        nombre: "P6",
+        experiencia: "Nuevo",
+        juegos_este_ano: 0,
+        prioridad: 0,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
+      },
+      {
+        nombre: "P7",
+        experiencia: "Nuevo",
+        juegos_este_ano: 0,
+        prioridad: 0,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
       },
     ]);
   });
@@ -436,7 +518,7 @@ describe("SnapshotDetail", () => {
       created_at: "2024-01-01 12:00:00",
       players: [
         {
-          nombre: "Alice",
+          nombre: "P1",
           experiencia: "Nuevo",
           juegos_este_ano: 0,
           prioridad: 0,
@@ -514,6 +596,177 @@ describe("SnapshotDetail", () => {
     // Assert it proceeds to fetch Notion players
     await waitFor(() => {
       expect(fetchNotionPlayers).toHaveBeenCalled();
+    });
+  });
+
+  describe("Organizar Validation", () => {
+    it("should hard block if less than 7 players", async () => {
+      const { fetchSnapshot, runScript } = await import("../api");
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 10,
+        players: new Array(6)
+          .fill(null)
+          .map((_, i) => ({ nombre: `P${i}`, partidas_deseadas: 1 })),
+      });
+
+      const onShowError = vi.fn();
+      render(SnapshotDetail, {
+        props: {
+          id: 10,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onEditDraft: () => {},
+          onShowError,
+        },
+      });
+
+      await waitFor(() => expect(screen.queryByText("Cargando…")).toBeNull());
+      await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
+
+      expect(onShowError).toHaveBeenCalledWith(
+        "Error al organizar",
+        "Se necesitan al menos 7 jugadores para organizar partidas.",
+      );
+      expect(runScript).not.toHaveBeenCalled();
+    });
+
+    it("should show modal if all players have 1 ticket", async () => {
+      const { fetchSnapshot, runScript } = await import("../api");
+      const { validateOrganizar } = await import("../syncUtils");
+
+      const players = new Array(7).fill(null).map((_, i) => ({
+        nombre: `P${i}`,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
+        prioridad: 0,
+      }));
+
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 11,
+        players,
+      });
+      (validateOrganizar as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+        isAllOnes: true,
+        gmShortage: { required: 1, assigned: 0 },
+        excludedPlayers: [],
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 11,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => expect(screen.queryByText("Cargando…")).toBeNull());
+      await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
+
+      expect(screen.getByText("Revisar Roster")).toBeTruthy();
+      expect(runScript).not.toHaveBeenCalled();
+    });
+
+    it("should call executeOrganizar when confirmed in modal", async () => {
+      vi.useRealTimers();
+      const { fetchSnapshot, runScript } = await import("../api");
+      const { validateOrganizar } = await import("../syncUtils");
+
+      const players = new Array(7).fill(null).map((_, i) => ({
+        nombre: `P${i}`,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
+        prioridad: 0,
+      }));
+
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 12,
+        players,
+      });
+      (validateOrganizar as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+        isAllOnes: true,
+        gmShortage: null,
+        excludedPlayers: [],
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 12,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => expect(screen.queryByText("Cargando…")).toBeNull());
+      await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
+
+      const confirmBtn = screen.getByText("Organizar de todos modos");
+      await fireEvent.click(confirmBtn);
+
+      await waitFor(() => {
+        expect(runScript).toHaveBeenCalledWith("organizar", 12);
+      });
+      vi.useFakeTimers();
+    });
+
+    it("should call onEditDraft when edit is clicked in modal", async () => {
+      const { fetchSnapshot } = await import("../api");
+      const { validateOrganizar } = await import("../syncUtils");
+
+      const players = new Array(7).fill(null).map((_, i) => ({
+        nombre: `P${i}`,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
+        prioridad: 0,
+        experiencia: "Nuevo",
+        juegos_este_ano: 0,
+      }));
+
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 13,
+        players,
+      });
+      (validateOrganizar as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+        isAllOnes: true,
+        gmShortage: null,
+        excludedPlayers: [],
+      });
+
+      const onEditDraft = vi.fn();
+      render(SnapshotDetail, {
+        props: {
+          id: 13,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onEditDraft,
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => expect(screen.queryByText("Cargando…")).toBeNull());
+      await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
+
+      const editBtn = screen.getByText("Volver a Editar");
+      await fireEvent.click(editBtn);
+
+      expect(onEditDraft).toHaveBeenCalledTimes(1);
+      expect(onEditDraft).toHaveBeenCalledWith(
+        13,
+        "manual",
+        null,
+        expect.arrayContaining([expect.objectContaining({ nombre: "P0" })]),
+      );
     });
   });
 });

@@ -11,12 +11,16 @@ export default defineConfig([
   })),
   {
     files: ["frontend/src/**/*.ts"],
+    plugins: {
+      "@typescript-eslint": tseslint.plugin,
+    },
     languageOptions: {
       parserOptions: {
         projectService: true,
       },
     },
     rules: {
+      "@typescript-eslint/dot-notation": "error",
       "@typescript-eslint/no-explicit-any": "error",
       "@typescript-eslint/naming-convention": [
         "error",
@@ -77,12 +81,16 @@ export default defineConfig([
   })),
   {
     files: ["frontend/src/**/*.svelte"],
+    plugins: {
+      "@typescript-eslint": tseslint.plugin,
+    },
     languageOptions: {
       parserOptions: {
         parser: tseslint.parser,
       },
     },
     rules: {
+      "dot-notation": "error",
       // Disable TypeScript rules that require type information for Svelte files
       "@typescript-eslint/no-floating-promises": "off",
       "@typescript-eslint/restrict-template-expressions": "off",
