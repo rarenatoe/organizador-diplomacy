@@ -13,7 +13,8 @@ Los tests de db.py y db_views.py viven en test_db.py.
 import random
 import unittest
 
-from .organizador import Jugador, ResultadoPartidas, _calcular_partidas
+from .core import calcular_partidas
+from .models import Jugador, ResultadoPartidas
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -88,20 +89,20 @@ class TestCalcularPartidas(unittest.TestCase):
     # ── Casos base ────────────────────────────────────────────────────────────
 
     def test_sin_jugadores_retorna_none(self):
-        self.assertIsNone(_calcular_partidas([]))
+        self.assertIsNone(calcular_partidas([]))
 
     def test_menos_de_siete_jugadores_retorna_none(self):
-        self.assertIsNone(_calcular_partidas(_pool(6)))
+        self.assertIsNone(calcular_partidas(_pool(6)))
 
     def test_exactamente_siete_forma_una_partida(self):
-        res = _calcular_partidas(_pool(7))
+        res = calcular_partidas(_pool(7))
         self.assertIsNotNone(res)
         self.assertIsInstance(res, ResultadoPartidas)
         self.assertEqual(len(res.mesas), 1)
         self.assertEqual(len(res.mesas[0].jugadores), 7)
 
     def test_catorce_jugadores_forman_dos_partidas(self):
-        res = _calcular_partidas(_pool(14))
+        res = calcular_partidas(_pool(14))
         self.assertIsNotNone(res)
         self.assertEqual(len(res.mesas), 2)
 
@@ -111,22 +112,22 @@ class TestCalcularPartidas(unittest.TestCase):
             _j("Multi1", partidas_deseadas=2),
             _j("Multi2", partidas_deseadas=2),
         ]
-        res = _calcular_partidas(jugadores)
+        res = calcular_partidas(jugadores)
         self.assertIsNotNone(res)
         self.assertEqual(len(res.mesas), 2)
 
     # ── Corrección de las mesas ───────────────────────────────────────────────
 
     def test_cada_mesa_tiene_exactamente_siete_jugadores(self):
-        res = _calcular_partidas(_pool(14))
+        res = calcular_partidas(_pool(14))
         self.assertIsNotNone(res)
         for mesa in res.mesas:
             self.assertEqual(len(mesa.jugadores), 7)
 
     def test_sin_duplicados_por_mesa(self):
-        """Un jugador no puede aparecer dos veces en la misma mesa."""
+        """Un jugador no puede aparecer dos veces in the same mesa."""
         jugadores = _pool(10) + [_j("Multi", partidas_deseadas=2)]
-        res = _calcular_partidas(jugadores)
+        res = calcular_partidas(jugadores)
         if res is None:
             return
         for mesa in res.mesas:
@@ -139,7 +140,7 @@ class TestCalcularPartidas(unittest.TestCase):
             _j("Multi1", partidas_deseadas=2),
             _j("Multi2", partidas_deseadas=2),
         ]
-        res = _calcular_partidas(jugadores)
+        res = calcular_partidas(jugadores)
         self.assertIsNotNone(res)
         for nombre in ("Multi1", "Multi2"):
             mesas_del_jugador = [
@@ -154,7 +155,7 @@ class TestCalcularPartidas(unittest.TestCase):
     def test_balance_nuevos_y_antiguos_por_mesa(self):
         """Con una mezcla suficiente, cada mesa debe tener nuevos y antiguos."""
         jugadores = _pool(6, prefix="N", experiencia="Nuevo") + _pool(8, prefix="A")
-        res = _calcular_partidas(jugadores)
+        res = calcular_partidas(jugadores)
         self.assertIsNotNone(res)
         for mesa in res.mesas:
             self.assertTrue(any(j.es_nuevo for j in mesa.jugadores), "Mesa sin jugadores nuevos")
@@ -167,19 +168,19 @@ class TestCalcularPartidas(unittest.TestCase):
         jugadores = _pool(7)  # 1 mesa
         jugadores += [_j("GM1", partidas_gm=1), _j("GM2", partidas_gm=1)]
         with self.assertRaises(ValueError):
-            _calcular_partidas(jugadores)
+            calcular_partidas(jugadores)
 
     def test_un_gm_en_unica_mesa_no_es_error(self):
         """Un solo GM para una sola mesa es configuración válida."""
         jugadores = _pool(7) + [_j("GM1", partidas_gm=1)]
-        res = _calcular_partidas(jugadores)  # no debe lanzar excepción
+        res = calcular_partidas(jugadores)  # no debe lanzar excepción
         self.assertIsNotNone(res)
 
     # ── Lista de espera ───────────────────────────────────────────────────────
 
     def test_lista_de_espera_contiene_jugadores_sobrantes(self):
         """Con 15 jugadores (2 mesas = 14 cupos), 1 debe quedar en espera."""
-        res = _calcular_partidas(_pool(15))
+        res = calcular_partidas(_pool(15))
         self.assertIsNotNone(res)
         self.assertEqual(len(res.mesas), 2)
         total_colocados = sum(len(m.jugadores) for m in res.mesas)
@@ -188,7 +189,7 @@ class TestCalcularPartidas(unittest.TestCase):
 
     def test_todos_entran_cuando_hay_cupos_exactos(self):
         """Si los tickets caben exactamente, la lista de espera debe estar vacía."""
-        res = _calcular_partidas(_pool(14))
+        res = calcular_partidas(_pool(14))
         self.assertIsNotNone(res)
         self.assertEqual(len(res.tickets_sobrantes), 0)
 
