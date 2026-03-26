@@ -74,7 +74,7 @@ export interface SnapshotDetail {
   id: number;
   created_at: string;
   source: string;
-  players?: Record<string, string | number>[];
+  players?: EditPlayerRow[];
 }
 
 export interface GameDetail {
@@ -116,6 +116,7 @@ export interface NotionPlayer {
   nombre: string;
   experiencia: string;
   juegos_este_ano: number;
+  alias?: string[];
 }
 
 export interface SimilarName {
@@ -134,6 +135,7 @@ export interface SyncDetectResult {
 export interface MergePair {
   from: string;
   to: string;
+  action: ResolutionAction;
 }
 
 // ── Toast notification types ─────────────────────────────────────────────────
@@ -148,7 +150,7 @@ export interface ToastOptions {
 
 // ── Resolution card types ────────────────────────────────────────────────────
 
-export type ResolutionAction = "merge" | "skip";
+export type ResolutionAction = "merge_notion" | "merge_local" | "skip";
 
 export interface ResolutionDecision {
   pair: SimilarName;

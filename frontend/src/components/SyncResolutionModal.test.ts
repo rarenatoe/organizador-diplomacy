@@ -75,7 +75,7 @@ describe("SyncResolutionModal.svelte", () => {
     expect(container.textContent).toContain("95% similar");
   });
 
-  it("calls onComplete with merges when all resolved", async () => {
+  it("calls onComplete with merges when all resolved (Notion name)", async () => {
     const onComplete = vi.fn();
     const firstPair = mockPairs[0]!;
     const { container } = render(SyncResolutionModal, {
@@ -87,12 +87,33 @@ describe("SyncResolutionModal.svelte", () => {
       },
     });
 
-    // Click merge button
-    const mergeBtn = container.querySelector(".resolution-btn-merge");
+    // Click merge Notion button
+    const mergeBtn = container.querySelector(".resolution-btn-merge-notion");
     await fireEvent.click(mergeBtn!);
 
     expect(onComplete).toHaveBeenCalledWith([
-      { from: "Juan Perez", to: "Juan Pérez" },
+      { from: "Juan Perez", to: "Juan Pérez", action: "merge_notion" },
+    ]);
+  });
+
+  it("calls onComplete with merges when all resolved (Local name)", async () => {
+    const onComplete = vi.fn();
+    const firstPair = mockPairs[0]!;
+    const { container } = render(SyncResolutionModal, {
+      props: {
+        visible: true,
+        pairs: [firstPair],
+        onComplete,
+        onCancel: vi.fn(),
+      },
+    });
+
+    // Click merge local button
+    const mergeBtn = container.querySelector(".resolution-btn-merge-local");
+    await fireEvent.click(mergeBtn!);
+
+    expect(onComplete).toHaveBeenCalledWith([
+      { from: "Juan Perez", to: "Juan Pérez", action: "merge_local" },
     ]);
   });
 
@@ -143,7 +164,7 @@ describe("SyncResolutionModal.svelte", () => {
     });
 
     // Click merge on first pair
-    const mergeBtn = container.querySelector(".resolution-btn-merge");
+    const mergeBtn = container.querySelector(".resolution-btn-merge-notion");
     await fireEvent.click(mergeBtn!);
 
     // Should show second pair

@@ -7,8 +7,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 # Fixtures are provided by conftest.py
 
 
@@ -146,7 +144,7 @@ class TestApiRun:
     def test_run_notion_sync_missing_snapshot_returns_200_when_empty(self, client, monkeypatch):
         """Calling notion_sync without snapshot returns 200 when DB is empty (first-time sync)."""
         import subprocess
-        from backend.db import db
+
         
         # Clear all snapshots to simulate first-time sync
         c, conn = client
@@ -164,7 +162,7 @@ class TestApiRun:
     def test_run_notion_sync_first_time_no_snapshot_allowed(self, client, monkeypatch):
         """First-time sync (empty DB) is allowed without snapshot ID."""
         import subprocess
-        from backend.db import db
+
         
         # Clear all snapshots to simulate first-time sync
         c, conn = client

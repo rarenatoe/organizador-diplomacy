@@ -79,9 +79,20 @@ describe("similarity", () => {
     expect(similarity("Gonzalo Ch.", "Gonzalo L.")).toBe(0.0);
   });
 
-  it("should return 0.0 for different word counts", () => {
-    expect(similarity("John", "John Doe")).toBe(0.0);
-    expect(similarity("John Doe Smith", "John Doe")).toBe(0.0);
+  it("should handle different word counts with prefix matching (regression)", () => {
+    // Jean Carlos (local) matches Jean Carlos R. (Notion) -> 0.8
+    expect(similarity("Jean Carlos", "Jean Carlos R.")).toBe(0.8);
+    // Jean Carlos R. (local) matches Jean Carlos (Notion) -> 0.8
+    expect(similarity("Jean Carlos R.", "Jean Carlos")).toBe(0.8);
+    // Jean (local) vs Jean Carlos R. (Notion) -> no boost (diff > 1)
+    expect(similarity("Jean", "Jean Carlos R.")).toBeLessThan(0.4);
+  });
+
+  it("should return 0.0 for any word mismatch (regression)", () => {
+    // Mismatch in common words -> 0.0
+    expect(similarity("Jean Carlos", "Jean Pedro")).toBe(0.0);
+    // Mismatch in first word -> 0.0
+    expect(similarity("Carlos", "Jean Carlos")).toBe(0.0);
   });
 
   it("should handle empty strings", () => {
@@ -93,10 +104,14 @@ describe("similarity", () => {
 
 describe("detectSimilarNames", () => {
   it("should detect similar names above threshold", () => {
-    const notionNames = ["Ren Alegre", "P. Knight", "John Doe"];
+    const notionPlayers = [
+      { nombre: "Ren Alegre", experiencia: "Antiguo", juegos_este_ano: 0 },
+      { nombre: "P. Knight", experiencia: "Nuevo", juegos_este_ano: 0 },
+      { nombre: "John Doe", experiencia: "Antiguo", juegos_este_ano: 0 }
+    ];
     const snapshotNames = ["Renato Alegre", "Paul Knight", "Jane Smith"];
 
-    const result = detectSimilarNames(notionNames, snapshotNames, 0.75);
+    const result = detectSimilarNames(notionPlayers, snapshotNames, 0.75);
 
     expect(result).toHaveLength(2);
     expect(result[0]?.notion).toBe("Ren Alegre");
@@ -108,19 +123,26 @@ describe("detectSimilarNames", () => {
   });
 
   it("should skip exact matches", () => {
-    const notionNames = ["John Doe", "Jane Smith"];
+    const notionPlayers = [
+      { nombre: "John Doe", experiencia: "Antiguo", juegos_este_ano: 0 },
+      { nombre: "Jane Smith", experiencia: "Antiguo", juegos_este_ano: 0 }
+    ];
     const snapshotNames = ["John Doe", "Jane Smith"];
 
-    const result = detectSimilarNames(notionNames, snapshotNames, 0.75);
+    const result = detectSimilarNames(notionPlayers, snapshotNames, 0.75);
 
     expect(result).toHaveLength(0);
   });
 
   it("should sort by similarity descending", () => {
-    const notionNames = ["Ren Alegre", "P. Knight", "Miguel P."];
+    const notionPlayers = [
+      { nombre: "Ren Alegre", experiencia: "Antiguo", juegos_este_ano: 0 },
+      { nombre: "P. Knight", experiencia: "Nuevo", juegos_este_ano: 0 },
+      { nombre: "Miguel P.", experiencia: "Antiguo", juegos_este_ano: 0 }
+    ];
     const snapshotNames = ["Renato Alegre", "Paul Knight", "Miguel Paucar"];
 
-    const result = detectSimilarNames(notionNames, snapshotNames, 0.75);
+    const result = detectSimilarNames(notionPlayers, snapshotNames, 0.75);
 
     expect(result).toHaveLength(3);
     // All should have similarity 1.0, but order should be preserved
@@ -130,11 +152,13 @@ describe("detectSimilarNames", () => {
   });
 
   it("should respect threshold parameter", () => {
-    const notionNames = ["Ren Alegre"];
+    const notionPlayers = [
+      { nombre: "Ren Alegre", experiencia: "Antiguo", juegos_este_ano: 0 }
+    ];
     const snapshotNames = ["Renato Alegre"];
 
-    const resultHigh = detectSimilarNames(notionNames, snapshotNames, 0.9);
-    const resultLow = detectSimilarNames(notionNames, snapshotNames, 0.5);
+    const resultHigh = detectSimilarNames(notionPlayers, snapshotNames, 0.9);
+    const resultLow = detectSimilarNames(notionPlayers, snapshotNames, 0.5);
 
     expect(resultHigh).toHaveLength(1);
     expect(resultLow).toHaveLength(1);
@@ -142,17 +166,44 @@ describe("detectSimilarNames", () => {
 
   it("should handle empty arrays", () => {
     expect(detectSimilarNames([], ["John Doe"], 0.75)).toHaveLength(0);
-    expect(detectSimilarNames(["John Doe"], [], 0.75)).toHaveLength(0);
+    expect(detectSimilarNames([{ nombre: "John Doe", experiencia: "Nuevo", juegos_este_ano: 0 }], [], 0.75)).toHaveLength(0);
     expect(detectSimilarNames([], [], 0.75)).toHaveLength(0);
   });
 
   it("should round similarity to 3 decimal places", () => {
-    const notionNames = ["Test Name"];
+    const notionPlayers = [
+      { nombre: "Test Name", experiencia: "Nuevo", juegos_este_ano: 0 }
+    ];
     const snapshotNames = ["Test Name"];
 
-    const result = detectSimilarNames(notionNames, snapshotNames, 0.75);
+    const result = detectSimilarNames(notionPlayers, snapshotNames, 0.75);
 
     // Exact match should be skipped
+    expect(result).toHaveLength(0);
+  });
+
+  it("should detect similarity against aliases", () => {
+    const notionPlayers = [
+      { nombre: "Renato Alegre", experiencia: "Antiguo", juegos_este_ano: 0, alias: ["ren"] }
+    ];
+    const snapshotNames = ["re"]; // Prefix of "ren"
+
+    const result = detectSimilarNames(notionPlayers, snapshotNames, 0.5);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.notion).toBe("Renato Alegre");
+    expect(result[0]?.snapshot).toBe("re");
+    expect(result[0]?.similarity).toBe(1.0);
+  });
+
+  it("should skip exact matches against aliases", () => {
+    const notionPlayers = [
+      { nombre: "Renato Alegre", experiencia: "Antiguo", juegos_este_ano: 0, alias: ["ren"] }
+    ];
+    const snapshotNames = ["ren"]; // Exact match with alias
+
+    const result = detectSimilarNames(notionPlayers, snapshotNames, 0.75);
+
     expect(result).toHaveLength(0);
   });
 });

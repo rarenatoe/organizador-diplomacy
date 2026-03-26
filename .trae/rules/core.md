@@ -51,7 +51,8 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 
 ## Workflow
 1. Run `uv run python -m pytest -q`.
-2. Run `bun run build && bun run lint && bun run typecheck`. Check Svelte Problems in VS Code.
+2. Run `uv run ruff check backend && uv run pyright backend && uv run vulture backend`.
+3. Run `bun run build && bun run lint && bun run typecheck`. Check Svelte Problems in VS Code.
 3. Refactor files >400 LOC.
 4. Update/add tests for changes.
 5. Update instructions if architecture/data model changed.
@@ -61,11 +62,13 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 - **Governance**: Rules in `docs/ai-rules/`, generated via `scripts/generate-ai-instructions.ts`. No direct edits to `.trae/rules/*.md`.
 - **Database**: Centralized `graph_nodes` table for global IDs and cascading deletes.
 - **Testing**: Tests required for new behavior and modifications.
+- **Identity Resolution (Golden Rule)**: During Notion sync, prefer keeping the local name (WhatsApp/CSV) unless the user explicitly chooses "Usar nombre Notion". Use `Alias` column in Notion for secondary matches.
+- **Similarity Algorithm**: Matches names with different word counts (e.g., "Jean Carlos" vs "Jean Carlos R.") using prefix matching and a 0.8 bonus for single-word differences.
 - **Integrity**: Snapshots require explicit source snapshot ID. UI uses store getters directly in templates.
 - **Reactivity**: Svelte 5 `$state`, `$derived`, `$effect`. No local copies of store state.
 - **Loading**: Use `-1` for unknown state; `0` when loaded.
 - **Errors**: Check for null/undefined backend responses. UI toast for errors.
-- **UI**: `title` attributes on disabled buttons for feedback.
+- **UI**: `title` attributes on disabled buttons for feedback. Use vertical layouts for multi-action resolution modals.
 
 ## File Size
 400-line soft limit. Extract sub-domains into new files. Exception: highly cohesive indivisible units.

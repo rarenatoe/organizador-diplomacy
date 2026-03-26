@@ -7,6 +7,7 @@ globs: backend/**/*.py
 
 ## Python conventions
 - Type hints on all function signatures. `Path` for file paths.
+- Static analysis: `ruff check backend`, `pyright backend` (standard mode), and `vulture backend`.
 - Non-interactive: no `input()`. `print()` for stdout, `sys.stderr` for errors.
 - Separators: `# ── Title ────────────────────────────────────────────`
 
@@ -24,10 +25,12 @@ globs: backend/**/*.py
 - Sort edges by `created_at`.
 
 ## Notion Sync
-- Fresh pull of `Nombre`, `Experiencia`, `Juegos_Este_Ano`.
+- Fresh pull of `Nombre`, `Experiencia`, `Juegos_Este_Ano`, and `Alias`.
 - Strict Roster: only updates existing players. No new players added unless first sync.
-- Merges: `--merges` JSON maps local names to Notion names.
+- Identity Resolution: Uses primary `Nombre` and the `Alias` (CSV list) for matching.
+- Merges: `--merges` JSON supports `action: "merge_notion" | "merge_local"`.
 - Preserves local stats (`prioridad`, `partidas_deseadas`, `partidas_gm`).
+- **Golden Rule**: Always default to keeping the local player name to avoid breaking WhatsApp/CSV recognition.
 
 ## API (viewer.py)
 - `GET /api/chain`: Tree data.

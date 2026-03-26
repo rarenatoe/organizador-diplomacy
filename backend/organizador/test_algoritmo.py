@@ -15,7 +15,6 @@ import unittest
 
 from .organizador import Jugador, _calcular_partidas
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _j(

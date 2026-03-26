@@ -26,8 +26,12 @@
       currentIndex++;
     } else {
       const merges: MergePair[] = decisions
-        .filter((d) => d.action === "merge")
-        .map((d) => ({ from: d.pair.snapshot, to: d.pair.notion }));
+        .filter((d) => d.action !== "skip")
+        .map((d) => ({ 
+          from: d.pair.snapshot, 
+          to: d.pair.notion,
+          action: d.action
+        }));
       onComplete(merges);
     }
   }
@@ -72,14 +76,25 @@
         <div class="resolution-similarity">{similarity}% similar</div>
         <div class="resolution-actions">
           <button
-            class="btn btn-primary resolution-btn-merge"
-            onclick={() => handleAction("merge")}>🔀 Fusionar</button
+            class="btn btn-primary resolution-btn-merge-notion"
+            title="Fusionar y adoptar el nombre principal de Notion"
+            onclick={() => handleAction("merge_notion")}>📋 Usar nombre Notion</button
           >
           <button
-            class="btn btn-secondary resolution-btn-skip"
+            class="btn btn-secondary resolution-btn-merge-local"
+            title="Fusionar manteniendo el nombre local actual"
+            onclick={() => handleAction("merge_local")}>📱 Mantener local</button
+          >
+          <button
+            class="btn btn-ghost resolution-btn-skip"
+            title="No realizar ninguna acción de fusión"
             onclick={() => handleAction("skip")}>⏭ Omitir</button
           >
         </div>
+        <p class="resolution-hint">
+          💡 <strong>Mantener local</strong> vincula los datos pero conserva el nombre del snapshot. 
+          Recuerda actualizar el nombre o añadir el alias en Notion para futuras sincronizaciones.
+        </p>
       {/if}
       <div class="resolution-footer">
         <button class="btn btn-ghost resolution-btn-stop" onclick={handleStop}
@@ -200,14 +215,41 @@
     text-align: center;
   }
 
+  .resolution-hint {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--muted);
+    background: var(--surface2);
+    padding: 10px;
+    border-radius: 8px;
+    margin: 0;
+    border-left: 3px solid #f59e0b;
+  }
+
   .resolution-actions {
     display: flex;
-    gap: 10px;
+    flex-direction: column;
+    gap: 8px;
   }
 
   .resolution-actions .btn {
-    flex: 1;
+    width: 100%;
     justify-content: center;
+    padding: 10px;
+    font-size: 13px;
+  }
+
+  .resolution-btn-merge-notion {
+    order: 1;
+  }
+
+  .resolution-btn-merge-local {
+    order: 2;
+  }
+
+  .resolution-btn-skip {
+    order: 3;
+    border: 1px solid var(--border);
   }
 
   .resolution-footer {

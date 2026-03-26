@@ -1,9 +1,9 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import type { EditPlayerRow, SimilarName, MergePair } from "../types";
+  import type { EditPlayerRow, SimilarName, MergePair, NotionPlayer } from "../types";
   import { createSnapshot, saveSnapshot, fetchNotionPlayers } from "../api";
   import { parsePlayersCsv } from "../utils";
-  import { detectSimilarNames } from "../syncUtils";
+  import { detectSimilarNames, normalizeName } from "../syncUtils";
   import { setActiveNodeId } from "../stores.svelte";
   import SyncResolutionModal from "./SyncResolutionModal.svelte";
 
@@ -44,7 +44,7 @@
   let isImporting = $state(false);
   let resolutionVisible = $state(false);
   let resolutionPairs = $state<SimilarName[]>([]);
-  let fetchedNotionPlayers = $state<any[]>([]);
+  let fetchedNotionPlayers = $state<NotionPlayer[]>([]);
 
   // Auto-action on mount
   let autoActionExecuted = $state(false);
@@ -113,9 +113,8 @@
       fetchedNotionPlayers = response.players;
 
       // Detect similar names between Notion and current draft
-      const notionNames = response.players.map((p: any) => p.nombre);
       const draftNames = draftPlayers.map((p) => p.nombre);
-      const similar = detectSimilarNames(notionNames, draftNames, 0.75);
+      const similar = detectSimilarNames(fetchedNotionPlayers, draftNames, 0.75);
 
       if (similar.length > 0) {
         // Show resolution modal
@@ -133,18 +132,22 @@
   }
 
   function mergeNotionPlayers(merges: MergePair[]): void {
-    const mergeMap = new Map(merges.map((m) => [m.from, m.to]));
+    const mergeMap = new Map(merges.map((m) => [m.from, m]));
 
     // Update existing players with Notion data
     const updatedPlayers = draftPlayers.map((player) => {
-      const notionName = mergeMap.get(player.nombre) || player.nombre;
+      const mergeInfo = mergeMap.get(player.nombre);
+      const notionName = mergeInfo ? mergeInfo.to : player.nombre;
+      const normName = normalizeName(notionName);
+      
       const notionPlayer = fetchedNotionPlayers.find(
-        (p: any) => p.nombre === notionName
+        (p) => normalizeName(p.nombre) === normName || p.alias?.some((a) => normalizeName(a) === normName)
       );
+      
       if (notionPlayer) {
         return {
           ...player,
-          nombre: notionName,
+          nombre: mergeInfo?.action === "merge_notion" ? notionPlayer.nombre : player.nombre,
           experiencia: notionPlayer.experiencia,
           juegos_este_ano: notionPlayer.juegos_este_ano,
         };
@@ -154,10 +157,10 @@
 
     // Strict Roster Rule: Only add new players if creating from scratch (parentId === null)
     if (parentId === null) {
-      const existingNames = new Set(updatedPlayers.map((p) => p.nombre));
+      const existingNames = new Set(updatedPlayers.map((p) => normalizeName(p.nombre)));
       const newPlayers = fetchedNotionPlayers
-        .filter((p: any) => !existingNames.has(p.nombre))
-        .map((p: any) => ({
+        .filter((p) => !existingNames.has(normalizeName(p.nombre)))
+        .map((p) => ({
           nombre: p.nombre,
           experiencia: p.experiencia,
           juegos_este_ano: p.juegos_este_ano,

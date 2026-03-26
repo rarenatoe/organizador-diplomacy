@@ -7,8 +7,7 @@ models.py – Domain types shared across organizador.py, formatter.py, and viewe
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
+from dataclasses import dataclass
 
 # ── CSV column reference ───────────────────────────────────────────────────────
 # Columns: Nombre, Experiencia, Juegos_Este_Ano, Prioridad, Partidas_Deseadas, Partidas_GM

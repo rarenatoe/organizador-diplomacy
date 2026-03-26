@@ -8,14 +8,13 @@ from __future__ import annotations
 
 import pytest
 
-from backend.db import db, db_game
-from . import viewer
-from .viewer import app
+from backend.db import db
 
+from .viewer import app
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _make_db() -> "db.sqlite3.Connection":
+def _make_db() -> db.sqlite3.Connection:
     """Returns an in-memory DB with the full schema."""
     return db.get_db(":memory:")
 
@@ -48,7 +47,7 @@ def client(mem_db, monkeypatch):
     """
     class _NoClose:
         """Proxy for sqlite3.Connection that ignores close() calls."""
-        def __init__(self, conn: "db.sqlite3.Connection") -> None:
+        def __init__(self, conn: db.sqlite3.Connection) -> None:
             object.__setattr__(self, "_c", conn)
         def __getattr__(self, name: str):  # type: ignore[override]
             return getattr(object.__getattribute__(self, "_c"), name)

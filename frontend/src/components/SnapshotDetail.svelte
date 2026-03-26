@@ -1,9 +1,9 @@
 <script lang="ts">
-  import type { SnapshotDetail, EditPlayerRow, SimilarName, MergePair } from "../types";
+  import type { SnapshotDetail, EditPlayerRow, SimilarName, MergePair, NotionPlayer } from "../types";
   import { fetchSnapshot, runScript, renamePlayer, fetchChain, fetchNotionPlayers, saveSnapshot } from "../api";
   import { findLatestGameId } from "../snapshotUtils";
   import { setActiveNodeId } from "../stores.svelte";
-  import { detectSimilarNames } from "../syncUtils";
+  import { detectSimilarNames, normalizeName } from "../syncUtils";
   import SyncResolutionModal from "./SyncResolutionModal.svelte";
 
   interface Props {
@@ -23,7 +23,7 @@
   let isSyncing = $state(false);
   let resolutionVisible = $state(false);
   let resolutionPairs = $state<SimilarName[]>([]);
-  let fetchedNotionPlayers = $state<any[]>([]);
+  let fetchedNotionPlayers = $state<NotionPlayer[]>([]);
   let csvCopied = $state(false);
 
   const CSV_COLS = [
@@ -64,8 +64,8 @@
     return [
       CSV_COLS.join(","),
       ...rows.map((r) =>
-        CSV_COLS.map((c: Col) =>
-          String((r as Record<Col, string | number>)[c]),
+        CSV_COLS.map((c) =>
+          String(r[c] ?? ""),
         ).join(","),
       ),
     ].join("\n");
@@ -133,9 +133,8 @@
       fetchedNotionPlayers = response.players;
 
       // Detect similar names between Notion and current snapshot
-      const notionNames = response.players.map((p: any) => p.nombre);
-      const currentNames = (data?.players ?? []).map((p: any) => String(p["nombre"]));
-      const similar = detectSimilarNames(notionNames, currentNames, 0.75);
+      const currentNames = (data?.players ?? []).map((p) => p.nombre);
+      const similar = detectSimilarNames(fetchedNotionPlayers, currentNames, 0.75);
 
       if (similar.length > 0) {
         // Show resolution modal
@@ -153,33 +152,37 @@
   }
 
   async function executeSyncMerge(merges: MergePair[]): Promise<void> {
-    const mergeMap = new Map(merges.map((m) => [m.from, m.to]));
+    const mergeMap = new Map(merges.map((m) => [m.from, m]));
     const currentRows = data?.players ?? [];
 
     // Update existing players with Notion data (Strict Roster Rule: only update existing)
-    const mergedPlayers = currentRows.map((row: any) => {
-      const currentName = String(row["nombre"]);
-      const notionName = mergeMap.get(currentName) || currentName;
+    const mergedPlayers = currentRows.map((row) => {
+      const currentName = row.nombre;
+      const mergeInfo = mergeMap.get(currentName);
+      const notionName = mergeInfo ? mergeInfo.to : currentName;
+      const normName = normalizeName(notionName);
+
       const notionPlayer = fetchedNotionPlayers.find(
-        (p: any) => p.nombre === notionName
+        (p) => normalizeName(p.nombre) === normName || p.alias?.some((a: string) => normalizeName(a) === normName)
       );
+
       if (notionPlayer) {
         return {
-          nombre: notionName,
+          nombre: mergeInfo?.action === "merge_notion" ? notionPlayer.nombre : currentName,
           experiencia: notionPlayer.experiencia,
           juegos_este_ano: notionPlayer.juegos_este_ano,
-          prioridad: Number(row["prioridad"]),
-          partidas_deseadas: Number(row["partidas_deseadas"]),
-          partidas_gm: Number(row["partidas_gm"]),
+          prioridad: row.prioridad,
+          partidas_deseadas: row.partidas_deseadas,
+          partidas_gm: row.partidas_gm,
         };
       }
       return {
         nombre: currentName,
-        experiencia: String(row["experiencia"]),
-        juegos_este_ano: Number(row["juegos_este_ano"]),
-        prioridad: Number(row["prioridad"]),
-        partidas_deseadas: Number(row["partidas_deseadas"]),
-        partidas_gm: Number(row["partidas_gm"]),
+        experiencia: row.experiencia ?? "Nuevo",
+        juegos_este_ano: row.juegos_este_ano ?? 0,
+        prioridad: row.prioridad,
+        partidas_deseadas: row.partidas_deseadas,
+        partidas_gm: row.partidas_gm,
       };
     });
 
@@ -258,31 +261,31 @@
             </tr>
           </thead>
           <tbody>
-            {#each rows as r (r["nombre"])}
-              {@const nombre = esc(String(r["nombre"] ?? ""))}
+            {#each rows as r (r.nombre)}
+              {@const nombre = esc(r.nombre)}
               {@const expColor =
-                r["experiencia"] === "Nuevo" ? "#713f12" : "#166534"}
+                r.experiencia === "Nuevo" ? "#713f12" : "#166534"}
               {@const expBg =
-                r["experiencia"] === "Nuevo" ? "#fef9c3" : "#f0fdf4"}
+                r.experiencia === "Nuevo" ? "#fef9c3" : "#f0fdf4"}
               <tr>
                 <td><span class="player-name">{nombre}</span></td>
                 <td style="padding-left: 0; width: 32px;">
                   <button
                     class="btn-ghost btn-rename"
                     title="Renombrar"
-                    onclick={() => handleRename(String(r["nombre"] ?? ""))}
+                    onclick={() => handleRename(r.nombre)}
                   >✏️</button>
                 </td>
                 <td
                   ><span
                     style="font-size:10px;font-weight:700;color:{expColor};background:{expBg};padding:1px 6px;border-radius:4px"
-                    >{esc(String(r["experiencia"] ?? ""))}</span
+                    >{esc(r.experiencia ?? "Nuevo")}</span
                   ></td
                 >
-                <td>{String(r["juegos_este_ano"] ?? "")}</td>
-                <td>{r["prioridad"] === 1 ? "✓" : ""}</td>
-                <td>{String(r["partidas_deseadas"] ?? "1")}</td>
-                <td>{(r["partidas_gm"] as number) > 0 ? "✓" : ""}</td>
+                <td>{r.juegos_este_ano ?? 0}</td>
+                <td>{r.prioridad === 1 ? "✓" : ""}</td>
+                <td>{r.partidas_deseadas}</td>
+                <td>{r.partidas_gm > 0 ? "✓" : ""}</td>
               </tr>
             {/each}
           </tbody>
@@ -293,13 +296,13 @@
       class="btn btn-secondary"
       style="width:100%"
       onclick={() => {
-        const playersToEdit = (data?.players || []).map((p: any) => ({
-          nombre: String(p.nombre || ""),
-          experiencia: String(p.experiencia || "Nuevo"),
-          juegos_este_ano: Number(p.juegos_este_ano || 0),
-          prioridad: Number(p.prioridad || 0),
-          partidas_deseadas: Number(p.partidas_deseadas ?? 1),
-          partidas_gm: Number(p.partidas_gm || 0)
+        const playersToEdit = (data?.players || []).map((p) => ({
+          nombre: p.nombre,
+          experiencia: p.experiencia ?? "Nuevo",
+          juegos_este_ano: p.juegos_este_ano ?? 0,
+          prioridad: p.prioridad ?? 0,
+          partidas_deseadas: p.partidas_deseadas ?? 1,
+          partidas_gm: p.partidas_gm ?? 0
         }));
         onEditDraft(id, 'manual', null, playersToEdit);
       }}

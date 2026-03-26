@@ -13,7 +13,6 @@ import unittest
 
 from . import db, db_game, db_views
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _make_conn() -> "db.sqlite3.Connection":

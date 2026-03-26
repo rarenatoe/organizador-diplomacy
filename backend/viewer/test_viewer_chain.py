@@ -7,11 +7,9 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from backend.db import db, db_game
-from .conftest import _add_snapshot
 
+from .conftest import _add_snapshot
 
 # ── /api/chain ────────────────────────────────────────────────────────────────
 

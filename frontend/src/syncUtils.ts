@@ -1,7 +1,7 @@
 // ── Sync Utilities ────────────────────────────────────────────────────────────
 // Name similarity detection logic ported from backend/sync/notion_sync.py
 
-import type { SimilarName } from "./types";
+import type { SimilarName, NotionPlayer } from "./types";
 
 // ── Name normalization ────────────────────────────────────────────────────────
 
@@ -55,21 +55,7 @@ export function wordsMatch(wordA: string, wordB: string): boolean {
  * Calculate similarity ratio between two names (0.0 to 1.0).
  *
  * Uses word-by-word comparison with special handling for abbreviations and prefixes.
- *
- * The algorithm:
- * 1. Splits names into words
- * 2. Compares each word position separately
- * 3. Returns 1.0 if all words match (considering abbreviations/prefixes)
- * 4. Returns 0.0 if any word doesn't match
- *
- * Examples:
- * - "Ren Alegre" vs "Renato Alegre" -> 1.0 (first name is prefix, last name exact)
- * - "Chachi Faker" vs "Charlie Faker" -> 0.0 (first names don't match)
- * - "P. Knight" vs "Paul Knight" -> 1.0 (abbreviated first name matches)
- * - "Miguel P." vs "Miguel Paucar" -> 1.0 (abbreviated last name matches)
- * - "T. Lopez" vs "Tomas L" -> 1.0 (both abbreviated, both match)
- * - "Lori Sanchez" vs "Lori Sal." -> 0.0 (last names don't match)
- * - "Gonzalo Ch." vs "Gonzalo L." -> 0.0 (last names don't match)
+ * Handles names with different word counts by comparing common prefix words.
  */
 export function similarity(a: string, b: string): number {
   const normA = normalizeName(a);
@@ -86,56 +72,88 @@ export function similarity(a: string, b: string): number {
   const wordsA = normA.split(" ");
   const wordsB = normB.split(" ");
 
-  // Must have same number of words
-  if (wordsA.length !== wordsB.length) {
+  // Compare word by word up to the length of the shorter name
+  const minLen = Math.min(wordsA.length, wordsB.length);
+  if (minLen === 0) {
     return 0.0;
   }
 
-  // Check each word position
-  for (let i = 0; i < wordsA.length; i++) {
+  let matchedWords = 0;
+  for (let i = 0; i < minLen; i++) {
     const wordA = wordsA[i];
     const wordB = wordsB[i];
-    if (!wordA || !wordB || !wordsMatch(wordA, wordB)) {
-      return 0.0;
+    if (wordA && wordB && wordsMatch(wordA, wordB)) {
+      matchedWords++;
+    } else {
+      return 0.0; // Any mismatch in prefix words results in 0 similarity
     }
   }
 
-  // All words match
-  return 1.0;
+  // Calculate similarity as the ratio of matched words over the longest name length
+  const maxLen = Math.max(wordsA.length, wordsB.length);
+
+  // BONUS: If it's a perfect prefix match (all words of shorter name match)
+  // and the difference is only 1 word, we boost the similarity to 0.8
+  // This helps "Jean Carlos" vs "Jean Carlos R." match at 0.75 threshold.
+  if (matchedWords === minLen && maxLen - minLen === 1) {
+    return Math.max(0.8, matchedWords / maxLen);
+  }
+
+  return matchedWords / maxLen;
 }
 
 // ── Similar name detection ────────────────────────────────────────────────────
 
 /**
- * Detect similar names between Notion and snapshot.
- * Returns list of potential matches: [{"notion": name1, "snapshot": name2, "similarity": 0.85}]
- * Only includes pairs where similarity >= threshold and names are not identical.
+ * Detect similar names between Notion (including aliases) and snapshot.
+ * Returns list of potential matches, sorted by similarity.
  */
 export function detectSimilarNames(
-  notionNames: string[],
+  notionPlayers: NotionPlayer[],
   snapshotNames: string[],
-  threshold: number = 0.75,
+  threshold: number = 0.75
 ): SimilarName[] {
-  const matches: SimilarName[] = [];
+  const matchesMap = new Map<string, SimilarName>(); // key: "notionMainName|snapshotName"
 
-  for (const notionName of notionNames) {
+  for (const player of notionPlayers) {
+    const notionMainName = player.nombre;
+    const allNotionVariations = [notionMainName, ...(player.alias || [])];
+
     for (const snapshotName of snapshotNames) {
-      // Skip exact matches
-      if (normalizeName(notionName) === normalizeName(snapshotName)) {
+      const normSnapshot = normalizeName(snapshotName);
+
+      // Skip if any variation is an exact match
+      const isExactMatch = allNotionVariations.some(
+        (v) => normalizeName(v) === normSnapshot
+      );
+      if (isExactMatch) {
         continue;
       }
 
-      const sim = similarity(notionName, snapshotName);
-      if (sim >= threshold) {
-        matches.push({
-          notion: notionName,
-          snapshot: snapshotName,
-          similarity: Math.round(sim * 1000) / 1000, // Round to 3 decimal places
-        });
+      // Check similarity against all variations
+      let bestSim = 0;
+      for (const variation of allNotionVariations) {
+        const sim = similarity(variation, snapshotName);
+        if (sim > bestSim) {
+          bestSim = sim;
+        }
+      }
+
+      if (bestSim >= threshold) {
+        const key = `${notionMainName}|${snapshotName}`;
+        const existing = matchesMap.get(key);
+        if (!existing || bestSim > existing.similarity) {
+          matchesMap.set(key, {
+            notion: notionMainName,
+            snapshot: snapshotName,
+            similarity: Number(bestSim.toFixed(3)),
+          });
+        }
       }
     }
   }
 
+  const matches = Array.from(matchesMap.values());
   // Sort by similarity descending
   matches.sort((a, b) => b.similarity - a.similarity);
   return matches;

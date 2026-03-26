@@ -12,6 +12,50 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=9.0.2",
+    "pyright>=1.1.391",
+    "ruff>=0.9.1",
+    "vulture>=2.14",
+]
+
+[tool.vulture]
+exclude = ["backend/test_*.py", "backend/**/test_*.py"]
+ignore_decorators = ["@app.route"]
+ignore_names = ["main", "args", "kwargs", "conn", "client", "app"]
+min_confidence = 80
+paths = ["backend"]
+
+[tool.ruff]
+# Rules for the fast linter
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # Pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "ARG", # flake8-unused-arguments
+    "FBT", # flake8-boolean-trap
+]
+ignore = [
+    "E501",   # Line too long (handled by formatter or ignored)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["backend"]
+
+[tool.pyright]
+include = ["backend"]
+typeCheckingMode = "standard" # "strict" is too noisy for this codebase yet
+reportMissingTypeStubs = "none"
+pythonVersion = "3.13"
+pythonPlatform = "Darwin"
+executionEnvironments = [
+  { root = "backend" }
 ]
 
 [project.scripts]

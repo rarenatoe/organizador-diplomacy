@@ -37,14 +37,13 @@ from __future__ import annotations
 import argparse
 import concurrent.futures
 import json
+import os
 import sys
 from datetime import datetime
-from difflib import SequenceMatcher
 
 from dotenv import load_dotenv
 from notion_client import Client
 from notion_client.errors import APIResponseError
-import os
 
 from backend.db import db
 
@@ -96,9 +95,9 @@ def _words_match(word_a: str, word_b: str) -> bool:
         return True
     
     # Check if one is a prefix of the other (at least 1 char)
-    if len(word_a_lower) >= 1 and len(word_b_lower) >= 1:
-        if word_b_lower.startswith(word_a_lower) or word_a_lower.startswith(word_b_lower):
-            return True
+    if (len(word_a_lower) >= 1 and len(word_b_lower) >= 1 and 
+        (word_b_lower.startswith(word_a_lower) or word_a_lower.startswith(word_b_lower))):
+        return True
     
     return False
 
@@ -108,21 +107,7 @@ def _similarity(a: str, b: str) -> float:
     Calculate similarity ratio between two names (0.0 to 1.0).
     
     Uses word-by-word comparison with special handling for abbreviations and prefixes.
-    
-    The algorithm:
-    1. Splits names into words
-    2. Compares each word position separately
-    3. Returns 1.0 if all words match (considering abbreviations/prefixes)
-    4. Returns 0.0 if any word doesn't match
-    
-    Examples:
-    - "Ren Alegre" vs "Renato Alegre" -> 1.0 (first name is prefix, last name exact)
-    - "Chachi Faker" vs "Charlie Faker" -> 0.0 (first names don't match)
-    - "P. Knight" vs "Paul Knight" -> 1.0 (abbreviated first name matches)
-    - "Miguel P." vs "Miguel Paucar" -> 1.0 (abbreviated last name matches)
-    - "T. Lopez" vs "Tomas L" -> 1.0 (both abbreviated, both match)
-    - "Lori Sanchez" vs "Lori Sal." -> 0.0 (last names don't match)
-    - "Gonzalo Ch." vs "Gonzalo L." -> 0.0 (last names don't match)
+    Handles names with different word counts by comparing common prefix words.
     """
     norm_a = _normalize_name(a)
     norm_b = _normalize_name(b)
@@ -136,43 +121,71 @@ def _similarity(a: str, b: str) -> float:
     words_a = norm_a.split()
     words_b = norm_b.split()
     
-    # Must have same number of words
-    if len(words_a) != len(words_b):
+    # Compare word by word up to the length of the shorter name
+    min_len = min(len(words_a), len(words_b))
+    if min_len == 0:
         return 0.0
+        
+    matched_words = 0
+    for i in range(min_len):
+        if _words_match(words_a[i], words_b[i]):
+            matched_words += 1
+        else:
+            return 0.0 # Any mismatch in prefix words results in 0 similarity
+            
+    # Calculate similarity as the ratio of matched words over the longest name length
+    max_len = max(len(words_a), len(words_b))
     
-    # Check each word position
-    for word_a, word_b in zip(words_a, words_b):
-        if not _words_match(word_a, word_b):
-            return 0.0
-    
-    # All words match
-    return 1.0
+    # BONUS: If it's a perfect prefix match (all words of shorter name match)
+    # and the difference is only 1 word, we boost the similarity to 0.8
+    # This helps "Jean Carlos" vs "Jean Carlos R." match at 0.75 threshold.
+    if matched_words == min_len and max_len - min_len == 1:
+        return max(0.8, matched_words / max_len)
+        
+    return matched_words / max_len
 
 
 def _detect_similar_names(
-    notion_names: list[str],
+    notion_players: dict[str, dict],
     snapshot_names: list[str],
     threshold: float = 0.75,
 ) -> list[dict]:
     """
-    Detect similar names between Notion and snapshot.
+    Detect similar names between Notion (including aliases) and snapshot.
     Returns list of potential matches: [{"notion": name1, "snapshot": name2, "similarity": 0.85}]
     Only includes pairs where similarity >= threshold and names are not identical.
     """
-    matches: list[dict] = []
-    for notion_name in notion_names:
+    matches_map: dict[tuple[str, str], float] = {} # (notion_main_name, snapshot_name) -> similarity
+    
+    for player_data in notion_players.values():
+        notion_main_name = player_data["nombre"]
+        all_notion_variations = [notion_main_name] + player_data.get("alias", [])
+        
         for snapshot_name in snapshot_names:
-            # Skip exact matches
-            if _normalize_name(notion_name) == _normalize_name(snapshot_name):
+            norm_snapshot = _normalize_name(snapshot_name)
+            
+            # Skip if any variation is an exact match
+            is_exact_match = any(_normalize_name(v) == norm_snapshot for v in all_notion_variations)
+            if is_exact_match:
                 continue
-            sim = _similarity(notion_name, snapshot_name)
-            if sim >= threshold:
-                matches.append({
-                    "notion": notion_name,
-                    "snapshot": snapshot_name,
-                    "similarity": round(sim, 3),
-                })
-    # Sort by similarity descending
+            
+            # Check similarity against all variations
+            best_sim = 0.0
+            for variation in all_notion_variations:
+                sim = _similarity(variation, snapshot_name)
+                if sim > best_sim:
+                    best_sim = sim
+            
+            if best_sim >= threshold:
+                key = (notion_main_name, snapshot_name)
+                if best_sim > matches_map.get(key, 0.0):
+                    matches_map[key] = best_sim
+
+    # Convert map to list and sort
+    matches = [
+        {"notion": notion, "snapshot": snapshot, "similarity": round(sim, 3)}
+        for (notion, snapshot), sim in matches_map.items()
+    ]
     matches.sort(key=lambda m: m["similarity"], reverse=True)
     return matches
 
@@ -180,7 +193,7 @@ def _detect_similar_names(
 # ── Existing player data (from DB) ──────────────────────────────────────
 
 def _leer_snapshot_existente(
-    conn: "db.sqlite3.Connection",
+    conn: db.sqlite3.Connection,
     snapshot_id: int | None = None,
 ) -> dict[str, dict]:
     """Returns nombre → row dict from the given snapshot (or {} if None)."""
@@ -278,52 +291,6 @@ def _conteo_partidas_este_ano(
     return conteo
 
 
-# ── Conversión Notion → filas DB ─────────────────────────────────────────────
-
-def _paginas_a_filas(
-    pages: list[dict],
-    existentes: dict[str, dict],
-    conteo_por_jugador: dict[str, int],
-) -> list[dict]:
-    """
-    Merges Notion page data with existing DB snapshot data.
-    Returns a list of normalized player dicts ready for DB insertion.
-    Keys: Nombre, Experiencia, Juegos_Este_Ano, prioridad, partidas_deseadas, partidas_gm
-    Omits pages without a name.
-    """
-    filas: list[dict] = []
-    for page in pages:
-        props = page.get("properties", {})
-
-        # Nombre (obligatorio)
-        nombre_prop = props.get("Nombre")
-        if not nombre_prop:
-            continue
-        nombre = _extraer_nombre(nombre_prop)
-        if not nombre:
-            continue
-
-        # Experiencia ← total histórico de Participaciones
-        part_prop = props.get("Participaciones")
-        experiencia = _experiencia(part_prop) if part_prop else "Nuevo"
-
-        # Juegos_Este_Ano ← conteo filtrado por año (indexado por page ID del jugador)
-        player_id = page["id"].replace("-", "")
-        juegos = conteo_por_jugador.get(player_id, 0)
-
-        # Preserve local fields from the latest snapshot, or use defaults
-        existente = existentes.get(nombre, {})
-        filas.append({
-            "Nombre":            nombre,
-            "Experiencia":       experiencia,
-            "Juegos_Este_Ano":   juegos,
-            "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
-            "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
-            "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
-        })
-    return filas
-
-
 # ── Descarga desde Notion ─────────────────────────────────────────────────────
 
 def _descargar_todos(client: Client, database_id: str) -> list[dict]:
@@ -342,10 +309,10 @@ def _descargar_todos(client: Client, database_id: str) -> list[dict]:
         )
     data_source_id: str = data_sources[0]["id"]
 
-    # Payload reduction: get property IDs for "Nombre" and "Participaciones"
+    # Payload reduction: get property IDs for "Nombre", "Participaciones" and "Alias"
     prop_ids: list[str] = []
     props = db_info.get("properties", {})
-    for name in ["Nombre", "Participaciones"]:
+    for name in ["Nombre", "Participaciones", "Alias"]:
         if name in props:
             prop_ids.append(props[name]["id"])
 
@@ -366,6 +333,19 @@ def _descargar_todos(client: Client, database_id: str) -> list[dict]:
             break
         cursor = response.get("next_cursor")
     return pages
+
+
+def _find_notion_player(name: str, notion_players: dict[str, dict]) -> dict | None:
+    """Finds a Notion player by name or alias."""
+    norm_name = _normalize_name(name)
+    # Exact name match
+    if norm_name in notion_players:
+        return notion_players[norm_name]
+    # Alias match
+    for p in notion_players.values():
+        if norm_name in p.get("alias", []):
+            return p
+    return None
 
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────
@@ -432,12 +412,12 @@ def main() -> None:
     existentes = _leer_snapshot_existente(conn, source_snapshot_id)
 
     # ── Parse merges if provided ──────────────────────────────────────────────
-    merges: dict[str, str] = {}  # from_name → to_name
+    merges: dict[str, dict] = {}  # from_name → {"to": notion_name, "action": action}
     if args.merges:
         try:
             merges_data = json.loads(args.merges)
             for m in merges_data.get("merges", []):
-                merges[m["from"]] = m["to"]
+                merges[m["from"]] = {"to": m["to"], "action": m.get("action", "merge_local")}
         except (json.JSONDecodeError, KeyError) as e:
             print(f"❌  Error parsing --merges JSON: {e}", file=sys.stderr)
             sys.exit(1)
@@ -461,20 +441,25 @@ def main() -> None:
         player_id = page["id"].replace("-", "")
         juegos = conteo_por_jugador.get(player_id, 0)
         
+        # Alias extraction
+        alias_prop = props.get("Alias")
+        alias_text = "".join(p.get("plain_text", "") for p in alias_prop.get("rich_text", [])) if alias_prop else ""
+        alias_list = [a.strip().lower() for a in alias_text.split(",") if a.strip()]
+        
         notion_players[_normalize_name(nombre)] = {
             "nombre": nombre,
             "experiencia": experiencia,
             "juegos": juegos,
+            "alias": alias_list,
         }
     
     # ── Detect-only mode: output similar names as JSON ────────────────────────
     # We must do this BEFORE building `filas` so we use the raw incoming Notion names
     if args.detect_only:
-        notion_names = [data["nombre"] for data in notion_players.values()]
         snapshot_names = list(existentes.keys())
-        similar = _detect_similar_names(notion_names, snapshot_names)
+        similar = _detect_similar_names(notion_players, snapshot_names)
         result = {
-            "notion_count": len(notion_names),
+            "notion_count": len(notion_players),
             "snapshot_count": len(snapshot_names),
             "similar_names": similar,
         }
@@ -486,20 +471,21 @@ def main() -> None:
     filas: list[dict] = []
     
     if source_snapshot_id is not None:
-        merged_notion_normalized = {_normalize_name(v) for v in merges.values()}
+        merged_notion_normalized = {_normalize_name(v["to"]) for v in merges.values()}
         
         # Start with all players from the existing snapshot
         for nombre, existente in existentes.items():
-            normalized_nombre = _normalize_name(nombre)
-
             # 1. Check if this player was explicitly merged via the UI dialog
             if nombre in merges:
-                notion_name = merges[nombre]
+                merge_info = merges[nombre]
+                notion_name = merge_info["to"]
+                action = merge_info["action"]
                 notion_norm = _normalize_name(notion_name)
+                
                 if notion_norm in notion_players:
                     notion_data = notion_players[notion_norm]
                     filas.append({
-                        "Nombre":            notion_data["nombre"], # Switch to the Notion name
+                        "Nombre":            notion_data["nombre"] if action == "merge_notion" else nombre,
                         "Experiencia":       notion_data["experiencia"],
                         "Juegos_Este_Ano":   notion_data["juegos"],
                         "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
@@ -508,11 +494,11 @@ def main() -> None:
                     })
                     continue
             
-            # 2. Check if this player exists in Notion (exact match)
-            if normalized_nombre in notion_players and normalized_nombre not in merged_notion_normalized:
-                notion_data = notion_players[normalized_nombre]
+            # 2. Check if this player exists in Notion (exact match or alias match)
+            notion_data = _find_notion_player(nombre, notion_players)
+            if notion_data and _normalize_name(notion_data["nombre"]) not in merged_notion_normalized:
                 filas.append({
-                    "Nombre":            nombre,
+                    "Nombre":            nombre, # Keep local name
                     "Experiencia":       notion_data["experiencia"],
                     "Juegos_Este_Ano":   notion_data["juegos"],
                     "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
@@ -532,7 +518,7 @@ def main() -> None:
 
     else:
         # No existing snapshot - use all Notion players directly from our lookup
-        for norm_name, notion_data in notion_players.items():
+        for _, notion_data in notion_players.items():
             filas.append({
                 "Nombre":            notion_data["nombre"],
                 "Experiencia":       notion_data["experiencia"],
@@ -556,12 +542,11 @@ def main() -> None:
         return
 
     # ── Content-addressed guard: skip if data hasn't changed ──────────────────
-    if source_snapshot_id is not None and not args.force:
-        if db.snapshots_have_same_roster(conn, source_snapshot_id, filas):
-            print("✓  Los datos de Notion coinciden con el último snapshot — sin cambios.")
-            print("   Usa --force para crear un snapshot igualmente.")
-            conn.close()
-            return
+    if source_snapshot_id is not None and not args.force and db.snapshots_have_same_roster(conn, source_snapshot_id, filas):
+        print("✓  Los datos de Notion coinciden con el último snapshot — sin cambios.")
+        print("   Usa --force para crear un snapshot igualmente.")
+        conn.close()
+        return
 
     # ── Persist new snapshot atomically ───────────────────────────────────────
     try:

@@ -8,19 +8,18 @@ Uso:
 """
 from __future__ import annotations
 
-import json
+import os
 import subprocess
 import threading
 import webbrowser
 
-from flask import Flask, jsonify, render_template, request
-
-from backend.config import FLASK_TEMPLATE_DIR, FLASK_STATIC_DIR, PROJECT_ROOT
-from backend.db import db, db_views
-from backend.sync.notion_sync import _descargar_todos, _conteo_partidas_este_ano
 from dotenv import load_dotenv
+from flask import Flask, jsonify, render_template, request
 from notion_client import Client
-import os
+
+from backend.config import FLASK_STATIC_DIR, FLASK_TEMPLATE_DIR, PROJECT_ROOT
+from backend.db import db, db_views
+from backend.sync.notion_sync import _conteo_partidas_este_ano, _descargar_todos
 
 # Configure Flask to find templates and static in frontend/
 app = Flask(__name__, template_folder=str(FLASK_TEMPLATE_DIR), static_folder=str(FLASK_STATIC_DIR))
@@ -139,6 +138,11 @@ def api_notion_fetch():
             part_prop = props.get("Participaciones")
             experiencia = "Antiguo" if part_prop and part_prop.get("relation") else "Nuevo"
 
+            # Alias
+            alias_prop = props.get("Alias")
+            alias_text = "".join(p.get("plain_text", "") for p in alias_prop.get("rich_text", [])) if alias_prop else ""
+            alias_list = [a.strip().lower() for a in alias_text.split(",") if a.strip()]
+
             # Juegos_Este_Ano
             player_id = page["id"].replace("-", "")
             juegos = conteo_por_jugador.get(player_id, 0)
@@ -147,6 +151,7 @@ def api_notion_fetch():
                 "nombre": nombre,
                 "experiencia": experiencia,
                 "juegos_este_ano": juegos,
+                "alias": alias_list,
             })
 
         return jsonify({"players": players})

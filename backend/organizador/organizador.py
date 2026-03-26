@@ -1,17 +1,19 @@
 from __future__ import annotations
+
 import random
 import sys
 from collections import Counter
 from pathlib import Path
 
+from backend.config import DATA_DIR
 from backend.db import db, db_game
+
 from .formatter import (
     _construir_proyeccion,
     _formatear_copypaste,
     _formatear_resultado,
 )
 from .models import Jugador, Mesa, ResultadoPartidas
-from backend.config import DATA_DIR
 
 SEP: str = "─" * 44
 

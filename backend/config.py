@@ -12,10 +12,6 @@ from pathlib import Path
 
 PROJECT_ROOT: Path = Path(__file__).parent.parent
 
-# ── Backend directory ──────────────────────────────────────────────────────────
-
-BACKEND_DIR: Path = PROJECT_ROOT / "backend"
-
 # ── Frontend directory ─────────────────────────────────────────────────────────
 
 FRONTEND_DIR: Path = PROJECT_ROOT / "frontend"
