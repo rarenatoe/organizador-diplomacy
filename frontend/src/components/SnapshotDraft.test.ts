@@ -10,7 +10,7 @@ vi.mock("../api", () => ({
   saveSnapshot: vi.fn().mockResolvedValue({
     snapshot_id: 123,
   }),
-  fetchNotionPlayers: vi.fn().mockResolvedValue({ players: [] }),
+  fetchNotionPlayers: vi.fn().mockResolvedValue({ players: [], similar_names: [] }),
 }));
 
 // Mock the utils module

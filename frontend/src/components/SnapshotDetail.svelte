@@ -3,7 +3,8 @@
   import { fetchSnapshot, runScript, renamePlayer, fetchChain, fetchNotionPlayers, saveSnapshot } from "../api";
   import { findLatestGameId } from "../snapshotUtils";
   import { setActiveNodeId } from "../stores.svelte";
-  import { detectSimilarNames, normalizeName, validateOrganizar } from "../syncUtils";
+  import { validateOrganizar } from "../syncUtils";
+  import { normalizeName } from "../utils";
   import SyncResolutionModal from "./SyncResolutionModal.svelte";
   import OrganizarConfirmModal from "./OrganizarConfirmModal.svelte";
 
@@ -145,7 +146,9 @@
 
     isSyncing = true;
     try {
-      const response = await fetchNotionPlayers();
+      const currentNames = (data?.players ?? []).map((p) => p.nombre);
+      const response = await fetchNotionPlayers(currentNames);
+      
       if (response.error) {
         onShowError("Error de Sincronización", response.error || "Error desconocido");
         return;
@@ -153,13 +156,9 @@
 
       fetchedNotionPlayers = response.players;
 
-      // Detect similar names between Notion and current snapshot
-      const currentNames = (data?.players ?? []).map((p) => p.nombre);
-      const similar = detectSimilarNames(fetchedNotionPlayers, currentNames, 0.75);
-
-      if (similar.length > 0) {
+      if (response.similar_names && response.similar_names.length > 0) {
         // Show resolution modal
-        resolutionPairs = similar;
+        resolutionPairs = response.similar_names;
         resolutionVisible = true;
       } else {
         // No conflicts, merge directly

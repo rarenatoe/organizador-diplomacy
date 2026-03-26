@@ -36,9 +36,11 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import difflib
 import json
 import os
 import sys
+from collections import defaultdict
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -74,120 +76,179 @@ def _normalize_name(name: str) -> str:
     return " ".join(name.lower().split())
 
 
-def _words_match(word_a: str, word_b: str) -> bool:
+def _words_match(word_a: str, word_b: str) -> float:
     """
-    Check if two words match, considering abbreviations and prefixes.
-    
-    Rules:
-    - Exact match (case-insensitive)
-    - One is a prefix of the other (e.g., "Ren" matches "Renato", "D" matches "Doe")
-    - One is abbreviated (ends with ".") and matches the start of the other
-      (e.g., "P." matches "Paul", "D." matches "Doe")
+    Check similarity between two words using difflib.
+    Handles typos, prefixes, and abbreviations.
+    Returns a score between 0.0 and 1.0.
     """
     if not word_a or not word_b:
-        return False
+        return 0.0
     
-    word_a_lower = word_a.lower().rstrip(".")
-    word_b_lower = word_b.lower().rstrip(".")
+    wa = word_a.lower().rstrip(".")
+    wb = word_b.lower().rstrip(".")
     
-    # Exact match (after removing periods)
-    if word_a_lower == word_b_lower:
-        return True
-    
+    if wa == wb:
+        return 1.0
+        
     # Check if one is a prefix of the other (at least 1 char)
-    if (len(word_a_lower) >= 1 and len(word_b_lower) >= 1 and 
-        (word_b_lower.startswith(word_a_lower) or word_a_lower.startswith(word_b_lower))):
-        return True
-    
-    return False
+    # This handles abbreviations like "P." for "Paul"
+    if (len(wa) >= 1 and len(wb) >= 1 and 
+        (wb.startswith(wa) or wa.startswith(wb))):
+        return 0.8 # Prefix match is good but not perfect
+        
+    # Probabilistic match for typos
+    return difflib.SequenceMatcher(None, wa, wb).ratio()
 
 
 def _similarity(a: str, b: str) -> float:
     """
     Calculate similarity ratio between two names (0.0 to 1.0).
-    
-    Uses word-by-word comparison with special handling for abbreviations and prefixes.
-    Handles names with different word counts by comparing common prefix words.
+    Uses Token-Set + Probabilistic matching.
     """
     norm_a = _normalize_name(a)
     norm_b = _normalize_name(b)
     
-    # Handle empty strings
     if not norm_a and not norm_b:
         return 1.0
     if not norm_a or not norm_b:
         return 0.0
-    
+        
     words_a = norm_a.split()
     words_b = norm_b.split()
     
-    # Compare word by word up to the length of the shorter name
-    min_len = min(len(words_a), len(words_b))
-    if min_len == 0:
-        return 0.0
+    # We want to see how many words from the shorter name find a match in the longer name
+    short_words = words_a if len(words_a) <= len(words_b) else words_b
+    long_words = words_b if len(words_a) <= len(words_b) else words_a
+    
+    matched_count = 0.0
+    used_long_indices = set()
+    
+    for sw in short_words:
+        best_word_sim = 0.0
+        best_idx = -1
         
-    matched_words = 0
-    for i in range(min_len):
-        if _words_match(words_a[i], words_b[i]):
-            matched_words += 1
-        else:
-            return 0.0 # Any mismatch in prefix words results in 0 similarity
+        for i, lw in enumerate(long_words):
+            if i in used_long_indices:
+                continue
+            sim = _words_match(sw, lw)
+            if sim > best_word_sim:
+                best_word_sim = sim
+                best_idx = i
+        
+        if best_word_sim >= 0.85: # High confidence word match
+            matched_count += 1.0
+            used_long_indices.add(best_idx)
+        elif best_word_sim >= 0.5: # Partial word match
+            matched_count += best_word_sim
+            used_long_indices.add(best_idx)
             
-    # Calculate similarity as the ratio of matched words over the longest name length
-    max_len = max(len(words_a), len(words_b))
+    # Score is matched words over total words in the longer name
+    score = matched_count / len(long_words)
     
     # BONUS: If it's a perfect prefix match (all words of shorter name match)
     # and the difference is only 1 word, we boost the similarity to 0.8
-    # This helps "Jean Carlos" vs "Jean Carlos R." match at 0.75 threshold.
-    if matched_words == min_len and max_len - min_len == 1:
-        return max(0.8, matched_words / max_len)
+    if matched_count == len(short_words) and len(long_words) - len(short_words) == 1:
+        return max(0.8, score)
         
-    return matched_words / max_len
+    return score
 
 
 def _detect_similar_names(
-    notion_players: dict[str, dict],
+    notion_players: dict[str, dict] | list[dict],
     snapshot_names: list[str],
     threshold: float = 0.75,
 ) -> list[dict]:
     """
-    Detect similar names between Notion (including aliases) and snapshot.
-    Returns list of potential matches: [{"notion": name1, "snapshot": name2, "similarity": 0.85}]
-    Only includes pairs where similarity >= threshold and names are not identical.
+    Detect similar names between Notion (including aliases) and snapshot
+    using a 4-step waterfall algorithm.
     """
-    matches_map: dict[tuple[str, str], float] = {} # (notion_main_name, snapshot_name) -> similarity
+    # Normalize notion_players input to list of dicts if it's a map
+    players_list = (
+        list(notion_players.values()) if isinstance(notion_players, dict) 
+        else notion_players
+    )
     
-    for player_data in notion_players.values():
+    # Pre-normalize all snapshot names for Step 1 & 2
+    norm_snapshots = {name: _normalize_name(name) for name in snapshot_names}
+    
+    potential_matches = []
+    
+    # Step 1 & 2: Exact & Alias Matches (Filter them out)
+    # We want to find names that DON'T match exactly but are similar
+    remaining_snapshots = list(snapshot_names)
+    
+    # Track exact matches to avoid comparing them for similarity
+    exact_matches_snapshot = set()
+    
+    for player_data in players_list:
         notion_main_name = player_data["nombre"]
-        all_notion_variations = [notion_main_name] + player_data.get("alias", [])
+        norm_notion_main = _normalize_name(notion_main_name)
+        notion_aliases = [_normalize_name(a) for a in player_data.get("alias", [])]
         
-        for snapshot_name in snapshot_names:
-            norm_snapshot = _normalize_name(snapshot_name)
+        for snap_name in snapshot_names:
+            norm_snap = norm_snapshots[snap_name]
             
-            # Skip if any variation is an exact match
-            is_exact_match = any(_normalize_name(v) == norm_snapshot for v in all_notion_variations)
-            if is_exact_match:
+            # Step 1: Exact Match
+            if norm_notion_main == norm_snap:
+                exact_matches_snapshot.add(snap_name)
                 continue
-            
-            # Check similarity against all variations
+                
+            # Step 2: Explicit Alias Match
+            if norm_snap in notion_aliases:
+                exact_matches_snapshot.add(snap_name)
+                continue
+
+    # Step 3: Hybrid Fuzzy Matching
+    # Only compare snapshots that didn't have an exact match with ANY notion player
+    # and notion players that didn't have an exact match with THIS snapshot
+    for player_data in players_list:
+        notion_main_name = player_data["nombre"]
+        notion_variations = [notion_main_name] + player_data.get("alias", [])
+        
+        for snap_name in snapshot_names:
+            if snap_name in exact_matches_snapshot:
+                continue
+                
+            # Check similarity against all variations, keep best
             best_sim = 0.0
-            for variation in all_notion_variations:
-                sim = _similarity(variation, snapshot_name)
+            for var in notion_variations:
+                sim = _similarity(var, snap_name)
                 if sim > best_sim:
                     best_sim = sim
             
             if best_sim >= threshold:
-                key = (notion_main_name, snapshot_name)
-                if best_sim > matches_map.get(key, 0.0):
-                    matches_map[key] = best_sim
+                potential_matches.append({
+                    "notion": notion_main_name,
+                    "snapshot": snap_name,
+                    "similarity": round(best_sim, 3)
+                })
 
-    # Convert map to list and sort
-    matches = [
-        {"notion": notion, "snapshot": snapshot, "similarity": round(sim, 3)}
-        for (notion, snapshot), sim in matches_map.items()
-    ]
-    matches.sort(key=lambda m: m["similarity"], reverse=True)
-    return matches
+    # Step 4: Bi-Directional Ambiguity Detection (1-to-Many)
+    # If a name maps to multiple candidates, they are all conflicts.
+    # Group by notion and by snapshot to detect 1-to-Many in both directions.
+    notion_to_snaps = defaultdict(set)
+    snap_to_notions = defaultdict(set)
+    
+    for m in potential_matches:
+        notion_to_snaps[m["notion"]].add(m["snapshot"])
+        snap_to_notions[m["snapshot"]].add(m["notion"])
+        
+    # All potential matches found in Step 3 are technically conflicts 
+    # since they are not exact matches but are above threshold.
+    # The ambiguity detection is already implicit if we return all matches.
+    # We just need to make sure they are unique and sorted.
+    
+    unique_matches = []
+    seen = set()
+    for m in potential_matches:
+        key = (m["notion"], m["snapshot"])
+        if key not in seen:
+            unique_matches.append(m)
+            seen.add(key)
+            
+    unique_matches.sort(key=lambda x: x["similarity"], reverse=True)
+    return unique_matches
 
 
 # ── Existing player data (from DB) ──────────────────────────────────────

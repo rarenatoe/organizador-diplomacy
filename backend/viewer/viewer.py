@@ -20,7 +20,7 @@ from notion_client import Client
 
 from backend.config import FLASK_STATIC_DIR, FLASK_TEMPLATE_DIR, PROJECT_ROOT
 from backend.db import db, db_views
-from backend.sync.notion_sync import conteo_partidas_este_ano, descargar_todos
+from backend.sync.notion_sync import conteo_partidas_este_ano, descargar_todos, _detect_similar_names
 
 # Configure Flask to find templates and static in frontend/
 app = Flask(__name__, template_folder=str(FLASK_TEMPLATE_DIR), static_folder=str(FLASK_STATIC_DIR))
@@ -97,11 +97,13 @@ def api_create_snapshot():
         conn.close()
 
 
-@app.route("/api/notion/fetch", methods=["GET"])
+@app.route("/api/notion/fetch", methods=["POST"])
 def api_notion_fetch():
     """
     Fetches raw player data from Notion without writing to the database.
-    Returns: {"players": [{"nombre": "...", "experiencia": "Nuevo", "juegos_este_ano": 0}, ...]}
+    Optionally detects similar names if snapshot_names is provided in body.
+    Body: {"snapshot_names": ["Name1", "Name2", ...]}
+    Returns: {"players": [...], "similar_names": [...]}
     """
     load_dotenv()
     token = os.getenv("NOTION_TOKEN")
@@ -116,6 +118,9 @@ def api_notion_fetch():
         return jsonify({"error": "NOTION_PARTICIPACIONES_DB_ID not configured"}), 500
 
     try:
+        body = request.get_json(silent=True) or {}
+        snapshot_names = body.get("snapshot_names", [])
+
         from datetime import datetime
         client = Client(auth=token)
         año_actual = datetime.now().year
@@ -146,7 +151,7 @@ def api_notion_fetch():
             # Alias
             alias_prop = props.get("Alias")
             alias_text = "".join(p.get("plain_text", "") for p in alias_prop.get("rich_text", [])) if alias_prop else ""
-            alias_list = [a.strip().lower() for a in alias_text.split(",") if a.strip()]
+            alias_list = [a.strip() for a in alias_text.split(",") if a.strip()]
 
             # Juegos_Este_Ano
             player_id = page["id"].replace("-", "")
@@ -159,7 +164,14 @@ def api_notion_fetch():
                 "alias": alias_list,
             })
 
-        return jsonify({"players": players})
+        similar_names = []
+        if snapshot_names:
+            similar_names = _detect_similar_names(players, snapshot_names)
+
+        return jsonify({
+            "players": players,
+            "similar_names": similar_names
+        })
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 

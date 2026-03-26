@@ -109,6 +109,7 @@ export interface SnapshotSaveResponse {
 
 export interface NotionFetchResponse {
   players: NotionPlayer[];
+  similar_names: SimilarName[];
   error?: string;
 }
 

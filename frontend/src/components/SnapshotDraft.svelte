@@ -2,8 +2,7 @@
   import { untrack } from "svelte";
   import type { EditPlayerRow, SimilarName, MergePair, NotionPlayer } from "../types";
   import { createSnapshot, saveSnapshot, fetchNotionPlayers } from "../api";
-  import { parsePlayersCsv } from "../utils";
-  import { detectSimilarNames, normalizeName } from "../syncUtils";
+  import { parsePlayersCsv, normalizeName } from "../utils";
   import { setActiveNodeId } from "../stores.svelte";
   import SyncResolutionModal from "./SyncResolutionModal.svelte";
 
@@ -104,7 +103,9 @@
   async function handleImportNotion(): Promise<void> {
     isImporting = true;
     try {
-      const response = await fetchNotionPlayers();
+      const draftNames = draftPlayers.map((p) => p.nombre);
+      const response = await fetchNotionPlayers(draftNames);
+
       if (response.error) {
         onShowError("Aviso / Error", `Error: ${response.error}`);
         return;
@@ -112,13 +113,9 @@
 
       fetchedNotionPlayers = response.players;
 
-      // Detect similar names between Notion and current draft
-      const draftNames = draftPlayers.map((p) => p.nombre);
-      const similar = detectSimilarNames(fetchedNotionPlayers, draftNames, 0.75);
-
-      if (similar.length > 0) {
+      if (response.similar_names && response.similar_names.length > 0) {
         // Show resolution modal
-        resolutionPairs = similar;
+        resolutionPairs = response.similar_names;
         resolutionVisible = true;
       } else {
         // No conflicts, merge directly

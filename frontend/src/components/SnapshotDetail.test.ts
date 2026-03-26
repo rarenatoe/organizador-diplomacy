@@ -70,7 +70,9 @@ vi.mock("../api", () => ({
   runScript: vi.fn().mockResolvedValue({ returncode: 0 }),
   renamePlayer: vi.fn().mockResolvedValue({}),
   fetchChain: vi.fn().mockResolvedValue({ roots: [] }),
-  fetchNotionPlayers: vi.fn().mockResolvedValue({ players: [] }),
+  fetchNotionPlayers: vi
+    .fn()
+    .mockResolvedValue({ players: [], similar_names: [] }),
   saveSnapshot: vi.fn().mockResolvedValue({ snapshot_id: 2 }),
 }));
 
@@ -81,8 +83,6 @@ vi.mock("../stores.svelte", () => ({
 
 // Mock the syncUtils
 vi.mock("../syncUtils", () => ({
-  detectSimilarNames: vi.fn().mockReturnValue([]),
-  normalizeName: vi.fn((s: string) => s.toLowerCase()),
   validateOrganizar: vi.fn().mockReturnValue(null),
 }));
 

@@ -57,8 +57,15 @@ export async function saveSnapshot(payload: {
   return (await res.json()) as SnapshotSaveResponse;
 }
 
-export async function fetchNotionPlayers(): Promise<NotionFetchResponse> {
-  const res = await fetch("/api/notion/fetch");
+export async function fetchNotionPlayers(
+  snapshotNames: string[] = [],
+): Promise<NotionFetchResponse> {
+  const res = await fetch("/api/notion/fetch", {
+    method: "POST",
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ snapshot_names: snapshotNames }),
+  });
   return (await res.json()) as NotionFetchResponse;
 }
 

@@ -77,3 +77,10 @@ export function parsePlayersCsv(csvText: string): Array<{
 
   return result;
 }
+
+/**
+ * Normalize a name for comparison: lowercase, strip, collapse whitespace.
+ */
+export function normalizeName(name: string): string {
+  return name.toLowerCase().trim().replace(/\s+/g, " ");
+}
