@@ -427,4 +427,93 @@ describe("SnapshotDetail", () => {
 
     vi.useFakeTimers();
   });
+
+  it("should prevent Sincronizar Notion if snapshot source is already notion_sync", async () => {
+    const { fetchSnapshot, fetchNotionPlayers } = await import("../api");
+    (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: 4,
+      source: "notion_sync",
+      created_at: "2024-01-01 12:00:00",
+      players: [
+        {
+          nombre: "Alice",
+          experiencia: "Nuevo",
+          juegos_este_ano: 0,
+          prioridad: 0,
+          partidas_deseadas: 1,
+          partidas_gm: 0,
+        },
+      ],
+    });
+
+    const onShowError = vi.fn();
+
+    render(SnapshotDetail, {
+      props: {
+        id: 4,
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
+        onOpenGame: () => {},
+        onEditDraft: () => {},
+        onShowError,
+      },
+    });
+
+    // Wait for loading to finish
+    await waitFor(() => {
+      expect(screen.queryByText("Cargando…")).toBeNull();
+    });
+
+    // Click "Sincronizar Notion"
+    const syncBtn = screen.getByText(/Sincronizar Notion/);
+    await fireEvent.click(syncBtn);
+
+    // Assert fail-fast behavior: onShowError called, fetchNotionPlayers NOT called
+    expect(onShowError).toHaveBeenCalledWith(
+      "Acción no permitida",
+      "El snapshot base ya fue generado por notion_sync y aún no se ha jugado una partida.",
+    );
+    expect(fetchNotionPlayers).not.toHaveBeenCalled();
+  });
+
+  it("should allow Sincronizar Notion if snapshot source is manual", async () => {
+    const { fetchSnapshot, fetchNotionPlayers } = await import("../api");
+    (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      id: 5,
+      source: "manual",
+      created_at: "2024-01-01 12:00:00",
+      players: [],
+    });
+
+    (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      players: [],
+      error: undefined,
+    });
+
+    render(SnapshotDetail, {
+      props: {
+        id: 5,
+        onClose: () => {},
+        onChainUpdate: () => {},
+        onOpenSnapshot: () => {},
+        onOpenGame: () => {},
+        onEditDraft: () => {},
+        onShowError: () => {},
+      },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Cargando…")).toBeNull();
+    });
+
+    // Click "Sincronizar Notion"
+    const syncBtn = screen.getByText(/Sincronizar Notion/);
+    await fireEvent.click(syncBtn);
+
+    // Assert it proceeds to fetch Notion players
+    await waitFor(() => {
+      expect(fetchNotionPlayers).toHaveBeenCalled();
+    });
+  });
 });

@@ -303,6 +303,22 @@ class TestApiSnapshotSave:
         )
         assert resp.status_code == 404
 
+    def test_save_consecutive_notion_sync_returns_400(self, client):
+        """POST /api/snapshot/save fails if parent is also a sync and current is sync."""
+        c, conn = client
+        parent_id = _add_snapshot(conn, source="notion_sync")
+        conn.commit()
+
+        resp = c.post(
+            "/api/snapshot/save",
+            data=json.dumps({"parent_id": parent_id, "event_type": "sync", "players": []}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert "notion_sync" in data["error"]
+        assert "aún no se ha jugado una partida" in data["error"]
+
 
 class TestApiNotionFetch:
     def test_fetch_returns_players_list(self, client, monkeypatch):

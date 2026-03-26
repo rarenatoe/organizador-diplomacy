@@ -179,10 +179,15 @@ def api_snapshot_save():
 
         # Validate parent exists if provided
         if parent_id is not None:
-            if not conn.execute(
-                "SELECT 1 FROM snapshots WHERE id = ?", (parent_id,)
-            ).fetchone():
+            parent_row = conn.execute(
+                "SELECT source FROM snapshots WHERE id = ?", (parent_id,)
+            ).fetchone()
+            if not parent_row:
                 return jsonify({"error": "parent snapshot not found"}), 404
+
+            # STRICT GUARD: Prevent consecutive syncs
+            if event_type == "sync" and parent_row["source"] == "notion_sync":
+                return jsonify({"error": "El snapshot base ya fue generado por notion_sync y aún no se ha jugado una partida."}), 400
 
         # Create snapshot with appropriate source
         source = "notion_sync" if event_type == "sync" else "manual"

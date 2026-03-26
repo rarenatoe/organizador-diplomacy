@@ -114,6 +114,14 @@
   }
 
   async function handleDirectSync(): Promise<void> {
+    if (data?.source === "notion_sync") {
+      onShowError(
+        "Acción no permitida",
+        "El snapshot base ya fue generado por notion_sync y aún no se ha jugado una partida."
+      );
+      return;
+    }
+
     isSyncing = true;
     try {
       const response = await fetchNotionPlayers();
