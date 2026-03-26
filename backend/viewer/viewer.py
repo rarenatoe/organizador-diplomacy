@@ -12,6 +12,7 @@ import os
 import subprocess
 import threading
 import webbrowser
+import concurrent.futures
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify, render_template, request
@@ -19,7 +20,7 @@ from notion_client import Client
 
 from backend.config import FLASK_STATIC_DIR, FLASK_TEMPLATE_DIR, PROJECT_ROOT
 from backend.db import db, db_views
-from backend.sync.notion_sync import _conteo_partidas_este_ano, _descargar_todos
+from backend.sync.notion_sync import conteo_partidas_este_ano, descargar_todos
 
 # Configure Flask to find templates and static in frontend/
 app = Flask(__name__, template_folder=str(FLASK_TEMPLATE_DIR), static_folder=str(FLASK_STATIC_DIR))
@@ -119,8 +120,12 @@ def api_notion_fetch():
         client = Client(auth=token)
         año_actual = datetime.now().year
 
-        pages = _descargar_todos(client, db_id)
-        conteo_por_jugador = _conteo_partidas_este_ano(client, part_db_id, año_actual)
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_pages = executor.submit(descargar_todos, client, db_id)
+            future_conteo = executor.submit(conteo_partidas_este_ano, client, part_db_id, año_actual)
+            
+            pages = future_pages.result()
+            conteo_por_jugador = future_conteo.result()
 
         players: list[dict] = []
         for page in pages:

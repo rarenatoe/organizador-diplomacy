@@ -207,7 +207,7 @@ def _leer_snapshot_existente(
 
 # ── Partidas del año actual ──────────────────────────────────────────────────
 
-def _conteo_partidas_este_ano(
+def conteo_partidas_este_ano(
     client: Client,
     participaciones_db_id: str,
     año: int,
@@ -293,7 +293,10 @@ def _conteo_partidas_este_ano(
 
 # ── Descarga desde Notion ─────────────────────────────────────────────────────
 
-def _descargar_todos(client: Client, database_id: str) -> list[dict]:
+def descargar_todos(
+    client: Client,
+    database_id: str,
+) -> list[dict]:
     """
     Descarga todas las páginas de la DB paginando automáticamente.
 
@@ -387,8 +390,8 @@ def main() -> None:
     print("⟳  Conectando a Notion...", end=" ", flush=True)
     try:
         with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_pages = executor.submit(_descargar_todos, client, db_id)
-            future_conteo = executor.submit(_conteo_partidas_este_ano, client, part_db_id, año_actual)
+            future_pages = executor.submit(descargar_todos, client, db_id)
+            future_conteo = executor.submit(conteo_partidas_este_ano, client, part_db_id, año_actual)
             
             pages = future_pages.result()
             conteo_por_jugador = future_conteo.result()
