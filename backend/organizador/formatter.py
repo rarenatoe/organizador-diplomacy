@@ -11,8 +11,10 @@ Functions:
 from __future__ import annotations
 
 from collections import Counter
+from typing import TYPE_CHECKING, Any
 
-from .models import Mesa, ResultadoPartidas
+if TYPE_CHECKING:
+    from .models import Jugador, Mesa, ResultadoPartidas
 
 SEP: str = "─" * 44
 
@@ -24,20 +26,32 @@ def _formatear_copypaste(resultado: ResultadoPartidas) -> str:
     Section ready to copy-paste (WhatsApp, Discord, etc.).
     Names only — no experience metadata or decorations.
     """
+    return _formatear_copypaste_from_dict(resultado.to_dict())
+
+
+def _formatear_copypaste_from_dict(resultado_dict: dict[str, Any]) -> str:
+    """
+    Section ready to copy-paste from a dictionary representation.
+    """
     lineas: list[str] = []
-    for mesa in resultado.mesas:
-        gm_str: str = f"  |  GM: {mesa.gm.nombre}" if mesa.gm else ""
-        lineas.append(f"Partida {mesa.numero}{gm_str}")
-        for i, jugador in enumerate(mesa.jugadores):
-            lineas.append(f"  {i + 1}. {jugador.nombre}")
+    for mesa in resultado_dict.get("mesas", []):
+        gm_nombre = mesa.get("gm", {}).get("nombre") if mesa.get("gm") else None
+        gm_str: str = f"  |  GM: {gm_nombre}" if gm_nombre else ""
+        lineas.append(f"Partida {mesa['numero']}{gm_str}")
+        for i, jugador in enumerate(mesa.get("jugadores", [])):
+            pais_str = f" ({jugador['pais']})" if jugador.get('pais') else ""
+            lineas.append(f"  {i + 1}. {jugador['nombre']}{pais_str}")
         lineas.append("")
-    if resultado.tickets_sobrantes:
+    
+    sobrantes = resultado_dict.get("tickets_sobrantes", [])
+    if sobrantes:
         lineas.append("Lista de espera:")
         vistos: set[str] = set()
-        for j in resultado.tickets_sobrantes:
-            if j.nombre not in vistos:
-                vistos.add(j.nombre)
-                lineas.append(f"  - {j.nombre}")
+        for j in sobrantes:
+            nombre = j["nombre"]
+            if nombre not in vistos:
+                vistos.add(nombre)
+                lineas.append(f"  - {nombre}")
     return "\n".join(lineas)
 
 
@@ -59,12 +73,13 @@ def _formatear_resultado(
         gm_str: str = f"GM: {mesa.gm.nombre}" if mesa.gm else "⚠️  Sin GM asignado"
         lineas.append(f"\n[ Partida {mesa.numero} ]  Nuevos: {nuevos}  Antiguos: {antiguos}  {gm_str}")
         for j, jugador in enumerate(mesa.jugadores):
+            pais_str = f" ({jugador.pais})" if jugador.pais else ""
             etiqueta: str = "Nuevo" if jugador.es_nuevo else f"Antiguo ({jugador.juegos_ano} juegos)"
-            lineas.append(f"  {j + 1}. {jugador.nombre}  —  {etiqueta}")
+            lineas.append(f"  {j + 1}. {jugador.nombre}{pais_str}  —  {etiqueta}")
 
     # Unique GMs who referee at least one table, in order of appearance
     gms_vistos: set[str] = set()
-    gms_activos: list = []
+    gms_activos: list[Jugador] = []
     for mesa in resultado.mesas:
         if mesa.gm and mesa.gm.nombre not in gms_vistos:
             gms_vistos.add(mesa.gm.nombre)
@@ -100,7 +115,7 @@ def _formatear_resultado(
 
 def _construir_proyeccion(
     resultado: ResultadoPartidas,
-    jugadores: list,
+    jugadores: list[Jugador],
 ) -> list[str]:
     """
     Projects each player's Juegos_Este_Ano after this event.

@@ -18,14 +18,15 @@ Public API
 """
 from __future__ import annotations
 
-import sqlite3
 from collections import Counter
 from typing import TYPE_CHECKING
 
-from .db import add_snapshot_player, create_event, create_snapshot, get_snapshot_players
-
 if TYPE_CHECKING:
-    from models import ResultadoPartidas
+    import sqlite3
+
+    from .models import ResultadoPartidas
+
+from .db import add_snapshot_player, create_event, create_snapshot, get_snapshot_players
 
 # ── Game events ────────────────────────────────────────────────────────────────
 
@@ -62,11 +63,12 @@ def add_mesa_player(
     mesa_id: int,
     player_id: int,
     orden: int,
+    pais: str | None = None,
 ) -> None:
     """Inserts one mesa_players row. Does NOT commit."""
     conn.execute(
-        "INSERT INTO mesa_players (mesa_id, player_id, orden) VALUES (?, ?, ?)",
-        (mesa_id, player_id, orden),
+        "INSERT INTO mesa_players (mesa_id, player_id, orden, pais) VALUES (?, ?, ?, ?)",
+        (mesa_id, player_id, orden, pais),
     )
 
 

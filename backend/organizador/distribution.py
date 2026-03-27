@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import random
+
 from .models import Jugador, Mesa, ResultadoPartidas
 
 # ── Distribution Logic ───────────────────────────────────────────────────────
 
 def distribuir_tickets(
     lista_tickets: list[tuple[float, Jugador]],
-    es_grupo_nuevo: bool,
     partidas: list[list[Jugador]],
     gm_bloqueados: dict[str, set[int]],
+    *,
+    es_grupo_nuevo: bool,
 ) -> list[Jugador]:
     """
     Distributes tickets into tables, respecting GM constraints and priority.
@@ -94,8 +96,8 @@ def run_distribution_loop(
 
         partidas: list[list[Jugador]] = [[] for _ in range(mesas_reales)]
 
-        rechazados_nuevos = distribuir_tickets(tickets_nuevos, True, partidas, gm_bloqueados)
-        rechazados_antiguos = distribuir_tickets(tickets_antiguos, False, partidas, gm_bloqueados)
+        rechazados_nuevos = distribuir_tickets(tickets_nuevos, partidas, gm_bloqueados, es_grupo_nuevo=True)
+        rechazados_antiguos = distribuir_tickets(tickets_antiguos, partidas, gm_bloqueados, es_grupo_nuevo=False)
         tickets_sobrantes = sobrantes_iniciales + rechazados_nuevos + rechazados_antiguos
 
         # Construir mesas semánticas para este intento

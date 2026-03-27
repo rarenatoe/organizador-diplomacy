@@ -38,6 +38,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from backend.config import DATA_DIR
 
@@ -125,6 +126,7 @@ CREATE TABLE IF NOT EXISTS mesa_players (
     mesa_id   INTEGER NOT NULL REFERENCES mesas(id) ON DELETE CASCADE,
     player_id INTEGER NOT NULL REFERENCES players(id),
     orden     INTEGER NOT NULL,     -- seat number within the table (1-based)
+    pais      TEXT,               -- assigned country (England, France, Germany, Italy, Austria, Russia, Turkey)
     PRIMARY KEY (mesa_id, player_id)
 );
 
@@ -153,6 +155,13 @@ def get_db(path: Path | str = DB_PATH) -> sqlite3.Connection:
     
     conn.executescript(_SCHEMA)
     conn.commit()
+    
+    # Ensure 'pais' column exists (migration for older DBs)
+    cols = [row["name"] for row in conn.execute("PRAGMA table_info(mesa_players)").fetchall()]
+    if "pais" not in cols:
+        conn.execute("ALTER TABLE mesa_players ADD COLUMN pais TEXT")
+        conn.commit()
+    
     return conn
 
 
@@ -306,7 +315,7 @@ def add_player_to_snapshot(
 
 def get_snapshot_players(
     conn: sqlite3.Connection, snapshot_id: int
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """
     Returns all players in a snapshot as a list of dicts, ordered by nombre.
     Each dict has: nombre, experiencia, juegos_este_ano, prioridad,
@@ -392,7 +401,7 @@ def get_latest_snapshot_id(conn: sqlite3.Connection) -> int | None:
 def snapshots_have_same_roster(
     conn: sqlite3.Connection,
     snapshot_id: int,
-    notion_rows: list[dict],
+    notion_rows: list[dict[str, Any]],
 ) -> bool:
     """
     Returns True if the Notion-fetched rows match the snapshot's data for
@@ -430,7 +439,7 @@ def snapshots_have_same_roster(
 def create_manual_snapshot(
     conn: sqlite3.Connection,
     source_snapshot_id: int,
-    edits: list[dict],
+    edits: list[dict[str, Any]],
 ) -> int:
     """
     Creates a new 'manual' snapshot based on source_snapshot_id, applying edits.
@@ -477,7 +486,7 @@ def create_manual_snapshot(
 
 def create_root_manual_snapshot(
     conn: sqlite3.Connection,
-    players_list: list[dict],
+    players_list: list[dict[str, Any]],
 ) -> int:
     """
     Creates a new 'manual' root snapshot (no source snapshot).
@@ -527,7 +536,7 @@ def create_event(
     event_type: str,
     source_snapshot_id: int | None,
     output_snapshot_id: int,
-    details: dict | None = None,
+    details: dict[str, Any] | None = None,
 ) -> int:
     """
     Unified event creation helper. Inserts into the events table

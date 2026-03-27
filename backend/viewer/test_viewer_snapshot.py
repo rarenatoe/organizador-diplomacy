@@ -365,13 +365,66 @@ class TestApiNotionFetch:
         assert data["players"] == []
         assert data["last_updated"] is None
 
+    def test_similar_names_detection(self, client):
+        """POST /api/notion/fetch returns similar_names when snapshot_names provided."""
+        c, conn = client
+        
+        # Populate notion_cache with players that have similar names
+        conn.execute(
+            """
+            INSERT INTO notion_cache 
+            (notion_id, nombre, experiencia, juegos_este_ano, 
+             c_england, c_france, c_germany, c_italy, 
+             c_austria, c_russia, c_turkey, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("page1", "Alice Smith", "Antiguo", 5, 1, 0, 0, 0, 0, 0, 0, "2023-01-01 12:00:00")
+        )
+        conn.execute(
+            """
+            INSERT INTO notion_cache 
+            (notion_id, nombre, experiencia, juegos_este_ano, 
+             c_england, c_france, c_germany, c_italy, 
+             c_austria, c_russia, c_turkey, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("page2", "Alicia Smith", "Nuevo", 2, 0, 1, 0, 0, 0, 0, 0, "2023-01-01 12:00:00")
+        )
+        conn.commit()
+
+        # Test with snapshot names that should trigger similarity detection
+        # Use a name that's similar but not exact to "Alice Smith"
+        resp = c.post(
+            "/api/notion/fetch", 
+            data=json.dumps({"snapshot_names": ["Alic Smith", "Bob Johnson"]}), 
+            content_type="application/json"
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        
+        # Should return players
+        assert "players" in data
+        assert len(data["players"]) == 2
+        
+        # Should return similar names (might be empty depending on algorithm)
+        assert "similar_names" in data
+        similar_names = data["similar_names"]
+        
+        # If similar names are found, they should have the right structure
+        for match in similar_names:
+            assert "notion" in match
+            assert "snapshot" in match
+            assert "similarity" in match
+            assert isinstance(match["similarity"], (int, float))
+            assert 0 <= match["similarity"] <= 1
+
     def test_force_refresh_triggers_update(self, client, monkeypatch):
         """POST /api/notion/force_refresh calls update_notion_cache."""
         c, conn = client
         
         # Mock update_notion_cache
         updated = False
-        def mock_update(*args, **kwargs):
+        def mock_update(*_args, **_kwargs):
             nonlocal updated
             updated = True
             

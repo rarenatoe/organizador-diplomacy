@@ -42,6 +42,7 @@ import os
 import sys
 from collections import defaultdict
 from datetime import datetime
+from typing import Any, cast
 
 from dotenv import load_dotenv
 from notion_client import Client
@@ -71,7 +72,7 @@ COUNTRY_PROPS: dict[str, str] = {
 
 # ── Helpers de extracción ─────────────────────────────────────────────────────
 
-def _extraer_numero(prop: dict) -> int:
+def extraer_numero(prop: dict[str, Any]) -> int:
     """Extrae un número de una propiedad number o formula."""
     if not prop:
         return 0
@@ -82,12 +83,12 @@ def _extraer_numero(prop: dict) -> int:
     return 0
 
 
-def _extraer_nombre(prop: dict) -> str:
+def extraer_nombre(prop: dict[str, Any]) -> str:
     """Extrae texto plano de una propiedad title."""
     return "".join(p.get("plain_text", "") for p in prop.get("title", [])).strip()
 
 
-def _experiencia(participaciones_prop: dict) -> str:
+def experiencia(participaciones_prop: dict[str, Any]) -> str:
     """'Antiguo' si el jugador tiene ≥1 participación histórica, 'Nuevo' si no."""
     return "Antiguo" if participaciones_prop.get("relation") else "Nuevo"
 
@@ -145,7 +146,7 @@ def _similarity(a: str, b: str) -> float:
     long_words = words_b if len(words_a) <= len(words_b) else words_a
     
     matched_count = 0.0
-    used_long_indices = set()
+    used_long_indices: set[int] = set()
     
     for sw in short_words:
         best_word_sim = 0.0
@@ -178,10 +179,10 @@ def _similarity(a: str, b: str) -> float:
 
 
 def _detect_similar_names(
-    notion_players: dict[str, dict] | list[dict],
+    notion_players: dict[str, dict[str, Any]] | list[dict[str, Any]],
     snapshot_names: list[str],
     threshold: float = 0.75,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """
     Detect similar names between Notion (including aliases) and snapshot
     using a 4-step waterfall algorithm.
@@ -195,14 +196,13 @@ def _detect_similar_names(
     # Pre-normalize all snapshot names for Step 1 & 2
     norm_snapshots = {name: _normalize_name(name) for name in snapshot_names}
     
-    potential_matches = []
+    potential_matches: list[dict[str, Any]] = []
     
     # Step 1 & 2: Exact & Alias Matches (Filter them out)
     # We want to find names that DON'T match exactly but are similar
-    remaining_snapshots = list(snapshot_names)
     
     # Track exact matches to avoid comparing them for similarity
-    exact_matches_snapshot = set()
+    exact_matches_snapshot: set[str] = set()
     
     for player_data in players_list:
         notion_main_name = player_data["nombre"]
@@ -250,8 +250,8 @@ def _detect_similar_names(
     # Step 4: Bi-Directional Ambiguity Detection (1-to-Many)
     # If a name maps to multiple candidates, they are all conflicts.
     # Group by notion and by snapshot to detect 1-to-Many in both directions.
-    notion_to_snaps = defaultdict(set)
-    snap_to_notions = defaultdict(set)
+    notion_to_snaps: defaultdict[str, set[str]] = defaultdict(set)
+    snap_to_notions: defaultdict[str, set[str]] = defaultdict(set)
     
     for m in potential_matches:
         notion_to_snaps[m["notion"]].add(m["snapshot"])
@@ -262,8 +262,8 @@ def _detect_similar_names(
     # The ambiguity detection is already implicit if we return all matches.
     # We just need to make sure they are unique and sorted.
     
-    unique_matches = []
-    seen = set()
+    unique_matches: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
     for m in potential_matches:
         key = (m["notion"], m["snapshot"])
         if key not in seen:
@@ -279,7 +279,7 @@ def _detect_similar_names(
 def _leer_snapshot_existente(
     conn: db.sqlite3.Connection,
     snapshot_id: int | None = None,
-) -> dict[str, dict]:
+) -> dict[str, dict[str, Any]]:
     """Returns nombre → row dict from the given snapshot (or {} if None)."""
     if snapshot_id is None:
         return {}
@@ -306,7 +306,7 @@ def conteo_partidas_este_ano(
     no está conectada a la integración, el valor será None y se advertirá al
     usuario (todos los conteos quedarán en 0).
     """
-    db_info = client.databases.retrieve(database_id=participaciones_db_id)
+    db_info: dict[str, Any] = cast("dict[str, Any]", client.databases.retrieve(database_id=participaciones_db_id))
     data_sources = db_info.get("data_sources", [])
     if not data_sources:
         raise RuntimeError(
@@ -327,7 +327,7 @@ def conteo_partidas_este_ano(
     cursor: str | None = None
 
     while True:
-        kwargs: dict = {
+        kwargs: dict[str, Any] = {
             "data_source_id": ds_id,
             "result_type": "page",
             "filter": {
@@ -343,7 +343,7 @@ def conteo_partidas_este_ano(
             kwargs["filter_properties"] = prop_ids
         if cursor:
             kwargs["start_cursor"] = cursor
-        response = client.data_sources.query(**kwargs)
+        response: dict[str, Any] = cast("dict[str, Any]", client.data_sources.query(**kwargs))
 
         for page in response.get("results", []):
             props = page.get("properties", {})
@@ -380,14 +380,14 @@ def conteo_partidas_este_ano(
 def descargar_todos(
     client: Client,
     database_id: str,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """
     Descarga todas las páginas de la DB paginando automáticamente.
 
     notion-client ≥2.7 eliminó databases.query(); hay que obtener el
     data_source_id desde databases.retrieve() y luego usar data_sources.query().
     """
-    db_info = client.databases.retrieve(database_id=database_id)
+    db_info: dict[str, Any] = cast("dict[str, Any]", client.databases.retrieve(database_id=database_id))
     data_sources = db_info.get("data_sources", [])
     if not data_sources:
         raise RuntimeError(
@@ -404,10 +404,10 @@ def descargar_todos(
         if name in props:
             prop_ids.append(props[name]["id"])
 
-    pages: list[dict] = []
+    pages: list[dict[str, Any]] = []
     cursor: str | None = None
     while True:
-        kwargs: dict = {
+        kwargs: dict[str, Any] = {
             "data_source_id": data_source_id,
             "result_type": "page",
         }
@@ -415,7 +415,7 @@ def descargar_todos(
             kwargs["filter_properties"] = prop_ids
         if cursor:
             kwargs["start_cursor"] = cursor
-        response = client.data_sources.query(**kwargs)
+        response: dict[str, Any] = cast("dict[str, Any]", client.data_sources.query(**kwargs))
         pages.extend(response.get("results", []))
         if not response.get("has_more"):
             break
@@ -423,7 +423,7 @@ def descargar_todos(
     return pages
 
 
-def _find_notion_player(name: str, notion_players: dict[str, dict]) -> dict | None:
+def _find_notion_player(name: str, notion_players: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
     """Finds a Notion player by name or alias."""
     norm_name = _normalize_name(name)
     # Exact name match
@@ -511,19 +511,19 @@ def main() -> None:
             sys.exit(1)
 
     # ── Build Notion player lookup (for updating existing players) ──────────
-    notion_players: dict[str, dict] = {}
+    notion_players: dict[str, dict[str, Any]] = {}
     for page in pages:
         props = page.get("properties", {})
         nombre_prop = props.get("Nombre")
         if not nombre_prop:
             continue
-        nombre = _extraer_nombre(nombre_prop)
+        nombre = extraer_nombre(nombre_prop)
         if not nombre:
             continue
         
         # Experiencia ← total histórico de Participaciones
         part_prop = props.get("Participaciones")
-        experiencia = _experiencia(part_prop) if part_prop else "Nuevo"
+        experiencia_val = experiencia(part_prop) if part_prop else "Nuevo"
         
         # Juegos_Este_Ano ← conteo filtrado por año (indexado por page ID del jugador)
         player_id = page["id"].replace("-", "")
@@ -536,14 +536,14 @@ def main() -> None:
         
         # Country history extraction
         countries_data = {
-            key: _extraer_numero(props.get(notion_name, {}))
+            key: extraer_numero(props.get(notion_name, {}))
             for key, notion_name in COUNTRY_PROPS.items()
         }
         
         notion_players[_normalize_name(nombre)] = {
             "notion_id": page["id"],
             "nombre": nombre,
-            "experiencia": experiencia,
+            "experiencia": experiencia_val,
             "juegos": juegos,
             "alias": alias_list,
             **countries_data,

@@ -2,6 +2,8 @@
 test_viewer_run.py — Tests for /api/run endpoint.
 
 Tests script execution and validation.
+The 'organizar' script was replaced by the two-step /api/game/draft + /api/game/save
+flow. Only 'notion_sync' is still accepted by /api/run.
 """
 from __future__ import annotations
 
@@ -18,36 +20,26 @@ class TestApiRun:
         resp = c.post("/api/run/evil_script")
         assert resp.status_code == 400
 
-    def test_invalid_snapshot_type_returns_400(self, client):
+    def test_organizar_script_no_longer_accepted(self, client):
+        """organizar was replaced by /api/game/draft + /api/game/save; /api/run/organizar → 400."""
         c, conn = client
-        resp = c.post(
-            "/api/run/organizar",
-            data=json.dumps({"snapshot": "not_an_int"}),
-            content_type="application/json",
-        )
-        assert resp.status_code == 400
-
-    def test_valid_integer_snapshot_accepted(self, client, monkeypatch):
-        import subprocess
-        c, conn = client
-        monkeypatch.setattr(
-            subprocess, "run",
-            lambda *a, **kw: type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
-        )
         resp = c.post(
             "/api/run/organizar",
             data=json.dumps({"snapshot": 1}),
             content_type="application/json",
         )
-        assert resp.status_code == 200
-
-    def test_run_organizar_missing_snapshot_returns_400(self, client):
-        """Omitting snapshot returns 400 — snapshot_id is required."""
-        c, conn = client
-        resp = c.post("/api/run/organizar", content_type="application/json")
         assert resp.status_code == 400
         data = resp.get_json()
-        assert "Snapshot selection required" in data["error"]
+        assert "unknown script" in data["error"]
+
+    def test_invalid_snapshot_type_returns_400(self, client):
+        c, conn = client
+        resp = c.post(
+            "/api/run/notion_sync",
+            data=json.dumps({"snapshot": "not_an_int"}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 400
 
     def test_run_notion_sync_with_snapshot_passes_arg(self, client, monkeypatch):
         """Passing snapshot id to notion_sync forwards --snapshot to the subprocess."""
@@ -56,7 +48,7 @@ class TestApiRun:
         c, conn = client
         monkeypatch.setattr(
             subprocess, "run",
-            lambda *a, **kw: calls.append(a[0]) or type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
+            lambda *a, **_kw: calls.append(a[0]) or type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
         )
         resp = c.post(
             "/api/run/notion_sync",
@@ -68,44 +60,25 @@ class TestApiRun:
         assert "3" in calls[0]
         assert "backend.sync.notion_sync" in calls[0]
 
-    def test_run_organizar_invokes_correct_module(self, client, monkeypatch):
-        """Organizar script maps to backend.organizador module (not a bare .py file)."""
+    def test_run_uses_module_flag(self, client, monkeypatch):
+        """Scripts are invoked with 'python -m <module>' to avoid relative-import errors."""
         import subprocess
         calls: list[list[str]] = []
         c, conn = client
         monkeypatch.setattr(
             subprocess, "run",
-            lambda *a, **kw: calls.append(a[0]) or type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
+            lambda *a, **_kw: calls.append(a[0]) or type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
         )
-        resp = c.post(
-            "/api/run/organizar",
+        calls.clear()
+        c.post(
+            "/api/run/notion_sync",
             data=json.dumps({"snapshot": 1}),
             content_type="application/json",
         )
-        assert resp.status_code == 200
-        assert "backend.organizador.organizador" in calls[0]
-
-    def test_run_uses_module_flag(self, client, monkeypatch):
-        """Both scripts are invoked with 'python -m <module>' to avoid relative-import errors."""
-        import subprocess
-        calls: list[list[str]] = []
-        c, conn = client
-        monkeypatch.setattr(
-            subprocess, "run",
-            lambda *a, **kw: calls.append(a[0]) or type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
+        assert "-m" in calls[0], "expected '-m' flag in notion_sync command"
+        assert not any(arg.endswith(".py") for arg in calls[0]), (
+            "command must not reference a .py file directly"
         )
-        for script in ("notion_sync", "organizar"):
-            calls.clear()
-            c.post(
-                f"/api/run/{script}",
-                data=json.dumps({"snapshot": 1}),
-                content_type="application/json",
-            )
-            assert "-m" in calls[0], f"{script}: expected '-m' flag in command"
-            # Must NOT be a bare .py filename (that would trigger the relative-import error)
-            assert not any(arg.endswith(".py") for arg in calls[0]), (
-                f"{script}: command must not reference a .py file directly"
-            )
 
     def test_run_cwd_is_project_root(self, client, monkeypatch):
         """subprocess.run must be called with cwd set to the project root (not backend/)."""
@@ -115,7 +88,7 @@ class TestApiRun:
         c, conn = client
         monkeypatch.setattr(
             subprocess, "run",
-            lambda *a, **kw: captured_kwargs.append(kw) or type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
+            lambda *_a, **kw: captured_kwargs.append(kw) or type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
         )
         c.post(
             "/api/run/notion_sync",
@@ -154,7 +127,7 @@ class TestApiRun:
         
         monkeypatch.setattr(
             subprocess, "run",
-            lambda *a, **kw: type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
+            lambda *_a, **_kw: type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
         )
         resp = c.post("/api/run/notion_sync", content_type="application/json")
         assert resp.status_code == 200
@@ -172,7 +145,7 @@ class TestApiRun:
         
         monkeypatch.setattr(
             subprocess, "run",
-            lambda *a, **kw: type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
+            lambda *_a, **_kw: type("R", (), {"returncode": 0, "stdout": "ok", "stderr": ""})(),
         )
         resp = c.post("/api/run/notion_sync", content_type="application/json")
         assert resp.status_code == 200

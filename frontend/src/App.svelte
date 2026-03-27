@@ -8,6 +8,7 @@
   import SidePanel from "./components/SidePanel.svelte";
   import SnapshotDetail from "./components/SnapshotDetail.svelte";
   import SnapshotDraft from "./components/SnapshotDraft.svelte";
+  import GameDraft from "./components/GameDraft.svelte";
   import GameDetail from "./components/GameDetail.svelte";
   import SyncDetail from "./components/SyncDetail.svelte";
   import Toaster from "./components/Toaster.svelte";
@@ -21,7 +22,7 @@
   // Panel state
   let panelOpen = $state(false);
   let panelTitle = $state("");
-  let panelType = $state<"snapshot" | "game" | "sync" | "draft" | null>(null);
+  let panelType = $state<"snapshot" | "game" | "sync" | "draft" | "game_draft" | null>(null);
   let panelId = $state<number | null>(null);
 
   // Draft state
@@ -77,6 +78,11 @@
     setActiveNodeId(id);
   }
 
+  function openGameDraft(snapshotId: number): void {
+    openPanel(`Draft - Snapshot #${snapshotId}`, "game_draft", snapshotId);
+    setActiveNodeId(snapshotId);
+  }
+
   function openDraft(parentId: number | null = null, eventType: string = "manual", autoAction: 'notion' | 'csv' | null = null, players: EditPlayerRow[] = []): void {
     closePanel();
     draftParentId = parentId;
@@ -115,7 +121,7 @@
         const chainData = await fetchChain();
         const gameId = findLatestGameId(chainData.roots);
         if (gameId !== null) {
-          setActiveNodeId(String(gameId));
+          setActiveNodeId(gameId);
           openGame(gameId);
         }
       } else if (ok) {
@@ -189,6 +195,7 @@
         onChainUpdate={handleChainUpdate}
         onOpenSnapshot={openSnapshot}
         onOpenGame={openGame}
+        onOpenGameDraft={openGameDraft}
         onEditDraft={(parentId: number, eventType: string, autoAction?: 'notion' | 'csv' | null, players?: EditPlayerRow[]) => openDraft(parentId, eventType, autoAction ?? null, players ?? [])}
         onShowError={(title, output) => { modalTitle = title; modalOutput = output; modalIsError = true; modalLoading = false; modalVisible = true; }}
       />
@@ -205,6 +212,14 @@
       />
     {:else if panelType === "game" && panelId !== null}
       <GameDetail id={panelId} />
+    {:else if panelType === "game_draft" && panelId !== null}
+      <GameDraft
+        snapshotId={panelId}
+        onClose={closePanel}
+        onChainUpdate={handleChainUpdate}
+        onOpenGame={openGame}
+        onShowError={(title, output) => { modalTitle = title; modalOutput = output; modalIsError = true; modalLoading = false; modalVisible = true; }}
+      />
     {:else if panelType === "sync" && panelId !== null}
       <SyncDetail id={panelId} />
     {/if}

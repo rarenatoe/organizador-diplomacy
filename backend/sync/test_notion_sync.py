@@ -301,9 +301,9 @@ class TestDetectSimilarNames:
 class TestSyncBehavior:
     """Tests for the sync behavior to ensure players are preserved, merged, and filtered correctly."""
 
-    def _simulate_sync_logic(self, existentes, notion_players, merges=None, is_first_sync=False):
+    def _simulate_sync_logic(self, existentes, notion_players, merges=None, *, is_first_sync=False):
         """Helper to simulate the exact row-building logic from notion_sync.py"""
-        from .notion_sync import FIELD_DEFAULTS, _find_notion_player, _normalize_name, COUNTRY_PROPS
+        from .notion_sync import COUNTRY_PROPS, FIELD_DEFAULTS, _find_notion_player, _normalize_name
         if merges is None:
             merges = {}
         
@@ -394,19 +394,18 @@ class TestSyncBehavior:
 
     def test_country_stats_extraction(self):
         """Test that country stats are correctly extracted and updated."""
-        from .notion_sync import _extraer_numero
+        from .notion_sync import extraer_numero
         
         # Mock property with number
         prop_num = {"type": "number", "number": 5}
-        assert _extraer_numero(prop_num) == 5
+        assert extraer_numero(prop_num) == 5
         
         # Mock property with formula
         prop_formula = {"type": "formula", "formula": {"type": "number", "number": 3}}
-        assert _extraer_numero(prop_formula) == 3
+        assert extraer_numero(prop_formula) == 3
         
         # Mock empty or invalid
-        assert _extraer_numero({}) == 0
-        assert _extraer_numero(None) == 0
+        assert extraer_numero({}) == 0
 
     def test_new_notion_players_are_ignored(self):
         """Regression test: New players in Notion must NOT be added to an existing snapshot."""

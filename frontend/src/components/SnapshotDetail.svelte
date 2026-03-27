@@ -14,11 +14,12 @@
     onChainUpdate: () => void;
     onOpenSnapshot: (id: number) => void;
     onOpenGame: (id: number) => void;
+    onOpenGameDraft: (snapshotId: number) => void;
     onEditDraft: (parentId: number, eventType: string, autoAction?: 'notion' | 'csv' | null, players?: EditPlayerRow[]) => void;
     onShowError: (title: string, output: string) => void;
   }
 
-  let { id, onClose, onChainUpdate, onOpenSnapshot, onOpenGame, onEditDraft, onShowError }: Props = $props();
+  let { id, onClose, onChainUpdate, onOpenSnapshot, onOpenGame, onOpenGameDraft, onEditDraft, onShowError }: Props = $props();
 
   let data = $state<SnapshotDetail | null>(null);
   let loading = $state(true);
@@ -102,28 +103,8 @@
 
   async function executeOrganizar(): Promise<void> {
     showConfirm = false;
-    try {
-      const res = await runScript("organizar", id);
-      if (
-        res.returncode !== 0 ||
-        (res.stdout && res.stdout.includes("No hay suficientes"))
-      ) {
-        onShowError("Error al organizar", res.stdout || res.stderr || "Error desconocido");
-        return;
-      }
-      await loadSnapshot();
-      onChainUpdate();
-      
-      // Fetch chain and find the latest game to open
-      const chainData = await fetchChain();
-      const gameId = findLatestGameId(chainData.roots);
-      if (gameId !== null) {
-        setActiveNodeId(gameId);
-        onOpenGame(gameId);
-      }
-    } catch (e) {
-      onShowError("Error de conexión", String(e));
-    }
+    // Open the game draft panel instead of running the script directly
+    onOpenGameDraft(id);
   }
 
   async function handleRename(oldName: string): Promise<void> {

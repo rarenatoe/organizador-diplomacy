@@ -12,13 +12,16 @@ Public API
 """
 from __future__ import annotations
 
-import sqlite3
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import sqlite3
 
 from .db import get_snapshot_players
 
 # ── Chain (viewer) ─────────────────────────────────────────────────────────────
 
-def build_chain_data(conn: sqlite3.Connection) -> dict:
+def build_chain_data(conn: sqlite3.Connection) -> dict[str, Any]:
     """
     Builds the full chain tree for /api/chain.
 
@@ -51,7 +54,7 @@ def build_chain_data(conn: sqlite3.Connection) -> dict:
     latest_id = max(snap_rows)
 
     # ── All edges from unified events table ────────────────────────────────────
-    edges: list[dict] = []
+    edges: list[dict[str, Any]] = []
     for r in conn.execute(
         """
         SELECT e.id, e.created_at, e.type, e.source_snapshot_id, e.output_snapshot_id,
@@ -66,7 +69,7 @@ def build_chain_data(conn: sqlite3.Connection) -> dict:
         GROUP  BY e.id
         """
     ).fetchall():
-        edge: dict = {
+        edge: dict[str, Any] = {
             "type": r["type"],
             "id": int(r["id"]),
             "created_at": r["created_at"],
@@ -80,7 +83,7 @@ def build_chain_data(conn: sqlite3.Connection) -> dict:
         edges.append(edge)
 
     # ── from_id → [edges] sorted chronologically ──────────────────────────────
-    from_to: dict[int, list[dict]] = {}
+    from_to: dict[int, list[dict[str, Any]]] = {}
     for edge in edges:
         from_to.setdefault(edge["from_id"], []).append(edge)
     for lst in from_to.values():
@@ -115,7 +118,7 @@ def build_chain_data(conn: sqlite3.Connection) -> dict:
             node["branches"].append({"edge": edge, "output": output})
         return node
 
-    roots: list[dict] = []
+    roots: list[dict[str, Any]] = []
     for r in root_ids:
         n = _walk(r)
         if n is not None:
@@ -133,7 +136,7 @@ def build_chain_data(conn: sqlite3.Connection) -> dict:
 
 # ── Viewer detail helpers ──────────────────────────────────────────────────────
 
-def get_snapshot_detail(conn: sqlite3.Connection, snapshot_id: int) -> dict | None:
+def get_snapshot_detail(conn: sqlite3.Connection, snapshot_id: int) -> dict[str, Any] | None:
     """Returns snapshot metadata + player list for the detail panel. None if not found."""
     snap = conn.execute(
         "SELECT id, created_at, source FROM snapshots WHERE id = ?",
@@ -149,7 +152,7 @@ def get_snapshot_detail(conn: sqlite3.Connection, snapshot_id: int) -> dict | No
     }
 
 
-def get_game_event_detail(conn: sqlite3.Connection, event_id: int) -> dict | None:
+def get_game_event_detail(conn: sqlite3.Connection, event_id: int) -> dict[str, Any] | None:
     """Returns full game event detail for the detail panel. None if not found."""
     ge = conn.execute(
         """
@@ -166,7 +169,7 @@ def get_game_event_detail(conn: sqlite3.Connection, event_id: int) -> dict | Non
 
     input_sid = int(ge["source_snapshot_id"])
 
-    mesas_data: list[dict] = []
+    mesas_data: list[dict[str, Any]] = []
     for mesa_row in conn.execute(
         "SELECT id, numero, gm_player_id FROM mesas WHERE event_id = ? ORDER BY numero",
         (event_id,),
@@ -181,7 +184,7 @@ def get_game_event_detail(conn: sqlite3.Connection, event_id: int) -> dict | Non
             ).fetchone()
             gm_name = gm_row["nombre"] if gm_row else None
 
-        jugadores: list[dict] = []
+        jugadores: list[dict[str, Any]] = []
         for p in conn.execute(
             """
             SELECT p.nombre, sp.experiencia, sp.juegos_este_ano
@@ -208,7 +211,7 @@ def get_game_event_detail(conn: sqlite3.Connection, event_id: int) -> dict | Non
             "jugadores": jugadores,
         })
 
-    waiting: list[dict] = [
+    waiting: list[dict[str, Any]] = [
         {
             "nombre": row["nombre"],
             "cupos":  f"{row['cupos_faltantes']} cupo(s) sin asignar",

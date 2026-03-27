@@ -5,6 +5,7 @@
 ## Stack
 Python 3.13 · uv · Flask 3 · pytest · notion-client · python-dotenv · SQLite (stdlib)
 TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecked`) · Vitest 4 · @testing-library/dom
+Lefthook for smart pre-commit execution on changed files.
 
 > Scoped instructions: `python.instructions.md` (applyTo `backend/**/*.py`) and
 > `typescript.instructions.md` (applyTo `frontend/src/**`) contain language-specific detail.
@@ -13,8 +14,27 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 ```
 .
 ├── backend/            Python source, tests, DB, Flask server
+│   ├── db/              Modular database operations
+│   │   ├── connection.py      # Database connection and schema
+│   │   ├── players.py         # Player CRUD operations
+│   │   ├── snapshots.py       # Snapshot management
+│   │   └── events.py         # Event operations
+│   ├── organizador/      Core algorithm and models
+│   │   ├── core.py           # Country assignment algorithm
+│   │   └── models.py         # Domain types
+│   ├── sync/              Notion integration
+│   │   ├── api.py            # Notion API utilities
+│   │   ├── similarity.py     # Name similarity detection
+│   │   └── notion_sync.py   # Main orchestrator
+│   └── viewer.py           # Flask REST API
 ├── frontend/           TypeScript source, UI bundles, templates
-└── [config files]      pyproject.toml, package.json, tsconfig.json, etc.
+│   ├── src/
+│   │   ├── types.ts          # Shared TypeScript interfaces
+│   │   ├── stores.svelte.ts   # Global state ($state runes)
+│   │   ├── api.ts            # API utility module
+│   │   ├── App.svelte         # Main layout shell
+│   │   └── components/*.svelte # UI components
+│   └── [config files]      pyproject.toml, package.json, tsconfig.json, etc.
 ```
 
 ## File map
@@ -22,21 +42,26 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 ### Backend (`backend/`)
 | File | Role |
 |---|---|
-| `organizador.py` | Algorithm: `_calcular_partidas()`, `organizar_partidas()` |
+| `connection.py` | Database connection and schema management |
+| `players.py` | Player CRUD operations (get_or_create_player, rename_player, add_player_to_snapshot, get_snapshot_players) |
+| `snapshots.py` | Snapshot management (create_snapshot, add_snapshot_player, get_latest_snapshot_id, snapshots_have_same_roster, create_manual_snapshot, create_root_manual_snapshot) |
+| `events.py` | Event operations (create_event, create_sync_event, create_game_event, delete_snapshot_cascade) |
+| `core.py` | Algorithm: `_calcular_partidas()`, `organizar_partidas()`, `assign_countries_to_mesa()` |
 | `models.py` | Domain types: `Jugador`, `Mesa`, `ResultadoPartidas` |
 | `formatter.py` | Text generation: `_formatear_*`, `_construir_proyeccion` |
-| `db.py` | SQLite schema + CRUD helpers |
-| `db_game.py` | Game-event persistence |
+| `db_game.py` | Game-event persistence (legacy, now in events.py) |
 | `db_views.py` | Read-only queries for viewer |
 | `viewer.py` | Flask REST API |
-| `notion_sync.py` | Notion → DB sync |
-| `test_*.py` | Tests (co-located) |
+| `sync/api.py` | Notion API utilities (descargar_todos, conteo_partidas_este_ano, extraer_numero, extraer_nombre, experiencia) |
+| `sync/similarity.py` | Name similarity detection (_normalize_name, _words_match, _similarity, _detect_similar_names) |
+| `sync/notion_sync.py` | Main orchestrator (main function) |
+| `test_*.py` | Tests (co-located with source files) |
 
 ### Frontend (`frontend/`)
 | Path | Role |
 |---|---|
 | `src/types.ts` | Shared TypeScript interfaces |
-| `src/stores.svelte.ts` | Global state (`$state` runes) |
+| `src/stores.svelte.ts` | Global state ($state runes) |
 | `src/api.ts` | API utility module |
 | `src/App.svelte` | Main layout shell |
 | `src/components/*.svelte` | UI components |
@@ -65,25 +90,3 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 
 ## File Size
 400-line soft limit. Extract sub-domains into new files. Exception: highly cohesive indivisible units.
-
-## Testing
-- Vitest + `@testing-library/dom` for DOM tests.
-- Mock dependencies with `vi.mock()`.
-- Export testable functions.
-- Test files: `frontend/src/*.test.ts`.
-
-## CSS
-- Flex layout for panels, rows, containers.
-- `overflow: hidden; text-overflow: ellipsis; white-space: nowrap;` for truncation.
-- Scoped `<style>` in `.svelte` files.
-- `static/style.css` for variables, resets, utility classes.
-- Scroll pattern: `.panel-body` (flex column, hidden) + `.panel-scroll` (flex 1, auto scroll).
-
-## Ripple Effect
-- **Player change**: Update `organizador.py`, `models.py`, `formatter.py`, `notion_sync.py`, `db.py`, `db_game.py`, `viewer.py`, tests.
-- **Flask route**: Update `test_viewer.py` (200, 400, 404).
-- **Algorithm**: Update `db_views.py`, `test_viewer.py`, `test_db.py`.
-- **Schema**: Update `db.py`, `test_db.py`, `test_viewer.py`.
-- **UI**: Update `src/*.ts`, `static/style.css`, `types.ts`.
-
-Tests live at root alongside source — flat layout is intentional for this project size.

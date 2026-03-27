@@ -56,7 +56,7 @@ def client(mem_db, monkeypatch):
         def close(self) -> None:
             pass  # keep the connection alive for the full test
 
-    monkeypatch.setattr(db, "get_db", lambda path=None: _NoClose(mem_db))
+    monkeypatch.setattr(db, "get_db", lambda _path=None: _NoClose(mem_db))
     app.config["TESTING"] = True
     with app.test_client() as c:
         yield c, mem_db

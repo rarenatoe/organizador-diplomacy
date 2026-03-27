@@ -10,6 +10,8 @@ import type {
   EditPlayerRow,
   SnapshotSaveResponse,
   NotionFetchResponse,
+  DraftResponse,
+  SaveDraftResponse,
 } from "./types";
 
 // ── Chain ─────────────────────────────────────────────────────────────────────
@@ -74,6 +76,31 @@ export async function fetchNotionPlayers(
 export async function fetchGame(id: number): Promise<GameDetail> {
   const res = await fetch(`/api/game/${id}`);
   return (await res.json()) as GameDetail;
+}
+
+export async function fetchGameDraft(
+  snapshotId: number,
+): Promise<DraftResponse> {
+  const res = await fetch("/api/game/draft", {
+    method: "POST",
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ snapshot_id: snapshotId }),
+  });
+  return (await res.json()) as DraftResponse;
+}
+
+export async function saveGameDraft(
+  snapshotId: number,
+  draft: DraftResponse,
+): Promise<SaveDraftResponse> {
+  const res = await fetch("/api/game/save", {
+    method: "POST",
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ snapshot_id: snapshotId, draft }),
+  });
+  return (await res.json()) as SaveDraftResponse;
 }
 
 // ── Player ────────────────────────────────────────────────────────────────────

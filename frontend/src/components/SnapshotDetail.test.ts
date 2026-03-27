@@ -118,6 +118,7 @@ describe("SnapshotDetail", () => {
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
         onOpenGame: () => {},
+        onOpenGameDraft: () => {},
         onEditDraft: () => {},
         onShowError: () => {},
       },
@@ -147,6 +148,7 @@ describe("SnapshotDetail", () => {
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
         onOpenGame: () => {},
+        onOpenGameDraft: () => {},
         onEditDraft,
         onShowError: () => {},
       },
@@ -241,6 +243,7 @@ describe("SnapshotDetail", () => {
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
         onOpenGame: () => {},
+        onOpenGameDraft: () => {},
         onEditDraft,
         onShowError: () => {},
       },
@@ -283,6 +286,7 @@ describe("SnapshotDetail", () => {
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
         onOpenGame: () => {},
+        onOpenGameDraft: () => {},
         onEditDraft,
         onShowError: () => {},
       },
@@ -319,6 +323,7 @@ describe("SnapshotDetail", () => {
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
         onOpenGame: () => {},
+        onOpenGameDraft: () => {},
         onEditDraft: () => {},
         onShowError: () => {},
       },
@@ -350,6 +355,7 @@ describe("SnapshotDetail", () => {
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
         onOpenGame: () => {},
+        onOpenGameDraft: () => {},
         onEditDraft: () => {},
         onShowError: () => {},
       },
@@ -379,21 +385,20 @@ describe("SnapshotDetail", () => {
     });
   });
 
-  it("calls onChainUpdate after successful organizar", async () => {
+  it("calls onOpenGameDraft after successful organizar", async () => {
     // Use real timers for this test to avoid async issues
     vi.useRealTimers();
 
-    const api = await import("../api");
-    const onChainUpdateMock = vi.fn(() => {});
-    const onOpenGameMock = vi.fn(() => {});
+    const onOpenGameDraft = vi.fn();
 
     render(SnapshotDetail, {
       props: {
         id: 1,
         onClose: () => {},
-        onChainUpdate: () => onChainUpdateMock(),
+        onChainUpdate: () => {},
         onOpenSnapshot: () => {},
-        onOpenGame: () => onOpenGameMock(),
+        onOpenGame: () => {},
+        onOpenGameDraft,
         onEditDraft: () => {},
         onShowError: () => {},
       },
@@ -404,25 +409,14 @@ describe("SnapshotDetail", () => {
       expect(screen.queryByText("Cargando…")).toBeNull();
     });
 
-    // Click the organizar button
     const organizarButton = screen.getByText("▶ Organizar Partidas");
     await fireEvent.click(organizarButton);
 
-    // Verify runScript was called
-    await waitFor(() => {
-      expect(api.runScript).toHaveBeenCalledWith("organizar", 1);
-    });
-
-    // Verify onChainUpdate was called
-    await waitFor(() => {
-      expect(onChainUpdateMock).toHaveBeenCalledTimes(1);
-    });
-
-    // Restore fake timers for other tests
-    vi.useFakeTimers();
+    // Verify onOpenGameDraft was called
+    expect(onOpenGameDraft).toHaveBeenCalledWith(1);
   });
 
-  it("calls onShowError and stops when organizar returns non-zero", async () => {
+  it("calls onOpenGameDraft and stops when organizar returns non-zero", async () => {
     vi.useRealTimers();
 
     const api = await import("../api");
@@ -432,17 +426,17 @@ describe("SnapshotDetail", () => {
       stderr: "",
     });
 
-    const onChainUpdateMock = vi.fn();
-    const onOpenGameMock = vi.fn();
+    const onOpenGameDraft = vi.fn();
     const onShowErrorMock = vi.fn();
 
     render(SnapshotDetail, {
       props: {
         id: 1,
         onClose: () => {},
-        onChainUpdate: onChainUpdateMock,
+        onChainUpdate: () => {},
         onOpenSnapshot: () => {},
-        onOpenGame: onOpenGameMock,
+        onOpenGame: () => {},
+        onOpenGameDraft,
         onEditDraft: () => {},
         onShowError: onShowErrorMock,
       },
@@ -454,19 +448,11 @@ describe("SnapshotDetail", () => {
 
     await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
 
-    await waitFor(() => {
-      expect(onShowErrorMock).toHaveBeenCalledWith(
-        "Error al organizar",
-        "No hay suficientes jugadores",
-      );
-    });
-    expect(onChainUpdateMock).not.toHaveBeenCalled();
-    expect(onOpenGameMock).not.toHaveBeenCalled();
-
-    vi.useFakeTimers();
+    // Should call onOpenGameDraft regardless of validation
+    expect(onOpenGameDraft).toHaveBeenCalledWith(1);
   });
 
-  it('calls onShowError and stops when organizar stdout includes "No hay suficientes"', async () => {
+  it("calls onOpenGameDraft when organizar stdout includes 'No hay suficientes'", async () => {
     vi.useRealTimers();
 
     const api = await import("../api");
@@ -476,17 +462,17 @@ describe("SnapshotDetail", () => {
       stderr: "",
     });
 
-    const onChainUpdateMock = vi.fn();
-    const onOpenGameMock = vi.fn();
+    const onOpenGameDraft = vi.fn();
     const onShowErrorMock = vi.fn();
 
     render(SnapshotDetail, {
       props: {
         id: 1,
         onClose: () => {},
-        onChainUpdate: onChainUpdateMock,
+        onChainUpdate: () => {},
         onOpenSnapshot: () => {},
-        onOpenGame: onOpenGameMock,
+        onOpenGame: () => {},
+        onOpenGameDraft,
         onEditDraft: () => {},
         onShowError: onShowErrorMock,
       },
@@ -498,16 +484,8 @@ describe("SnapshotDetail", () => {
 
     await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
 
-    await waitFor(() => {
-      expect(onShowErrorMock).toHaveBeenCalledWith(
-        "Error al organizar",
-        "No hay suficientes mesas para organizar",
-      );
-    });
-    expect(onChainUpdateMock).not.toHaveBeenCalled();
-    expect(onOpenGameMock).not.toHaveBeenCalled();
-
-    vi.useFakeTimers();
+    // Should call onOpenGameDraft regardless
+    expect(onOpenGameDraft).toHaveBeenCalledWith(1);
   });
 
   it("should prevent Sincronizar Notion if snapshot source is already notion_sync", async () => {
@@ -537,6 +515,7 @@ describe("SnapshotDetail", () => {
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
         onOpenGame: () => {},
+        onOpenGameDraft: () => {},
         onEditDraft: () => {},
         onShowError,
       },
@@ -580,6 +559,7 @@ describe("SnapshotDetail", () => {
         onChainUpdate: () => {},
         onOpenSnapshot: () => {},
         onOpenGame: () => {},
+        onOpenGameDraft: () => {},
         onEditDraft: () => {},
         onShowError: () => {},
       },
@@ -601,7 +581,10 @@ describe("SnapshotDetail", () => {
 
   describe("Organizar Validation", () => {
     it("should hard block if less than 7 players", async () => {
-      const { fetchSnapshot, runScript } = await import("../api");
+      const { fetchSnapshot } = await import("../api");
+      const onOpenGameDraft = vi.fn();
+      const onShowError = vi.fn();
+
       (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         id: 10,
         players: new Array(6)
@@ -609,7 +592,6 @@ describe("SnapshotDetail", () => {
           .map((_, i) => ({ nombre: `P${i}`, partidas_deseadas: 1 })),
       });
 
-      const onShowError = vi.fn();
       render(SnapshotDetail, {
         props: {
           id: 10,
@@ -617,6 +599,7 @@ describe("SnapshotDetail", () => {
           onChainUpdate: () => {},
           onOpenSnapshot: () => {},
           onOpenGame: () => {},
+          onOpenGameDraft,
           onEditDraft: () => {},
           onShowError,
         },
@@ -629,12 +612,13 @@ describe("SnapshotDetail", () => {
         "Error al organizar",
         "Se necesitan al menos 7 jugadores para organizar partidas.",
       );
-      expect(runScript).not.toHaveBeenCalled();
+      expect(onOpenGameDraft).not.toHaveBeenCalled();
     });
 
     it("should show modal if all players have 1 ticket", async () => {
-      const { fetchSnapshot, runScript } = await import("../api");
+      const { fetchSnapshot } = await import("../api");
       const { validateOrganizar } = await import("../syncUtils");
+      const onOpenGameDraft = vi.fn();
 
       const players = new Array(7).fill(null).map((_, i) => ({
         nombre: `P${i}`,
@@ -660,6 +644,7 @@ describe("SnapshotDetail", () => {
           onChainUpdate: () => {},
           onOpenSnapshot: () => {},
           onOpenGame: () => {},
+          onOpenGameDraft,
           onEditDraft: () => {},
           onShowError: () => {},
         },
@@ -669,13 +654,14 @@ describe("SnapshotDetail", () => {
       await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
 
       expect(screen.getByText("Revisar Roster")).toBeTruthy();
-      expect(runScript).not.toHaveBeenCalled();
+      expect(onOpenGameDraft).not.toHaveBeenCalled();
     });
 
     it("should call executeOrganizar when confirmed in modal", async () => {
       vi.useRealTimers();
-      const { fetchSnapshot, runScript } = await import("../api");
+      const { fetchSnapshot } = await import("../api");
       const { validateOrganizar } = await import("../syncUtils");
+      const onOpenGameDraft = vi.fn();
 
       const players = new Array(7).fill(null).map((_, i) => ({
         nombre: `P${i}`,
@@ -701,6 +687,7 @@ describe("SnapshotDetail", () => {
           onChainUpdate: () => {},
           onOpenSnapshot: () => {},
           onOpenGame: () => {},
+          onOpenGameDraft,
           onEditDraft: () => {},
           onShowError: () => {},
         },
@@ -713,7 +700,7 @@ describe("SnapshotDetail", () => {
       await fireEvent.click(confirmBtn);
 
       await waitFor(() => {
-        expect(runScript).toHaveBeenCalledWith("organizar", 12);
+        expect(onOpenGameDraft).toHaveBeenCalledWith(12);
       });
       vi.useFakeTimers();
     });
@@ -749,6 +736,7 @@ describe("SnapshotDetail", () => {
           onChainUpdate: () => {},
           onOpenSnapshot: () => {},
           onOpenGame: () => {},
+          onOpenGameDraft: () => {},
           onEditDraft,
           onShowError: () => {},
         },

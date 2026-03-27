@@ -3,26 +3,29 @@ cache_daemon.py – Background process for periodic Notion data caching.
 """
 from __future__ import annotations
 
+import concurrent.futures
 import os
-import sqlite3
 import threading
 import time
-import concurrent.futures
 from datetime import datetime
+from typing import TYPE_CHECKING
 
-from notion_client import Client
 from dotenv import load_dotenv
+from notion_client import Client
+
+if TYPE_CHECKING:
+    import sqlite3
 
 from backend.db import db
 from backend.sync.notion_sync import (
-    descargar_todos,
+    COUNTRY_PROPS,
     conteo_partidas_este_ano,
-    _extraer_nombre,
-    _experiencia,
-    _normalize_name,
-    _extraer_numero,
-    COUNTRY_PROPS
+    descargar_todos,
+    experiencia,
+    extraer_nombre,
+    extraer_numero,
 )
+
 
 def update_notion_cache(
     conn: sqlite3.Connection,
@@ -49,18 +52,18 @@ def update_notion_cache(
         nombre_prop = props.get("Nombre")
         if not nombre_prop:
             continue
-        nombre = _extraer_nombre(nombre_prop)
+        nombre = extraer_nombre(nombre_prop)
         if not nombre:
             continue
             
         part_prop = props.get("Participaciones")
-        experiencia = _experiencia(part_prop) if part_prop else "Nuevo"
+        experiencia_val = experiencia(part_prop) if part_prop else "Nuevo"
         
         player_id = page["id"].replace("-", "")
         juegos = conteo_por_jugador.get(player_id, 0)
         
         countries_data = {
-            key: _extraer_numero(props.get(notion_name, {}))
+            key: extraer_numero(props.get(notion_name, {}))
             for key, notion_name in COUNTRY_PROPS.items()
         }
         
@@ -75,7 +78,7 @@ def update_notion_cache(
             (
                 page["id"],
                 nombre,
-                experiencia,
+                experiencia_val,
                 juegos,
                 countries_data["c_england"],
                 countries_data["c_france"],
@@ -97,9 +100,13 @@ def _run_sync_loop() -> None:
     db_id      = os.getenv("NOTION_DATABASE_ID")
     part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
 
-    if not all([token, db_id, part_db_id]) or token.startswith("secret_XXX"):
+    if not all([token, db_id, part_db_id]) or not token or token.startswith("secret_XXX"):
         print(" [Cache Daemon] Skipping background sync: Missing Notion credentials.")
         return
+
+    # Type assertions for mypy/pyright
+    assert db_id is not None
+    assert part_db_id is not None
 
     client = Client(auth=token)
     
@@ -108,7 +115,7 @@ def _run_sync_loop() -> None:
         conn = db.get_db()
         try:
             update_notion_cache(conn, client, db_id, part_db_id)
-            print(f" [Cache Daemon] Sync complete. Sleeping for 15 minutes.")
+            print(" [Cache Daemon] Sync complete. Sleeping for 15 minutes.")
         except Exception as e:
             print(f" [Cache Daemon] Error during sync: {e}")
         finally:

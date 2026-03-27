@@ -2,8 +2,10 @@
 Unit tests for weights.py - build_weighted_tickets logic.
 """
 import unittest
+
 from .models import Jugador
 from .weights import build_weighted_tickets
+
 
 def _j(nombre: str, d=1, g=0, exp="Antiguo", j=0):
     return Jugador(nombre, exp, j, "False", d, g)

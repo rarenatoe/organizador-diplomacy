@@ -1,20 +1,22 @@
 from __future__ import annotations
 
-import random
 import sys
 from collections import Counter
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from backend.config import DATA_DIR
 from backend.db import db, db_game
 
 from .core import calcular_partidas
 from .formatter import (
-    _construir_proyeccion,
-    _formatear_copypaste,
-    _formatear_resultado,
+    _construir_proyeccion,  # pyright: ignore[reportPrivateUsage]
+    _formatear_copypaste,  # pyright: ignore[reportPrivateUsage]
+    _formatear_resultado,  # pyright: ignore[reportPrivateUsage]
 )
-from .models import Jugador, Mesa, ResultadoPartidas
+from .models import Jugador, ResultadoPartidas
 
 SEP: str = "─" * 44
 

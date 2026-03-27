@@ -152,6 +152,7 @@ async function main(): Promise<void> {
   }
 
   await writeFile(".clinerules", renderCline(rules));
+  await writeFile(".windsurfrules", renderCline(rules));
 }
 
 main().catch((error: unknown) => {

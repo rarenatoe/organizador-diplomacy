@@ -5,8 +5,9 @@ This file imports tests from split files for better organization.
 Tests are split by API endpoint functionality:
 - test_viewer_chain.py: /api/chain
 - test_viewer_snapshot.py: /api/snapshot, /api/snapshots, DELETE /api/snapshot, /api/snapshot/save, /api/notion/fetch
-- test_viewer_run.py: /api/run
+- test_viewer_run.py: /api/run (notion_sync only; organizar replaced by draft endpoints)
 - test_viewer_player.py: /api/player/rename, /api/snapshot/<id>/add-player
+- test_viewer_game.py: /api/game/draft, /api/game/save
 """
 from __future__ import annotations
 

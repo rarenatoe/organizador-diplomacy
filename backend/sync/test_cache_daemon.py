@@ -7,7 +7,9 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from backend.db import db
-from .cache_daemon import update_notion_cache, _run_sync_loop
+
+from .cache_daemon import _run_sync_loop, update_notion_cache
+
 
 class TestCacheDaemon(unittest.TestCase):
     def setUp(self):
@@ -60,9 +62,9 @@ class TestCacheDaemon(unittest.TestCase):
         
         # Track the order of calls
         call_order = []
-        mock_update.side_effect = lambda *args, **kwargs: call_order.append("update")
+        mock_update.side_effect = lambda *_, **__: call_order.append("update")
         
-        def mock_sleep_fn(*args, **kwargs):
+        def mock_sleep_fn(*_args, **_kwargs):
             call_order.append("sleep")
             raise Exception("StopLoop")
         mock_sleep.side_effect = mock_sleep_fn

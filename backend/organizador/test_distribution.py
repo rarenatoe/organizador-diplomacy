@@ -2,9 +2,10 @@
 Unit tests for distribution.py - run_distribution_loop and distribuir_tickets.
 """
 import unittest
-import random
+
+from .distribution import distribuir_tickets, run_distribution_loop
 from .models import Jugador
-from .distribution import run_distribution_loop, distribuir_tickets
+
 
 def _j(nombre: str, d=1, g=0, exp="Antiguo", j=0):
     return Jugador(nombre, exp, j, "False", d, g)
@@ -16,7 +17,7 @@ class TestDistribution(unittest.TestCase):
         weighted = [(1.0 + float(i), j) for i, j in enumerate(jugadores)]
         partidas = [[]]
         
-        rechazados = distribuir_tickets(weighted, True, partidas, {})
+        rechazados = distribuir_tickets(weighted, partidas, {}, es_grupo_nuevo=True)
         
         self.assertEqual(len(rechazados), 0)
         self.assertEqual(len(partidas[0]), 7)
@@ -27,7 +28,7 @@ class TestDistribution(unittest.TestCase):
         weighted = [(1.0, j), (2.0, j)]
         partidas = [[]]
         
-        rechazados = distribuir_tickets(weighted, True, partidas, {})
+        rechazados = distribuir_tickets(weighted, partidas, {}, es_grupo_nuevo=True)
         
         self.assertEqual(len(rechazados), 1)
         self.assertEqual(len(partidas[0]), 1)

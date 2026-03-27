@@ -8,6 +8,7 @@ models.py – Domain types shared across organizador.py, formatter.py, and viewe
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 # ── CSV column reference ───────────────────────────────────────────────────────
 # Columns: Nombre, Experiencia, Juegos_Este_Ano, Prioridad, Partidas_Deseadas, Partidas_GM
@@ -29,11 +30,13 @@ class Jugador:
         c_austria: int = 0,
         c_russia: int = 0,
         c_turkey: int = 0,
+        pais: str | None = None,
+        pais_reason: str | None = None,
     ) -> None:
         self.nombre: str = nombre
         self.es_nuevo: bool = (experiencia.strip().lower() == "nuevo")
         self.juegos_ano: int = int(juegos_ano)
-        self.tiene_prioridad: bool = (str(prioridad).strip().lower() == "true" or prioridad == 1)
+        self.tiene_prioridad: bool = str(prioridad).strip().lower() in ("true", "1")
         self.partidas_deseadas: int = int(partidas_deseadas)
         # How many tables this player will referee as GM (0 = not a GM).
         # The algorithm assigns which specific table(s) automatically.
@@ -47,6 +50,30 @@ class Jugador:
         self.c_austria: int = int(c_austria)
         self.c_russia: int = int(c_russia)
         self.c_turkey: int = int(c_turkey)
+        self.pais: str | None = pais
+        self.pais_reason: str | None = pais_reason
+
+    def to_dict(self) -> dict[str, Any]:
+        d: dict[str, Any] = {
+            "nombre": self.nombre,
+            "es_nuevo": self.es_nuevo,
+            "juegos_ano": self.juegos_ano,
+            "tiene_prioridad": self.tiene_prioridad,
+            "partidas_deseadas": self.partidas_deseadas,
+            "partidas_gm": self.partidas_gm,
+            "c_england": self.c_england,
+            "c_france": self.c_france,
+            "c_germany": self.c_germany,
+            "c_italy": self.c_italy,
+            "c_austria": self.c_austria,
+            "c_russia": self.c_russia,
+            "c_turkey": self.c_turkey,
+        }
+        if self.pais is not None:
+            d["pais"] = self.pais
+        if self.pais_reason is not None:
+            d["pais_reason"] = self.pais_reason
+        return d
 
     @property
     def puntaje_prioridad(self) -> float:
@@ -76,6 +103,13 @@ class Mesa:
     jugadores: list[Jugador]
     gm: Jugador | None = None
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "numero": self.numero,
+            "jugadores": [j.to_dict() for j in self.jugadores],
+            "gm": self.gm.to_dict() if self.gm else None,
+        }
+
 
 @dataclass
 class ResultadoPartidas:
@@ -84,3 +118,11 @@ class ResultadoPartidas:
     tickets_sobrantes: list[Jugador]
     minimo_teorico: int = 0    # tickets that cannot fit in any scenario
     intentos_usados: int = 0   # retry-loop iterations consumed
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "mesas": [m.to_dict() for m in self.mesas],
+            "tickets_sobrantes": [j.to_dict() for j in self.tickets_sobrantes],
+            "minimo_teorico": self.minimo_teorico,
+            "intentos_usados": self.intentos_usados
+        }

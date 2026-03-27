@@ -14,7 +14,7 @@ import random
 import unittest
 
 from .core import calcular_partidas
-from .models import Jugador, ResultadoPartidas
+from .models import Jugador
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

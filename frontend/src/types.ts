@@ -185,3 +185,42 @@ export interface SnapshotGroup {
   versions: SnapshotVersion[];
   branches: Branch[]; // The branches emanating from the LAST version in this group
 }
+
+// ── Draft Mode types ─────────────────────────────────────────────────────────
+
+export interface DraftPlayer {
+  nombre: string;
+  es_nuevo: boolean;
+  juegos_ano: number;
+  tiene_prioridad: boolean;
+  partidas_deseadas: number;
+  partidas_gm: number;
+  c_england: number;
+  c_france: number;
+  c_germany: number;
+  c_italy: number;
+  c_austria: number;
+  c_russia: number;
+  c_turkey: number;
+  pais?: string;
+  pais_reason?: string;
+}
+
+export interface DraftMesa {
+  numero: number;
+  jugadores: DraftPlayer[];
+  gm: DraftPlayer | null;
+}
+
+export interface DraftResponse {
+  mesas: DraftMesa[];
+  tickets_sobrantes: DraftPlayer[];
+  minimo_teorico: number;
+  intentos_usados: number;
+  error?: string;
+}
+
+export interface SaveDraftResponse {
+  game_id: number;
+  error?: string;
+}

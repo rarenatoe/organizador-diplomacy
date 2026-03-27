@@ -1,5 +1,20 @@
 pre-commit:
   commands:
+    python-lint:
+      glob: "backend/**/*.py"
+      run: uv run ruff check backend --fix && uv run pyright backend
+    python-test:
+      glob: "backend/**/*.py"
+      run: uv run python -m pytest -q
+    frontend-typecheck:
+      glob: "frontend/src/**/*.{ts,svelte}"
+      run: bun run typecheck
+    frontend-lint:
+      glob: "frontend/src/**/*.{ts,svelte}"
+      run: bun run lint
+    frontend-test:
+      glob: "frontend/src/**/*.{ts,svelte}"
+      run: bun run test
     ai-rules:
       glob: "docs/ai-rules/*.md"
-      run: bun run ai-rules:generate && git add .github/ .clinerules .trae/
+      run: bun run ai-rules:generate && git add .github/ .clinerules .trae/ .windsurfrules
