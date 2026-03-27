@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 from backend.db import db, db_game
 
-from .formatter import _formatear_copypaste_from_dict  # pyright: ignore[reportPrivateUsage]
+from .formatter import formatear_copypaste_from_dict
 
 
 def save_game_draft(
@@ -33,7 +33,7 @@ def save_game_draft(
     out_id = create_output_snapshot_from_draft(conn, input_snapshot_id, draft_data)
 
     # 2. Format copypaste text
-    copypaste = _formatear_copypaste_from_dict(draft_data)
+    copypaste = formatear_copypaste_from_dict(draft_data)
 
     # 3. Create the game event
     intentos = draft_data.get("intentos_usados", 0)

@@ -12,9 +12,9 @@ from backend.db import db, db_game
 
 from .core import calcular_partidas
 from .formatter import (
-    _construir_proyeccion,  # pyright: ignore[reportPrivateUsage]
-    _formatear_copypaste,  # pyright: ignore[reportPrivateUsage]
-    _formatear_resultado,  # pyright: ignore[reportPrivateUsage]
+    construir_proyeccion,
+    formatear_copypaste,
+    formatear_resultado,
 )
 from .models import Jugador, ResultadoPartidas
 
@@ -88,7 +88,7 @@ def organizar_partidas(
     total_tickets = total_cupos + resultado.minimo_teorico
 
     # ── Persist everything in a single transaction ──────────────────────────
-    copypaste = _formatear_copypaste(resultado)
+    copypaste = formatear_copypaste(resultado)
     try:
         out_id = db_game.create_output_snapshot(conn, snapshot_id, resultado)
         ge_id  = db_game.create_game_event(
@@ -131,10 +131,10 @@ def organizar_partidas(
     if en_espera_unicos:
         print(f"   En espera:   {', '.join(en_espera_unicos)}")
     print()
-    for line in _formatear_resultado(resultado):
+    for line in formatear_resultado(resultado):
         print(line)
     print()
-    for line in _construir_proyeccion(resultado, jugadores):
+    for line in construir_proyeccion(resultado, jugadores):
         print(line)
 
 

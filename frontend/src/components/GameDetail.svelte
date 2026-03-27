@@ -30,6 +30,42 @@
     }, 1500);
   }
 
+  function getCountryEmoji(pais: string | undefined): string {
+    // Handle both English (backend) and Spanish (display) country names
+    const countryEmojis: Record<string, string> = {
+      // English names (from backend)
+      England: "🇬🇧",
+      France: "🇫🇷",
+      Germany: "🇩🇪",
+      Italy: "🇮🇹",
+      Austria: "🇦🇹",
+      Russia: "🇷🇺",
+      Turkey: "🇹🇷",
+      // Spanish names (for display)
+      Inglaterra: "🇬🇧",
+      Francia: "🇫🇷",
+      Alemania: "🇩🇪",
+      Italia: "🇮🇹",
+      Rusia: "🇷🇺",
+      Turquía: "🇹🇷"
+    };
+    return pais ? (countryEmojis[pais] || "") : "";
+  }
+
+  function getCountryDisplayName(pais: string | undefined): string {
+    // Translate English country names to Spanish for display
+    const translations: Record<string, string> = {
+      England: "Inglaterra",
+      France: "Francia",
+      Germany: "Alemania",
+      Italy: "Italia",
+      Austria: "Austria",
+      Russia: "Rusia",
+      Turkey: "Turquía"
+    };
+    return pais ? (translations[pais] || pais) : "";
+  }
+
   $effect(() => {
     void loadGame();
   });
@@ -64,7 +100,7 @@
       <div class="section">
         <div class="section-title">Partidas ({mesas.length})</div>
         {#each mesas as mesa (mesa.numero)}
-          {@const playersTxt = mesa.jugadores.map((j) => j.nombre).join("\n")}
+          {@const playersTxt = mesa.jugadores.map((j) => j.pais ? `${j.nombre} (${getCountryDisplayName(j.pais)})` : j.nombre).join("\n")}
           <div class="mesa-card">
             <div class="mesa-header">
               <span class="mesa-title">Partida {mesa.numero}</span>
@@ -78,7 +114,7 @@
               {#each mesa.jugadores as j, i (j.nombre)}
                 <li>
                   <span class="p-num">{i + 1}.</span>
-                  <span class="p-name">{esc(j.nombre)}</span>
+                  <span class="p-name">{esc(j.nombre)} {j.pais ? getCountryEmoji(j.pais) : ""}</span>
                   {#if j.etiqueta === "Nuevo"}
                     <span class="tag tag-nuevo">Nuevo</span>
                   {:else}

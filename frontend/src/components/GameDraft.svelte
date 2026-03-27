@@ -38,14 +38,23 @@
   }
 
   function getCountryEmoji(pais: string | undefined): string {
+    // Handle both English (backend) and Spanish (display) country names
     const countryEmojis: Record<string, string> = {
+      // English names (from backend)
       England: "🇬🇧",
       France: "🇫🇷",
       Germany: "🇩🇪",
       Italy: "🇮🇹",
       Austria: "🇦🇹",
       Russia: "🇷🇺",
-      Turkey: "🇹🇷"
+      Turkey: "🇹🇷",
+      // Spanish names (for display)
+      Inglaterra: "🇬🇧",
+      Francia: "🇫🇷",
+      Alemania: "🇩🇪",
+      Italia: "🇮🇹",
+      Rusia: "🇷🇺",
+      Turquía: "🇹🇷"
     };
     return pais ? (countryEmojis[pais] || "") : "";
   }
@@ -396,13 +405,13 @@
                     }}
                     >
                       <option value={null}>🎲 Aleatorio</option>
-                      <option value="England">🇬🇧 England</option>
-                      <option value="France">🇫🇷 France</option>
-                      <option value="Germany">🇩🇪 Germany</option>
-                      <option value="Italy">🇮🇹 Italy</option>
+                      <option value="England">🇬🇧 Inglaterra</option>
+                      <option value="France">🇫🇷 Francia</option>
+                      <option value="Germany">🇩🇪 Alemania</option>
+                      <option value="Italy">🇮🇹 Italia</option>
                       <option value="Austria">🇦🇹 Austria</option>
-                      <option value="Russia">🇷🇺 Russia</option>
-                      <option value="Turkey">🇹🇷 Turkey</option>
+                      <option value="Russia">🇷🇺 Rusia</option>
+                      <option value="Turkey">🇹🇷 Turquía</option>
                     </select>
                     {#if j.pais_reason}
                       <div class="reason-tooltip">

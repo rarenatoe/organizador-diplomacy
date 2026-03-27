@@ -3,6 +3,7 @@
 export interface PlayerData {
   nombre: string;
   etiqueta: string;
+  pais?: string | null;
 }
 
 export interface MesaData {

@@ -23,6 +23,7 @@ ignore_decorators = ["@app.route"]
 ignore_names = ["main", "args", "kwargs", "conn", "client", "app"]
 min_confidence = 80
 paths = ["backend"]
+make_whitelist = true
 
 [tool.ruff]
 # Rules for the fast linter

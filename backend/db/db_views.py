@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import sqlite3
 
+from ..organizador.formatter import translate_country
 from .db import get_snapshot_players
 
 # ── Chain (viewer) ─────────────────────────────────────────────────────────────
@@ -96,7 +97,7 @@ def build_chain_data(conn: sqlite3.Connection) -> dict[str, Any]:
 
     visited: set[int] = set()
 
-    def _snap_node(sid: int) -> dict:
+    def _snap_node(sid: int) -> dict[str, Any]:
         r = snap_rows[sid]
         return {
             "type":         "snapshot",
@@ -108,7 +109,7 @@ def build_chain_data(conn: sqlite3.Connection) -> dict[str, Any]:
             "branches":     [],
         }
 
-    def _walk(sid: int) -> dict | None:
+    def _walk(sid: int) -> dict[str, Any] | None:
         if sid not in snap_rows or sid in visited:
             return None
         visited.add(sid)
@@ -187,7 +188,7 @@ def get_game_event_detail(conn: sqlite3.Connection, event_id: int) -> dict[str, 
         jugadores: list[dict[str, Any]] = []
         for p in conn.execute(
             """
-            SELECT p.nombre, sp.experiencia, sp.juegos_este_ano
+            SELECT p.nombre, sp.experiencia, sp.juegos_este_ano, mp.pais
             FROM   mesa_players mp
             JOIN   players      p  ON p.id  = mp.player_id
             JOIN   snapshot_players sp
@@ -203,7 +204,7 @@ def get_game_event_detail(conn: sqlite3.Connection, event_id: int) -> dict[str, 
                 if p["experiencia"] == "Nuevo"
                 else f"Antiguo ({p['juegos_este_ano']} juegos)"
             )
-            jugadores.append({"nombre": p["nombre"], "etiqueta": etiqueta})
+            jugadores.append({"nombre": p["nombre"], "etiqueta": etiqueta, "pais": translate_country(p["pais"])})
 
         mesas_data.append({
             "numero":    int(mesa_row["numero"]),

@@ -4,9 +4,9 @@ formatter.py – Pure text generation for game results.
 All functions return strings or lists of strings. No file I/O.
 
 Functions:
-  _formatear_copypaste   → share-ready text; stored in game_events.copypaste_text
-  _formatear_resultado   → detailed event results for terminal output
-  _construir_proyeccion  → per-player Juegos_Este_Ano projection table
+  formatear_copypaste           → share-ready text; stored in game_events.copypaste_text
+  formatear_resultado           → detailed event results for terminal output
+  construir_proyeccion          → per-player Juegos_Este_Ano projection table
 """
 from __future__ import annotations
 
@@ -18,18 +18,35 @@ if TYPE_CHECKING:
 
 SEP: str = "─" * 44
 
+# Country name translations from English to Spanish
+_COUNTRY_TRANSLATIONS: dict[str, str] = {
+    "England": "Inglaterra",
+    "France": "Francia", 
+    "Germany": "Alemania",
+    "Italy": "Italia",
+    "Austria": "Austria",
+    "Russia": "Rusia",
+    "Turkey": "Turquía"
+}
+
+def translate_country(pais: str | None) -> str:
+    """Translate English country name to Spanish."""
+    if not pais:
+        return ""
+    return _COUNTRY_TRANSLATIONS.get(pais, pais)
+
 
 # ── Share section ──────────────────────────────────────────────────────────────
 
-def _formatear_copypaste(resultado: ResultadoPartidas) -> str:
+def formatear_copypaste(resultado: ResultadoPartidas) -> str:
     """
     Section ready to copy-paste (WhatsApp, Discord, etc.).
     Names only — no experience metadata or decorations.
     """
-    return _formatear_copypaste_from_dict(resultado.to_dict())
+    return formatear_copypaste_from_dict(resultado.to_dict())
 
 
-def _formatear_copypaste_from_dict(resultado_dict: dict[str, Any]) -> str:
+def formatear_copypaste_from_dict(resultado_dict: dict[str, Any]) -> str:
     """
     Section ready to copy-paste from a dictionary representation.
     """
@@ -39,7 +56,7 @@ def _formatear_copypaste_from_dict(resultado_dict: dict[str, Any]) -> str:
         gm_str: str = f"  |  GM: {gm_nombre}" if gm_nombre else ""
         lineas.append(f"Partida {mesa['numero']}{gm_str}")
         for i, jugador in enumerate(mesa.get("jugadores", [])):
-            pais_str = f" ({jugador['pais']})" if jugador.get('pais') else ""
+            pais_str = f" ({translate_country(jugador.get('pais'))})" if jugador.get('pais') else ""
             lineas.append(f"  {i + 1}. {jugador['nombre']}{pais_str}")
         lineas.append("")
     
@@ -57,7 +74,7 @@ def _formatear_copypaste_from_dict(resultado_dict: dict[str, Any]) -> str:
 
 # ── Detail section ─────────────────────────────────────────────────────────────
 
-def _formatear_resultado(
+def formatear_resultado(
     resultado: ResultadoPartidas,
     sep: str = SEP,
 ) -> list[str]:
@@ -73,7 +90,7 @@ def _formatear_resultado(
         gm_str: str = f"GM: {mesa.gm.nombre}" if mesa.gm else "⚠️  Sin GM asignado"
         lineas.append(f"\n[ Partida {mesa.numero} ]  Nuevos: {nuevos}  Antiguos: {antiguos}  {gm_str}")
         for j, jugador in enumerate(mesa.jugadores):
-            pais_str = f" ({jugador.pais})" if jugador.pais else ""
+            pais_str = f" ({translate_country(jugador.pais)})" if jugador.pais else ""
             etiqueta: str = "Nuevo" if jugador.es_nuevo else f"Antiguo ({jugador.juegos_ano} juegos)"
             lineas.append(f"  {j + 1}. {jugador.nombre}{pais_str}  —  {etiqueta}")
 
@@ -113,7 +130,7 @@ def _formatear_resultado(
 
 # ── Projection section ─────────────────────────────────────────────────────────
 
-def _construir_proyeccion(
+def construir_proyeccion(
     resultado: ResultadoPartidas,
     jugadores: list[Jugador],
 ) -> list[str]:

@@ -16,8 +16,8 @@ vi.mock("../api", () => ({
         numero: 1,
         gm: "GameMaster1",
         jugadores: [
-          { nombre: "Alice", etiqueta: "Nuevo" },
-          { nombre: "Bob", etiqueta: "Antiguo" },
+          { nombre: "Alice", etiqueta: "Nuevo", pais: "England" },
+          { nombre: "Bob", etiqueta: "Antiguo", pais: "France" },
         ],
       },
     ],
@@ -71,8 +71,8 @@ describe("GameDetail", () => {
     // Verify mesas are displayed
     expect(screen.getByText("Partida 1")).toBeTruthy();
     expect(screen.getByText("GM: GameMaster1")).toBeTruthy();
-    expect(screen.getByText("Alice")).toBeTruthy();
-    expect(screen.getByText("Bob")).toBeTruthy();
+    expect(screen.getByText("Alice 🇬🇧")).toBeTruthy();
+    expect(screen.getByText("Bob 🇫🇷")).toBeTruthy();
 
     // Verify waiting list is displayed
     expect(screen.getByText("Lista de espera")).toBeTruthy();
@@ -135,7 +135,9 @@ describe("GameDetail", () => {
 
     // Verify clipboard.writeText was called
     expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
-    expect(mockClipboard.writeText).toHaveBeenCalledWith("Alice\nBob");
+    expect(mockClipboard.writeText).toHaveBeenCalledWith(
+      "Alice (Inglaterra)\nBob (Francia)",
+    );
 
     // Verify button text changes to "✅ Copiado"
     expect(screen.getByText("✅ Copiado")).toBeTruthy();

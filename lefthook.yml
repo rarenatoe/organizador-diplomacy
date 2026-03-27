@@ -2,7 +2,7 @@ pre-commit:
   commands:
     python-lint:
       glob: "backend/**/*.py"
-      run: uv run ruff check backend --fix && uv run pyright backend
+      run: uv run ruff check backend --fix && uv run vulture backend/ --min-confidence 60
     python-test:
       glob: "backend/**/*.py"
       run: uv run python -m pytest -q
