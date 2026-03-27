@@ -500,7 +500,7 @@ def main() -> None:
     existentes = _leer_snapshot_existente(conn, source_snapshot_id)
 
     # ── Parse merges if provided ──────────────────────────────────────────────
-    merges: dict[str, dict] = {}  # from_name → {"to": notion_name, "action": action}
+    merges: dict[str, dict[str, str]] = {}  # from_name → {"to": notion_name, "action": action}
     if args.merges:
         try:
             merges_data = json.loads(args.merges)
@@ -564,7 +564,7 @@ def main() -> None:
         return
 
     # ── Build new snapshot: start with all existing players, update from Notion ──
-    filas: list[dict] = []
+    filas: list[dict[str, Any]] = []
     
     if source_snapshot_id is not None:
         merged_notion_normalized = {_normalize_name(v["to"]) for v in merges.values()}
@@ -573,7 +573,7 @@ def main() -> None:
         for nombre, existente in existentes.items():
             # 1. Check if this player was explicitly merged via the UI dialog
             if nombre in merges:
-                merge_info = merges[nombre]
+                merge_info: dict[str, str] = merges[nombre]
                 notion_name = merge_info["to"]
                 action = merge_info["action"]
                 notion_norm = _normalize_name(notion_name)
@@ -628,7 +628,7 @@ def main() -> None:
                 **{c: notion_data[c] for c in COUNTRY_PROPS},
             })
 
-    nuevos = [f["Nombre"] for f in filas if f["Nombre"] not in existentes]
+    nuevos: list[str] = [f["Nombre"] for f in filas if f["Nombre"] not in existentes]
     print(f"⟳  {len(filas)} jugador(es) procesados ({len(nuevos)} nuevo(s)).")
     if nuevos:
         print(f"   Nuevos: {', '.join(nuevos)}")
@@ -650,6 +650,52 @@ def main() -> None:
 
     # ── Persist new snapshot atomically ───────────────────────────────────────
     try:
+        # Check if source_snapshot_id is a leaf node (has no children)
+        if source_snapshot_id is not None:
+            has_children = conn.execute(
+                "SELECT 1 FROM events WHERE source_snapshot_id = ? LIMIT 1",
+                (source_snapshot_id,)
+            ).fetchone() is not None
+            
+            # If source is a leaf node, update in-place
+            if not has_children:
+                # Update the existing snapshot in-place
+                conn.execute(
+                    "UPDATE snapshots SET source = 'notion_sync' WHERE id = ?",
+                    (source_snapshot_id,)
+                )
+                
+                # Clear old roster
+                conn.execute(
+                    "DELETE FROM snapshot_players WHERE snapshot_id = ?",
+                    (source_snapshot_id,)
+                )
+                
+                # Insert new players
+                for fila in filas:
+                    pid = db.get_or_create_player(conn, fila["Nombre"])
+                    db.add_snapshot_player(
+                        conn, source_snapshot_id, pid,
+                        fila["Experiencia"],
+                        fila["Juegos_Este_Ano"],
+                        fila["prioridad"],
+                        fila["partidas_deseadas"],
+                        fila["partidas_gm"],
+                        fila["c_england"],
+                        fila["c_france"],
+                        fila["c_germany"],
+                        fila["c_italy"],
+                        fila["c_austria"],
+                        fila["c_russia"],
+                        fila["c_turkey"],
+                    )
+                
+                conn.commit()
+                conn.close()
+                print(f"✓  Snapshot #{source_snapshot_id} actualizado in-place con {len(filas)} jugador(es).")
+                return
+        
+        # For internal nodes or no source, create new snapshot
         snap_id = db.create_snapshot(conn, "notion_sync")
         for fila in filas:
             pid = db.get_or_create_player(conn, fila["Nombre"])

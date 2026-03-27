@@ -6,15 +6,16 @@ Tests snapshot CRUD operations and editing.
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from backend.db import db
 
-from .conftest import _add_snapshot
+from .conftest import _add_snapshot  # type: ignore[reportPrivateUsage]
 
 # ── /api/snapshot/<id> ────────────────────────────────────────────────────────
 
 class TestApiSnapshot:
-    def test_returns_snapshot_detail(self, client):
+    def test_returns_snapshot_detail(self, client: Any) -> None:
         c, conn = client
         snap_id = _add_snapshot(conn, players=4)
         resp = c.get(f"/api/snapshot/{snap_id}")
@@ -23,8 +24,8 @@ class TestApiSnapshot:
         assert data["id"] == snap_id
         assert len(data["players"]) == 4
 
-    def test_unknown_id_returns_404(self, client):
-        c, conn = client
+    def test_unknown_id_returns_404(self, client: Any) -> None:
+        c, conn = client  # type: ignore[assignment]
         resp = c.get("/api/snapshot/9999")
         assert resp.status_code == 404
 
@@ -32,8 +33,8 @@ class TestApiSnapshot:
 # ── /api/snapshots ────────────────────────────────────────────────────────────
 
 class TestApiSnapshots:
-    def test_lists_snapshots_in_order(self, client):
-        c, conn = client
+    def test_lists_snapshots_in_order(self, client: Any) -> None:
+        c, conn = client  # type: ignore[assignment]
         snap1 = _add_snapshot(conn, source="notion_sync")
         snap2 = _add_snapshot(conn, source="organizar")
         resp = c.get("/api/snapshots")
@@ -41,8 +42,8 @@ class TestApiSnapshots:
         ids = [s["id"] for s in data["snapshots"]]
         assert ids == [snap1, snap2]
 
-    def test_empty_when_no_snapshots(self, client):
-        c, conn = client
+    def test_empty_when_no_snapshots(self, client: Any) -> None:
+        c, conn = client  # type: ignore[assignment]
         resp = c.get("/api/snapshots")
         data = json.loads(resp.data)
         assert data["snapshots"] == []
@@ -51,8 +52,8 @@ class TestApiSnapshots:
 # ── DELETE /api/snapshot/<id> ───────────────────────────────────────────────────
 
 class TestApiDeleteSnapshot:
-    def test_delete_existing_snapshot_returns_200(self, client):
-        c, conn = client
+    def test_delete_existing_snapshot_returns_200(self, client: Any) -> None:
+        c, conn = client  # type: ignore[assignment]
         snap_id = _add_snapshot(conn)
         conn.commit()
         resp = c.delete(f"/api/snapshot/{snap_id}")
@@ -60,24 +61,24 @@ class TestApiDeleteSnapshot:
         data = resp.get_json()
         assert snap_id in data["deleted"]
 
-    def test_delete_nonexistent_snapshot_returns_404(self, client):
-        c, conn = client
+    def test_delete_nonexistent_snapshot_returns_404(self, client: Any) -> None:
+        c, conn = client  # type: ignore[assignment]
         resp = c.delete("/api/snapshot/9999")
         assert resp.status_code == 404
 
-    def test_delete_removes_snapshot_from_chain(self, client):
-        """After deletion the snapshot no longer appears in /api/chain."""
-        c, conn = client
+    def test_delete_removes_snapshot_from_chain(self, client: Any) -> None:
+        """After deletion a snapshot no longer appears in /api/chain."""
+        c, conn = client  # type: ignore[assignment]
         snap_id = _add_snapshot(conn)
         conn.commit()
         c.delete(f"/api/snapshot/{snap_id}")
         chain = c.get("/api/chain").get_json()
-        ids = [n["id"] for n in chain["roots"]]
+        ids = [s["id"] for s in chain.get("snapshots", [])]
         assert snap_id not in ids
 
-    def test_delete_cascades_sync_event_via_api(self, client):
+    def test_delete_cascades_sync_event_via_api(self, client: Any) -> None:
         """Deleting the output snapshot of a sync event returns both IDs deleted."""
-        c, conn = client
+        c, conn = client  # type: ignore[assignment]
         snap1 = _add_snapshot(conn)
         snap2 = _add_snapshot(conn)
         db.create_sync_event(conn, snap1, snap2)
@@ -91,9 +92,9 @@ class TestApiDeleteSnapshot:
 
 
 class TestApiCreateSnapshot:
-    def test_create_new_snapshot_success(self, client):
-        """POST /api/snapshot/new creates a new root snapshot and returns the ID."""
-        c, conn = client
+    def test_create_new_snapshot_success(self, client: Any) -> None:
+        """POST /api/snapshot/new creates a new root snapshot and returns ID."""
+        c, conn = client  # type: ignore[assignment]
         players_list = [
             {"nombre": "Alice", "experiencia": "Nuevo", "juegos_este_ano": 0,
              "prioridad": 0, "partidas_deseadas": 1, "partidas_gm": 0},
@@ -110,16 +111,16 @@ class TestApiCreateSnapshot:
         assert "snapshot_id" in data
         new_id = data["snapshot_id"]
         
-        # Verify the snapshot was created with correct players
+        # Verify snapshot was created with correct players
         detail = c.get(f"/api/snapshot/{new_id}").get_json()
         assert detail["source"] == "manual"
         assert len(detail["players"]) == 2
         player_names = {p["nombre"] for p in detail["players"]}
         assert player_names == {"Alice", "Bob"}
 
-    def test_create_new_snapshot_empty_players(self, client):
+    def test_create_new_snapshot_empty_players(self, client: Any) -> None:
         """POST /api/snapshot/new with empty players list creates snapshot with no players."""
-        c, conn = client
+        c, conn = client  # type: ignore[assignment]
         resp = c.post(
             "/api/snapshot/new",
             data=json.dumps({"players": []}),
@@ -130,14 +131,14 @@ class TestApiCreateSnapshot:
         assert "snapshot_id" in data
         new_id = data["snapshot_id"]
         
-        # Verify the snapshot was created with no players
+        # Verify snapshot was created with no players
         detail = c.get(f"/api/snapshot/{new_id}").get_json()
         assert detail["source"] == "manual"
         assert len(detail["players"]) == 0
 
-    def test_create_new_snapshot_invalid_players_type_returns_400(self, client):
+    def test_create_new_snapshot_invalid_players_type_returns_400(self, client: Any) -> None:
         """POST /api/snapshot/new with invalid players type returns 400."""
-        c, conn = client
+        c, conn = client  # type: ignore[assignment]
         resp = c.post(
             "/api/snapshot/new",
             data=json.dumps({"players": "not_a_list"}),
@@ -145,9 +146,9 @@ class TestApiCreateSnapshot:
         )
         assert resp.status_code == 400
 
-    def test_create_new_snapshot_applies_defaults(self, client):
+    def test_create_new_snapshot_applies_defaults(self, client: Any) -> None:
         """POST /api/snapshot/new applies default values for missing fields."""
-        c, conn = client
+        c, conn = client  # type: ignore[assignment]
         # Only provide nombre, omit other fields
         players_list = [
             {"nombre": "Charlie"},
@@ -172,9 +173,9 @@ class TestApiCreateSnapshot:
 
 
 class TestApiSnapshotSave:
-    def test_save_creates_manual_snapshot(self, client):
+    def test_save_creates_manual_snapshot(self, client: Any) -> None:
         """POST /api/snapshot/save with event_type='manual' creates a manual snapshot."""
-        c, conn = client
+        c, conn = client  # type: ignore[assignment]
         players_list = [
             {"nombre": "Alice", "experiencia": "Nuevo", "juegos_este_ano": 0},
             {"nombre": "Bob", "experiencia": "Antiguo", "juegos_este_ano": 3},
@@ -189,14 +190,14 @@ class TestApiSnapshotSave:
         assert "snapshot_id" in data
         new_id = data["snapshot_id"]
 
-        # Verify the snapshot was created with correct source
+        # Verify snapshot was created with correct source
         detail = c.get(f"/api/snapshot/{new_id}").get_json()
         assert detail["source"] == "manual"
         assert len(detail["players"]) == 2
 
-    def test_save_creates_sync_snapshot(self, client):
+    def test_save_creates_sync_snapshot(self, client: Any) -> None:
         """POST /api/snapshot/save with event_type='sync' creates a notion_sync snapshot."""
-        c, conn = client
+        c, conn = client  # type: ignore[assignment]
         players_list = [{"nombre": "Charlie", "experiencia": "Nuevo", "juegos_este_ano": 0}]
         resp = c.post(
             "/api/snapshot/save",
@@ -209,10 +210,13 @@ class TestApiSnapshotSave:
         detail = c.get(f"/api/snapshot/{new_id}").get_json()
         assert detail["source"] == "notion_sync"
 
-    def test_save_with_parent_creates_event(self, client):
+    def test_save_with_parent_creates_event(self, client: Any) -> None:
         """POST /api/snapshot/save with parent_id creates an event linking parent to new snapshot."""
-        c, conn = client
+        c, conn = client  # type: ignore[assignment]
         parent_id = _add_snapshot(conn, players=2)
+        # Make parent an internal node by creating a child event
+        child_id = _add_snapshot(conn, players=1)
+        db.create_event(conn, "edit", parent_id, child_id)
         conn.commit()
 
         players_list = [{"nombre": "Dave", "experiencia": "Nuevo", "juegos_este_ano": 0}]
@@ -234,9 +238,9 @@ class TestApiSnapshotSave:
         assert event["source_snapshot_id"] == parent_id
         assert event["output_snapshot_id"] == new_id
 
-    def test_save_without_parent_no_event(self, client):
+    def test_save_without_parent_no_event(self, client: Any) -> None:
         """POST /api/snapshot/save without parent_id creates no event."""
-        c, conn = client
+        c, conn = client  # type: ignore[assignment]
         players_list = [{"nombre": "Eve", "experiencia": "Nuevo", "juegos_este_ano": 0}]
         resp = c.post(
             "/api/snapshot/save",
@@ -253,9 +257,9 @@ class TestApiSnapshotSave:
         ).fetchone()
         assert event is None
 
-    def test_save_applies_defaults(self, client):
+    def test_save_applies_defaults(self, client: Any) -> None:
         """POST /api/snapshot/save applies default values for missing fields."""
-        c, conn = client
+        c, conn = client  # type: ignore[assignment]
         players_list = [{"nombre": "Frank"}]
         resp = c.post(
             "/api/snapshot/save",
@@ -274,8 +278,8 @@ class TestApiSnapshotSave:
         assert player["partidas_deseadas"] == 1
         assert player["partidas_gm"] == 0
 
-    def test_save_invalid_players_type_returns_400(self, client):
-        c, conn = client
+    def test_save_invalid_players_type_returns_400(self, client: Any) -> None:
+        c, conn = client  # type: ignore[assignment]
         resp = c.post(
             "/api/snapshot/save",
             data=json.dumps({"event_type": "manual", "players": "not_a_list"}),
@@ -283,8 +287,8 @@ class TestApiSnapshotSave:
         )
         assert resp.status_code == 400
 
-    def test_save_invalid_event_type_returns_400(self, client):
-        c, conn = client
+    def test_save_invalid_event_type_returns_400(self, client: Any) -> None:
+        c, conn = client  # type: ignore[assignment]
         resp = c.post(
             "/api/snapshot/save",
             data=json.dumps({"event_type": "invalid", "players": []}),
@@ -292,8 +296,8 @@ class TestApiSnapshotSave:
         )
         assert resp.status_code == 400
 
-    def test_save_nonexistent_parent_returns_404(self, client):
-        c, conn = client
+    def test_save_nonexistent_parent_returns_404(self, client: Any) -> None:
+        c, conn = client  # type: ignore[assignment]
         resp = c.post(
             "/api/snapshot/save",
             data=json.dumps({"parent_id": 9999, "event_type": "manual", "players": []}),
@@ -301,10 +305,53 @@ class TestApiSnapshotSave:
         )
         assert resp.status_code == 404
 
-    def test_save_consecutive_notion_sync_returns_400(self, client):
+    def test_save_leaf_updates_in_place(self, client: Any) -> None:
+        """POST /api/snapshot/save with leaf parent updates in-place and returns same ID."""
+        c, conn = client  # type: ignore[assignment]
+        parent_id = _add_snapshot(conn, players=2, source="manual")
+        conn.commit()
+        
+        # Verify parent is a leaf (no children)
+        children = conn.execute(
+            "SELECT 1 FROM events WHERE source_snapshot_id = ?",
+            (parent_id,)
+        ).fetchall()
+        assert len(children) == 0
+        
+        # Save with different players to leaf parent
+        players_list = [
+            {"nombre": "Eve", "experiencia": "Nuevo", "juegos_este_ano": 0},
+            {"nombre": "Frank", "experiencia": "Antiguo", "juegos_este_ano": 2},
+        ]
+        resp = c.post(
+            "/api/snapshot/save",
+            data=json.dumps({"parent_id": parent_id, "event_type": "manual", "players": players_list}),
+            content_type="application/json",
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["snapshot_id"] == parent_id  # Same ID returned
+        
+        # Verify players were updated
+        detail = c.get(f"/api/snapshot/{parent_id}").get_json()
+        assert len(detail["players"]) == 2
+        player_names = {p["nombre"] for p in detail["players"]}
+        assert player_names == {"Eve", "Frank"}
+        
+        # Verify no new events were created
+        events = conn.execute(
+            "SELECT COUNT(*) as count FROM events WHERE source_snapshot_id = ? OR output_snapshot_id = ?",
+            (parent_id, parent_id)
+        ).fetchone()
+        assert events["count"] == 0
+
+    def test_save_consecutive_notion_sync_returns_400(self, client: Any) -> None:
         """POST /api/snapshot/save fails if parent is also a sync and current is sync."""
-        c, conn = client
+        c, conn = client  # type: ignore[assignment]
         parent_id = _add_snapshot(conn, source="notion_sync")
+        # Make parent an internal node by creating a child event
+        child_id = _add_snapshot(conn, source="manual")
+        db.create_event(conn, "edit", parent_id, child_id)
         conn.commit()
 
         resp = c.post(
@@ -319,9 +366,9 @@ class TestApiSnapshotSave:
 
 
 class TestApiNotionFetch:
-    def test_fetch_returns_players_from_cache(self, client):
+    def test_fetch_returns_players_from_cache(self, client: Any) -> None:
         """POST /api/notion/fetch returns players from notion_cache."""
-        c, conn = client
+        c, conn = client  # type: ignore[assignment]
         
         # Populate notion_cache
         conn.execute(
@@ -356,18 +403,18 @@ class TestApiNotionFetch:
         assert players["Bob"]["experiencia"] == "Antiguo"
         assert players["Bob"]["juegos_este_ano"] == 3
 
-    def test_fetch_empty_cache_returns_empty_list(self, client):
+    def test_fetch_empty_cache_returns_empty_list(self, client: Any) -> None:
         """POST /api/notion/fetch returns empty list if cache is empty."""
-        c, conn = client
+        c, conn = client  # type: ignore[assignment]
         resp = c.post("/api/notion/fetch", data=json.dumps({}), content_type="application/json")
         assert resp.status_code == 200
         data = resp.get_json()
         assert data["players"] == []
         assert data["last_updated"] is None
 
-    def test_similar_names_detection(self, client):
+    def test_similar_names_detection(self, client: Any) -> None:
         """POST /api/notion/fetch returns similar_names when snapshot_names provided."""
-        c, conn = client
+        c, conn = client  # type: ignore[assignment]
         
         # Populate notion_cache with players that have similar names
         conn.execute(
@@ -418,13 +465,13 @@ class TestApiNotionFetch:
             assert isinstance(match["similarity"], (int, float))
             assert 0 <= match["similarity"] <= 1
 
-    def test_force_refresh_triggers_update(self, client, monkeypatch):
+    def test_force_refresh_triggers_update(self, client: Any, monkeypatch: Any) -> None:
         """POST /api/notion/force_refresh calls update_notion_cache."""
-        c, conn = client
+        c, conn = client  # type: ignore[assignment]
         
         # Mock update_notion_cache
         updated = False
-        def mock_update(*_args, **_kwargs):
+        def mock_update(*_args: Any, **_kwargs: Any) -> None:
             nonlocal updated
             updated = True
             

@@ -90,7 +90,7 @@ def api_create_snapshot():
     conn = db.get_db()
     try:
         body: dict[str, Any] = request.get_json(silent=True) or {}
-        players = body.get("players")
+        players: list[dict[str, Any]] | None = body.get("players")
         if not isinstance(players, list):
             return jsonify({"error": "players must be a list"}), 400
         new_id = db.create_root_manual_snapshot(conn, players)
@@ -187,9 +187,9 @@ def api_snapshot_save():
     conn = db.get_db()
     try:
         body: dict[str, Any] = request.get_json(silent=True) or {}
-        parent_id = body.get("parent_id")
-        event_type = body.get("event_type", "manual")
-        players = body.get("players")
+        parent_id: int | None = body.get("parent_id")
+        event_type: str = body.get("event_type", "manual")
+        players: list[dict[str, Any]] | None = body.get("players")
 
         if not isinstance(players, list):
             return jsonify({"error": "players must be a list"}), 400
@@ -197,7 +197,7 @@ def api_snapshot_save():
         if event_type not in ("manual", "sync"):
             return jsonify({"error": "event_type must be 'manual' or 'sync'"}), 400
 
-        if parent_id is not None and not isinstance(parent_id, int):
+        if parent_id is not None and type(parent_id) is not int:
             return jsonify({"error": "parent_id must be an integer or null"}), 400
 
         # Validate parent exists if provided
@@ -208,11 +208,53 @@ def api_snapshot_save():
             if not parent_row:
                 return jsonify({"error": "parent snapshot not found"}), 404
 
-            # STRICT GUARD: Prevent consecutive syncs
+            # Check if parent is a leaf node (has no children)
+            has_children = conn.execute(
+                "SELECT 1 FROM events WHERE source_snapshot_id = ? LIMIT 1",
+                (parent_id,)
+            ).fetchone() is not None
+
+            # If parent is a leaf node, update in-place
+            if not has_children:
+                # Bypass STRICT GUARD for consecutive syncs on leaf nodes
+                # (it is perfectly safe and desirable to update a leaf sync in-place)
+                
+                # Update the snapshot source
+                source = "notion_sync" if event_type == "sync" else "manual"
+                conn.execute(
+                    "UPDATE snapshots SET source = ? WHERE id = ?",
+                    (source, parent_id)
+                )
+
+                # Clear old roster
+                conn.execute(
+                    "DELETE FROM snapshot_players WHERE snapshot_id = ?",
+                    (parent_id,)
+                )
+
+                # Insert new players
+                for player in players:
+                    nombre = player.get("nombre", "")
+                    if not nombre:
+                        continue
+                    player_id = db.get_or_create_player(conn, nombre)
+                    db.add_snapshot_player(
+                        conn, parent_id, player_id,
+                        player.get("experiencia", "Nuevo"),
+                        int(player.get("juegos_este_ano", 0)),
+                        int(player.get("prioridad", 0)),
+                        int(player.get("partidas_deseadas", 1)),
+                        int(player.get("partidas_gm", 0)),
+                    )
+
+                conn.commit()
+                return jsonify({"snapshot_id": parent_id})
+
+            # If parent is an internal node (has children), apply STRICT GUARD
             if event_type == "sync" and parent_row["source"] == "notion_sync":
                 return jsonify({"error": "El snapshot base ya fue generado por notion_sync y aún no se ha jugado una partida."}), 400
 
-        # Create snapshot with appropriate source
+        # Create snapshot with appropriate source (for internal nodes or no parent)
         source = "notion_sync" if event_type == "sync" else "manual"
         snap_id = db.create_snapshot(conn, source)
 
@@ -344,11 +386,11 @@ def api_run(script: str):
         return jsonify({"error": "unknown script"}), 400
 
     cwd = PROJECT_ROOT  # project root, so -m backend.X works
-    body = request.get_json(silent=True) or {}
-    snapshot_id = body.get("snapshot")
+    body: dict[str, Any] = request.get_json(silent=True) or {}
+    snapshot_id: int | None = body.get("snapshot")
 
     # notion_sync allows empty snapshot_id (first-time sync exception handled in notion_sync.py)
-    if snapshot_id is not None and not isinstance(snapshot_id, int):
+    if snapshot_id is not None and type(snapshot_id) is not int:
         return jsonify({"error": "snapshot must be an integer"}), 400
 
     SCRIPT_MODULES = {"notion_sync": "backend.sync.notion_sync"}
