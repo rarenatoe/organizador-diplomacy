@@ -15,11 +15,11 @@
     onOpenSnapshot: (id: number) => void;
     onOpenGame: (id: number) => void;
     onOpenGameDraft: (snapshotId: number) => void;
-    onEditDraft: (parentId: number, eventType: string, autoAction?: 'notion' | 'csv' | null, players?: EditPlayerRow[]) => void;
+    onEditDraft: (parentId: number, eventType: "sync" | "manual" | "edit", autoAction?: 'notion' | 'csv' | null, players?: EditPlayerRow[]) => void;
     onShowError: (title: string, output: string) => void;
   }
 
-  let { id, onClose, onChainUpdate, onOpenSnapshot, onOpenGame, onOpenGameDraft, onEditDraft, onShowError }: Props = $props();
+  let { id, onChainUpdate, onOpenSnapshot, onOpenGameDraft, onEditDraft, onShowError }: Props = $props();
 
   let data = $state<SnapshotDetail | null>(null);
   let loading = $state(true);

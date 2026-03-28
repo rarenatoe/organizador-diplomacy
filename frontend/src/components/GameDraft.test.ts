@@ -36,7 +36,6 @@ describe("GameDraft.svelte", () => {
         jugadores: [
           {
             nombre: "Alice",
-            etiqueta: "A5",
             es_nuevo: false,
             juegos_ano: 5,
             tiene_prioridad: true,
@@ -52,7 +51,6 @@ describe("GameDraft.svelte", () => {
           },
           {
             nombre: "Bob",
-            etiqueta: "B0",
             es_nuevo: true,
             juegos_ano: 0,
             tiene_prioridad: false,
@@ -65,6 +63,7 @@ describe("GameDraft.svelte", () => {
             c_austria: 0,
             c_russia: 0,
             c_turkey: 0,
+            pais: "France",
           },
         ],
       },
@@ -72,7 +71,6 @@ describe("GameDraft.svelte", () => {
     tickets_sobrantes: [
       {
         nombre: "David",
-        etiqueta: "D2",
         es_nuevo: false,
         juegos_ano: 2,
         tiene_prioridad: false,
@@ -140,7 +138,11 @@ describe("GameDraft.svelte", () => {
     const saveButton = screen.getByText("✨ Confirmar y Guardar");
     await fireEvent.click(saveButton);
 
-    expect(saveGameDraft).toHaveBeenCalledWith(123, mockDraftData);
+    expect(saveGameDraft).toHaveBeenCalledWith({
+      snapshot_id: 123,
+      draft: mockDraftData,
+      editing_game_id: null,
+    });
   });
 
   it("shows error when save fails", async () => {
@@ -460,6 +462,141 @@ describe("GameDraft.svelte", () => {
           "Movimiento Inválido",
           expect.stringContaining("Alice"),
         );
+      });
+    });
+  });
+
+  // NEW TESTS FOR EDITING FUNCTIONALITY
+  describe("Editing functionality", () => {
+    beforeEach(async () => {
+      vi.clearAllMocks();
+      const { fetchGameDraft } = vi.mocked(await import("../api"));
+      fetchGameDraft.mockResolvedValue(mockDraftData);
+    });
+
+    it("uses initialDraft prop and skips fetchGameDraft if provided", async () => {
+      const { fetchGameDraft } = vi.mocked(await import("../api"));
+
+      render(GameDraft, {
+        props: {
+          ...mockProps,
+          initialDraft: mockDraftData,
+        },
+      });
+
+      // Should not call fetchGameDraft
+      expect(fetchGameDraft).not.toHaveBeenCalled();
+
+      // Should immediately render players from the prop
+      await vi.waitFor(() => {
+        expect(screen.getByText("Partida 1")).toBeInTheDocument();
+        expect(screen.getByText("Alice")).toBeInTheDocument();
+        expect(screen.getByText("Bob")).toBeInTheDocument();
+        expect(screen.getByText("David")).toBeInTheDocument();
+      });
+    });
+
+    it("passes editing_game_id to saveGameDraft when editing", async () => {
+      const { saveGameDraft } = vi.mocked(await import("../api"));
+      saveGameDraft.mockResolvedValue({ game_id: 456 });
+
+      render(GameDraft, {
+        props: {
+          ...mockProps,
+          editingGameId: 99,
+        },
+      });
+
+      await vi.waitFor(() => {
+        expect(screen.getByText("✨ Confirmar y Guardar")).toBeInTheDocument();
+      });
+
+      const saveButton = screen.getByText("✨ Confirmar y Guardar");
+      await fireEvent.click(saveButton);
+
+      expect(saveGameDraft).toHaveBeenCalledWith({
+        snapshot_id: 123,
+        draft: mockDraftData,
+        editing_game_id: 99,
+      });
+    });
+
+    it("calls onOpenGame instead of onClose when editingGameId exists", async () => {
+      const { saveGameDraft } = vi.mocked(await import("../api"));
+      saveGameDraft.mockResolvedValue({ game_id: 456 });
+
+      render(GameDraft, {
+        props: {
+          ...mockProps,
+          editingGameId: 456,
+        },
+      });
+
+      await vi.waitFor(() => {
+        expect(screen.getByText("Cancelar")).toBeInTheDocument();
+      });
+
+      const cancelButton = screen.getByText("Cancelar");
+      await fireEvent.click(cancelButton);
+
+      expect(mockProps.onClose).not.toHaveBeenCalled();
+      expect(mockProps.onOpenGame).toHaveBeenCalledWith(456);
+    });
+
+    it("calls onClose when editingGameId is null", async () => {
+      const { saveGameDraft } = vi.mocked(await import("../api"));
+      saveGameDraft.mockResolvedValue({ game_id: 456 });
+
+      render(GameDraft, {
+        props: {
+          ...mockProps,
+          editingGameId: null,
+        },
+      });
+
+      await vi.waitFor(() => {
+        expect(screen.getByText("Cancelar")).toBeInTheDocument();
+      });
+
+      const cancelButton = screen.getByText("Cancelar");
+      await fireEvent.click(cancelButton);
+
+      expect(mockProps.onClose).toHaveBeenCalled();
+      expect(mockProps.onOpenGame).not.toHaveBeenCalled();
+    });
+
+    it("handles GM assignment correctly", async () => {
+      const { fetchGameDraft } = vi.mocked(await import("../api"));
+      const draftWithGM = {
+        ...mockDraftData,
+        mesas: [
+          {
+            numero: 1,
+            gm: {
+              nombre: "TestGM",
+              es_nuevo: false,
+              juegos_ano: 10,
+              tiene_prioridad: false,
+              partidas_deseadas: 1,
+              partidas_gm: 5,
+              c_england: 2,
+              c_france: 1,
+              c_germany: 1,
+              c_italy: 1,
+              c_austria: 1,
+              c_russia: 1,
+              c_turkey: 1,
+            },
+            jugadores: mockDraftData.mesas[0]?.jugadores || [],
+          },
+        ],
+      };
+      fetchGameDraft.mockResolvedValue(draftWithGM);
+
+      render(GameDraft, { props: mockProps });
+
+      await vi.waitFor(() => {
+        expect(screen.getByText("GM: TestGM")).toBeInTheDocument();
       });
     });
   });

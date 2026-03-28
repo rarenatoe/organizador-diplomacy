@@ -680,14 +680,7 @@ def main() -> None:
                         fila["Juegos_Este_Ano"],
                         fila["prioridad"],
                         fila["partidas_deseadas"],
-                        fila["partidas_gm"],
-                        fila["c_england"],
-                        fila["c_france"],
-                        fila["c_germany"],
-                        fila["c_italy"],
-                        fila["c_austria"],
-                        fila["c_russia"],
-                        fila["c_turkey"],
+                        fila["partidas_gm"]
                     )
                 
                 conn.commit()
@@ -705,14 +698,7 @@ def main() -> None:
                 fila["Juegos_Este_Ano"],
                 fila["prioridad"],
                 fila["partidas_deseadas"],
-                fila["partidas_gm"],
-                fila["c_england"],
-                fila["c_france"],
-                fila["c_germany"],
-                fila["c_italy"],
-                fila["c_austria"],
-                fila["c_russia"],
-                fila["c_turkey"],
+                fila["partidas_gm"]
             )
         db.create_sync_event(conn, source_snapshot_id, snap_id)
         conn.commit()

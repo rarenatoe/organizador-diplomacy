@@ -136,7 +136,7 @@ describe("GameDetail", () => {
     // Verify clipboard.writeText was called
     expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
     expect(mockClipboard.writeText).toHaveBeenCalledWith(
-      "Alice (Inglaterra)\nBob (Francia)",
+      "Alice (England)\nBob (France)",
     );
 
     // Verify button text changes to "✅ Copiado"
@@ -189,10 +189,13 @@ describe("GameDetail", () => {
     });
   });
 
-  it("resets feedback when another button is clicked", async () => {
+  it("calls openGameDraft with mapped DraftResponse when Edit button is clicked", async () => {
+    const mockOpenGameDraft = vi.fn();
+
     render(GameDetail, {
       props: {
         id: 1,
+        openGameDraft: mockOpenGameDraft,
       },
     });
 
@@ -201,26 +204,37 @@ describe("GameDetail", () => {
       expect(screen.queryByText("Cargando…")).toBeNull();
     });
 
-    // Click share button
-    const shareButton = screen.getByText("📋 Copiar lista para compartir");
-    await fireEvent.click(shareButton);
+    // Find and click the Edit button
+    const editButton = screen.getByText("✏️ Editar Jornada");
+    await fireEvent.click(editButton);
 
-    // Verify share button shows feedback
-    expect(screen.getByText("✅ Copiado")).toBeTruthy();
-
-    // Click waiting button before timeout
-    const waitingButton = screen.getByText("📋 Copiar lista de espera");
-    await fireEvent.click(waitingButton);
-
-    // Verify waiting button shows feedback
-    expect(screen.getByText("✅ Copiado")).toBeTruthy();
-
-    // Fast-forward time by 1500ms
-    vi.advanceTimersByTime(1500);
-
-    // Verify waiting button reverts
-    await waitFor(() => {
-      expect(screen.getByText("📋 Copiar lista de espera")).toBeTruthy();
-    });
+    // Verify openGameDraft was called with correct parameters
+    expect(mockOpenGameDraft).toHaveBeenCalledWith(
+      10, // input_snapshot_id
+      expect.objectContaining({
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        mesas: expect.arrayContaining([
+          expect.objectContaining({
+            numero: 1,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+            jugadores: expect.arrayContaining([
+              expect.objectContaining({
+                nombre: "Alice",
+                pais: "England",
+              }),
+              expect.objectContaining({
+                nombre: "Bob",
+                pais: "France",
+              }),
+            ]),
+          }),
+        ]),
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        tickets_sobrantes: expect.any(Array),
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        intentos_usados: expect.any(Number),
+      }),
+      1, // gameId
+    );
   });
 });

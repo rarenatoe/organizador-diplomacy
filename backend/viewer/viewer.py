@@ -22,7 +22,7 @@ from backend.config import FLASK_STATIC_DIR, FLASK_TEMPLATE_DIR, PROJECT_ROOT
 from backend.db import db, db_views
 from backend.organizador.core import calcular_partidas
 from backend.organizador.models import Jugador
-from backend.organizador.persistence import save_game_draft
+from backend.organizador.persistence import save_game_draft, update_game_draft
 from backend.sync.cache_daemon import start_background_sync, update_notion_cache
 from backend.sync.notion_sync import (
     _detect_similar_names,  # pyright: ignore[reportPrivateUsage]
@@ -359,7 +359,8 @@ def api_game_draft():
 def api_game_save():
     """
     Saves a confirmed game draft to the database.
-    Input: {"snapshot_id": int, "draft": dict}
+    Supports both creating new games and updating existing games in-place.
+    Input: {"snapshot_id": int, "draft": dict, "editing_game_id": int?}
     Returns: {"game_id": int}
     """
     conn = db.get_db()
@@ -367,9 +368,39 @@ def api_game_save():
         data = request.get_json()
         snapshot_id = data.get("snapshot_id")
         draft = data.get("draft")
+        editing_game_id = data.get("editing_game_id")
+        
         if not snapshot_id or not draft:
             return jsonify({"error": "snapshot_id and draft are required"}), 400
 
+        if editing_game_id is not None:
+            # In-place editing: check if game is a leaf node
+            game_row = conn.execute(
+                "SELECT output_snapshot_id FROM events WHERE id = ? AND type = 'game'",
+                (editing_game_id,)
+            ).fetchone()
+            
+            if not game_row:
+                return jsonify({"error": "Game not found"}), 404
+            
+            output_snapshot_id = game_row["output_snapshot_id"]
+            
+            # Check if it's a leaf node (no events source from it)
+            is_leaf = conn.execute(
+                "SELECT 1 FROM events WHERE source_snapshot_id = ? LIMIT 1",
+                (output_snapshot_id,)
+            ).fetchone() is None
+            
+            if is_leaf:
+                # Update existing game in place
+                game_id = update_game_draft(conn, editing_game_id, snapshot_id, output_snapshot_id, draft)
+                conn.commit()
+                return jsonify({"game_id": game_id})
+            else:
+                # Game is not a leaf, fall back to creating new game
+                pass
+        
+        # Create new game (fallback or normal flow)
         game_id = save_game_draft(conn, snapshot_id, draft)
         conn.commit()
         return jsonify({"game_id": game_id})

@@ -4,6 +4,19 @@ export interface PlayerData {
   nombre: string;
   etiqueta: string;
   pais?: string | null;
+  es_nuevo?: boolean;
+  juegos_este_ano?: number;
+  prioridad?: number;
+  partidas_deseadas?: number;
+  partidas_gm?: number;
+  c_england?: number;
+  c_france?: number;
+  c_germany?: number;
+  c_italy?: number;
+  c_austria?: number;
+  c_russia?: number;
+  c_turkey?: number;
+  cupos?: number;
 }
 
 export interface MesaData {
@@ -15,6 +28,19 @@ export interface MesaData {
 export interface WaitingItem {
   nombre: string;
   cupos: string;
+  pais?: string | null;
+  es_nuevo?: boolean;
+  juegos_este_ano?: number;
+  prioridad?: number;
+  partidas_deseadas?: number;
+  partidas_gm?: number;
+  c_england?: number;
+  c_france?: number;
+  c_germany?: number;
+  c_italy?: number;
+  c_austria?: number;
+  c_russia?: number;
+  c_turkey?: number;
 }
 
 export interface SnapshotNode {
@@ -224,4 +250,10 @@ export interface DraftResponse {
 export interface SaveDraftResponse {
   game_id: number;
   error?: string;
+}
+
+export interface SaveDraftRequest {
+  snapshot_id: number;
+  draft: DraftResponse;
+  editing_game_id?: number | null;
 }

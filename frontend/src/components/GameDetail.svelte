@@ -1,13 +1,14 @@
 <script lang="ts">
-  import type { GameDetail } from "../types";
+  import type { GameDetail, DraftResponse, DraftPlayer } from "../types";
   import { fetchGame } from "../api";
   import { esc } from "../utils";
 
   interface Props {
     id: number;
+    openGameDraft?: (snapshotId: number, draft: DraftResponse, gameId: number) => void;
   }
 
-  let { id }: Props = $props();
+  let { id, openGameDraft }: Props = $props();
 
   let data = $state<GameDetail | null>(null);
   let loading = $state(true);
@@ -66,6 +67,25 @@
     return pais ? (translations[pais] || pais) : "";
   }
 
+  function mapToDraftPlayer(player: any): DraftPlayer {
+    return {
+      nombre: player.nombre,
+      es_nuevo: player.es_nuevo ?? false,
+      juegos_ano: player.juegos_este_ano ?? 0,
+      tiene_prioridad: player.prioridad === 1,
+      partidas_deseadas: player.partidas_deseadas ?? 1,
+      partidas_gm: player.partidas_gm ?? 0,
+      c_england: player.c_england ?? 0,
+      c_france: player.c_france ?? 0,
+      c_germany: player.c_germany ?? 0,
+      c_italy: player.c_italy ?? 0,
+      c_austria: player.c_austria ?? 0,
+      c_russia: player.c_russia ?? 0,
+      c_turkey: player.c_turkey ?? 0,
+      pais: player.pais || null,
+    };
+  }
+
   $effect(() => {
     void loadGame();
   });
@@ -100,7 +120,7 @@
       <div class="section">
         <div class="section-title">Partidas ({mesas.length})</div>
         {#each mesas as mesa (mesa.numero)}
-          {@const playersTxt = mesa.jugadores.map((j) => j.pais ? `${j.nombre} (${getCountryDisplayName(j.pais)})` : j.nombre).join("\n")}
+          {@const playersTxt = mesa.jugadores.map((j) => j.pais ? `${j.nombre} (${j.pais})` : j.nombre).join("\n")}
           <div class="mesa-card">
             <div class="mesa-header">
               <span class="mesa-title">Partida {mesa.numero}</span>
@@ -149,7 +169,24 @@
         >
       </div>
     {/if}
-  </div>
+    {#if openGameDraft}
+    <div class="panel-footer" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border);">
+      <button class="btn btn-primary" style="width: 100%; font-size: 14px; padding: 10px;" onclick={() =>{
+        const draft = { 
+          mesas: (data?.mesas ?? []).map(m =>({ 
+            numero: m.numero, 
+            gm: m.gm ? mapToDraftPlayer({nombre: m.gm, experiencia: "Antiguo"}) : null, 
+            jugadores: m.jugadores.map(mapToDraftPlayer) 
+          })) || [], 
+          tickets_sobrantes: (data?.waiting_list ?? []).map(mapToDraftPlayer) || [], 
+          minimo_teorico: 0, 
+          intentos_usados: data?.intentos || 0 
+        };
+        openGameDraft(data!.input_snapshot_id, draft, id);
+      }}>✏️ Editar Jornada</button>
+    </div>
+  {/if}
+</div>
 {/if}
 
 <style>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { RunResult, EditPlayerRow } from "./types";
+  import type { RunResult, EditPlayerRow, DraftResponse } from "./types";
   import { runScript, deleteSnapshot as apiDeleteSnapshot } from "./api";
   import { setActiveNodeId } from "./stores.svelte";
   import { findLatestSnapshotId, findLatestGameId } from "./snapshotUtils";
@@ -30,6 +30,8 @@
   let draftEventType = $state<"sync" | "manual" | "edit">("manual");
   let draftAutoAction = $state<'notion' | 'csv' | null>(null);
   let draftInitialPlayers = $state<EditPlayerRow[]>([]);
+  let draftInitialData = $state<DraftResponse | null>(null);
+  let draftEditingGameId = $state<number | null>(null);
 
   // Modal state
   let modalVisible = $state(false);
@@ -78,15 +80,25 @@
     setActiveNodeId(id);
   }
 
-  function openGameDraft(snapshotId: number): void {
-    openPanel(`Draft - Snapshot #${snapshotId}`, "game_draft", snapshotId);
-    setActiveNodeId(snapshotId);
+  function openGameDraft(snapshotId: number, initialData?: DraftResponse, editingGameId?: number): void {
+    closePanel();
+    draftParentId = snapshotId;
+    draftEventType = "edit";
+    draftAutoAction = null;
+    draftInitialPlayers = [];
+    draftInitialData = initialData ?? null;
+    draftEditingGameId = editingGameId ?? null;
+    panelType = "game_draft";
+    panelOpen = true;
+    panelTitle = editingGameId ? `Editando Jornada #${editingGameId}` : `Draft - Snapshot #${snapshotId}`;
+    panelId = snapshotId;
+    setActiveNodeId(editingGameId || snapshotId);
   }
 
-  function openDraft(parentId: number | null = null, eventType: string = "manual", autoAction: 'notion' | 'csv' | null = null, players: EditPlayerRow[] = []): void {
+  function openDraft(parentId: number | null = null, eventType: "sync" | "manual" | "edit" = "manual", autoAction: 'notion' | 'csv' | null = null, players: EditPlayerRow[] = []): void {
     closePanel();
     draftParentId = parentId;
-    draftEventType = eventType as "sync" | "manual" | "edit";
+    draftEventType = eventType;
     draftAutoAction = autoAction;
     draftInitialPlayers = players;
     panelType = "draft";
@@ -196,7 +208,7 @@
         onOpenSnapshot={openSnapshot}
         onOpenGame={openGame}
         onOpenGameDraft={openGameDraft}
-        onEditDraft={(parentId: number, eventType: string, autoAction?: 'notion' | 'csv' | null, players?: EditPlayerRow[]) => openDraft(parentId, eventType, autoAction ?? null, players ?? [])}
+        onEditDraft={(parentId: number, eventType: "sync" | "manual" | "edit", autoAction?: 'notion' | 'csv' | null, players?: EditPlayerRow[]) => openDraft(parentId, eventType, autoAction ?? null, players ?? [])}
         onShowError={(title, output) => { modalTitle = title; modalOutput = output; modalIsError = true; modalLoading = false; modalVisible = true; }}
       />
     {:else if panelType === "draft"}
@@ -211,7 +223,10 @@
         onShowError={(title, output) => { modalTitle = title; modalOutput = output; modalIsError = true; modalLoading = false; modalVisible = true; }}
       />
     {:else if panelType === "game" && panelId !== null}
-      <GameDetail id={panelId} />
+      <GameDetail 
+        id={panelId} 
+        openGameDraft={openGameDraft}
+      />
     {:else if panelType === "game_draft" && panelId !== null}
       <GameDraft
         snapshotId={panelId}
@@ -219,6 +234,8 @@
         onChainUpdate={handleChainUpdate}
         onOpenGame={openGame}
         onShowError={(title, output) => { modalTitle = title; modalOutput = output; modalIsError = true; modalLoading = false; modalVisible = true; }}
+        editingGameId={draftEditingGameId}
+        initialDraft={draftInitialData}
       />
     {:else if panelType === "sync" && panelId !== null}
       <SyncDetail id={panelId} />

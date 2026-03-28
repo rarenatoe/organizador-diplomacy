@@ -60,10 +60,24 @@ class TestDb(unittest.TestCase):
     # ── create_snapshot / add_snapshot_player / get_snapshot_players ─────────
 
     def test_snapshot_players_roundtrip(self):
-        """Players inserted via add_snapshot_player are returned by get_snapshot_players."""
+        """Players inserted via add_snapshot_player return country counts from notion_cache."""
         snap_id = db.create_snapshot(self.conn, "notion_sync")
         pid = db.get_or_create_player(self.conn, "Alice")
-        db.add_snapshot_player(self.conn, snap_id, pid, "Antiguo", 3, 0, 2, 0, 1, 2, 3, 4, 5, 6, 7)
+        
+        # Add Alice to notion_cache with country counts
+        last_updated = "2026-03-26 12:00:00"
+        self.conn.execute(
+            """
+            INSERT INTO notion_cache 
+            (notion_id, nombre, experiencia, juegos_este_ano, 
+             c_england, c_france, c_germany, c_italy, 
+             c_austria, c_russia, c_turkey, last_updated)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("nid1", "Alice", "Antiguo", 3, 1, 2, 0, 0, 0, 0, 0, last_updated)
+        )
+        
+        db.add_snapshot_player(self.conn, snap_id, pid, "Antiguo", 3, 0, 2, 0)
         self.conn.commit()
         players = db.get_snapshot_players(self.conn, snap_id)
         self.assertEqual(len(players), 1)
@@ -71,13 +85,14 @@ class TestDb(unittest.TestCase):
         self.assertEqual(players[0]["experiencia"], "Antiguo")
         self.assertEqual(players[0]["juegos_este_ano"], 3)
         self.assertEqual(players[0]["partidas_deseadas"], 2)
+        # Country counts should come from notion_cache
         self.assertEqual(players[0]["c_england"], 1)
         self.assertEqual(players[0]["c_france"], 2)
-        self.assertEqual(players[0]["c_germany"], 3)
-        self.assertEqual(players[0]["c_italy"], 4)
-        self.assertEqual(players[0]["c_austria"], 5)
-        self.assertEqual(players[0]["c_russia"], 6)
-        self.assertEqual(players[0]["c_turkey"], 7)
+        self.assertEqual(players[0]["c_germany"], 0)
+        self.assertEqual(players[0]["c_italy"], 0)
+        self.assertEqual(players[0]["c_austria"], 0)
+        self.assertEqual(players[0]["c_russia"], 0)
+        self.assertEqual(players[0]["c_turkey"], 0)
 
     def test_notion_cache_roundtrip(self):
         """Data can be inserted and retrieved from notion_cache."""
@@ -108,23 +123,47 @@ class TestDb(unittest.TestCase):
     def test_get_snapshot_players_unknown_id_returns_empty(self):
         self.assertEqual(db.get_snapshot_players(self.conn, 9999), [])
 
+    def test_snapshot_players_without_notion_cache_coalesce_to_zero(self):
+        """Players not in notion_cache get country counts COALESCE to 0."""
+        snap_id = db.create_snapshot(self.conn, "notion_sync")
+        pid = db.get_or_create_player(self.conn, "Bob")
+        
+        # Don't add Bob to notion_cache - should coalesce to 0
+        db.add_snapshot_player(self.conn, snap_id, pid, "Nuevo", 0, 0, 1, 0)
+        self.conn.commit()
+        players = db.get_snapshot_players(self.conn, snap_id)
+        self.assertEqual(len(players), 1)
+        self.assertEqual(players[0]["nombre"], "Bob")
+        self.assertEqual(players[0]["experiencia"], "Nuevo")
+        self.assertEqual(players[0]["juegos_este_ano"], 0)
+        self.assertEqual(players[0]["partidas_deseadas"], 1)
+        # Country counts should COALESCE to 0 when not in notion_cache
+        self.assertEqual(players[0]["c_england"], 0)
+        self.assertEqual(players[0]["c_france"], 0)
+        self.assertEqual(players[0]["c_germany"], 0)
+        self.assertEqual(players[0]["c_italy"], 0)
+        self.assertEqual(players[0]["c_austria"], 0)
+        self.assertEqual(players[0]["c_russia"], 0)
+        self.assertEqual(players[0]["c_turkey"], 0)
+
     # ── snapshots_have_same_roster ────────────────────────────────────────────
 
     def test_same_roster_returns_true(self):
-        """snapshots_have_same_roster returns True when Notion data matches the snapshot."""
+        """snapshots_have_same_roster returns True when Notion data matches the snapshot.
+        Note: Only Nombre, Experiencia, and Juegos_Este_Ano are compared; country columns are ignored."""
         snap_id = db.create_snapshot(self.conn, "notion_sync")
         pid = db.get_or_create_player(self.conn, "Alice")
-        db.add_snapshot_player(self.conn, snap_id, pid, "Antiguo", 2, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0)
+        db.add_snapshot_player(self.conn, snap_id, pid, "Antiguo", 2, 0, 1, 0)
         self.conn.commit()
-        notion_rows = [{"Nombre": "Alice", "Experiencia": "Antiguo", "Juegos_Este_Ano": 2, "c_england": 1}]
+        notion_rows = [{"Nombre": "Alice", "Experiencia": "Antiguo", "Juegos_Este_Ano": 2}]
         self.assertTrue(db.snapshots_have_same_roster(self.conn, snap_id, notion_rows))
 
-    def test_different_countries_returns_false(self):
+    def test_different_experience_returns_false(self):
         snap_id = db.create_snapshot(self.conn, "notion_sync")
         pid = db.get_or_create_player(self.conn, "Alice")
-        db.add_snapshot_player(self.conn, snap_id, pid, "Antiguo", 2, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0)
+        db.add_snapshot_player(self.conn, snap_id, pid, "Antiguo", 2, 0, 1, 0)
         self.conn.commit()
-        notion_rows = [{"Nombre": "Alice", "Experiencia": "Antiguo", "Juegos_Este_Ano": 2, "c_england": 5}]
+        notion_rows = [{"Nombre": "Alice", "Experiencia": "Nuevo", "Juegos_Este_Ano": 2}]
         self.assertFalse(db.snapshots_have_same_roster(self.conn, snap_id, notion_rows))
 
     def test_different_juegos_returns_false(self):

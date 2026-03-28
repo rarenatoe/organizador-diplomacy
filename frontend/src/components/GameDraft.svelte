@@ -10,9 +10,11 @@
     onChainUpdate: () => void;
     onOpenGame: (id: number) => void;
     onShowError: (title: string, output: string) => void;
+    editingGameId?: number | null;
+    initialDraft?: DraftResponse | null;
   }
 
-  let { snapshotId, onClose, onChainUpdate, onOpenGame, onShowError }: Props = $props();
+  let { snapshotId, onClose, onChainUpdate, onOpenGame, onShowError, editingGameId, initialDraft }: Props = $props();
 
   let draftData = $state<DraftResponse | null>(null);
   let loading = $state(true);
@@ -24,12 +26,16 @@
   async function loadDraft(): Promise<void> {
     loading = true;
     try {
-      const response = await fetchGameDraft(snapshotId);
-      if (response.error) {
-        onShowError("Error al generar draft", response.error);
-        return;
+      if (initialDraft) {
+        draftData = initialDraft;
+      } else {
+        const response = await fetchGameDraft(snapshotId);
+        if (response.error) {
+          onShowError("Error al generar draft", response.error);
+          return;
+        }
+        draftData = response;
       }
-      draftData = response;
     } catch (e) {
       onShowError("Error de conexión", String(e));
     } finally {
@@ -37,29 +43,7 @@
     }
   }
 
-  function getCountryEmoji(pais: string | undefined): string {
-    // Handle both English (backend) and Spanish (display) country names
-    const countryEmojis: Record<string, string> = {
-      // English names (from backend)
-      England: "🇬🇧",
-      France: "🇫🇷",
-      Germany: "🇩🇪",
-      Italy: "🇮🇹",
-      Austria: "🇦🇹",
-      Russia: "🇷🇺",
-      Turkey: "🇹🇷",
-      // Spanish names (for display)
-      Inglaterra: "🇬🇧",
-      Francia: "🇫🇷",
-      Alemania: "🇩🇪",
-      Italia: "🇮🇹",
-      Rusia: "🇷🇺",
-      Turquía: "🇹🇷"
-    };
-    return pais ? (countryEmojis[pais] || "") : "";
-  }
-
-  function handleCountryChange(mesaIndex: number, playerIndex: number, newCountry: string): void {
+  function handleCountryChange(mesaIndex: number, playerIndex: number, newCountry: string | null): void {
     if (!draftData) return;
     
     // Check if the new country is already assigned to another player in the same mesa
@@ -79,31 +63,31 @@
       // Assign new country to current player
       if (newCountry !== null) {
         if (currentPlayer) {
-          (currentPlayer as DraftPlayer).pais = newCountry;
+          currentPlayer.pais = newCountry;
         }
       } else {
         // Handle "Aleatorio" selection - remove country assignment
         if (currentPlayer) {
-          delete (currentPlayer as DraftPlayer).pais;
+          delete currentPlayer.pais;
         }
       }
       
       // Give old country to conflicting player
       const conflictingPlayerObj = mesa.jugadores[conflictingPlayerIndex];
       if (tempCountry !== undefined && conflictingPlayerObj) {
-        (conflictingPlayerObj as DraftPlayer).pais = tempCountry;
+        conflictingPlayerObj.pais = tempCountry;
       } else if (conflictingPlayerObj) {
-        delete (conflictingPlayerObj as DraftPlayer).pais;
+        delete conflictingPlayerObj.pais;
       }
     } else {
       // Just assign country if no conflict
       const currentPlayer = mesa.jugadores[playerIndex];
       if (newCountry) {
         if (currentPlayer) {
-          (currentPlayer as DraftPlayer).pais = newCountry;
+          currentPlayer.pais = newCountry;
         }
       } else if (currentPlayer) {
-        delete (currentPlayer as DraftPlayer).pais;
+        delete currentPlayer.pais;
       }
     }
   }
@@ -124,7 +108,11 @@
       }));
       const payload: DraftResponse = { ...draftData, mesas: cleanMesas };
 
-      const response = await saveGameDraft(snapshotId, payload);
+      const response = await saveGameDraft({ 
+        snapshot_id: snapshotId, 
+        draft: payload, 
+        editing_game_id: editingGameId || null
+      });
       if (response.error) {
         onShowError("Error al guardar draft", response.error);
         return;
@@ -398,13 +386,13 @@
                   <div class="country-container">
                     <select 
                       class="country-select" 
-                      bind:value={j.pais}
+                      value={j.pais || ""}
                       onchange={(e) => {
                       const target = e.target as HTMLSelectElement;
-                      handleCountryChange(mesaIndex, i, target.value);
+                      handleCountryChange(mesaIndex, i, target.value || null);
                     }}
                     >
-                      <option value={null}>🎲 Aleatorio</option>
+                      <option value="">🎲 Aleatorio</option>
                       <option value="England">🇬🇧 Inglaterra</option>
                       <option value="France">🇫🇷 Francia</option>
                       <option value="Germany">🇩🇪 Alemania</option>
@@ -464,7 +452,13 @@
     <button 
       class="btn btn-secondary" 
       style="width:100%"
-      onclick={onClose}
+      onclick={() => {
+        if (editingGameId) {
+          onOpenGame(editingGameId);
+        } else {
+          onClose();
+        }
+      }}
       disabled={saving}
     >
       Cancelar

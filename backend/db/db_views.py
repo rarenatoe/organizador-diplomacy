@@ -17,7 +17,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import sqlite3
 
-from ..organizador.formatter import translate_country
 from .db import get_snapshot_players
 
 # ── Chain (viewer) ─────────────────────────────────────────────────────────────
@@ -188,12 +187,22 @@ def get_game_event_detail(conn: sqlite3.Connection, event_id: int) -> dict[str, 
         jugadores: list[dict[str, Any]] = []
         for p in conn.execute(
             """
-            SELECT p.nombre, sp.experiencia, sp.juegos_este_ano, mp.pais
+            SELECT p.nombre, sp.experiencia, sp.juegos_este_ano, sp.prioridad,
+                   sp.partidas_deseadas, sp.partidas_gm,
+                   COALESCE(nc.c_england, 0) AS c_england,
+                   COALESCE(nc.c_france, 0) AS c_france,
+                   COALESCE(nc.c_germany, 0) AS c_germany,
+                   COALESCE(nc.c_italy, 0) AS c_italy,
+                   COALESCE(nc.c_austria, 0) AS c_austria,
+                   COALESCE(nc.c_russia, 0) AS c_russia,
+                   COALESCE(nc.c_turkey, 0) AS c_turkey,
+                   mp.pais
             FROM   mesa_players mp
             JOIN   players      p  ON p.id  = mp.player_id
             JOIN   snapshot_players sp
                    ON sp.player_id   = mp.player_id
                    AND sp.snapshot_id = ?
+            LEFT  JOIN notion_cache nc ON nc.nombre = p.nombre
             WHERE  mp.mesa_id = ?
             ORDER  BY mp.orden
             """,
@@ -204,7 +213,25 @@ def get_game_event_detail(conn: sqlite3.Connection, event_id: int) -> dict[str, 
                 if p["experiencia"] == "Nuevo"
                 else f"Antiguo ({p['juegos_este_ano']} juegos)"
             )
-            jugadores.append({"nombre": p["nombre"], "etiqueta": etiqueta, "pais": translate_country(p["pais"])})
+            jugadores.append({
+                "nombre": p["nombre"], 
+                "etiqueta": etiqueta, 
+                "pais": p["pais"],  # CRITICAL: Raw string, no translation
+                "es_nuevo": p["experiencia"] == "Nuevo",
+                "experiencia": p["experiencia"],
+                "juegos_este_ano": p["juegos_este_ano"],
+                "prioridad": p["prioridad"],
+                "partidas_deseadas": p["partidas_deseadas"],
+                "partidas_gm": p["partidas_gm"],
+                "c_england": p["c_england"],
+                "c_france": p["c_france"],
+                "c_germany": p["c_germany"],
+                "c_italy": p["c_italy"],
+                "c_austria": p["c_austria"],
+                "c_russia": p["c_russia"],
+                "c_turkey": p["c_turkey"],
+                "cupos": p["partidas_deseadas"]  # For backward compatibility
+            })
 
         mesas_data.append({
             "numero":    int(mesa_row["numero"]),
@@ -216,16 +243,43 @@ def get_game_event_detail(conn: sqlite3.Connection, event_id: int) -> dict[str, 
         {
             "nombre": row["nombre"],
             "cupos":  f"{row['cupos_faltantes']} cupo(s) sin asignar",
+            "es_nuevo": row["experiencia"] == "Nuevo",
+            "experiencia": row["experiencia"],
+            "juegos_este_ano": row["juegos_este_ano"],
+            "prioridad": row["prioridad"],
+            "partidas_deseadas": row["partidas_deseadas"],
+            "partidas_gm": row["partidas_gm"],
+            "c_england": row["c_england"],
+            "c_france": row["c_france"],
+            "c_germany": row["c_germany"],
+            "c_italy": row["c_italy"],
+            "c_austria": row["c_austria"],
+            "c_russia": row["c_russia"],
+            "c_turkey": row["c_turkey"],
+            "cupos": row["partidas_deseadas"]  # For backward compatibility
         }
         for row in conn.execute(
             """
-            SELECT p.nombre, wl.cupos_faltantes
+            SELECT p.nombre, wl.cupos_faltantes,
+                   sp.experiencia, sp.juegos_este_ano, sp.prioridad,
+                   sp.partidas_deseadas, sp.partidas_gm,
+                   COALESCE(nc.c_england, 0) AS c_england,
+                   COALESCE(nc.c_france, 0) AS c_france,
+                   COALESCE(nc.c_germany, 0) AS c_germany,
+                   COALESCE(nc.c_italy, 0) AS c_italy,
+                   COALESCE(nc.c_austria, 0) AS c_austria,
+                   COALESCE(nc.c_russia, 0) AS c_russia,
+                   COALESCE(nc.c_turkey, 0) AS c_turkey
             FROM   waiting_list wl
             JOIN   players      p ON p.id = wl.player_id
+            JOIN   snapshot_players sp
+                   ON sp.player_id   = wl.player_id
+                   AND sp.snapshot_id = ?
+            LEFT  JOIN notion_cache nc ON nc.nombre = p.nombre
             WHERE  wl.event_id = ?
             ORDER  BY wl.orden
             """,
-            (event_id,),
+            (input_sid, event_id),
         ).fetchall()
     ]
 

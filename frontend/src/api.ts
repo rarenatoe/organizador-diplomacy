@@ -12,6 +12,7 @@ import type {
   NotionFetchResponse,
   DraftResponse,
   SaveDraftResponse,
+  SaveDraftRequest,
 } from "./types";
 
 // ── Chain ─────────────────────────────────────────────────────────────────────
@@ -91,14 +92,13 @@ export async function fetchGameDraft(
 }
 
 export async function saveGameDraft(
-  snapshotId: number,
-  draft: DraftResponse,
+  request: SaveDraftRequest,
 ): Promise<SaveDraftResponse> {
   const res = await fetch("/api/game/save", {
     method: "POST",
     // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ snapshot_id: snapshotId, draft }),
+    body: JSON.stringify(request),
   });
   return (await res.json()) as SaveDraftResponse;
 }
