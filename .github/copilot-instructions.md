@@ -52,7 +52,7 @@ Lefthook for smart pre-commit execution on changed files.
 | `db_game.py` | Game-event persistence (legacy, now in events.py) |
 | `db_views.py` | Read-only queries for viewer |
 | `viewer.py` | Flask REST API |
-| `sync/api.py` | Notion API utilities (descargar_todos, conteo_partidas_este_ano, extraer_numero, extraer_nombre, experiencia) |
+| `sync/api.py` | Notion API utilities (download data, count games, extract numbers, get names, experience) |
 | `sync/similarity.py` | Name similarity detection (_normalize_name, _words_match, _similarity, _detect_similar_names) |
 | `sync/notion_sync.py` | Main orchestrator (main function) |
 | `test_*.py` | Tests (co-located with source files) |
@@ -79,7 +79,7 @@ Lefthook for smart pre-commit execution on changed files.
 6. Commit: `feat:` · `fix:` · `refactor:` · `test:`.
 
 ## Principles
-- **Governance**: Rules in `docs/ai-rules/`, generated via `scripts/generate-ai-instructions.ts`. No direct edits to `.trae/rules/*.md`.
+- **Governance**: Rules in `docs/ai-rules/`, generated via `scripts/generate-ai-instructions.ts`. No direct edits to generated files.
 - **Database**: Centralized `graph_nodes` table for global IDs and cascading deletes.
 - **Testing**: Tests required for new behavior and modifications.
 - **Integrity**: Snapshots require explicit source snapshot ID. UI uses store getters directly in templates.

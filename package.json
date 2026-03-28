@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "ai-rules:generate": "bun run scripts/generate-ai-instructions.ts",
-    "ai-rules:check": "bun run ai-rules:generate && git diff --exit-code -- .github .clinerules .trae",
+    "ai-rules:check": "bun run ai-rules:generate && git diff --exit-code -- .github .clinerules",
     "build": "cd frontend && npx vite build && cp static/index.html templates/",
     "dev": "cd frontend && npx vite",
     "typecheck": "svelte-check --tsconfig tsconfig.json",

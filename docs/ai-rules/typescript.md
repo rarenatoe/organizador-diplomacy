@@ -7,10 +7,8 @@ applyTo:
   - frontend/src/**
 outputs:
   copilot: .github/typescript.instructions.md
-  trae: .trae/rules/typescript.md
 toolNotes:
   copilot: Scoped instructions for frontend TS/Svelte changes.
-  trae: Auto-attached for frontend/src/** files.
 ---
 # TypeScript + Svelte Instructions — Organizador Diplomacy
 
@@ -32,6 +30,8 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 - Use PascalCase for component names.
 - Props typed with TypeScript interfaces.
 - Slots used for composition.
+- Never use native HTML `<button>` tags for actions. Always import and use universal `<Button>` component (`import Button from './Button.svelte'`).
+- Use orthogonal props to control button appearance: `variant` ('primary', 'secondary', 'success', 'warning', 'ghost'), `size` ('md', 'sm'), `fill` (boolean, to take full width of container), and `iconOnly` (boolean).
 
 ## Constraint-Preserving UI (The Swap Pattern)
 - When manipulating strict arrays (like 7 players per table), use `SwapTarget` pattern instead of generic "Move to table" dropdowns.
@@ -59,6 +59,8 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 - Co-located tests: `ComponentName.test.ts`.
 - Mock API: `vi.mock('../api')`.
 - Test files: `frontend/src/*.test.ts`.
+- DOM testing for buttons MUST use accessible queries: `screen.getByRole('button', { name: /Text/i })`. Do NOT use `getByText()` for buttons, as emojis and text are structurally separated in DOM.
+- For `iconOnly` buttons, rely on their `title` attribute, which `getByRole` automatically uses as accessible name.
 
 ## Naming
 - Variables/Functions: `camelCase`.
@@ -69,6 +71,7 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 ## CSS
 - Flex layout for panels, rows, containers.
 - `overflow: hidden; text-overflow: ellipsis; white-space: nowrap;` for truncation.
+- Component-specific UI classes (like button variants or layouts) must live in scoped `<style>` blocks within component. Keep `static/style.css` strictly for CSS variables, CSS resets, and high-level layout utilities.
 - Scoped `<style>` in `.svelte` files.
 - `static/style.css` for variables, resets, utility classes.
 - Scroll pattern: `.panel-body` (flex column, hidden) + `.panel-scroll` (flex 1, auto scroll).

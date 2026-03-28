@@ -17,4 +17,4 @@ pre-commit:
       run: bun run test
     ai-rules:
       glob: "docs/ai-rules/*.md"
-      run: bun run ai-rules:generate && git add .github/ .clinerules .trae/ .windsurfrules
+      run: bun run ai-rules:generate && git add .github/ .clinerules .windsurfrules

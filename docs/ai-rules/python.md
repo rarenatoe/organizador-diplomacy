@@ -7,10 +7,8 @@ applyTo:
   - backend/**/*.py
 outputs:
   copilot: .github/python.instructions.md
-  trae: .trae/rules/python.md
 toolNotes:
   copilot: Base instructions read before scoped files.
-  trae: Project-wide rules, always applied.
 ---
 # Python Instructions — Organizador Diplomacy
 
@@ -52,7 +50,7 @@ backend/
 | `db_game.py` | Game-event persistence (legacy, now in events.py) |
 | `db_views.py` | Read-only queries for viewer |
 | `viewer.py` | Flask REST API |
-| `sync/api.py` | Notion API utilities (descargar_todos, conteo_partidas_este_ano, extraer_numero, extraer_nombre, experiencia) |
+| `sync/api.py` | Notion API utilities (download data, count games, extract numbers, get names, experience) |
 | `sync/similarity.py` | Name similarity detection (_normalize_name, _words_match, _similarity, _detect_similar_names) |
 | `sync/notion_sync.py` | Main orchestrator (main function) |
 | `test_*.py` | Tests (co-located with source files) |

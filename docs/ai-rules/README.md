@@ -26,6 +26,3 @@ Never edit generated files directly:
 - `.github/python.instructions.md`
 - `.github/typescript.instructions.md`
 - `.clinerules`
-- `.trae/rules/core.md`
-- `.trae/rules/python.md`
-- `.trae/rules/typescript.md`

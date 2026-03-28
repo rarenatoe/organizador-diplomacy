@@ -146,9 +146,6 @@ async function main(): Promise<void> {
     if (rule.meta.outputs?.copilot) {
       await writeFile(rule.meta.outputs.copilot, renderCopilot(rule));
     }
-    if (rule.meta.outputs?.trae) {
-      await writeFile(rule.meta.outputs.trae, renderTrae(rule));
-    }
   }
 
   await writeFile(".clinerules", renderCline(rules));
