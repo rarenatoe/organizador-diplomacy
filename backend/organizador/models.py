@@ -30,7 +30,7 @@ class Jugador:
         c_austria: int = 0,
         c_russia: int = 0,
         c_turkey: int = 0,
-        pais: str | None = None,
+        pais: str = "",
         pais_reason: str | None = None,
     ) -> None:
         self.nombre: str = nombre
@@ -50,7 +50,7 @@ class Jugador:
         self.c_austria: int = int(c_austria)
         self.c_russia: int = int(c_russia)
         self.c_turkey: int = int(c_turkey)
-        self.pais: str | None = pais
+        self.pais: str = pais
         self.pais_reason: str | None = pais_reason
 
     def to_dict(self) -> dict[str, Any]:
@@ -68,9 +68,8 @@ class Jugador:
             "c_austria": self.c_austria,
             "c_russia": self.c_russia,
             "c_turkey": self.c_turkey,
+            "pais": self.pais,
         }
-        if self.pais is not None:
-            d["pais"] = self.pais
         if self.pais_reason is not None:
             d["pais_reason"] = self.pais_reason
         return d

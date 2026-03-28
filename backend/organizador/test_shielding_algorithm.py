@@ -40,7 +40,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
         assign_countries_to_mesa(players)
         
         # At least one player should have a country assigned (the shield)
-        assigned_players = [p for p in players if p.pais is not None]
+        assigned_players = [p for p in players if p.pais != ""]
         self.assertGreater(len(assigned_players), 0, "At least one player should be assigned a country")
 
     def test_no_cursed_players_remain_unassigned(self):
@@ -58,7 +58,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
         
         # All players should have no country assigned
         for player in players:
-            self.assertIsNone(player.pais, f"Player {player.nombre} should have no country assigned")
+            self.assertEqual(player.pais, "", f"Player {player.nombre} should have no country assigned")
 
     def test_optimal_shield_selection_and_reason(self):
         """The algorithm must pick player with the lowest count for the cursed country."""
@@ -74,7 +74,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
         assign_countries_to_mesa(players)
         
         # 1. Alice (cursed) should NOT get a country directly
-        self.assertIsNone(players[0].pais)
+        self.assertEqual(players[0].pais, "")
         # 2. Charlie (0 games) is a better shield than Bob (1 game)
         self.assertEqual(players[2].pais, "England", "Charlie should be picked as a shield for England")
         # 3. The reason should explicitly mention Alice and the count
@@ -82,7 +82,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
         self.assertIn("Alice", players[2].pais_reason or "")
         self.assertIn("2", players[2].pais_reason or "")
         # 4. Bob should be left alone
-        self.assertIsNone(players[1].pais)
+        self.assertEqual(players[1].pais, "")
 
 
 if __name__ == "__main__":

@@ -229,7 +229,7 @@ export interface DraftPlayer {
   c_austria: number;
   c_russia: number;
   c_turkey: number;
-  pais?: string;
+  pais: string;
   pais_reason?: string;
 }
 

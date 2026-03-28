@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import sqlite3
 
-    from .models import ResultadoPartidas
+    from backend.organizador.models import ResultadoPartidas
 
 from .db import add_snapshot_player, create_event, create_snapshot, get_snapshot_players
 
@@ -63,7 +63,7 @@ def add_mesa_player(
     mesa_id: int,
     player_id: int,
     orden: int,
-    pais: str | None = None,
+    pais: str = "",
 ) -> None:
     """Inserts one mesa_players row. Does NOT commit."""
     conn.execute(
@@ -130,13 +130,6 @@ def create_output_snapshot(
             1 if nombre in nombres_en_espera else 0,
             p["partidas_deseadas"],
             0,  # partidas_gm reset
-            p["c_england"],
-            p["c_france"],
-            p["c_germany"],
-            p["c_italy"],
-            p["c_austria"],
-            p["c_russia"],
-            p["c_turkey"],
         )
 
     return snap_id

@@ -7,6 +7,7 @@ export default defineConfig({
     environment: "jsdom",
     include: ["frontend/src/**/*.test.ts"],
     globals: true,
+    setupFiles: ["frontend/test-setup.ts"],
     server: {
       deps: {
         inline: [/@testing-library\/svelte/],

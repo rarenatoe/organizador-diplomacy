@@ -119,7 +119,7 @@ CREATE TABLE IF NOT EXISTS mesa_players (
     mesa_id   INTEGER NOT NULL REFERENCES mesas(id) ON DELETE CASCADE,
     player_id INTEGER NOT NULL REFERENCES players(id),
     orden     INTEGER NOT NULL,     -- seat number within the table (1-based)
-    pais      TEXT,               -- assigned country (England, France, Germany, Italy, Austria, Russia, Turkey)
+    pais      TEXT NOT NULL DEFAULT '',               -- assigned country (England, France, Germany, Italy, Austria, Russia, Turkey)
     PRIMARY KEY (mesa_id, player_id)
 );
 
@@ -152,7 +152,11 @@ def get_db(path: Path | str = DB_PATH) -> sqlite3.Connection:
     # Ensure 'pais' column exists (migration for older DBs)
     cols = [row["name"] for row in conn.execute("PRAGMA table_info(mesa_players)").fetchall()]
     if "pais" not in cols:
-        conn.execute("ALTER TABLE mesa_players ADD COLUMN pais TEXT")
+        conn.execute("ALTER TABLE mesa_players ADD COLUMN pais TEXT NOT NULL DEFAULT ''")
+        conn.commit()
+    else:
+        # Update existing NULL values to empty string
+        conn.execute("UPDATE mesa_players SET pais = '' WHERE pais IS NULL")
         conn.commit()
     
     return conn

@@ -14,7 +14,7 @@ def assign_countries_to_mesa(jugadores: list[Jugador]) -> None:
     """
     # Initialize all players with no country
     for player in jugadores:
-        player.pais = None
+        player.pais = ""
         player.pais_reason = None
     
     # Identify cursed players (those with >= 2 games in any country)
@@ -41,7 +41,7 @@ def assign_countries_to_mesa(jugadores: list[Jugador]) -> None:
         best_shield_count = float('inf')
         
         for potential_shield in jugadores:
-            if potential_shield.pais is None and potential_shield != cursed_player:
+            if potential_shield.pais == "" and potential_shield != cursed_player:
                 shield_count = getattr(potential_shield, f"c_{country.lower()}", 0)
                 if shield_count < best_shield_count:
                     best_shield_count = shield_count

@@ -1,22 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
 import GameDraft from "./GameDraft.svelte";
-import "@testing-library/jest-dom";
 
 // Mock the API module
 vi.mock("../api", () => ({
   fetchGameDraft: vi.fn(),
   saveGameDraft: vi.fn(),
-}));
-
-// Mock the stores module
-vi.mock("../stores.svelte", () => ({
-  setActiveNodeId: vi.fn(),
-}));
-
-// Mock the snapshotUtils module
-vi.mock("../snapshotUtils", () => ({
-  findLatestGameId: vi.fn(),
 }));
 
 describe("GameDraft.svelte", () => {
@@ -48,6 +37,7 @@ describe("GameDraft.svelte", () => {
             c_austria: 0,
             c_russia: 0,
             c_turkey: 0,
+            pais: "",
           },
           {
             nombre: "Bob",
@@ -83,6 +73,7 @@ describe("GameDraft.svelte", () => {
         c_austria: 0,
         c_russia: 0,
         c_turkey: 0,
+        pais: "",
       },
     ],
     minimo_teorico: 2,
@@ -90,7 +81,7 @@ describe("GameDraft.svelte", () => {
   };
 
   beforeEach(async () => {
-    vi.clearAllMocks();
+    // Reset any necessary state before each test
     const { fetchGameDraft } = vi.mocked(await import("../api"));
     fetchGameDraft.mockResolvedValue(mockDraftData);
   });
@@ -98,13 +89,13 @@ describe("GameDraft.svelte", () => {
   it("renders draft data when loaded", async () => {
     render(GameDraft, { props: mockProps });
 
-    // Wait for loading to complete
-    await vi.waitFor(() => {
-      expect(screen.getByText("Partida 1")).toBeInTheDocument();
-      expect(screen.getByText("Alice")).toBeInTheDocument();
-      expect(screen.getByText("Bob")).toBeInTheDocument();
-      expect(screen.getByText("David")).toBeInTheDocument();
-    });
+    // Wait a bit for the component to render
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(screen.getByText("Partida 1")).toBeInTheDocument();
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+    expect(screen.getByText("Bob")).toBeInTheDocument();
+    expect(screen.getByText("David")).toBeInTheDocument();
   });
 
   it("shows loading state initially", async () => {
@@ -236,6 +227,7 @@ describe("GameDraft.svelte", () => {
                 c_austria: 0,
                 c_russia: 0,
                 c_turkey: 0,
+                pais: "",
               },
               {
                 nombre: "Bob",
@@ -251,6 +243,7 @@ describe("GameDraft.svelte", () => {
                 c_austria: 0,
                 c_russia: 0,
                 c_turkey: 0,
+                pais: "France",
               },
             ],
           },
@@ -272,6 +265,7 @@ describe("GameDraft.svelte", () => {
                 c_austria: 0,
                 c_russia: 0,
                 c_turkey: 0,
+                pais: "",
               },
             ],
           },
@@ -291,6 +285,7 @@ describe("GameDraft.svelte", () => {
             c_austria: 0,
             c_russia: 0,
             c_turkey: 0,
+            pais: "",
           },
         ],
         minimo_teorico: 2,
@@ -394,6 +389,7 @@ describe("GameDraft.svelte", () => {
                 c_austria: 0,
                 c_russia: 0,
                 c_turkey: 0,
+                pais: "",
               },
             ],
           },
@@ -416,6 +412,7 @@ describe("GameDraft.svelte", () => {
                 c_austria: 0,
                 c_russia: 0,
                 c_turkey: 0,
+                pais: "",
               },
               {
                 nombre: "Charlie",
@@ -431,6 +428,7 @@ describe("GameDraft.svelte", () => {
                 c_austria: 0,
                 c_russia: 0,
                 c_turkey: 0,
+                pais: "",
               },
             ],
           },
@@ -586,6 +584,7 @@ describe("GameDraft.svelte", () => {
               c_austria: 1,
               c_russia: 1,
               c_turkey: 1,
+              pais: "",
             },
             jugadores: mockDraftData.mesas[0]?.jugadores || [],
           },
@@ -599,5 +598,26 @@ describe("GameDraft.svelte", () => {
         expect(screen.getByText("GM: TestGM")).toBeInTheDocument();
       });
     });
+  });
+
+  it("correctly updates country selection including reverting to Aleatorio", async () => {
+    render(GameDraft, { props: mockProps });
+
+    await vi.waitFor(() => {
+      expect(screen.getByText("Partida 1")).toBeInTheDocument();
+    });
+
+    // Find the country selects
+    const countrySelects = document.querySelectorAll(".country-select");
+    const aliceSelect = countrySelects[0] as HTMLSelectElement;
+    expect(aliceSelect).toBeDefined();
+
+    // Change to England
+    await fireEvent.change(aliceSelect, { target: { value: "England" } });
+    expect(aliceSelect.value).toBe("England");
+
+    // Change back to Aleatorio (empty string)
+    await fireEvent.change(aliceSelect, { target: { value: "" } });
+    expect(aliceSelect.value).toBe("");
   });
 });

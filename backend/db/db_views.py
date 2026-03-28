@@ -216,7 +216,7 @@ def get_game_event_detail(conn: sqlite3.Connection, event_id: int) -> dict[str, 
             jugadores.append({
                 "nombre": p["nombre"], 
                 "etiqueta": etiqueta, 
-                "pais": p["pais"],  # CRITICAL: Raw string, no translation
+                "pais": p["pais"] or "",  # Convert None to empty string
                 "es_nuevo": p["experiencia"] == "Nuevo",
                 "experiencia": p["experiencia"],
                 "juegos_este_ano": p["juegos_este_ano"],

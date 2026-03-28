@@ -29,9 +29,9 @@ _COUNTRY_TRANSLATIONS: dict[str, str] = {
     "Turkey": "Turquía"
 }
 
-def translate_country(pais: str | None) -> str:
+def translate_country(pais: str) -> str:
     """Translate English country name to Spanish."""
-    if not pais:
+    if not pais or pais == "":
         return ""
     return _COUNTRY_TRANSLATIONS.get(pais, pais)
 

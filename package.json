@@ -34,6 +34,7 @@
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/svelte": "5.3.1",
     "@vitest/coverage-v8": "4.1.0",
+    "@vitest/eslint-plugin": "^1.6.13",
     "eslint": "10.1.0",
     "eslint-plugin-svelte": "3.16.0",
     "jsdom": "29.0.1",

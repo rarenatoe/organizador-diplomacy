@@ -2,6 +2,7 @@
 import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 import svelte from "eslint-plugin-svelte";
+import vitest from "@vitest/eslint-plugin";
 
 export default defineConfig([
   // TypeScript files configuration
@@ -73,6 +74,11 @@ export default defineConfig([
         { ignoreArrowShorthand: true },
       ],
     },
+  },
+  // Vitest test files configuration
+  {
+    files: ["frontend/src/**/*.test.ts", "frontend/test-setup.ts"],
+    ...vitest.configs.recommended,
   },
   // Svelte files configuration with proper TypeScript support
   ...svelte.configs["flat/recommended"].map((config) => ({

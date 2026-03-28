@@ -43,7 +43,7 @@
     }
   }
 
-  function handleCountryChange(mesaIndex: number, playerIndex: number, newCountry: string | null): void {
+  function handleCountryChange(mesaIndex: number, playerIndex: number, newCountry: string): void {
     if (!draftData) return;
     
     // Check if the new country is already assigned to another player in the same mesa
@@ -51,43 +51,35 @@
     if (!mesa) return;
     
     const conflictingPlayer = mesa.jugadores.find((j, idx) => 
-      idx !== playerIndex && j.pais === newCountry
+      idx !== playerIndex && j.pais === newCountry && newCountry !== ""
     );
     
     if (conflictingPlayer) {
       // Automatically swap countries between the two players
       const conflictingPlayerIndex = mesa.jugadores.indexOf(conflictingPlayer);
-      const currentPlayer = mesa.jugadores[playerIndex];
-      const tempCountry = currentPlayer?.pais;
+      const currentPlayer = mesa.jugadores[playerIndex]!;
+      const tempCountry = currentPlayer.pais;
       
       // Assign new country to current player
-      if (newCountry !== null) {
-        if (currentPlayer) {
-          currentPlayer.pais = newCountry;
-        }
+      if (newCountry !== "") {
+        currentPlayer.pais = newCountry;
       } else {
         // Handle "Aleatorio" selection - remove country assignment
-        if (currentPlayer) {
-          delete currentPlayer.pais;
-        }
+        currentPlayer.pais = "";
       }
       
       // Give old country to conflicting player
       const conflictingPlayerObj = mesa.jugadores[conflictingPlayerIndex];
-      if (tempCountry !== undefined && conflictingPlayerObj) {
+      if (conflictingPlayerObj) {
         conflictingPlayerObj.pais = tempCountry;
-      } else if (conflictingPlayerObj) {
-        delete conflictingPlayerObj.pais;
       }
     } else {
       // Just assign country if no conflict
-      const currentPlayer = mesa.jugadores[playerIndex];
-      if (newCountry) {
-        if (currentPlayer) {
-          currentPlayer.pais = newCountry;
-        }
-      } else if (currentPlayer) {
-        delete currentPlayer.pais;
+      const currentPlayer = mesa.jugadores[playerIndex]!;
+      if (newCountry !== "") {
+        currentPlayer.pais = newCountry;
+      } else {
+        currentPlayer.pais = "";
       }
     }
   }
@@ -102,11 +94,16 @@
         ...mesa,
         jugadores: mesa.jugadores.map(({ pais, pais_reason, ...rest }) => ({
           ...rest,
-          ...(pais ? { pais } : {}),
+          pais: pais || "",
           ...(pais_reason ? { pais_reason } : {}),
         })),
       }));
-      const payload: DraftResponse = { ...draftData, mesas: cleanMesas };
+      const cleanTicketsSobrantes = draftData.tickets_sobrantes.map(({ pais, pais_reason, ...rest }) => ({
+        ...rest,
+        pais: pais || "",
+        ...(pais_reason ? { pais_reason } : {}),
+      }));
+      const payload: DraftResponse = { ...draftData, mesas: cleanMesas, tickets_sobrantes: cleanTicketsSobrantes };
 
       const response = await saveGameDraft({ 
         snapshot_id: snapshotId, 
@@ -230,17 +227,8 @@
             const tempPais = draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex].pais;
             const targetPais = draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex].pais;
             
-            if (targetPais !== undefined) {
-              draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex].pais = targetPais;
-            } else {
-              delete draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex].pais;
-            }
-            
-            if (tempPais !== undefined) {
-              draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex].pais = tempPais;
-            } else {
-              delete draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex].pais;
-            }
+            draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex].pais = targetPais;
+            draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex].pais = tempPais;
             
             draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex] = playerB;
             draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex] = playerA;
@@ -255,17 +243,8 @@
             const tempPais = draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex].pais;
             const targetPais = draftData.tickets_sobrantes[targetPlayerIndex].pais;
             
-            if (targetPais !== undefined) {
-              draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex].pais = targetPais;
-            } else {
-              delete draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex].pais;
-            }
-            
-            if (tempPais !== undefined) {
-              draftData.tickets_sobrantes[targetPlayerIndex].pais = tempPais;
-            } else {
-              delete draftData.tickets_sobrantes[targetPlayerIndex].pais;
-            }
+            draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex].pais = targetPais;
+            draftData.tickets_sobrantes[targetPlayerIndex].pais = tempPais;
             
             draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex] = playerB;
             draftData.tickets_sobrantes[targetPlayerIndex] = playerA;
@@ -285,17 +264,8 @@
             const tempPais = draftData.tickets_sobrantes[selectedPlayerIndex].pais;
             const targetPais = draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex].pais;
             
-            if (targetPais !== undefined) {
-              draftData.tickets_sobrantes[selectedPlayerIndex].pais = targetPais;
-            } else {
-              delete draftData.tickets_sobrantes[selectedPlayerIndex].pais;
-            }
-            
-            if (tempPais !== undefined) {
-              draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex].pais = tempPais;
-            } else {
-              delete draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex].pais;
-            }
+            draftData.tickets_sobrantes[selectedPlayerIndex].pais = targetPais;
+            draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex].pais = tempPais;
             
             draftData.tickets_sobrantes[selectedPlayerIndex] = playerB;
             draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex] = playerA;
@@ -310,17 +280,8 @@
             const tempPais = draftData.tickets_sobrantes[selectedPlayerIndex].pais;
             const targetPais = draftData.tickets_sobrantes[targetPlayerIndex].pais;
             
-            if (targetPais !== undefined) {
-              draftData.tickets_sobrantes[selectedPlayerIndex].pais = targetPais;
-            } else {
-              delete draftData.tickets_sobrantes[selectedPlayerIndex].pais;
-            }
-            
-            if (tempPais !== undefined) {
-              draftData.tickets_sobrantes[targetPlayerIndex].pais = tempPais;
-            } else {
-              delete draftData.tickets_sobrantes[targetPlayerIndex].pais;
-            }
+            draftData.tickets_sobrantes[selectedPlayerIndex].pais = targetPais;
+            draftData.tickets_sobrantes[targetPlayerIndex].pais = tempPais;
             
             draftData.tickets_sobrantes[selectedPlayerIndex] = playerB;
             draftData.tickets_sobrantes[targetPlayerIndex] = playerA;
@@ -389,7 +350,7 @@
                       value={j.pais || ""}
                       onchange={(e) => {
                       const target = e.target as HTMLSelectElement;
-                      handleCountryChange(mesaIndex, i, target.value || null);
+                      handleCountryChange(mesaIndex, i, target.value);
                     }}
                     >
                       <option value="">🎲 Aleatorio</option>

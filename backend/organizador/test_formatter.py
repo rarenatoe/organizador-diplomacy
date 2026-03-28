@@ -24,7 +24,7 @@ class TestCountryTranslation:
     
     def test_translate_country_none_and_empty(self):
         """Test handling of None and empty strings."""
-        assert translate_country(None) == ""
+        assert translate_country("") == ""
         assert translate_country("") == ""
         assert translate_country("   ") == "   "
 
@@ -42,7 +42,7 @@ class TestCopypasteFormatting:
                     "jugadores": [
                         {"nombre": "Alice", "pais": "England"},
                         {"nombre": "Bob", "pais": "France"},
-                        {"nombre": "Charlie", "pais": None},
+                        {"nombre": "Charlie", "pais": ""},
                     ]
                 }
             ],

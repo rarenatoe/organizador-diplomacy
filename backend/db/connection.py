@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS mesa_players (
     mesa_numero INTEGER NOT NULL,
     orden INTEGER NOT NULL,
     es_gm BOOLEAN DEFAULT FALSE,
-    pais TEXT,
+    pais TEXT NOT NULL DEFAULT '',
     FOREIGN KEY (snapshot_id) REFERENCES snapshots(id) ON DELETE CASCADE,
     FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
 );
@@ -96,10 +96,15 @@ def get_db(path: Path | str = DB_PATH) -> sqlite3.Connection:
     conn.executescript(_SCHEMA)
     conn.commit()
     
-    # Migration: Add pais column if missing
+    # Migration: Add pais column if missing and update existing NULL values
     cursor = conn.execute("PRAGMA table_info(mesa_players)")
     columns = [column[1] for column in cursor.fetchall()]
     if "pais" not in columns:
-        conn.execute("ALTER TABLE mesa_players ADD COLUMN pais TEXT")
+        conn.execute("ALTER TABLE mesa_players ADD COLUMN pais TEXT NOT NULL DEFAULT ''")
+    else:
+        # Update existing NULL values to empty string and add NOT NULL constraint
+        conn.execute("UPDATE mesa_players SET pais = '' WHERE pais IS NULL")
+        # Note: SQLite doesn't support ALTER TABLE to add NOT NULL constraint directly
+        # This would require recreating the table, but for now we'll ensure data integrity
     
     return conn
