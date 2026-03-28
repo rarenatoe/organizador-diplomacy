@@ -1,62 +1,63 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, fireEvent } from "@testing-library/svelte";
+import { render, fireEvent, screen } from "@testing-library/svelte";
 import Header from "./Header.svelte";
 
 describe("Header", () => {
   it("renders header correctly", () => {
     const onNewDraft = vi.fn();
 
-    const { container } = render(Header, {
+    render(Header, {
       props: {
         onNewDraft,
       },
     });
 
-    expect(container.textContent).toContain("Organizador Diplomacy");
+    expect(screen.getByRole("heading", { level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toContain(
+      "Organizador Diplomacy",
+    );
   });
 
-  it("shows Nueva Versión button", () => {
+  it("shows Nueva Lista button", () => {
     const onNewDraft = vi.fn();
 
-    const { container } = render(Header, {
+    render(Header, {
       props: {
         onNewDraft,
       },
     });
 
-    const newVersionButton = container.querySelector("#btn-new-version");
-    expect(newVersionButton).not.toBeNull();
-    expect(newVersionButton!.textContent).toContain("Nueva Lista");
+    const newListaButton = screen.getByRole("button", { name: /Nueva Lista/i });
+    expect(newListaButton).toBeInTheDocument();
+    expect(newListaButton.textContent).toContain("Nueva Lista");
   });
 
-  it("clicking Nueva Versión button calls onNewDraft", async () => {
+  it("clicking Nueva Lista button calls onNewDraft", async () => {
     const onNewDraft = vi.fn();
 
-    const { container } = render(Header, {
+    render(Header, {
       props: {
         onNewDraft,
       },
     });
 
-    const newVersionButton = container.querySelector("#btn-new-version");
-    expect(newVersionButton).not.toBeNull();
-
-    await fireEvent.click(newVersionButton!);
+    const newListaButton = screen.getByRole("button", { name: /Nueva Lista/i });
+    await fireEvent.click(newListaButton);
 
     expect(onNewDraft).toHaveBeenCalledTimes(1);
   });
 
-  it("Nueva Versión button uses btn-primary class", () => {
+  it("Nueva Lista button uses btn-primary class", () => {
     const onNewDraft = vi.fn();
 
-    const { container } = render(Header, {
+    render(Header, {
       props: {
         onNewDraft,
       },
     });
 
-    const newVersionButton = container.querySelector("#btn-new-version");
-    expect(newVersionButton).not.toBeNull();
-    expect(newVersionButton!.classList.contains("btn-primary")).toBe(true);
+    const newListaButton = screen.getByRole("button", { name: /Nueva Lista/i });
+    expect(newListaButton).toBeInTheDocument();
+    expect(newListaButton.classList.contains("btn-primary")).toBe(true);
   });
 });

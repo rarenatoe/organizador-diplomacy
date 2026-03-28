@@ -5,7 +5,6 @@ import type {
   ChainData,
   SnapshotDetail,
   GameDetail,
-  RunResult,
   DeleteResult,
   EditPlayerRow,
   SnapshotSaveResponse,
@@ -116,20 +115,4 @@ export async function renamePlayer(
     body: JSON.stringify({ old_name: oldName, new_name: newName }),
   });
   return (await res.json()) as { error?: string };
-}
-
-// ── Scripts ───────────────────────────────────────────────────────────────────
-
-export async function runScript(
-  script: string,
-  snapshotId: number | null = null,
-): Promise<RunResult> {
-  const init: RequestInit = { method: "POST" };
-  if (snapshotId !== null) {
-    // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
-    init.headers = { "Content-Type": "application/json" };
-    init.body = JSON.stringify({ snapshot: snapshotId });
-  }
-  const res = await fetch(`/api/run/${script}`, init);
-  return (await res.json()) as RunResult;
 }

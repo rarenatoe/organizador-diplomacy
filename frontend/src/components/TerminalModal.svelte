@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Button from './Button.svelte';
+
   interface Props {
     visible: boolean;
     title: string;
@@ -26,9 +28,9 @@
       </div>
       <div class="modal-out" class:err={isError} id="modal-out">{output}</div>
       <div class="modal-foot">
-        <button class="btn btn-secondary" onclick={onClose} disabled={loading}
-          >Cerrar</button
-        >
+        <Button variant="secondary" onclick={onClose} disabled={loading}>
+          Cerrar
+        </Button>
       </div>
     </div>
   </div>

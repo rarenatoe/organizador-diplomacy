@@ -123,10 +123,12 @@ describe("GameDraft.svelte", () => {
     render(GameDraft, { props: mockProps });
 
     await vi.waitFor(() => {
-      expect(screen.getByText("✨ Confirmar y Guardar")).toBeInTheDocument();
+      expect(screen.getByText("Confirmar y Guardar")).toBeInTheDocument();
     });
 
-    const saveButton = screen.getByText("✨ Confirmar y Guardar");
+    const saveButton = screen.getByRole("button", {
+      name: /Confirmar y Guardar/i,
+    });
     await fireEvent.click(saveButton);
 
     expect(saveGameDraft).toHaveBeenCalledWith({
@@ -143,10 +145,12 @@ describe("GameDraft.svelte", () => {
     render(GameDraft, { props: mockProps });
 
     await vi.waitFor(() => {
-      expect(screen.getByText("✨ Confirmar y Guardar")).toBeInTheDocument();
+      expect(screen.getByText("Confirmar y Guardar")).toBeInTheDocument();
     });
 
-    const saveButton = screen.getByText("✨ Confirmar y Guardar");
+    const saveButton = screen.getByRole("button", {
+      name: /Confirmar y Guardar/i,
+    });
     await fireEvent.click(saveButton);
 
     await vi.waitFor(() => {
@@ -164,7 +168,7 @@ describe("GameDraft.svelte", () => {
       expect(screen.getByText("Cancelar")).toBeInTheDocument();
     });
 
-    const cancelButton = screen.getByText("Cancelar");
+    const cancelButton = screen.getByRole("button", { name: /Cancelar/i });
     await fireEvent.click(cancelButton);
 
     expect(mockProps.onClose).toHaveBeenCalled();
@@ -506,10 +510,10 @@ describe("GameDraft.svelte", () => {
       });
 
       await vi.waitFor(() => {
-        expect(screen.getByText("✨ Confirmar y Guardar")).toBeInTheDocument();
+        expect(screen.getByText("Confirmar y Guardar")).toBeInTheDocument();
       });
 
-      const saveButton = screen.getByText("✨ Confirmar y Guardar");
+      const saveButton = screen.getByText("Confirmar y Guardar");
       await fireEvent.click(saveButton);
 
       expect(saveGameDraft).toHaveBeenCalledWith({

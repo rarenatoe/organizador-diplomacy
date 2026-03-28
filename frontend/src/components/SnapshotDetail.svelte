@@ -1,12 +1,12 @@
 <script lang="ts">
   import type { SnapshotDetail, EditPlayerRow, SimilarName, MergePair, NotionPlayer, OrganizarValidation } from "../types";
-  import { fetchSnapshot, runScript, renamePlayer, fetchChain, fetchNotionPlayers, saveSnapshot } from "../api";
-  import { findLatestGameId } from "../snapshotUtils";
+  import { fetchSnapshot, renamePlayer, fetchNotionPlayers, saveSnapshot } from "../api";
   import { setActiveNodeId } from "../stores.svelte";
   import { validateOrganizar } from "../syncUtils";
   import { normalizeName } from "../utils";
   import SyncResolutionModal from "./SyncResolutionModal.svelte";
   import OrganizarConfirmModal from "./OrganizarConfirmModal.svelte";
+  import Button from "./Button.svelte";
 
   interface Props {
     id: number;
@@ -40,8 +40,6 @@
     "partidas_deseadas",
     "partidas_gm",
   ] as const;
-
-  type Col = (typeof CSV_COLS)[number];
 
   function esc(s: string | null | undefined): string {
     const el = document.createElement("span");
@@ -236,9 +234,7 @@
     <div class="section" style="margin-bottom: 16px;">
       <div class="section-title">Snapshot #{id} · {sourceLabel(data.source)}</div>
       <div class="node-meta" style="margin-bottom:8px">{esc(data.created_at)}</div>
-      <button class="copy-btn" class:ok={csvCopied} onclick={copyCsv}>
-        {csvCopied ? "✅ Copiado" : "📋 Copiar tabla CSV"}
-      </button>
+      <Button size="sm" variant={csvCopied ? 'success' : 'secondary'} icon={csvCopied ? "✅" : "📋"} fill={true} onclick={copyCsv}>{csvCopied ? "Copiado" : "Copiar tabla CSV"}</Button>
     </div>
     <div class="section-title" style="margin-bottom:6px">
       Jugadores <span
@@ -271,11 +267,14 @@
               <tr>
                 <td><span class="player-name">{nombre}</span></td>
                 <td style="padding-left: 0; width: 32px;">
-                  <button
-                    class="btn-ghost btn-rename"
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly={true}
                     title="Renombrar"
                     onclick={() => handleRename(r.nombre)}
-                  >✏️</button>
+                    icon="✏️"
+                  />
                 </td>
                 <td
                   ><span
@@ -293,32 +292,19 @@
         </table>
   </div>
   <div class="panel-footer">
-    <button
-      class="btn btn-secondary"
-      style="width:100%"
-      onclick={() => {
-        const playersToEdit = (data?.players || []).map((p) => ({
-          nombre: p.nombre,
-          experiencia: p.experiencia ?? "Nuevo",
-          juegos_este_ano: p.juegos_este_ano ?? 0,
-          prioridad: p.prioridad ?? 0,
-          partidas_deseadas: p.partidas_deseadas ?? 1,
-          partidas_gm: p.partidas_gm ?? 0
-        }));
-        onEditDraft(id, 'manual', null, playersToEdit);
-      }}
-    >📝 Editar</button>
-    <button
-      class="btn btn-secondary"
-      style="width:100%"
-      onclick={handleDirectSync}
-      disabled={isSyncing}
-    >{isSyncing ? "⏳ Sincronizando..." : "↻ Sincronizar Notion"}</button>
-    <button
-      class="btn btn-primary"
-      style="width:100%"
-      onclick={handleOrganizar}
-    >▶ Organizar Partidas</button>
+    <Button variant="secondary" fill={true} icon="📝" onclick={() => {
+      const playersToEdit = (data?.players || []).map((p) => ({
+        nombre: p.nombre,
+        experiencia: p.experiencia ?? "Nuevo",
+        juegos_este_ano: p.juegos_este_ano ?? 0,
+        prioridad: p.prioridad ?? 0,
+        partidas_deseadas: p.partidas_deseadas ?? 1,
+        partidas_gm: p.partidas_gm ?? 0
+      }));
+      onEditDraft(id, 'manual', null, playersToEdit);
+    }}>Editar</Button>
+    <Button variant="secondary" fill={true} icon="🔄" onclick={handleDirectSync} disabled={isSyncing}>{isSyncing ? "Sincronizando..." : "Sincronizar Notion"}</Button>
+    <Button variant="primary" fill={true} icon="▶️" onclick={handleOrganizar}>Organizar Partidas</Button>
   </div>
 {/if}
 
@@ -364,33 +350,7 @@
     margin-bottom: 10px;
   }
 
-  .copy-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 8px 14px;
-    width: 100%;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    border: 1px solid var(--border);
-    background: var(--surface2);
-    color: var(--text);
-    transition: background 0.15s;
-  }
-
-  .copy-btn:hover {
-    background: var(--border);
-  }
-
-  :global(.copy-btn.ok) {
-    background: var(--success);
-    color: #fff;
-    border-color: var(--success);
-  }
-
+  
   .table-wrap {
     overflow-x: auto;
     border: 1px solid var(--border);
@@ -489,17 +449,5 @@
 
   .player-name {
     white-space: nowrap;
-  }
-
-  .btn-rename {
-    flex-shrink: 0;
-    font-size: 12px;
-    padding: 2px 6px;
-    opacity: 0.7;
-    transition: opacity 0.15s;
-  }
-
-  .btn-rename:hover {
-    opacity: 1;
   }
 </style>

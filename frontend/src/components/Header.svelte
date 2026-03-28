@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Button from './Button.svelte';
+
   interface Props {
     onNewDraft: () => void;
   }
@@ -8,12 +10,11 @@
 
 <header>
   <h1>🎲 Organizador Diplomacy <span id="pending-badge">⏳ Sin jugar</span></h1>
-  <button
-    class="btn btn-primary"
-    id="btn-new-version"
+  <Button
+    variant="primary"
     onclick={onNewDraft}
-    >➕ Nueva Lista</button
-  >
+    icon="➕"
+  >Nueva Lista</Button>
 </header>
 
 <style>

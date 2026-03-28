@@ -91,12 +91,6 @@ export interface ChainData {
   roots?: SnapshotNode[];
 }
 
-export interface RunResult {
-  returncode: number;
-  stdout?: string;
-  stderr?: string;
-}
-
 export interface SnapshotDetail {
   id: number;
   created_at: string;

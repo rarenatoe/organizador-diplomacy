@@ -1,8 +1,7 @@
 <script lang="ts">
-  import type { RunResult, EditPlayerRow, DraftResponse } from "./types";
-  import { runScript, deleteSnapshot as apiDeleteSnapshot } from "./api";
+  import type { EditPlayerRow, DraftResponse } from "./types";
+  import { deleteSnapshot as apiDeleteSnapshot } from "./api";
   import { setActiveNodeId } from "./stores.svelte";
-  import { findLatestSnapshotId, findLatestGameId } from "./snapshotUtils";
   import Header from "./components/Header.svelte";
   import ChainViewer from "./components/ChainViewer.svelte";
   import SidePanel from "./components/SidePanel.svelte";
@@ -17,6 +16,7 @@
 
   // Component refs
   let chainViewer = $state<ChainViewer | null>(null);
+  // @ts-ignore: Component reference needed for exported toast functions
   let toaster = $state<Toaster | null>(null);
 
   // Panel state
@@ -39,15 +39,6 @@
   let modalOutput = $state("");
   let modalIsError = $state(false);
   let modalLoading = $state(false);
-
-  // Syncing/running state
-  let syncing = $state(false);
-  let running = $state(false);
-
-  const SCRIPT_LABELS: Record<string, string> = {
-    notion_sync: "↻ Sync Notion",
-    organizar: "▶ Organizar",
-  };
 
 
   // Panel handlers
@@ -106,56 +97,6 @@
     panelTitle = parentId === null ? "Nueva Lista" : (eventType === 'sync' ? `Sincronizando #${parentId}` : `Editando #${parentId}`);
     if (parentId !== null) {
       setActiveNodeId(parentId);
-    }
-  }
-
-  // Script execution
-  async function handleRunScript(script: string): Promise<void> {
-    const label = SCRIPT_LABELS[script] ?? script;
-    modalTitle = `Ejecutando ${label}…`;
-    modalOutput = "";
-    modalIsError = false;
-    modalLoading = true;
-    modalVisible = true;
-    running = true;
-
-    try {
-      const data = await runScript(script, null);
-      const ok = data.returncode === 0;
-
-      if (ok && script === "organizar") {
-        modalVisible = false;
-        toaster?.showSuccessToast("Organizar completado");
-        await chainViewer?.loadChain();
-
-        // Find and open the latest game
-        const { fetchChain } = await import("./api");
-        const chainData = await fetchChain();
-        const gameId = findLatestGameId(chainData.roots);
-        if (gameId !== null) {
-          setActiveNodeId(gameId);
-          openGame(gameId);
-        }
-      } else if (ok) {
-        modalTitle = `${label} completado`;
-        modalOutput =
-          (data.stdout ?? "") +
-          (data.stderr ? "\n[stderr]\n" + data.stderr : "");
-        await chainViewer?.loadChain();
-      } else {
-        modalTitle = `Error en ${label}`;
-        modalOutput =
-          (data.stdout ?? "") +
-          (data.stderr ? "\n[stderr]\n" + data.stderr : "");
-        modalIsError = true;
-      }
-    } catch (e) {
-      modalTitle = "Error de conexión";
-      modalOutput = String(e);
-      modalIsError = true;
-    } finally {
-      modalLoading = false;
-      running = false;
     }
   }
 

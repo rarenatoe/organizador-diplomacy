@@ -1,10 +1,11 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import type { EditPlayerRow, SimilarName, MergePair, NotionPlayer } from "../types";
-  import { createSnapshot, saveSnapshot, fetchNotionPlayers } from "../api";
+  import { saveSnapshot, fetchNotionPlayers } from "../api";
   import { parsePlayersCsv, normalizeName } from "../utils";
   import { setActiveNodeId } from "../stores.svelte";
   import SyncResolutionModal from "./SyncResolutionModal.svelte";
+  import Button from "./Button.svelte";
 
   interface Props {
     parentId: number | null;
@@ -18,15 +19,6 @@
   }
 
   let { parentId, initialPlayers, defaultEventType, autoAction = null, onClose, onChainUpdate, onOpenSnapshot, onShowError }: Props = $props();
-
-  interface DraftPlayer {
-    nombre: string;
-    experiencia: string;
-    juegos_este_ano: number;
-    prioridad: number;
-    partidas_deseadas: number;
-    partidas_gm: number;
-  }
 
   let draftPlayers = $state(untrack(() => initialPlayers.map((p) => ({
     nombre: p.nombre,
@@ -255,20 +247,20 @@
       Crea una nueva versión desde cero o importa jugadores desde CSV
     </div>
     <div style="display: flex; gap: 8px;">
-      <button class="btn btn-secondary" onclick={handleAddPlayer}>
+      <Button variant="secondary" onclick={handleAddPlayer}>
         ➕ Agregar jugador
-      </button>
+      </Button>
       {#if parentId === null}
-        <button class="btn btn-secondary" onclick={() => (showCsvModal = true)}>
+        <Button variant="secondary" onclick={() => (showCsvModal = true)}>
           📥 Pegar CSV
-        </button>
-        <button
-          class="btn btn-secondary"
+        </Button>
+        <Button
+          variant="secondary"
           onclick={handleImportNotion}
           disabled={isImporting}
         >
-          {isImporting ? "⏳ Importando..." : "☁️ Importar de Notion"}
-        </button>
+          {isImporting ? "⏳ Sincronizando..." : "🔗 Importar Notion"}
+        </Button>
       {/if}
     </div>
   </div>
@@ -340,13 +332,14 @@
               />
             </td>
             <td>
-              <button
-                class="btn-ghost btn-delete"
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly={true}
                 title="Eliminar"
                 onclick={() => handleDeletePlayer(i)}
-              >
-                🗑
-              </button>
+                icon="🗑"
+              />
             </td>
           </tr>
         {/each}
@@ -361,15 +354,8 @@
 {/if}
 
 <div class="panel-footer">
-  <button
-    class="btn btn-primary"
-    style="width: 100%;"
-    onclick={handleSave}
-    disabled={saving || draftPlayers.length === 0}
-    title={draftPlayers.length === 0 ? "Agrega al menos un jugador para guardar" : ""}
-  >
-    {saving ? "Guardando..." : (eventType === 'sync' ? '✨ Guardar Sincronización' : (parentId ? '✨ Guardar Edición' : '✨ Guardar Nueva Lista'))}
-  </button>
+  <Button variant="secondary" fill={true} onclick={onClose} disabled={saving}>Cancelar</Button>
+  <Button variant="primary" fill={true} icon={saving ? "⏳" : "✨"} onclick={handleSave} disabled={saving || draftPlayers.length === 0} title={draftPlayers.length === 0 ? "Agrega al menos un jugador para guardar" : ""}>{saving ? "Guardando..." : (eventType === 'sync' ? 'Guardar Sincronización' : (parentId ? 'Guardar Edición' : 'Guardar Nueva Lista'))}</Button>
 </div>
 
 {#if showCsvModal}
@@ -389,12 +375,12 @@
         rows="10"
       ></textarea>
       <div class="modal-actions">
-        <button class="btn btn-secondary" onclick={handleCancelCsv}>
+        <Button variant="secondary" onclick={handleCancelCsv}>
           Cancelar
-        </button>
-        <button class="btn btn-primary" onclick={handleImportCsv}>
+        </Button>
+        <Button variant="primary" onclick={handleImportCsv}>
           Importar
-        </button>
+        </Button>
       </div>
     </div>
   </div>
@@ -518,17 +504,6 @@
     outline: none;
     border: 1px solid var(--accent);
     background: var(--surface);
-  }
-
-  .btn-delete {
-    font-size: 12px;
-    padding: 2px 6px;
-    opacity: 0.7;
-    transition: opacity 0.15s;
-  }
-
-  .btn-delete:hover {
-    opacity: 1;
   }
 
   .empty-draft {

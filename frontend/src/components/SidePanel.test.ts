@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, fireEvent } from "@testing-library/svelte";
+import { render, fireEvent, screen } from "@testing-library/svelte";
 import SidePanel from "./SidePanel.svelte";
 
 describe("SidePanel", () => {
@@ -34,7 +34,7 @@ describe("SidePanel", () => {
   it("has close button that calls onClose", async () => {
     const onClose = vi.fn();
 
-    const { container: panelContainer } = render(SidePanel, {
+    render(SidePanel, {
       props: {
         title: "Test Panel",
         open: true,
@@ -44,10 +44,9 @@ describe("SidePanel", () => {
       target: container,
     });
 
-    const closeButton = panelContainer.querySelector("#btn-close-panel");
-    expect(closeButton).not.toBeNull();
-
-    await fireEvent.click(closeButton!);
+    const closeButton = screen.getByTitle("Cerrar");
+    expect(closeButton).toBeInTheDocument();
+    await fireEvent.click(closeButton);
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });

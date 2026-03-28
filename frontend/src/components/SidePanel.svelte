@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { clickOutside } from "../clickOutside";
+  import Button from './Button.svelte';
 
   interface Props {
     title: string;
@@ -23,9 +24,7 @@
   <div class="panel-inner">
     <div class="panel-header">
       <h2 id="panel-title">{title}</h2>
-      <button class="btn btn-ghost" id="btn-close-panel" onclick={onClose}
-        >✕</button
-      >
+      <Button variant="ghost" size="sm" iconOnly={true} onclick={onClose} icon="✕" title="Cerrar" />
     </div>
     <div class="panel-body" id="panel-body">
       {@render children()}

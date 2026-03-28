@@ -2,8 +2,6 @@
   import { untrack } from "svelte";
   import type {
     SnapshotGroup,
-    SnapshotVersion,
-    Branch,
     SyncEdge,
     EditEdge,
   } from "../types";

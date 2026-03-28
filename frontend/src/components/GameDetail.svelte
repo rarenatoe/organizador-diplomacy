@@ -2,6 +2,7 @@
   import type { GameDetail, DraftResponse, DraftPlayer } from "../types";
   import { fetchGame } from "../api";
   import { esc } from "../utils";
+  import Button from "./Button.svelte";
 
   interface Props {
     id: number;
@@ -53,20 +54,6 @@
     return pais ? (countryEmojis[pais] || "") : "";
   }
 
-  function getCountryDisplayName(pais: string | undefined): string {
-    // Translate English country names to Spanish for display
-    const translations: Record<string, string> = {
-      England: "Inglaterra",
-      France: "Francia",
-      Germany: "Alemania",
-      Italy: "Italia",
-      Austria: "Austria",
-      Russia: "Rusia",
-      Turkey: "Turquía"
-    };
-    return pais ? (translations[pais] || pais) : "";
-  }
-
   function mapToDraftPlayer(player: any): DraftPlayer {
     return {
       nombre: player.nombre,
@@ -111,9 +98,7 @@
       </div>
     </div>
     <div class="section">
-      <button class="copy-btn" class:ok={copiedId === 'share'} onclick={() => copyText(data?.copypaste ?? "", 'share')}
-        >{copiedId === 'share' ? "✅ Copiado" : "📋 Copiar lista para compartir"}</button
-      >
+      <Button size="sm" variant={copiedId === 'share' ? 'success' : 'secondary'} icon={copiedId === 'share' ? "✅" : "📋"} fill={true} onclick={() => copyText(data?.copypaste ?? "", 'share')}>{copiedId === 'share' ? "Copiado" : "Copiar lista para compartir"}</Button>
       <div class="share-pre" style="margin-top:8px">{esc(data?.copypaste)}</div>
     </div>
     {#if mesas.length > 0}
@@ -143,13 +128,7 @@
                 </li>
               {/each}
             </ul>
-            <button
-              class="copy-btn"
-              class:ok={copiedId === 'players-' + mesa.numero}
-              style="margin-top:9px"
-              onclick={() => copyText(playersTxt, 'players-' + mesa.numero)}
-              >{copiedId === 'players-' + mesa.numero ? "✅ Copiado" : "📋 Copiar jugadores"}</button
-            >
+            <Button size="sm" variant={copiedId === 'players-' + mesa.numero ? 'success' : 'secondary'} icon={copiedId === 'players-' + mesa.numero ? "✅" : "📋"} class={copiedId === 'players-' + mesa.numero ? 'ok' : ''} fill={true} onclick={() => copyText(playersTxt, 'players-' + mesa.numero)}>{copiedId === 'players-' + mesa.numero ? "Copiado" : "Copiar jugadores"}</Button>
           </div>
         {/each}
       </div>
@@ -164,14 +143,12 @@
             <span class="waiting-cupos">{esc(w.cupos)}</span>
           </div>
         {/each}
-        <button class="copy-btn" class:ok={copiedId === 'waiting'} onclick={() => copyText(waitTxt, 'waiting')}
-          >{copiedId === 'waiting' ? "✅ Copiado" : "📋 Copiar lista de espera"}</button
-        >
+        <Button size="sm" variant={copiedId === 'waiting' ? 'success' : 'secondary'} icon={copiedId === 'waiting' ? "✅" : "📋"} fill={true} onclick={() => copyText(waitTxt, 'waiting')}>{copiedId === 'waiting' ? "Copiado" : "Copiar lista de espera"}</Button>
       </div>
     {/if}
     {#if openGameDraft}
-    <div class="panel-footer" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid var(--border);">
-      <button class="btn btn-primary" style="width: 100%; font-size: 14px; padding: 10px;" onclick={() =>{
+    <div class="panel-footer">
+      <Button variant="primary" fill={true} icon="✏️" onclick={() =>{
         const draft = { 
           mesas: (data?.mesas ?? []).map(m =>({ 
             numero: m.numero, 
@@ -183,7 +160,7 @@
           intentos_usados: data?.intentos || 0 
         };
         openGameDraft(data!.input_snapshot_id, draft, id);
-      }}>✏️ Editar Jornada</button>
+      }}>Editar Jornada</Button>
     </div>
   {/if}
 </div>
@@ -217,33 +194,6 @@
 
   .meta-val {
     font-weight: 600;
-  }
-
-  .copy-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 8px 14px;
-    width: 100%;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    border: 1px solid var(--border);
-    background: var(--surface2);
-    color: var(--text);
-    transition: background 0.15s;
-  }
-
-  .copy-btn:hover {
-    background: var(--border);
-  }
-
-  :global(.copy-btn.ok) {
-    background: var(--success);
-    color: #fff;
-    border-color: var(--success);
   }
 
   .share-pre {

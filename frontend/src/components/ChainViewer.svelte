@@ -4,7 +4,6 @@
   import {
     setSnapshotCount,
     setChainData,
-    setActiveNodeId,
   } from "../stores.svelte";
   import SnapshotGroupNode from "./SnapshotGroupNode.svelte";
   import { groupSnapshots } from "../groupSnapshots";

@@ -56,62 +56,18 @@ body {
   overflow: hidden;
 }
 
-/* ── Buttons ── */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 13px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  border: 1px solid transparent;
-  transition: background 0.15s, opacity 0.15s;
-  white-space: nowrap;
-}
-
-.btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: var(--accent);
-  color: #fff;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: #2563eb;
-}
-
-.btn-secondary {
-  background: var(--surface2);
-  color: var(--text);
-  border-color: var(--border);
-}
-
-.btn-secondary:hover:not(:disabled) {
-  background: var(--border);
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--muted);
-  border: none;
-  font-size: 18px;
-  padding: 4px 8px;
-  border-radius: 6px;
-}
-
-.btn-ghost:hover {
-  color: var(--text);
-  background: var(--surface2);
-}
-
 /* ── Main layout ── */
 .main {
   flex: 1;
   display: flex;
   overflow: hidden;
+}
+
+.panel-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
 }

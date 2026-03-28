@@ -68,7 +68,9 @@ describe("Panel Scroll Pattern", () => {
           onChainUpdate: () => {},
           onOpenSnapshot: () => {},
           onOpenGame: () => {},
+          onOpenGameDraft: () => {},
           onEditDraft: () => {},
+          onShowError: () => {},
         },
       });
 
@@ -93,7 +95,9 @@ describe("Panel Scroll Pattern", () => {
           onChainUpdate: () => {},
           onOpenSnapshot: () => {},
           onOpenGame: () => {},
+          onOpenGameDraft: () => {},
           onEditDraft: () => {},
+          onShowError: () => {},
         },
       });
 
@@ -105,9 +109,9 @@ describe("Panel Scroll Pattern", () => {
       expect(panelFooter).toBeTruthy();
 
       // Verify action buttons are inside panel-footer
-      const editButton = screen.getByText("📝 Editar");
-      const syncButton = screen.getByText("↻ Sincronizar Notion");
-      const organizarButton = screen.getByText("▶ Organizar Partidas");
+      const editButton = screen.getByText("Editar");
+      const syncButton = screen.getByText("Sincronizar Notion");
+      const organizarButton = screen.getByText("Organizar Partidas");
 
       expect(panelFooter?.contains(editButton)).toBe(true);
       expect(panelFooter?.contains(syncButton)).toBe(true);
@@ -122,7 +126,9 @@ describe("Panel Scroll Pattern", () => {
           onChainUpdate: () => {},
           onOpenSnapshot: () => {},
           onOpenGame: () => {},
+          onOpenGameDraft: () => {},
           onEditDraft: () => {},
+          onShowError: () => {},
         },
       });
 

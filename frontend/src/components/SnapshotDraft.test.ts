@@ -10,7 +10,9 @@ vi.mock("../api", () => ({
   saveSnapshot: vi.fn().mockResolvedValue({
     snapshot_id: 123,
   }),
-  fetchNotionPlayers: vi.fn().mockResolvedValue({ players: [], similar_names: [] }),
+  fetchNotionPlayers: vi
+    .fn()
+    .mockResolvedValue({ players: [], similar_names: [] }),
 }));
 
 // Mock the utils module
@@ -202,9 +204,11 @@ describe("SnapshotDraft", () => {
 
     expect(screen.getByText("Pegar CSV")).toBeTruthy();
 
-    // Click cancel
-    const cancelButton = screen.getByText("Cancelar");
-    await fireEvent.click(cancelButton);
+    // Click cancel button in the modal (not the footer button)
+    const allCancelButtons = screen.getAllByText("Cancelar");
+    // The modal cancel button should be the last one (inside the modal)
+    const modalCancelButton = allCancelButtons[allCancelButtons.length - 1];
+    await fireEvent.click(modalCancelButton!);
 
     // Modal should be closed
     expect(screen.queryByText("Pegar CSV")).toBeNull();
@@ -236,9 +240,9 @@ describe("SnapshotDraft", () => {
     expect(nameInput.value).toBe("Test Player");
 
     // Delete the player
-    const deleteButton = container.querySelector(".btn-delete");
-    expect(deleteButton).toBeTruthy();
-    await fireEvent.click(deleteButton!);
+    const deleteButton = screen.getByTitle("Eliminar");
+    expect(deleteButton).toBeInTheDocument();
+    await fireEvent.click(deleteButton);
 
     // Player should be removed - no name input should exist
     const nameInputs = container.querySelectorAll(".player-name-input");
@@ -258,8 +262,10 @@ describe("SnapshotDraft", () => {
       },
     });
 
-    const saveButton = screen.getByText("✨ Guardar Nueva Lista");
-    expect(saveButton.hasAttribute("disabled")).toBe(true);
+    const saveButton = screen.getByRole("button", {
+      name: /Guardar Nueva Lista/i,
+    });
+    expect(saveButton).toBeDisabled();
   });
 
   it("enables save button when players exist", async () => {
@@ -281,8 +287,10 @@ describe("SnapshotDraft", () => {
     const addButton = screen.getByText("➕ Agregar jugador");
     await fireEvent.click(addButton);
 
-    const saveButton = screen.getByText("✨ Guardar Nueva Lista");
-    expect(saveButton.hasAttribute("disabled")).toBe(false);
+    const saveButton = screen.getByRole("button", {
+      name: /Guardar Nueva Lista/i,
+    });
+    expect(saveButton).not.toBeDisabled();
   });
 
   it("calls saveSnapshot when save button is clicked", async () => {
@@ -310,7 +318,9 @@ describe("SnapshotDraft", () => {
     await fireEvent.click(addButton);
 
     // Save
-    const saveButton = screen.getByText("✨ Guardar Nueva Lista");
+    const saveButton = screen.getByRole("button", {
+      name: /Guardar Nueva Lista/i,
+    });
     await fireEvent.click(saveButton);
 
     expect(saveSnapshot).toHaveBeenCalledWith({
@@ -455,7 +465,7 @@ describe("SnapshotDraft", () => {
     );
   });
 
-  it("calls onShowError when saving with no players", async () => {
+  it("shows disabled save button with title when no players", () => {
     const onShowError = vi.fn();
     render(SnapshotDraft, {
       props: {
@@ -469,10 +479,14 @@ describe("SnapshotDraft", () => {
       },
     });
 
-    await fireEvent.click(screen.getByText("✨ Guardar Nueva Lista"));
-    expect(onShowError).toHaveBeenCalledWith(
-      "Aviso / Error",
-      "Agrega al menos un jugador antes de guardar",
+    const saveButton = screen.getByRole("button", {
+      name: /Guardar Nueva Lista/i,
+    });
+    // Verify button is disabled and has helpful title
+    expect(saveButton).toBeDisabled();
+    expect(saveButton).toHaveAttribute(
+      "title",
+      "Agrega al menos un jugador para guardar",
     );
   });
 });

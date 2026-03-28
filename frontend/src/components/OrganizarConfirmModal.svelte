@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { OrganizarValidation } from "../types";
   import { esc } from "../utils";
+  import Button from './Button.svelte';
 
   interface Props {
     visible: boolean;
@@ -59,15 +60,15 @@
       </div>
 
       <div class="confirm-actions">
-        <button class="btn btn-primary" onclick={onConfirm}>
+        <Button variant="primary" onclick={onConfirm}>
           Organizar de todos modos
-        </button>
-        <button class="btn btn-secondary" onclick={onEdit}>
+        </Button>
+        <Button variant="secondary" onclick={onEdit}>
           Volver a Editar
-        </button>
-        <button class="btn btn-ghost" onclick={onCancel}>
+        </Button>
+        <Button variant="ghost" onclick={onCancel}>
           Cancelar
-        </button>
+        </Button>
       </div>
     </div>
   </div>
@@ -189,21 +190,5 @@
     flex-direction: column;
     gap: 8px;
     margin-top: 8px;
-  }
-
-  .confirm-actions .btn {
-    width: 100%;
-    justify-content: center;
-    padding: 10px;
-    font-size: 13px;
-  }
-
-  .btn-primary {
-    background: #f59e0b;
-    border-color: #d97706;
-  }
-
-  .btn-primary:hover {
-    background: #d97706;
   }
 </style>

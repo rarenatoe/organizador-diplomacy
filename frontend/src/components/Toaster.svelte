@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { ToastState } from "../types";
+  import Button from './Button.svelte';
 
   interface Toast {
     id: string;
@@ -80,11 +81,14 @@
       </span>
       <span class="toast-message">{toast.message}</span>
       {#if toast.dismissible}
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly={true}
           class="toast-close"
-          data-toast-id={toast.id}
-          onclick={() => dismissToast(toast.id)}>✕</button
-        >
+          onclick={() => dismissToast(toast.id)}
+          icon="✕"
+        />
       {/if}
     </div>
   {/each}

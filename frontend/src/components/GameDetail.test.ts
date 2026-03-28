@@ -93,7 +93,9 @@ describe("GameDetail", () => {
     });
 
     // Find the share copy button
-    const shareButton = screen.getByText("📋 Copiar lista para compartir");
+    const shareButton = screen.getByRole("button", {
+      name: /Copiar lista para compartir/i,
+    });
     await fireEvent.click(shareButton);
 
     // Verify clipboard.writeText was called
@@ -102,18 +104,20 @@ describe("GameDetail", () => {
       "Player1\nPlayer2\nPlayer3",
     );
 
-    // Verify button text changes to "✅ Copiado"
-    expect(screen.getByText("✅ Copiado")).toBeTruthy();
+    // Verify button text changes to "Copiado"
+    expect(screen.getByText("Copiado")).toBeTruthy();
 
-    // Verify button has 'ok' class
-    expect(shareButton.classList.contains("ok")).toBe(true);
+    // Verify button has success variant when copied
+    expect(shareButton.classList.contains("btn-success")).toBe(true);
 
     // Fast-forward time by 1500ms
     vi.advanceTimersByTime(1500);
 
     // Verify button reverts to original text
     await waitFor(() => {
-      expect(screen.getByText("📋 Copiar lista para compartir")).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: /Copiar lista para compartir/i }),
+      ).toBeTruthy();
     });
   });
 
@@ -130,7 +134,9 @@ describe("GameDetail", () => {
     });
 
     // Find the players copy button
-    const playersButton = screen.getByText("📋 Copiar jugadores");
+    const playersButton = screen.getByRole("button", {
+      name: /Copiar jugadores/i,
+    });
     await fireEvent.click(playersButton);
 
     // Verify clipboard.writeText was called
@@ -139,18 +145,20 @@ describe("GameDetail", () => {
       "Alice (England)\nBob (France)",
     );
 
-    // Verify button text changes to "✅ Copiado"
-    expect(screen.getByText("✅ Copiado")).toBeTruthy();
+    // Verify button text changes to "Copiado"
+    expect(screen.getByText("Copiado")).toBeTruthy();
 
-    // Verify button has 'ok' class
-    expect(playersButton.classList.contains("ok")).toBe(true);
+    // Verify button has success variant when copied
+    expect(playersButton.classList.contains("btn-success")).toBe(true);
 
     // Fast-forward time by 1500ms
     vi.advanceTimersByTime(1500);
 
     // Verify button reverts to original text
     await waitFor(() => {
-      expect(screen.getByText("📋 Copiar jugadores")).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: /Copiar jugadores/i }),
+      ).toBeTruthy();
     });
   });
 
@@ -167,25 +175,29 @@ describe("GameDetail", () => {
     });
 
     // Find the waiting list copy button
-    const waitingButton = screen.getByText("📋 Copiar lista de espera");
+    const waitingButton = screen.getByRole("button", {
+      name: /Copiar lista de espera/i,
+    });
     await fireEvent.click(waitingButton);
 
     // Verify clipboard.writeText was called
     expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
     expect(mockClipboard.writeText).toHaveBeenCalledWith("Charlie\nDiana");
 
-    // Verify button text changes to "✅ Copiado"
-    expect(screen.getByText("✅ Copiado")).toBeTruthy();
+    // Verify button text changes to "Copiado"
+    expect(screen.getByText("Copiado")).toBeTruthy();
 
-    // Verify button has 'ok' class
-    expect(waitingButton.classList.contains("ok")).toBe(true);
+    // Verify button has success variant when copied
+    expect(waitingButton.classList.contains("btn-success")).toBe(true);
 
     // Fast-forward time by 1500ms
     vi.advanceTimersByTime(1500);
 
     // Verify button reverts to original text
     await waitFor(() => {
-      expect(screen.getByText("📋 Copiar lista de espera")).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: /Copiar lista de espera/i }),
+      ).toBeTruthy();
     });
   });
 
@@ -204,8 +216,8 @@ describe("GameDetail", () => {
       expect(screen.queryByText("Cargando…")).toBeNull();
     });
 
-    // Find and click the Edit button
-    const editButton = screen.getByText("✏️ Editar Jornada");
+    // Find and click Edit button
+    const editButton = screen.getByRole("button", { name: /Editar Jornada/i });
     await fireEvent.click(editButton);
 
     // Verify openGameDraft was called with correct parameters

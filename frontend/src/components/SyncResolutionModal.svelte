@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { SimilarName, ResolutionAction, MergePair } from "../types";
   import { esc } from "../utils";
+  import Button from './Button.svelte';
 
   interface Props {
     visible: boolean;
@@ -75,21 +76,24 @@
         </div>
         <div class="resolution-similarity">{similarity}% similar</div>
         <div class="resolution-actions">
-          <button
-            class="btn btn-primary resolution-btn-merge-notion"
+          <Button
+            variant="primary"
             title="Fusionar y adoptar el nombre principal de Notion"
-            onclick={() => handleAction("merge_notion")}>📋 Usar nombre Notion</button
-          >
-          <button
-            class="btn btn-secondary resolution-btn-merge-local"
+            onclick={() => handleAction("merge_notion")}
+            icon="📋"
+          >Usar nombre Notion</Button>
+          <Button
+            variant="secondary"
             title="Fusionar manteniendo el nombre local actual"
-            onclick={() => handleAction("merge_local")}>📱 Mantener local</button
-          >
-          <button
-            class="btn btn-ghost resolution-btn-skip"
+            onclick={() => handleAction("merge_local")}
+            icon="📱"
+          >Mantener local</Button>
+          <Button
+            variant="ghost"
             title="No realizar ninguna acción de fusión"
-            onclick={() => handleAction("skip")}>⏭ Omitir</button
-          >
+            onclick={() => handleAction("skip")}
+            icon="⏭"
+          >Omitir</Button>
         </div>
         <p class="resolution-hint">
           💡 <strong>Mantener local</strong> vincula los datos pero conserva el nombre del snapshot. 
@@ -97,9 +101,9 @@
         </p>
       {/if}
       <div class="resolution-footer">
-        <button class="btn btn-ghost resolution-btn-stop" onclick={handleStop}
-          >Detener resolución</button
-        >
+        <Button variant="ghost" onclick={handleStop}>
+          Detener resolución
+        </Button>
       </div>
     </div>
   </div>
@@ -232,34 +236,9 @@
     gap: 8px;
   }
 
-  .resolution-actions .btn {
-    width: 100%;
-    justify-content: center;
-    padding: 10px;
-    font-size: 13px;
-  }
-
-  .resolution-btn-merge-notion {
-    order: 1;
-  }
-
-  .resolution-btn-merge-local {
-    order: 2;
-  }
-
-  .resolution-btn-skip {
-    order: 3;
-    border: 1px solid var(--border);
-  }
-
   .resolution-footer {
     display: flex;
     justify-content: center;
     padding-top: 4px;
-  }
-
-  .resolution-btn-stop {
-    font-size: 12px;
-    color: var(--muted);
   }
 </style>

@@ -1,8 +1,9 @@
 <script lang="ts">
-  import type { DraftResponse, DraftPlayer, DraftMesa } from "../types";
+  import type { DraftResponse, DraftPlayer } from "../types";
   import { fetchGameDraft, saveGameDraft } from "../api";
   import { setActiveNodeId } from "../stores.svelte";
   import { findLatestGameId } from "../snapshotUtils";
+  import Button from "./Button.svelte";
 
   interface Props {
     snapshotId: number;
@@ -374,11 +375,7 @@
                   {:else}
                     <span class="tag tag-antiguo">Antiguo</span>
                   {/if}
-                  <button 
-                    class="btn-ghost btn-swap" 
-                    title="Intercambiar"
-                    onclick={() => handlePlayerClick(target)}
-                  >🔄</button>
+                  <Button variant="ghost" size="sm" iconOnly={true} icon="🔄" title="Intercambiar" onclick={() => handlePlayerClick(target)} />
                 </li>
               {/each}
             </ul>
@@ -395,11 +392,7 @@
           <div class="waiting-item" class:swapping-active={isSelected}>
             <span class="waiting-name">{w.nombre}</span>
             <span class="waiting-cupos">{w.partidas_deseadas} cupos</span>
-            <button 
-              class="btn-ghost btn-swap" 
-              title="Intercambiar"
-              onclick={() => handlePlayerClick(target)}
-            >🔄</button>
+            <Button variant="ghost" size="sm" iconOnly={true} icon="🔄" title="Intercambiar" onclick={() => handlePlayerClick(target)} />
           </div>
         {/each}
       </div>
@@ -410,28 +403,14 @@
 </div>
 <div class="panel-footer">
   {#if draftData}
-    <button 
-      class="btn btn-secondary" 
-      style="width:100%"
-      onclick={() => {
-        if (editingGameId) {
-          onOpenGame(editingGameId);
-        } else {
-          onClose();
-        }
-      }}
-      disabled={saving}
-    >
-      Cancelar
-    </button>
-    <button 
-      class="btn btn-primary" 
-      style="width:100%"
-      onclick={handleSaveDraft}
-      disabled={saving}
-    >
-      {saving ? "⏳ Guardando..." : "✨ Confirmar y Guardar"}
-    </button>
+    <Button variant="secondary" fill={true} onclick={() => {
+      if (editingGameId) {
+        onOpenGame(editingGameId);
+      } else {
+        onClose();
+      }
+    }} disabled={saving}>Cancelar</Button>
+    <Button variant="primary" fill={true} icon={saving ? "⏳" : "✨"} onclick={handleSaveDraft} disabled={saving}>{saving ? "Guardando..." : "Confirmar y Guardar"}</Button>
   {/if}
 </div>
 
@@ -622,17 +601,7 @@
     display: block;
   }
 
-  .btn-swap {
-    font-size: 12px;
-    padding: 2px 6px;
-    opacity: 0.7;
-    transition: opacity 0.15s;
-  }
-
-  .btn-swap:hover {
-    opacity: 1;
-  }
-
+  
   .swapping-active {
     background: #eff6ff;
     outline: 1px solid var(--accent);

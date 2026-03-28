@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, fireEvent } from "@testing-library/svelte";
+import { render, fireEvent, screen } from "@testing-library/svelte";
 import SyncResolutionModal from "./SyncResolutionModal.svelte";
 
 describe("SyncResolutionModal.svelte", () => {
@@ -78,7 +78,7 @@ describe("SyncResolutionModal.svelte", () => {
   it("calls onComplete with merges when all resolved (Notion name)", async () => {
     const onComplete = vi.fn();
     const firstPair = mockPairs[0]!;
-    const { container } = render(SyncResolutionModal, {
+    render(SyncResolutionModal, {
       props: {
         visible: true,
         pairs: [firstPair],
@@ -88,8 +88,10 @@ describe("SyncResolutionModal.svelte", () => {
     });
 
     // Click merge Notion button
-    const mergeBtn = container.querySelector(".resolution-btn-merge-notion");
-    await fireEvent.click(mergeBtn!);
+    const mergeBtn = screen.getByRole("button", {
+      name: /Usar nombre Notion/i,
+    });
+    await fireEvent.click(mergeBtn);
 
     expect(onComplete).toHaveBeenCalledWith([
       { from: "Juan Perez", to: "Juan Pérez", action: "merge_notion" },
@@ -99,7 +101,7 @@ describe("SyncResolutionModal.svelte", () => {
   it("calls onComplete with merges when all resolved (Local name)", async () => {
     const onComplete = vi.fn();
     const firstPair = mockPairs[0]!;
-    const { container } = render(SyncResolutionModal, {
+    render(SyncResolutionModal, {
       props: {
         visible: true,
         pairs: [firstPair],
@@ -109,8 +111,8 @@ describe("SyncResolutionModal.svelte", () => {
     });
 
     // Click merge local button
-    const mergeBtn = container.querySelector(".resolution-btn-merge-local");
-    await fireEvent.click(mergeBtn!);
+    const mergeBtn = screen.getByRole("button", { name: /Mantener local/i });
+    await fireEvent.click(mergeBtn);
 
     expect(onComplete).toHaveBeenCalledWith([
       { from: "Juan Perez", to: "Juan Pérez", action: "merge_local" },
@@ -120,7 +122,7 @@ describe("SyncResolutionModal.svelte", () => {
   it("calls onComplete with empty array when all skipped", async () => {
     const onComplete = vi.fn();
     const firstPair = mockPairs[0]!;
-    const { container } = render(SyncResolutionModal, {
+    render(SyncResolutionModal, {
       props: {
         visible: true,
         pairs: [firstPair],
@@ -130,15 +132,15 @@ describe("SyncResolutionModal.svelte", () => {
     });
 
     // Click skip button
-    const skipBtn = container.querySelector(".resolution-btn-skip");
-    await fireEvent.click(skipBtn!);
+    const skipBtn = screen.getByRole("button", { name: /Omitir/i });
+    await fireEvent.click(skipBtn);
 
     expect(onComplete).toHaveBeenCalledWith([]);
   });
 
   it("calls onCancel when stop button clicked", async () => {
     const onCancel = vi.fn();
-    const { container } = render(SyncResolutionModal, {
+    render(SyncResolutionModal, {
       props: {
         visible: true,
         pairs: mockPairs,
@@ -147,8 +149,8 @@ describe("SyncResolutionModal.svelte", () => {
       },
     });
 
-    const stopBtn = container.querySelector(".resolution-btn-stop");
-    await fireEvent.click(stopBtn!);
+    const stopBtn = screen.getByRole("button", { name: /Detener resolución/i });
+    await fireEvent.click(stopBtn);
 
     expect(onCancel).toHaveBeenCalled();
   });
@@ -164,8 +166,10 @@ describe("SyncResolutionModal.svelte", () => {
     });
 
     // Click merge on first pair
-    const mergeBtn = container.querySelector(".resolution-btn-merge-notion");
-    await fireEvent.click(mergeBtn!);
+    const mergeBtn = screen.getByRole("button", {
+      name: /Usar nombre Notion/i,
+    });
+    await fireEvent.click(mergeBtn);
 
     // Should show second pair
     expect(container.textContent).toContain("María García");

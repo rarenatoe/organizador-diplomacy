@@ -67,7 +67,6 @@ vi.mock("../api", () => ({
       },
     ],
   }),
-  runScript: vi.fn().mockResolvedValue({ returncode: 0 }),
   renamePlayer: vi.fn().mockResolvedValue({}),
   fetchChain: vi.fn().mockResolvedValue({ roots: [] }),
   fetchNotionPlayers: vi
@@ -160,7 +159,7 @@ describe("SnapshotDetail", () => {
     });
 
     // Click the edit button
-    const editButton = screen.getByText("📝 Editar");
+    const editButton = screen.getByText("Editar");
     await fireEvent.click(editButton);
 
     // Verify onEditDraft was called with correct parameters
@@ -255,7 +254,7 @@ describe("SnapshotDetail", () => {
     });
 
     // Click the edit button
-    const editButton = screen.getByText("📝 Editar");
+    const editButton = screen.getByRole("button", { name: /Editar/i });
     await fireEvent.click(editButton);
 
     // Verify onEditDraft was called with empty array
@@ -298,7 +297,7 @@ describe("SnapshotDetail", () => {
     });
 
     // Click the edit button
-    const editButton = screen.getByText("📝 Editar");
+    const editButton = screen.getByRole("button", { name: /Editar/i });
     await fireEvent.click(editButton);
 
     // Verify onEditDraft was called with default values for missing fields
@@ -335,7 +334,9 @@ describe("SnapshotDetail", () => {
     });
 
     // Click the copy button
-    const copyButton = screen.getByText("📋 Copiar tabla CSV");
+    const copyButton = screen.getByRole("button", {
+      name: /Copiar tabla CSV/i,
+    });
     await fireEvent.click(copyButton);
 
     // Verify clipboard.writeText was called
@@ -367,21 +368,25 @@ describe("SnapshotDetail", () => {
     });
 
     // Find the copy button
-    const copyButton = screen.getByText("📋 Copiar tabla CSV");
+    const copyButton = screen.getByRole("button", {
+      name: /Copiar tabla CSV/i,
+    });
     await fireEvent.click(copyButton);
 
-    // Verify button text changes to "✅ Copiado"
-    expect(screen.getByText("✅ Copiado")).toBeTruthy();
+    // Verify button text changes to "Copiado"
+    expect(screen.getByText("Copiado")).toBeTruthy();
 
-    // Verify button has 'ok' class
-    expect(copyButton.classList.contains("ok")).toBe(true);
+    // Verify button has success variant when copied
+    expect(copyButton.classList.contains("btn-success")).toBe(true);
 
     // Fast-forward time by 1500ms
     vi.advanceTimersByTime(1500);
 
     // Verify button reverts to original text
     await waitFor(() => {
-      expect(screen.getByText("📋 Copiar tabla CSV")).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: /Copiar tabla CSV/i }),
+      ).toBeTruthy();
     });
   });
 
@@ -409,82 +414,12 @@ describe("SnapshotDetail", () => {
       expect(screen.queryByText("Cargando…")).toBeNull();
     });
 
-    const organizarButton = screen.getByText("▶ Organizar Partidas");
+    const organizarButton = screen.getByRole("button", {
+      name: /Organizar Partidas/i,
+    });
     await fireEvent.click(organizarButton);
 
     // Verify onOpenGameDraft was called
-    expect(onOpenGameDraft).toHaveBeenCalledWith(1);
-  });
-
-  it("calls onOpenGameDraft and stops when organizar returns non-zero", async () => {
-    vi.useRealTimers();
-
-    const api = await import("../api");
-    (api.runScript as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      returncode: 1,
-      stdout: "No hay suficientes jugadores",
-      stderr: "",
-    });
-
-    const onOpenGameDraft = vi.fn();
-    const onShowErrorMock = vi.fn();
-
-    render(SnapshotDetail, {
-      props: {
-        id: 1,
-        onClose: () => {},
-        onChainUpdate: () => {},
-        onOpenSnapshot: () => {},
-        onOpenGame: () => {},
-        onOpenGameDraft,
-        onEditDraft: () => {},
-        onShowError: onShowErrorMock,
-      },
-    });
-
-    await waitFor(() => {
-      expect(screen.queryByText("Cargando…")).toBeNull();
-    });
-
-    await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
-
-    // Should call onOpenGameDraft regardless of validation
-    expect(onOpenGameDraft).toHaveBeenCalledWith(1);
-  });
-
-  it("calls onOpenGameDraft when organizar stdout includes 'No hay suficientes'", async () => {
-    vi.useRealTimers();
-
-    const api = await import("../api");
-    (api.runScript as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      returncode: 0,
-      stdout: "No hay suficientes mesas para organizar",
-      stderr: "",
-    });
-
-    const onOpenGameDraft = vi.fn();
-    const onShowErrorMock = vi.fn();
-
-    render(SnapshotDetail, {
-      props: {
-        id: 1,
-        onClose: () => {},
-        onChainUpdate: () => {},
-        onOpenSnapshot: () => {},
-        onOpenGame: () => {},
-        onOpenGameDraft,
-        onEditDraft: () => {},
-        onShowError: onShowErrorMock,
-      },
-    });
-
-    await waitFor(() => {
-      expect(screen.queryByText("Cargando…")).toBeNull();
-    });
-
-    await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
-
-    // Should call onOpenGameDraft regardless
     expect(onOpenGameDraft).toHaveBeenCalledWith(1);
   });
 
@@ -606,7 +541,9 @@ describe("SnapshotDetail", () => {
       });
 
       await waitFor(() => expect(screen.queryByText("Cargando…")).toBeNull());
-      await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
+      await fireEvent.click(
+        screen.getByRole("button", { name: /Organizar Partidas/i }),
+      );
 
       expect(onShowError).toHaveBeenCalledWith(
         "Error al organizar",
@@ -651,7 +588,9 @@ describe("SnapshotDetail", () => {
       });
 
       await waitFor(() => expect(screen.queryByText("Cargando…")).toBeNull());
-      await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
+      await fireEvent.click(
+        screen.getByRole("button", { name: /Organizar Partidas/i }),
+      );
 
       expect(screen.getByText("Revisar Roster")).toBeTruthy();
       expect(onOpenGameDraft).not.toHaveBeenCalled();
@@ -694,9 +633,13 @@ describe("SnapshotDetail", () => {
       });
 
       await waitFor(() => expect(screen.queryByText("Cargando…")).toBeNull());
-      await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
+      await fireEvent.click(
+        screen.getByRole("button", { name: /Organizar Partidas/i }),
+      );
 
-      const confirmBtn = screen.getByText("Organizar de todos modos");
+      const confirmBtn = screen.getByRole("button", {
+        name: /Organizar de todos modos/i,
+      });
       await fireEvent.click(confirmBtn);
 
       await waitFor(() => {
@@ -743,9 +686,11 @@ describe("SnapshotDetail", () => {
       });
 
       await waitFor(() => expect(screen.queryByText("Cargando…")).toBeNull());
-      await fireEvent.click(screen.getByText("▶ Organizar Partidas"));
+      await fireEvent.click(
+        screen.getByRole("button", { name: /Organizar Partidas/i }),
+      );
 
-      const editBtn = screen.getByText("Volver a Editar");
+      const editBtn = screen.getByRole("button", { name: /Volver a Editar/i });
       await fireEvent.click(editBtn);
 
       expect(onEditDraft).toHaveBeenCalledTimes(1);
