@@ -186,6 +186,8 @@
         defaultEventType={draftEventType}
         autoAction={draftAutoAction}
         onClose={closePanel}
+        onCancel={() =>
+          draftParentId !== null ? openSnapshot(draftParentId) : closePanel()}
         onChainUpdate={handleChainUpdate}
         onOpenSnapshot={openSnapshot}
         onShowError={(title, output) => {
@@ -202,6 +204,10 @@
       <GameDraft
         snapshotId={panelId}
         onClose={closePanel}
+        onCancel={() =>
+          draftEditingGameId !== null
+            ? openGame(draftEditingGameId)
+            : closePanel()}
         onChainUpdate={handleChainUpdate}
         onOpenGame={openGame}
         onShowError={(title, output) => {

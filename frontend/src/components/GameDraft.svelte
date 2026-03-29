@@ -9,6 +9,7 @@
   interface Props {
     snapshotId: number;
     onClose: () => void;
+    onCancel: () => void;
     onChainUpdate: () => void;
     onOpenGame: (id: number) => void;
     onShowError: (title: string, output: string) => void;
@@ -19,6 +20,7 @@
   let {
     snapshotId,
     onClose,
+    onCancel,
     onChainUpdate,
     onOpenGame,
     onShowError,
@@ -510,13 +512,7 @@
       <Button
         variant="secondary"
         fill={true}
-        onclick={() => {
-          if (editingGameId) {
-            onOpenGame(editingGameId);
-          } else {
-            onClose();
-          }
-        }}
+        onclick={onCancel}
         disabled={saving}>Cancelar</Button
       >
       <Button

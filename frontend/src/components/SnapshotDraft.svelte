@@ -19,6 +19,7 @@
     defaultEventType: "manual" | "sync" | "edit";
     autoAction?: "notion" | "csv" | null;
     onClose: () => void;
+    onCancel: () => void;
     onChainUpdate: () => void;
     onOpenSnapshot: (id: number) => void;
     onShowError: (title: string, output: string) => void;
@@ -30,6 +31,7 @@
     defaultEventType,
     autoAction = null,
     onClose,
+    onCancel,
     onChainUpdate,
     onOpenSnapshot,
     onShowError,
@@ -406,7 +408,7 @@
   {/snippet}
 
   {#snippet footer()}
-    <Button variant="secondary" fill={true} onclick={onClose} disabled={saving}
+    <Button variant="secondary" fill={true} onclick={onCancel} disabled={saving}
       >Cancelar</Button
     >
     <Button

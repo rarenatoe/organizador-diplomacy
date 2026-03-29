@@ -12,6 +12,7 @@ describe("GameDraft.svelte", () => {
   const mockProps = {
     snapshotId: 123,
     onClose: vi.fn(),
+    onCancel: vi.fn(),
     onChainUpdate: vi.fn(),
     onOpenGame: vi.fn(),
     onShowError: vi.fn(),
@@ -190,7 +191,7 @@ describe("GameDraft.svelte", () => {
     const cancelButton = screen.getByRole("button", { name: /Cancelar/i });
     await fireEvent.click(cancelButton);
 
-    expect(mockProps.onClose).toHaveBeenCalled();
+    expect(mockProps.onCancel).toHaveBeenCalled();
   });
 
   it("shows intentos_usados information", async () => {
@@ -542,7 +543,7 @@ describe("GameDraft.svelte", () => {
       });
     });
 
-    it("calls onOpenGame instead of onClose when editingGameId exists", async () => {
+    it("calls onCancel instead of onClose when editingGameId exists", async () => {
       const { saveGameDraft } = vi.mocked(await import("../api"));
       saveGameDraft.mockResolvedValue({ game_id: 456 });
 
@@ -560,11 +561,10 @@ describe("GameDraft.svelte", () => {
       const cancelButton = screen.getByText("Cancelar");
       await fireEvent.click(cancelButton);
 
-      expect(mockProps.onClose).not.toHaveBeenCalled();
-      expect(mockProps.onOpenGame).toHaveBeenCalledWith(456);
+      expect(mockProps.onCancel).toHaveBeenCalled();
     });
 
-    it("calls onClose when editingGameId is null", async () => {
+    it("calls onCancel when editingGameId is null", async () => {
       const { saveGameDraft } = vi.mocked(await import("../api"));
       saveGameDraft.mockResolvedValue({ game_id: 456 });
 
@@ -582,8 +582,7 @@ describe("GameDraft.svelte", () => {
       const cancelButton = screen.getByText("Cancelar");
       await fireEvent.click(cancelButton);
 
-      expect(mockProps.onClose).toHaveBeenCalled();
-      expect(mockProps.onOpenGame).not.toHaveBeenCalled();
+      expect(mockProps.onCancel).toHaveBeenCalled();
     });
 
     it("handles GM assignment correctly", async () => {
