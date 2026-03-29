@@ -7,6 +7,7 @@
   import SyncResolutionModal from "./SyncResolutionModal.svelte";
   import OrganizarConfirmModal from "./OrganizarConfirmModal.svelte";
   import Button from "./Button.svelte";
+  import PanelLayout from "./PanelLayout.svelte";
 
   interface Props {
     id: number;
@@ -230,21 +231,23 @@
   <p style="color:var(--muted);font-size:12px;padding:4px 0">Cargando…</p>
 {:else if data}
   {@const rows = data.players ?? []}
-  <div class="panel-body-fixed">
-    <div class="section" style="margin-bottom: 16px;">
-      <div class="section-title">Snapshot #{id} · {sourceLabel(data.source)}</div>
-      <div class="node-meta" style="margin-bottom:8px">{esc(data.created_at)}</div>
-      <Button size="sm" variant={csvCopied ? 'success' : 'secondary'} icon={csvCopied ? "✅" : "📋"} fill={true} onclick={copyCsv}>{csvCopied ? "Copiado" : "Copiar tabla CSV"}</Button>
-    </div>
-    <div class="section-title" style="margin-bottom:6px">
-      Jugadores <span
-        style="color:var(--muted);font-weight:400;text-transform:none;font-size:11px"
-        >— desactiva para excluir de la siguiente jornada</span
-      >
-    </div>
-  </div>
+  <PanelLayout scrollable={false}>
+    {#snippet header()}
+      <div class="section" style="margin-bottom: 16px;">
+        <div class="section-title">Snapshot #{id} · {sourceLabel(data?.source)}</div>
+        <div class="node-meta" style="margin-bottom:8px">{esc(data?.created_at)}</div>
+        <Button size="sm" variant={csvCopied ? 'success' : 'secondary'} icon={csvCopied ? "✅" : "📋"} fill={true} onclick={copyCsv}>{csvCopied ? "Copiado" : "Copiar tabla CSV"}</Button>
+      </div>
+      <div class="section-title" style="margin-bottom:6px">
+        Jugadores <span
+          style="color:var(--muted);font-weight:400;text-transform:none;font-size:11px"
+          >— desactiva para excluir de la siguiente jornada</span
+        >
+      </div>
+    {/snippet}
 
-  <div class="table-wrap flex-table-wrap">
+    {#snippet body()}
+      <div class="table-wrap flex-table-wrap">
     <table>
           <thead>
             <tr>
@@ -290,22 +293,25 @@
             {/each}
           </tbody>
         </table>
-  </div>
-  <div class="panel-footer">
-    <Button variant="secondary" fill={true} icon="📝" onclick={() => {
-      const playersToEdit = (data?.players || []).map((p) => ({
-        nombre: p.nombre,
-        experiencia: p.experiencia ?? "Nuevo",
-        juegos_este_ano: p.juegos_este_ano ?? 0,
-        prioridad: p.prioridad ?? 0,
-        partidas_deseadas: p.partidas_deseadas ?? 1,
-        partidas_gm: p.partidas_gm ?? 0
-      }));
-      onEditDraft(id, 'manual', null, playersToEdit);
-    }}>Editar</Button>
-    <Button variant="secondary" fill={true} icon="🔄" onclick={handleDirectSync} disabled={isSyncing}>{isSyncing ? "Sincronizando..." : "Sincronizar Notion"}</Button>
-    <Button variant="primary" fill={true} icon="▶️" onclick={handleOrganizar}>Organizar Partidas</Button>
-  </div>
+      </div>
+    {/snippet}
+
+    {#snippet footer()}
+      <Button variant="secondary" fill={true} icon="📝" onclick={() => {
+        const playersToEdit = (data?.players || []).map((p) => ({
+          nombre: p.nombre,
+          experiencia: p.experiencia ?? "Nuevo",
+          juegos_este_ano: p.juegos_este_ano ?? 0,
+          prioridad: p.prioridad ?? 0,
+          partidas_deseadas: p.partidas_deseadas ?? 1,
+          partidas_gm: p.partidas_gm ?? 0
+        }));
+        onEditDraft(id, 'manual', null, playersToEdit);
+      }}>Editar</Button>
+      <Button variant="secondary" fill={true} icon="🔄" onclick={handleDirectSync} disabled={isSyncing}>{isSyncing ? "Sincronizando..." : "Sincronizar Notion"}</Button>
+      <Button variant="primary" fill={true} icon="▶️" onclick={handleOrganizar}>Organizar Partidas</Button>
+    {/snippet}
+  </PanelLayout>
 {/if}
 
 <SyncResolutionModal

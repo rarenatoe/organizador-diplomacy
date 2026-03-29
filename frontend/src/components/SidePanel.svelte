@@ -83,25 +83,4 @@
     padding: 0;
   }
 
-  :global(.panel-scroll) {
-    flex: 1;
-    overflow-y: auto;
-    min-height: 0;
-    padding: 16px 18px;
-  }
-
-  :global(.panel-body-fixed) {
-    padding: 16px 18px 0;
-    flex-shrink: 0;
-  }
-
-  :global(.panel-footer) {
-    flex-shrink: 0;
-    padding: 16px 18px;
-    border-top: 1px solid var(--border);
-    background: var(--surface);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-</style>
+  </style>

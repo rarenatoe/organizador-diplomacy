@@ -233,4 +233,4 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 - Component-specific UI classes (like button variants or layouts) must live in scoped `<style>` blocks within component. Keep `static/style.css` strictly for CSS variables, CSS resets, and high-level layout utilities.
 - Scoped `<style>` in `.svelte` files.
 - `static/style.css` for variables, resets, utility classes.
-- Scroll pattern: `.panel-body` (flex column, hidden) + `.panel-scroll` (flex 1, auto scroll).
+- Layout pattern: Always use the <PanelLayout> component with {#snippet body()}, {#snippet header()}, and {#snippet footer()} for side panel content. Use scrollable={false} for table views relying on .flex-table-wrap. Do not manually write .panel-scroll, .panel-body-fixed, or .panel-footer classes.

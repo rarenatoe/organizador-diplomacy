@@ -84,10 +84,10 @@ describe("Panel Scroll Pattern", () => {
 
       expect(fixedHeader).toBeTruthy();
       expect(tableWrap).toBeTruthy();
-      expect(container.querySelector(".panel-scroll")).toBeNull(); // Ensure old wrapper is gone
+      expect(container.querySelector(".panel-scroll")).toBeNull(); // Ensure scrollable={false} worked
     });
 
-    it("should have panel-footer outside panel-scroll with action buttons", async () => {
+    it("should have panel-footer with action buttons", async () => {
       const { container } = render(SnapshotDetail, {
         props: {
           id: 1,
@@ -144,7 +144,7 @@ describe("Panel Scroll Pattern", () => {
   describe("GameDetail", () => {
     it("should have panel-scroll wrapper around all content", async () => {
       const { container } = render(GameDetail, {
-        props: { id: 1 },
+        props: { id: 1, openGameDraft: vi.fn() },
       });
 
       await vi.waitFor(() => {
@@ -157,6 +157,26 @@ describe("Panel Scroll Pattern", () => {
       // Verify all sections are inside panel-scroll
       const sections = panelScroll?.querySelectorAll(".section");
       expect(sections?.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("should have conditional panel-footer when openGameDraft is provided", async () => {
+      const { container } = render(GameDetail, {
+        props: {
+          id: 1,
+          openGameDraft: () => {},
+        },
+      });
+
+      await vi.waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      const panelFooter = container.querySelector(".panel-footer");
+      expect(panelFooter).toBeTruthy();
+
+      // Verify the "Editar Jornada" button is in the footer
+      const editButton = screen.getByText("Editar Jornada");
+      expect(panelFooter?.contains(editButton)).toBe(true);
     });
   });
 

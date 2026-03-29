@@ -4,6 +4,7 @@
   import { setActiveNodeId } from "../stores.svelte";
   import { findLatestGameId } from "../snapshotUtils";
   import Button from "./Button.svelte";
+  import PanelLayout from "./PanelLayout.svelte";
 
   interface Props {
     snapshotId: number;
@@ -310,10 +311,11 @@
   loadDraft();
 </script>
 
-<div class="panel-scroll">
-  {#if loading}
-    <p style="color:var(--muted);font-size:12px;padding:4px 0">Generando draft...</p>
-  {:else if draftData}
+<PanelLayout>
+  {#snippet body()}
+    {#if loading}
+      <p style="color:var(--muted);font-size:12px;padding:4px 0">Generando draft...</p>
+    {:else if draftData}
     <div class="section">
       <div class="section-title">Draft de Partidas - Snapshot #{snapshotId}</div>
       <div class="meta-grid">
@@ -397,22 +399,23 @@
         {/each}
       </div>
     {/if}
-  {:else}
     <p style="color:var(--danger);font-size:12px;padding:4px 0">No se pudo generar el draft</p>
-  {/if}
-</div>
-<div class="panel-footer">
-  {#if draftData}
-    <Button variant="secondary" fill={true} onclick={() => {
-      if (editingGameId) {
-        onOpenGame(editingGameId);
-      } else {
-        onClose();
-      }
-    }} disabled={saving}>Cancelar</Button>
-    <Button variant="primary" fill={true} icon={saving ? "⏳" : "✨"} onclick={handleSaveDraft} disabled={saving}>{saving ? "Guardando..." : "Confirmar y Guardar"}</Button>
-  {/if}
-</div>
+    {/if}
+  {/snippet}
+
+  {#snippet footer()}
+    {#if draftData}
+      <Button variant="secondary" fill={true} onclick={() => {
+        if (editingGameId) {
+          onOpenGame(editingGameId);
+        } else {
+          onClose();
+        }
+      }} disabled={saving}>Cancelar</Button>
+      <Button variant="primary" fill={true} icon={saving ? "⏳" : "✨"} onclick={handleSaveDraft} disabled={saving}>{saving ? "Guardando..." : "Confirmar y Guardar"}</Button>
+    {/if}
+  {/snippet}
+</PanelLayout>
 
 <style>
   .section {

@@ -56,6 +56,7 @@ describe("GameDetail", () => {
     render(GameDetail, {
       props: {
         id: 1,
+        openGameDraft: vi.fn(),
       },
     });
 
@@ -84,6 +85,7 @@ describe("GameDetail", () => {
     render(GameDetail, {
       props: {
         id: 1,
+        openGameDraft: vi.fn(),
       },
     });
 
@@ -125,6 +127,7 @@ describe("GameDetail", () => {
     render(GameDetail, {
       props: {
         id: 1,
+        openGameDraft: vi.fn(),
       },
     });
 
@@ -166,6 +169,7 @@ describe("GameDetail", () => {
     render(GameDetail, {
       props: {
         id: 1,
+        openGameDraft: vi.fn(),
       },
     });
 

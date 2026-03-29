@@ -3,10 +3,11 @@
   import { fetchGame } from "../api";
   import { esc } from "../utils";
   import Button from "./Button.svelte";
+  import PanelLayout from "./PanelLayout.svelte";
 
   interface Props {
     id: number;
-    openGameDraft?: (snapshotId: number, draft: DraftResponse, gameId: number) => void;
+    openGameDraft: (snapshotId: number, draft: DraftResponse, gameId: number) => void;
   }
 
   let { id, openGameDraft }: Props = $props();
@@ -78,23 +79,40 @@
   });
 </script>
 
+{#snippet gameFooter()}
+  <Button variant="primary" fill={true} icon="✏️" onclick={() =>{
+    const draft = { 
+      mesas: (data?.mesas ?? []).map(m =>({ 
+        numero: m.numero, 
+        gm: m.gm ? mapToDraftPlayer({nombre: m.gm, experiencia: "Antiguo"}) : null, 
+        jugadores: m.jugadores.map(mapToDraftPlayer) 
+      })) || [], 
+      tickets_sobrantes: (data?.waiting_list ?? []).map(mapToDraftPlayer) || [], 
+      minimo_teorico: 0, 
+      intentos_usados: data?.intentos || 0 
+    };
+    openGameDraft(data!.input_snapshot_id, draft, id);
+  }}>Editar Jornada</Button>
+{/snippet}
+
 {#if loading}
   <p style="color:var(--muted);font-size:12px;padding:4px 0">Cargando…</p>
 {:else if data}
   {@const mesas = data.mesas ?? []}
   {@const waiting = data.waiting_list ?? []}
-  <div class="panel-scroll">
-    <div class="section">
+  <PanelLayout footer={gameFooter}>
+    {#snippet body()}
+      <div class="section">
       <div class="section-title">Resumen</div>
       <div class="meta-grid">
         <span class="meta-key">Generado</span>
-        <span class="meta-val">{esc(data.created_at)}</span>
+        <span class="meta-val">{esc(data?.created_at)}</span>
         <span class="meta-key">Intentos</span>
-        <span class="meta-val">{data.intentos}</span>
+        <span class="meta-val">{data?.intentos}</span>
         <span class="meta-key">Snapshot entrada</span>
-        <span class="meta-val">#{data.input_snapshot_id}</span>
+        <span class="meta-val">#{data?.input_snapshot_id}</span>
         <span class="meta-key">Snapshot salida</span>
-        <span class="meta-val">#{data.output_snapshot_id}</span>
+        <span class="meta-val">#{data?.output_snapshot_id}</span>
       </div>
     </div>
     <div class="section">
@@ -146,24 +164,8 @@
         <Button size="sm" variant={copiedId === 'waiting' ? 'success' : 'secondary'} icon={copiedId === 'waiting' ? "✅" : "📋"} fill={true} onclick={() => copyText(waitTxt, 'waiting')}>{copiedId === 'waiting' ? "Copiado" : "Copiar lista de espera"}</Button>
       </div>
     {/if}
-    {#if openGameDraft}
-    <div class="panel-footer">
-      <Button variant="primary" fill={true} icon="✏️" onclick={() =>{
-        const draft = { 
-          mesas: (data?.mesas ?? []).map(m =>({ 
-            numero: m.numero, 
-            gm: m.gm ? mapToDraftPlayer({nombre: m.gm, experiencia: "Antiguo"}) : null, 
-            jugadores: m.jugadores.map(mapToDraftPlayer) 
-          })) || [], 
-          tickets_sobrantes: (data?.waiting_list ?? []).map(mapToDraftPlayer) || [], 
-          minimo_teorico: 0, 
-          intentos_usados: data?.intentos || 0 
-        };
-        openGameDraft(data!.input_snapshot_id, draft, id);
-      }}>Editar Jornada</Button>
-    </div>
-  {/if}
-</div>
+    {/snippet}
+  </PanelLayout>
 {/if}
 
 <style>

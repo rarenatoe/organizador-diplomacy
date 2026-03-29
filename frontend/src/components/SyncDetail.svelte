@@ -2,6 +2,7 @@
   import { fetchChain } from "../api";
   import type { SnapshotNode } from "../types";
   import { esc } from "../utils";
+  import PanelLayout from "./PanelLayout.svelte";
 
   interface Props {
     id: number;
@@ -48,21 +49,25 @@
 {#if loading}
   <p style="color:var(--muted);font-size:12px;padding:4px 0">Cargando…</p>
 {:else if info}
-  <div class="panel-scroll">
-    <div class="section">
-      <div class="section-title">Detalles del Sync</div>
-      <div class="meta-grid">
-        <span class="meta-key">Generado</span>
-        <span class="meta-val">{esc(info.created_at)}</span>
-        <span class="meta-key">De snapshot</span>
-        <span class="meta-val">#{info.from_id}</span>
-        <span class="meta-key">A snapshot</span>
-        <span class="meta-val">#{info.to_id}</span>
+  <PanelLayout>
+    {#snippet body()}
+      <div class="section">
+        <div class="section-title">Detalles del Sync</div>
+        <div class="meta-grid">
+          <span class="meta-key">Generado</span>
+          <span class="meta-val">{esc(info?.created_at)}</span>
+          <span class="meta-key">De snapshot</span>
+          <span class="meta-val">#{info?.from_id}</span>
+          <span class="meta-key">A snapshot</span>
+          <span class="meta-val">#{info?.to_id}</span>
+        </div>
       </div>
-    </div>
-  </div>
+    {/snippet}
+  </PanelLayout>
 {:else}
-  <div class="panel-scroll">
-    <p>Sync no encontrado.</p>
-  </div>
+  <PanelLayout>
+    {#snippet body()}
+      <p>Sync no encontrado.</p>
+    {/snippet}
+  </PanelLayout>
 {/if}

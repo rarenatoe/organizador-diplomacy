@@ -6,6 +6,7 @@
   import { setActiveNodeId } from "../stores.svelte";
   import SyncResolutionModal from "./SyncResolutionModal.svelte";
   import Button from "./Button.svelte";
+  import PanelLayout from "./PanelLayout.svelte";
 
   interface Props {
     parentId: number | null;
@@ -240,37 +241,39 @@
   }
 </script>
 
-<div class="panel-body-fixed">
-  <div class="section" style="margin-bottom: 16px;">
-    <div class="section-title">Nueva Versión</div>
-    <div class="node-meta" style="margin-bottom: 8px;">
-      Crea una nueva versión desde cero o importa jugadores desde CSV
-    </div>
-    <div style="display: flex; gap: 8px;">
-      <Button variant="secondary" onclick={handleAddPlayer}>
-        ➕ Agregar jugador
-      </Button>
-      {#if parentId === null}
-        <Button variant="secondary" onclick={() => (showCsvModal = true)}>
-          📥 Pegar CSV
+<PanelLayout scrollable={false}>
+  {#snippet header()}
+    <div class="section" style="margin-bottom: 16px;">
+      <div class="section-title">Nueva Versión</div>
+      <div class="node-meta" style="margin-bottom: 8px;">
+        Crea una nueva versión desde cero o importa jugadores desde CSV
+      </div>
+      <div style="display: flex; gap: 8px;">
+        <Button variant="secondary" onclick={handleAddPlayer}>
+          ➕ Agregar jugador
         </Button>
-        <Button
-          variant="secondary"
-          onclick={handleImportNotion}
-          disabled={isImporting}
-        >
-          {isImporting ? "⏳ Sincronizando..." : "🔗 Importar Notion"}
-        </Button>
-      {/if}
+        {#if parentId === null}
+          <Button variant="secondary" onclick={() => (showCsvModal = true)}>
+            📥 Pegar CSV
+          </Button>
+          <Button
+            variant="secondary"
+            onclick={handleImportNotion}
+            disabled={isImporting}
+          >
+            {isImporting ? "⏳ Sincronizando..." : "🔗 Importar Notion"}
+          </Button>
+        {/if}
+      </div>
     </div>
-  </div>
-  <div class="section-title" style="margin-bottom: 6px;">
-    Jugadores ({draftPlayers.length})
-  </div>
-</div>
+    <div class="section-title" style="margin-bottom: 6px;">
+      Jugadores ({draftPlayers.length})
+    </div>
+  {/snippet}
 
-{#if draftPlayers.length > 0}
-  <div class="table-wrap flex-table-wrap">
+  {#snippet body()}
+    {#if draftPlayers.length > 0}
+      <div class="table-wrap flex-table-wrap">
     <table>
       <thead>
         <tr>
@@ -345,18 +348,20 @@
         {/each}
       </tbody>
     </table>
-  </div>
-{:else}
-  <div class="empty-draft">
-    <p>No hay jugadores en el borrador.</p>
-    <p>Agrega jugadores manualmente o importa desde CSV.</p>
-  </div>
-{/if}
+      </div>
+    {:else}
+      <div class="empty-draft">
+        <p>No hay jugadores en el borrador.</p>
+        <p>Agrega jugadores manualmente o importa desde CSV.</p>
+      </div>
+    {/if}
+  {/snippet}
 
-<div class="panel-footer">
-  <Button variant="secondary" fill={true} onclick={onClose} disabled={saving}>Cancelar</Button>
-  <Button variant="primary" fill={true} icon={saving ? "⏳" : "✨"} onclick={handleSave} disabled={saving || draftPlayers.length === 0} title={draftPlayers.length === 0 ? "Agrega al menos un jugador para guardar" : ""}>{saving ? "Guardando..." : (eventType === 'sync' ? 'Guardar Sincronización' : (parentId ? 'Guardar Edición' : 'Guardar Nueva Lista'))}</Button>
-</div>
+  {#snippet footer()}
+    <Button variant="secondary" fill={true} onclick={onClose} disabled={saving}>Cancelar</Button>
+    <Button variant="primary" fill={true} icon={saving ? "⏳" : "✨"} onclick={handleSave} disabled={saving || draftPlayers.length === 0} title={draftPlayers.length === 0 ? "Agrega al menos un jugador para guardar" : ""}>{saving ? "Guardando..." : (eventType === 'sync' ? 'Guardar Sincronización' : (parentId ? 'Guardar Edición' : 'Guardar Nueva Lista'))}</Button>
+  {/snippet}
+</PanelLayout>
 
 {#if showCsvModal}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
