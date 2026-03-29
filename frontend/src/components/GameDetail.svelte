@@ -139,9 +139,13 @@
                   <span class="p-num">{i + 1}.</span>
                   <span class="p-name">{esc(j.nombre)} {j.pais ? getCountryEmoji(j.pais) : ""}</span>
                   {#if j.etiqueta === "Nuevo"}
-                    <span class="tag tag-nuevo">Nuevo</span>
+                    <div class="tag-wrapper">
+                      <span class="tag tag-nuevo">Nuevo</span>
+                    </div>
                   {:else}
-                    <span class="tag tag-antiguo">{esc(j.etiqueta)}</span>
+                    <div class="tag-wrapper">
+                      <span class="tag tag-antiguo">{esc(j.etiqueta)}</span>
+                    </div>
                   {/if}
                 </li>
               {/each}
@@ -257,7 +261,8 @@
   .player-list li {
     font-size: 12px;
     padding: 4px 0;
-    display: flex;
+    display: grid;
+    grid-template-columns: 16px 1fr 120px;
     align-items: center;
     gap: 8px;
     border-bottom: 1px solid var(--border);
@@ -274,8 +279,15 @@
   }
 
   .p-name {
-    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-weight: 500;
+  }
+
+  .tag-wrapper {
+    display: flex;
+    justify-content: flex-end;
   }
 
   .tag {
@@ -297,9 +309,9 @@
   }
 
   .waiting-item {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 60px;
     align-items: center;
-    justify-content: space-between;
     padding: 7px 10px;
     background: #fffbeb;
     border: 1px solid #fde68a;
@@ -310,10 +322,14 @@
 
   .waiting-name {
     font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .waiting-cupos {
     color: #92400e;
     font-size: 11px;
+    text-align: right;
   }
 </style>

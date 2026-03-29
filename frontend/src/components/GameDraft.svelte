@@ -373,9 +373,13 @@
                     {/if}
                   </div>
                   {#if j.es_nuevo}
-                    <span class="tag tag-nuevo">Nuevo</span>
+                    <div class="tag-wrapper">
+                      <span class="tag tag-nuevo">Nuevo</span>
+                    </div>
                   {:else}
-                    <span class="tag tag-antiguo">Antiguo</span>
+                    <div class="tag-wrapper">
+                      <span class="tag tag-antiguo">Antiguo</span>
+                    </div>
                   {/if}
                   <Button variant="ghost" size="sm" iconOnly={true} icon="🔄" title="Intercambiar" onclick={() => handlePlayerClick(target)} />
                 </li>
@@ -493,7 +497,8 @@
   .player-list li {
     font-size: 12px;
     padding: 4px 0;
-    display: flex;
+    display: grid;
+    grid-template-columns: 16px 1fr 115px 56px 32px;
     align-items: center;
     gap: 8px;
     border-bottom: 1px solid var(--border);
@@ -510,8 +515,15 @@
   }
 
   .p-name {
-    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-weight: 500;
+  }
+
+  .tag-wrapper {
+    display: flex;
+    justify-content: center;
   }
 
   .tag {
@@ -546,6 +558,8 @@
     background: var(--bg);
     color: var(--text);
     cursor: pointer;
+    width: 100%;
+    min-width: 0;
   }
 
   .reason-tooltip {
@@ -612,9 +626,9 @@
   }
 
   .waiting-item {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 60px 32px;
     align-items: center;
-    justify-content: space-between;
     padding: 7px 10px;
     background: #fffbeb;
     border: 1px solid #fde68a;
@@ -631,10 +645,14 @@
 
   .waiting-name {
     font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .waiting-cupos {
     color: #92400e;
     font-size: 11px;
+    text-align: right;
   }
 </style>

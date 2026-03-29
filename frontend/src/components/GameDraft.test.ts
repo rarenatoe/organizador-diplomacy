@@ -96,6 +96,13 @@ describe("GameDraft.svelte", () => {
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.getByText("Bob")).toBeInTheDocument();
     expect(screen.getByText("David")).toBeInTheDocument();
+
+    // Verify that experience tags are wrapped in tag-wrapper divs
+    const nuevoTag = screen.getByText("Nuevo");
+    const antiguoTag = screen.getByText("Antiguo");
+
+    expect(nuevoTag.closest(".tag-wrapper")).toBeInTheDocument();
+    expect(antiguoTag.closest(".tag-wrapper")).toBeInTheDocument();
   });
 
   it("shows loading state initially", async () => {
@@ -113,6 +120,18 @@ describe("GameDraft.svelte", () => {
     await vi.waitFor(() => {
       const swapButtons = screen.getAllByTitle("Intercambiar");
       expect(swapButtons).toHaveLength(3); // 2 in mesa + 1 in espera
+    });
+
+    // Verify that all experience tags are properly wrapped
+    const nuevoTags = screen.getAllByText("Nuevo");
+    const antiguoTags = screen.getAllByText("Antiguo");
+
+    nuevoTags.forEach((tag) => {
+      expect(tag.closest(".tag-wrapper")).toBeInTheDocument();
+    });
+
+    antiguoTags.forEach((tag) => {
+      expect(tag.closest(".tag-wrapper")).toBeInTheDocument();
     });
   });
 
@@ -623,5 +642,22 @@ describe("GameDraft.svelte", () => {
     // Change back to Aleatorio (empty string)
     await fireEvent.change(aliceSelect, { target: { value: "" } });
     expect(aliceSelect.value).toBe("");
+  });
+
+  it("verifies tag-wrapper structure for all players", async () => {
+    render(GameDraft, { props: mockProps });
+
+    await vi.waitFor(() => {
+      expect(screen.getByText("Partida 1")).toBeInTheDocument();
+    });
+
+    // Check that all experience tags are wrapped in tag-wrapper divs
+    const allTags = screen.getAllByText(/Nuevo|Antiguo/);
+
+    allTags.forEach((tag) => {
+      const wrapper = tag.closest(".tag-wrapper");
+      expect(wrapper).toBeInTheDocument();
+      expect(wrapper?.tagName).toBe("DIV");
+    });
   });
 });

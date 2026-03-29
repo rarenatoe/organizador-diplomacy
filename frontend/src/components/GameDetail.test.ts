@@ -79,6 +79,13 @@ describe("GameDetail", () => {
     expect(screen.getByText("Lista de espera")).toBeTruthy();
     expect(screen.getByText("Charlie")).toBeTruthy();
     expect(screen.getByText("Diana")).toBeTruthy();
+
+    // Verify that experience tags are wrapped in tag-wrapper divs
+    const nuevoTag = screen.getByText("Nuevo");
+    const antiguoTag = screen.getByText("Antiguo");
+
+    expect(nuevoTag.closest(".tag-wrapper")).toBeInTheDocument();
+    expect(antiguoTag.closest(".tag-wrapper")).toBeInTheDocument();
   });
 
   it("copies share list and shows feedback when share button is clicked", async () => {
@@ -220,6 +227,13 @@ describe("GameDetail", () => {
       expect(screen.queryByText("Cargando…")).toBeNull();
     });
 
+    // Verify tag-wrapper structure before editing
+    const nuevoTag = screen.getByText("Nuevo");
+    const antiguoTag = screen.getByText("Antiguo");
+
+    expect(nuevoTag.closest(".tag-wrapper")).toBeInTheDocument();
+    expect(antiguoTag.closest(".tag-wrapper")).toBeInTheDocument();
+
     // Find and click Edit button
     const editButton = screen.getByRole("button", { name: /Editar Jornada/i });
     await fireEvent.click(editButton);
@@ -252,5 +266,28 @@ describe("GameDetail", () => {
       }),
       1, // gameId
     );
+  });
+
+  it("verifies tag-wrapper structure for all experience tags", async () => {
+    render(GameDetail, {
+      props: {
+        id: 1,
+        openGameDraft: vi.fn(),
+      },
+    });
+
+    // Wait for loading to complete
+    await waitFor(() => {
+      expect(screen.queryByText("Cargando…")).toBeNull();
+    });
+
+    // Check that all experience tags are wrapped in tag-wrapper divs
+    const allTags = screen.getAllByText(/Nuevo|Antiguo/);
+
+    allTags.forEach((tag) => {
+      const wrapper = tag.closest(".tag-wrapper");
+      expect(wrapper).toBeInTheDocument();
+      expect(wrapper?.tagName).toBe("DIV");
+    });
   });
 });

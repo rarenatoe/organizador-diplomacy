@@ -64,6 +64,7 @@ TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecke
 
 ## CSS
 - Flex layout for panels, rows, containers.
+- **List Alignment**: When displaying lists of items with complex horizontal alignment (like player tables, waiting lists, or rows with varying-width badges), strictly prefer **CSS Grid** (`display: grid` with `grid-template-columns`) over Flexbox to ensure perfect column alignment.
 - `overflow: hidden; text-overflow: ellipsis; white-space: nowrap;` for truncation.
 - Component-specific UI classes (like button variants or layouts) must live in scoped `<style>` blocks within component. Keep `static/style.css` strictly for CSS variables, CSS resets, and high-level layout utilities.
 - Scoped `<style>` in `.svelte` files.
