@@ -1,16 +1,10 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import type {
-    SnapshotGroup,
-    SyncEdge,
-    EditEdge,
-  } from "../types";
+  import type { SnapshotGroup, SyncEdge, EditEdge } from "../types";
   import GameNode from "./GameNode.svelte";
   import SnapshotGroupNode from "./SnapshotGroupNode.svelte";
   import { groupSnapshots } from "../groupSnapshots";
-  import {
-    getActiveNodeId
-  } from "../stores.svelte";
+  import { getActiveNodeId } from "../stores.svelte";
 
   interface Props {
     group: SnapshotGroup;
@@ -77,7 +71,7 @@
           b.edge.type === "game"
             ? groupSnapshots([b.output!])[0]
             : groupSnapshots([b.output!], b.edge as SyncEdge | EditEdge)[0],
-      }))
+      })),
   );
 </script>
 
@@ -104,10 +98,10 @@
       <div class="node-name">{esc(currentVersion.snapshot.created_at)}</div>
       <div class="node-meta">
         {currentVersion.snapshot.player_count} jugadores · {sourceLabel(
-          currentVersion.snapshot.source
+          currentVersion.snapshot.source,
         )}
       </div>
-      
+
       <div class="node-badges">
         {#if currentVersion.snapshot.is_latest}
           <span class="badge badge-latest">Actual</span>
@@ -190,7 +184,10 @@
     flex-direction: column;
     flex-shrink: 0;
     box-shadow: var(--shadow);
-    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    transition:
+      transform 0.15s,
+      box-shadow 0.15s,
+      border-color 0.15s;
     border: 2px solid transparent;
     user-select: none;
     position: relative;
@@ -229,7 +226,9 @@
     cursor: pointer;
     font-size: 11px;
     opacity: 0;
-    transition: opacity 0.15s, background 0.15s;
+    transition:
+      opacity 0.15s,
+      background 0.15s;
     padding: 2px 4px;
     border-radius: 4px;
     line-height: 1;
@@ -280,7 +279,9 @@
     font-size: 15px;
     font-weight: 600;
     color: var(--text);
-    transition: background 0.15s, opacity 0.15s;
+    transition:
+      background 0.15s,
+      opacity 0.15s;
   }
 
   .pagination-btn:hover:not(:disabled) {
@@ -381,7 +382,9 @@
   }
 
   :global(.node-group.csv-selected) {
-    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.4), var(--shadow-md);
+    box-shadow:
+      0 0 0 3px rgba(34, 197, 94, 0.4),
+      var(--shadow-md);
   }
 
   :global(.node-group.csv-selected) .node-label {

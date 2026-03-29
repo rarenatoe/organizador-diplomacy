@@ -13,20 +13,22 @@
   let time = $derived((node.created_at || "").split(" ")[1] ?? "");
 </script>
 
-<div 
-  class="node node-report" 
+<div
+  class="node node-report"
   class:active={getActiveNodeId() === node.id}
-  data-id={node.id} 
-  data-type="game" 
-  role="button" 
-  tabindex="0" 
-  onclick={() => onOpen(node.id)} 
+  data-id={node.id}
+  data-type="game"
+  role="button"
+  tabindex="0"
+  onclick={() => onOpen(node.id)}
   onkeydown={(e) => e.key === "Enter" && onOpen(node.id)}
 >
   <div class="node-icon">📊</div>
   <div class="node-label">Jornada</div>
   <div class="node-name">{date}</div>
-  <div class="node-meta">{time}<br />{node.mesa_count} partida(s)<br />{node.espera_count} en espera</div>
+  <div class="node-meta">
+    {time}<br />{node.mesa_count} partida(s)<br />{node.espera_count} en espera
+  </div>
 </div>
 
 <style>
@@ -40,7 +42,10 @@
     flex-direction: column;
     flex-shrink: 0;
     box-shadow: var(--shadow);
-    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+    transition:
+      transform 0.15s,
+      box-shadow 0.15s,
+      border-color 0.15s;
     border: 2px solid transparent;
     user-select: none;
     position: relative;

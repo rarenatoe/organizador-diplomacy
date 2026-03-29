@@ -7,7 +7,11 @@
 
   interface Props {
     id: number;
-    openGameDraft: (snapshotId: number, draft: DraftResponse, gameId: number) => void;
+    openGameDraft: (
+      snapshotId: number,
+      draft: DraftResponse,
+      gameId: number,
+    ) => void;
   }
 
   let { id, openGameDraft }: Props = $props();
@@ -50,9 +54,9 @@
       Alemania: "🇩🇪",
       Italia: "🇮🇹",
       Rusia: "🇷🇺",
-      Turquía: "🇹🇷"
+      Turquía: "🇹🇷",
     };
-    return pais ? (countryEmojis[pais] || "") : "";
+    return pais ? countryEmojis[pais] || "" : "";
   }
 
   function mapToDraftPlayer(player: any): DraftPlayer {
@@ -80,19 +84,28 @@
 </script>
 
 {#snippet gameFooter()}
-  <Button variant="primary" fill={true} icon="✏️" onclick={() =>{
-    const draft = { 
-      mesas: (data?.mesas ?? []).map(m =>({ 
-        numero: m.numero, 
-        gm: m.gm ? mapToDraftPlayer({nombre: m.gm, experiencia: "Antiguo"}) : null, 
-        jugadores: m.jugadores.map(mapToDraftPlayer) 
-      })) || [], 
-      tickets_sobrantes: (data?.waiting_list ?? []).map(mapToDraftPlayer) || [], 
-      minimo_teorico: 0, 
-      intentos_usados: data?.intentos || 0 
-    };
-    openGameDraft(data!.input_snapshot_id, draft, id);
-  }}>Editar Jornada</Button>
+  <Button
+    variant="primary"
+    fill={true}
+    icon="✏️"
+    onclick={() => {
+      const draft = {
+        mesas:
+          (data?.mesas ?? []).map((m) => ({
+            numero: m.numero,
+            gm: m.gm
+              ? mapToDraftPlayer({ nombre: m.gm, experiencia: "Antiguo" })
+              : null,
+            jugadores: m.jugadores.map(mapToDraftPlayer),
+          })) || [],
+        tickets_sobrantes:
+          (data?.waiting_list ?? []).map(mapToDraftPlayer) || [],
+        minimo_teorico: 0,
+        intentos_usados: data?.intentos || 0,
+      };
+      openGameDraft(data!.input_snapshot_id, draft, id);
+    }}>Editar Jornada</Button
+  >
 {/snippet}
 
 {#if loading}
@@ -103,71 +116,108 @@
   <PanelLayout footer={gameFooter}>
     {#snippet body()}
       <div class="section">
-      <div class="section-title">Resumen</div>
-      <div class="meta-grid">
-        <span class="meta-key">Generado</span>
-        <span class="meta-val">{esc(data?.created_at)}</span>
-        <span class="meta-key">Intentos</span>
-        <span class="meta-val">{data?.intentos}</span>
-        <span class="meta-key">Snapshot entrada</span>
-        <span class="meta-val">#{data?.input_snapshot_id}</span>
-        <span class="meta-key">Snapshot salida</span>
-        <span class="meta-val">#{data?.output_snapshot_id}</span>
+        <div class="section-title">Resumen</div>
+        <div class="meta-grid">
+          <span class="meta-key">Generado</span>
+          <span class="meta-val">{esc(data?.created_at)}</span>
+          <span class="meta-key">Intentos</span>
+          <span class="meta-val">{data?.intentos}</span>
+          <span class="meta-key">Snapshot entrada</span>
+          <span class="meta-val">#{data?.input_snapshot_id}</span>
+          <span class="meta-key">Snapshot salida</span>
+          <span class="meta-val">#{data?.output_snapshot_id}</span>
+        </div>
       </div>
-    </div>
-    <div class="section">
-      <Button size="sm" variant={copiedId === 'share' ? 'success' : 'secondary'} icon={copiedId === 'share' ? "✅" : "📋"} fill={true} onclick={() => copyText(data?.copypaste ?? "", 'share')}>{copiedId === 'share' ? "Copiado" : "Copiar lista para compartir"}</Button>
-      <div class="share-pre" style="margin-top:8px">{esc(data?.copypaste)}</div>
-    </div>
-    {#if mesas.length > 0}
       <div class="section">
-        <div class="section-title">Partidas ({mesas.length})</div>
-        {#each mesas as mesa (mesa.numero)}
-          {@const playersTxt = mesa.jugadores.map((j) => j.pais ? `${j.nombre} (${j.pais})` : j.nombre).join("\n")}
-          <div class="mesa-card">
-            <div class="mesa-header">
-              <span class="mesa-title">Partida {mesa.numero}</span>
-              {#if mesa.gm}
-                <span class="gm-tag gm-tag-ok">GM: {esc(mesa.gm)}</span>
-              {:else}
-                <span class="gm-tag gm-tag-bad">⚠️ Sin GM</span>
-              {/if}
+        <Button
+          size="sm"
+          variant={copiedId === "share" ? "success" : "secondary"}
+          icon={copiedId === "share" ? "✅" : "📋"}
+          fill={true}
+          onclick={() => copyText(data?.copypaste ?? "", "share")}
+          >{copiedId === "share"
+            ? "Copiado"
+            : "Copiar lista para compartir"}</Button
+        >
+        <div class="share-pre" style="margin-top:8px">
+          {esc(data?.copypaste)}
+        </div>
+      </div>
+      {#if mesas.length > 0}
+        <div class="section">
+          <div class="section-title">Partidas ({mesas.length})</div>
+          {#each mesas as mesa (mesa.numero)}
+            {@const playersTxt = mesa.jugadores
+              .map((j) => (j.pais ? `${j.nombre} (${j.pais})` : j.nombre))
+              .join("\n")}
+            <div class="mesa-card">
+              <div class="mesa-header">
+                <span class="mesa-title">Partida {mesa.numero}</span>
+                {#if mesa.gm}
+                  <span class="gm-tag gm-tag-ok">GM: {esc(mesa.gm)}</span>
+                {:else}
+                  <span class="gm-tag gm-tag-bad">⚠️ Sin GM</span>
+                {/if}
+              </div>
+              <ul class="player-list">
+                {#each mesa.jugadores as j, i (j.nombre)}
+                  <li>
+                    <span class="p-num">{i + 1}.</span>
+                    <span class="p-name"
+                      >{esc(j.nombre)}
+                      {j.pais ? getCountryEmoji(j.pais) : ""}</span
+                    >
+                    {#if j.etiqueta === "Nuevo"}
+                      <div class="tag-wrapper">
+                        <span class="tag tag-nuevo">Nuevo</span>
+                      </div>
+                    {:else}
+                      <div class="tag-wrapper">
+                        <span class="tag tag-antiguo">{esc(j.etiqueta)}</span>
+                      </div>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+              <Button
+                size="sm"
+                variant={copiedId === "players-" + mesa.numero
+                  ? "success"
+                  : "secondary"}
+                icon={copiedId === "players-" + mesa.numero ? "✅" : "📋"}
+                class={copiedId === "players-" + mesa.numero ? "ok" : ""}
+                fill={true}
+                onclick={() => copyText(playersTxt, "players-" + mesa.numero)}
+                >{copiedId === "players-" + mesa.numero
+                  ? "Copiado"
+                  : "Copiar jugadores"}</Button
+              >
             </div>
-            <ul class="player-list">
-              {#each mesa.jugadores as j, i (j.nombre)}
-                <li>
-                  <span class="p-num">{i + 1}.</span>
-                  <span class="p-name">{esc(j.nombre)} {j.pais ? getCountryEmoji(j.pais) : ""}</span>
-                  {#if j.etiqueta === "Nuevo"}
-                    <div class="tag-wrapper">
-                      <span class="tag tag-nuevo">Nuevo</span>
-                    </div>
-                  {:else}
-                    <div class="tag-wrapper">
-                      <span class="tag tag-antiguo">{esc(j.etiqueta)}</span>
-                    </div>
-                  {/if}
-                </li>
-              {/each}
-            </ul>
-            <Button size="sm" variant={copiedId === 'players-' + mesa.numero ? 'success' : 'secondary'} icon={copiedId === 'players-' + mesa.numero ? "✅" : "📋"} class={copiedId === 'players-' + mesa.numero ? 'ok' : ''} fill={true} onclick={() => copyText(playersTxt, 'players-' + mesa.numero)}>{copiedId === 'players-' + mesa.numero ? "Copiado" : "Copiar jugadores"}</Button>
-          </div>
-        {/each}
-      </div>
-    {/if}
-    {#if waiting.length > 0}
-      {@const waitTxt = waiting.map((w) => w.nombre).join("\n")}
-      <div class="section">
-        <div class="section-title">Lista de espera</div>
-        {#each waiting as w (w.nombre)}
-          <div class="waiting-item">
-            <span class="waiting-name">{esc(w.nombre)}</span>
-            <span class="waiting-cupos">{esc(w.cupos)}</span>
-          </div>
-        {/each}
-        <Button size="sm" variant={copiedId === 'waiting' ? 'success' : 'secondary'} icon={copiedId === 'waiting' ? "✅" : "📋"} fill={true} onclick={() => copyText(waitTxt, 'waiting')}>{copiedId === 'waiting' ? "Copiado" : "Copiar lista de espera"}</Button>
-      </div>
-    {/if}
+          {/each}
+        </div>
+      {/if}
+      {#if waiting.length > 0}
+        {@const waitTxt = waiting.map((w) => w.nombre).join("\n")}
+        <div class="section">
+          <div class="section-title">Lista de espera</div>
+          {#each waiting as w (w.nombre)}
+            <div class="waiting-item">
+              <span class="waiting-name">{esc(w.nombre)}</span>
+              <span class="waiting-cupos">{esc(w.cupos)}</span>
+            </div>
+          {/each}
+          <Button
+            size="sm"
+            variant={copiedId === "waiting" ? "success" : "secondary"}
+            icon={copiedId === "waiting" ? "✅" : "📋"}
+            fill={true}
+            onclick={() => copyText(waitTxt, "waiting")}
+            >{copiedId === "waiting"
+              ? "Copiado"
+              : "Copiar lista de espera"}</Button
+          >
+        </div>
+      {/if}
     {/snippet}
   </PanelLayout>
 {/if}

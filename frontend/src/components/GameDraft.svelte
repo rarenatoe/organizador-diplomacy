@@ -16,13 +16,23 @@
     initialDraft?: DraftResponse | null;
   }
 
-  let { snapshotId, onClose, onChainUpdate, onOpenGame, onShowError, editingGameId, initialDraft }: Props = $props();
+  let {
+    snapshotId,
+    onClose,
+    onChainUpdate,
+    onOpenGame,
+    onShowError,
+    editingGameId,
+    initialDraft,
+  }: Props = $props();
 
   let draftData = $state<DraftResponse | null>(null);
   let loading = $state(true);
   let saving = $state(false);
-  
-  type SwapTarget = { type: 'mesa', mesaIndex: number, playerIndex: number } | { type: 'espera', playerIndex: number };
+
+  type SwapTarget =
+    | { type: "mesa"; mesaIndex: number; playerIndex: number }
+    | { type: "espera"; playerIndex: number };
   let selectedSwap = $state<SwapTarget | null>(null);
 
   async function loadDraft(): Promise<void> {
@@ -45,23 +55,28 @@
     }
   }
 
-  function handleCountryChange(mesaIndex: number, playerIndex: number, newCountry: string): void {
+  function handleCountryChange(
+    mesaIndex: number,
+    playerIndex: number,
+    newCountry: string,
+  ): void {
     if (!draftData) return;
-    
+
     // Check if the new country is already assigned to another player in the same mesa
     const mesa = draftData.mesas[mesaIndex];
     if (!mesa) return;
-    
-    const conflictingPlayer = mesa.jugadores.find((j, idx) => 
-      idx !== playerIndex && j.pais === newCountry && newCountry !== ""
+
+    const conflictingPlayer = mesa.jugadores.find(
+      (j, idx) =>
+        idx !== playerIndex && j.pais === newCountry && newCountry !== "",
     );
-    
+
     if (conflictingPlayer) {
       // Automatically swap countries between the two players
       const conflictingPlayerIndex = mesa.jugadores.indexOf(conflictingPlayer);
       const currentPlayer = mesa.jugadores[playerIndex]!;
       const tempCountry = currentPlayer.pais;
-      
+
       // Assign new country to current player
       if (newCountry !== "") {
         currentPlayer.pais = newCountry;
@@ -69,7 +84,7 @@
         // Handle "Aleatorio" selection - remove country assignment
         currentPlayer.pais = "";
       }
-      
+
       // Give old country to conflicting player
       const conflictingPlayerObj = mesa.jugadores[conflictingPlayerIndex];
       if (conflictingPlayerObj) {
@@ -100,17 +115,23 @@
           ...(pais_reason ? { pais_reason } : {}),
         })),
       }));
-      const cleanTicketsSobrantes = draftData.tickets_sobrantes.map(({ pais, pais_reason, ...rest }) => ({
-        ...rest,
-        pais: pais || "",
-        ...(pais_reason ? { pais_reason } : {}),
-      }));
-      const payload: DraftResponse = { ...draftData, mesas: cleanMesas, tickets_sobrantes: cleanTicketsSobrantes };
+      const cleanTicketsSobrantes = draftData.tickets_sobrantes.map(
+        ({ pais, pais_reason, ...rest }) => ({
+          ...rest,
+          pais: pais || "",
+          ...(pais_reason ? { pais_reason } : {}),
+        }),
+      );
+      const payload: DraftResponse = {
+        ...draftData,
+        mesas: cleanMesas,
+        tickets_sobrantes: cleanTicketsSobrantes,
+      };
 
-      const response = await saveGameDraft({ 
-        snapshot_id: snapshotId, 
-        draft: payload, 
-        editing_game_id: editingGameId || null
+      const response = await saveGameDraft({
+        snapshot_id: snapshotId,
+        draft: payload,
+        editing_game_id: editingGameId || null,
       });
       if (response.error) {
         onShowError("Error al guardar draft", response.error);
@@ -120,7 +141,7 @@
       // Close the draft panel and open the new game
       onClose();
       onChainUpdate();
-      
+
       // Find and open the latest game
       const { fetchChain } = await import("../api");
       const chainData = await fetchChain();
@@ -138,28 +159,30 @@
 
   function handlePlayerClick(target: SwapTarget): void {
     if (!draftData) return;
-    
+
     if (selectedSwap === null) {
       // First selection - set the swap target
       selectedSwap = target;
     } else {
       // Second selection - attempt to swap
-      if (selectedSwap.type === target.type && 
-          selectedSwap.type === 'mesa' && 
-          target.type === 'mesa' &&
-          selectedSwap.mesaIndex === target.mesaIndex && 
-          selectedSwap.playerIndex === target.playerIndex) {
+      if (
+        selectedSwap.type === target.type &&
+        selectedSwap.type === "mesa" &&
+        target.type === "mesa" &&
+        selectedSwap.mesaIndex === target.mesaIndex &&
+        selectedSwap.playerIndex === target.playerIndex
+      ) {
         // Clicked the same player - cancel selection
         selectedSwap = null;
         return;
       }
-      
+
       // Get the two players to swap
       let playerA: DraftPlayer | null = null;
       let playerB: DraftPlayer | null = null;
-      
+
       // Extract Player A
-      if (selectedSwap.type === 'mesa') {
+      if (selectedSwap.type === "mesa") {
         const mesaAIndex = selectedSwap.mesaIndex;
         const mesaA = draftData.mesas[mesaAIndex];
         if (mesaA) {
@@ -168,9 +191,9 @@
       } else {
         playerA = draftData.tickets_sobrantes[selectedSwap.playerIndex] ?? null;
       }
-      
+
       // Extract Player B
-      if (target.type === 'mesa') {
+      if (target.type === "mesa") {
         const mesaBIndex = target.mesaIndex;
         const mesaB = draftData.mesas[mesaBIndex];
         if (mesaB) {
@@ -179,118 +202,165 @@
       } else {
         playerB = draftData.tickets_sobrantes[target.playerIndex] ?? null;
       }
-      
+
       if (!playerA || !playerB) {
-        onShowError("Error", "No se encontraron los jugadores para intercambiar.");
+        onShowError(
+          "Error",
+          "No se encontraron los jugadores para intercambiar.",
+        );
         selectedSwap = null;
         return;
       }
-      
+
       // Constraint: Check for duplicates in destination tables
-      if (target.type === 'mesa') {
+      if (target.type === "mesa") {
         const mesaAIndex = target.mesaIndex;
         const mesaA = draftData.mesas[mesaAIndex];
         if (mesaA) {
-          const hasDuplicate = mesaA.jugadores.some(p => p.nombre === playerA.nombre && p !== playerA);
+          const hasDuplicate = mesaA.jugadores.some(
+            (p) => p.nombre === playerA.nombre && p !== playerA,
+          );
           if (hasDuplicate) {
-            onShowError("Movimiento Inválido", `El jugador ${playerA.nombre} ya está en la mesa ${mesaA.numero}.`);
+            onShowError(
+              "Movimiento Inválido",
+              `El jugador ${playerA.nombre} ya está en la mesa ${mesaA.numero}.`,
+            );
             selectedSwap = null;
             return;
           }
         }
       }
-      
-      if (selectedSwap.type === 'mesa') {
+
+      if (selectedSwap.type === "mesa") {
         const mesaBIndex = selectedSwap.mesaIndex;
         const mesaB = draftData.mesas[mesaBIndex];
         if (mesaB) {
-          const hasDuplicate = mesaB.jugadores.some(p => p.nombre === playerB.nombre && p !== playerB);
+          const hasDuplicate = mesaB.jugadores.some(
+            (p) => p.nombre === playerB.nombre && p !== playerB,
+          );
           if (hasDuplicate) {
-            onShowError("Movimiento Inválido", `El jugador ${playerB.nombre} ya está en la mesa ${mesaB.numero}.`);
+            onShowError(
+              "Movimiento Inválido",
+              `El jugador ${playerB.nombre} ya está en la mesa ${mesaB.numero}.`,
+            );
             selectedSwap = null;
             return;
           }
         }
       }
-      
+
       // Execute the swap
-      if (selectedSwap.type === 'mesa') {
+      if (selectedSwap.type === "mesa") {
         const selectedMesaIndex = selectedSwap.mesaIndex;
         const selectedPlayerIndex = selectedSwap.playerIndex;
-        
-        if (target.type === 'mesa') {
+
+        if (target.type === "mesa") {
           // Mesa to Mesa swap
           const targetMesaIndex = target.mesaIndex;
           const targetPlayerIndex = target.playerIndex;
-          
-          if (draftData.mesas[selectedMesaIndex]?.jugadores[selectedPlayerIndex] && 
-              draftData.mesas[targetMesaIndex]?.jugadores[targetPlayerIndex]) {
+
+          if (
+            draftData.mesas[selectedMesaIndex]?.jugadores[
+              selectedPlayerIndex
+            ] &&
+            draftData.mesas[targetMesaIndex]?.jugadores[targetPlayerIndex]
+          ) {
             // Swap countries so slot retains assigned country
-            const tempPais = draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex].pais;
-            const targetPais = draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex].pais;
-            
-            draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex].pais = targetPais;
-            draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex].pais = tempPais;
-            
-            draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex] = playerB;
-            draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex] = playerA;
+            const tempPais =
+              draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex]
+                .pais;
+            const targetPais =
+              draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex]
+                .pais;
+
+            draftData.mesas[selectedMesaIndex].jugadores[
+              selectedPlayerIndex
+            ].pais = targetPais;
+            draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex].pais =
+              tempPais;
+
+            draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex] =
+              playerB;
+            draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex] =
+              playerA;
           }
         } else {
           // Mesa to Espera swap
           const targetPlayerIndex = target.playerIndex;
-          
-          if (draftData.mesas[selectedMesaIndex]?.jugadores[selectedPlayerIndex] && 
-              draftData.tickets_sobrantes[targetPlayerIndex] !== undefined) {
+
+          if (
+            draftData.mesas[selectedMesaIndex]?.jugadores[
+              selectedPlayerIndex
+            ] &&
+            draftData.tickets_sobrantes[targetPlayerIndex] !== undefined
+          ) {
             // Swap countries so slot retains assigned country
-            const tempPais = draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex].pais;
-            const targetPais = draftData.tickets_sobrantes[targetPlayerIndex].pais;
-            
-            draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex].pais = targetPais;
+            const tempPais =
+              draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex]
+                .pais;
+            const targetPais =
+              draftData.tickets_sobrantes[targetPlayerIndex].pais;
+
+            draftData.mesas[selectedMesaIndex].jugadores[
+              selectedPlayerIndex
+            ].pais = targetPais;
             draftData.tickets_sobrantes[targetPlayerIndex].pais = tempPais;
-            
-            draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex] = playerB;
+
+            draftData.mesas[selectedMesaIndex].jugadores[selectedPlayerIndex] =
+              playerB;
             draftData.tickets_sobrantes[targetPlayerIndex] = playerA;
           }
         }
       } else {
         const selectedPlayerIndex = selectedSwap.playerIndex;
-        
-        if (target.type === 'mesa') {
+
+        if (target.type === "mesa") {
           // Espera to Mesa swap
           const targetMesaIndex = target.mesaIndex;
           const targetPlayerIndex = target.playerIndex;
-          
-          if (draftData.tickets_sobrantes[selectedPlayerIndex] !== undefined && 
-              draftData.mesas[targetMesaIndex]?.jugadores[targetPlayerIndex]) {
+
+          if (
+            draftData.tickets_sobrantes[selectedPlayerIndex] !== undefined &&
+            draftData.mesas[targetMesaIndex]?.jugadores[targetPlayerIndex]
+          ) {
             // Swap countries so slot retains assigned country
-            const tempPais = draftData.tickets_sobrantes[selectedPlayerIndex].pais;
-            const targetPais = draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex].pais;
-            
+            const tempPais =
+              draftData.tickets_sobrantes[selectedPlayerIndex].pais;
+            const targetPais =
+              draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex]
+                .pais;
+
             draftData.tickets_sobrantes[selectedPlayerIndex].pais = targetPais;
-            draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex].pais = tempPais;
-            
+            draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex].pais =
+              tempPais;
+
             draftData.tickets_sobrantes[selectedPlayerIndex] = playerB;
-            draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex] = playerA;
+            draftData.mesas[targetMesaIndex].jugadores[targetPlayerIndex] =
+              playerA;
           }
         } else {
           // Espera to Espera swap
           const targetPlayerIndex = target.playerIndex;
-          
-          if (draftData.tickets_sobrantes[selectedPlayerIndex] !== undefined && 
-              draftData.tickets_sobrantes[targetPlayerIndex] !== undefined) {
+
+          if (
+            draftData.tickets_sobrantes[selectedPlayerIndex] !== undefined &&
+            draftData.tickets_sobrantes[targetPlayerIndex] !== undefined
+          ) {
             // Swap countries so slot retains assigned country
-            const tempPais = draftData.tickets_sobrantes[selectedPlayerIndex].pais;
-            const targetPais = draftData.tickets_sobrantes[targetPlayerIndex].pais;
-            
+            const tempPais =
+              draftData.tickets_sobrantes[selectedPlayerIndex].pais;
+            const targetPais =
+              draftData.tickets_sobrantes[targetPlayerIndex].pais;
+
             draftData.tickets_sobrantes[selectedPlayerIndex].pais = targetPais;
             draftData.tickets_sobrantes[targetPlayerIndex].pais = tempPais;
-            
+
             draftData.tickets_sobrantes[selectedPlayerIndex] = playerB;
             draftData.tickets_sobrantes[targetPlayerIndex] = playerA;
           }
         }
       }
-      
+
       // Reset selection
       selectedSwap = null;
     }
@@ -299,10 +369,13 @@
   function isSelectedSwap(target: SwapTarget): boolean {
     if (!selectedSwap) return false;
     if (selectedSwap.type !== target.type) return false;
-    
-    if (selectedSwap.type === 'mesa' && target.type === 'mesa') {
-      return selectedSwap.mesaIndex === target.mesaIndex && selectedSwap.playerIndex === target.playerIndex;
-    } else if (selectedSwap.type === 'espera' && target.type === 'espera') {
+
+    if (selectedSwap.type === "mesa" && target.type === "mesa") {
+      return (
+        selectedSwap.mesaIndex === target.mesaIndex &&
+        selectedSwap.playerIndex === target.playerIndex
+      );
+    } else if (selectedSwap.type === "espera" && target.type === "espera") {
       return selectedSwap.playerIndex === target.playerIndex;
     }
     return false;
@@ -314,109 +387,146 @@
 <PanelLayout>
   {#snippet body()}
     {#if loading}
-      <p style="color:var(--muted);font-size:12px;padding:4px 0">Generando draft...</p>
+      <p style="color:var(--muted);font-size:12px;padding:4px 0">
+        Generando draft...
+      </p>
     {:else if draftData}
-    <div class="section">
-      <div class="section-title">Draft de Partidas - Snapshot #{snapshotId}</div>
-      <div class="meta-grid">
-        <span class="meta-key">Mesas generadas</span>
-        <span class="meta-val">{draftData.mesas.length}</span>
-        <span class="meta-key">Jugadores en espera</span>
-        <span class="meta-val">{draftData.tickets_sobrantes.length}</span>
-        <span class="meta-key">Intentos usados</span>
-        <span class="meta-val">{draftData.intentos_usados}</span>
-      </div>
-    </div>
-    {#if draftData.mesas.length > 0}
       <div class="section">
-        <div class="section-title">Partidas ({draftData.mesas.length})</div>
-        {#each draftData.mesas as mesa, mesaIndex (mesa.numero)}
-          <div class="mesa-card">
-            <div class="mesa-header">
-              <span class="mesa-title">Partida {mesa.numero}</span>
-              {#if mesa.gm}
-                <span class="gm-tag gm-tag-ok">GM: {mesa.gm.nombre}</span>
-              {:else}
-                <span class="gm-tag gm-tag-bad">⚠️ Sin GM</span>
-              {/if}
-            </div>
-            <ul class="player-list">
-              {#each mesa.jugadores as j, i (j.nombre)}
-                {@const target = { type: 'mesa' as const, mesaIndex, playerIndex: i } }
-                {@const isSelected = isSelectedSwap(target)}
-                <li class:swapping-active={isSelected}>
-                  <span class="p-num">{i + 1}.</span>
-                  <span class="p-name">{j.nombre}</span>
-                  <div class="country-container">
-                    <select 
-                      class="country-select" 
-                      value={j.pais || ""}
-                      onchange={(e) => {
-                      const target = e.target as HTMLSelectElement;
-                      handleCountryChange(mesaIndex, i, target.value);
-                    }}
-                    >
-                      <option value="">🎲 Aleatorio</option>
-                      <option value="England">🇬🇧 Inglaterra</option>
-                      <option value="France">🇫🇷 Francia</option>
-                      <option value="Germany">🇩🇪 Alemania</option>
-                      <option value="Italy">🇮🇹 Italia</option>
-                      <option value="Austria">🇦🇹 Austria</option>
-                      <option value="Russia">🇷🇺 Rusia</option>
-                      <option value="Turkey">🇹🇷 Turquía</option>
-                    </select>
-                    {#if j.pais_reason}
-                      <div class="reason-tooltip">
-                        <span class="info-icon">ℹ️</span>
-                        <div class="tooltip-popover">{j.pais_reason}</div>
+        <div class="section-title">
+          Draft de Partidas - Snapshot #{snapshotId}
+        </div>
+        <div class="meta-grid">
+          <span class="meta-key">Mesas generadas</span>
+          <span class="meta-val">{draftData.mesas.length}</span>
+          <span class="meta-key">Jugadores en espera</span>
+          <span class="meta-val">{draftData.tickets_sobrantes.length}</span>
+          <span class="meta-key">Intentos usados</span>
+          <span class="meta-val">{draftData.intentos_usados}</span>
+        </div>
+      </div>
+      {#if draftData.mesas.length > 0}
+        <div class="section">
+          <div class="section-title">Partidas ({draftData.mesas.length})</div>
+          {#each draftData.mesas as mesa, mesaIndex (mesa.numero)}
+            <div class="mesa-card">
+              <div class="mesa-header">
+                <span class="mesa-title">Partida {mesa.numero}</span>
+                {#if mesa.gm}
+                  <span class="gm-tag gm-tag-ok">GM: {mesa.gm.nombre}</span>
+                {:else}
+                  <span class="gm-tag gm-tag-bad">⚠️ Sin GM</span>
+                {/if}
+              </div>
+              <ul class="player-list">
+                {#each mesa.jugadores as j, i (j.nombre)}
+                  {@const target = {
+                    type: "mesa" as const,
+                    mesaIndex,
+                    playerIndex: i,
+                  }}
+                  {@const isSelected = isSelectedSwap(target)}
+                  <li class:swapping-active={isSelected}>
+                    <span class="p-num">{i + 1}.</span>
+                    <span class="p-name">{j.nombre}</span>
+                    <div class="country-container">
+                      <select
+                        class="country-select"
+                        value={j.pais || ""}
+                        onchange={(e) => {
+                          const target = e.target as HTMLSelectElement;
+                          handleCountryChange(mesaIndex, i, target.value);
+                        }}
+                      >
+                        <option value="">🎲 Aleatorio</option>
+                        <option value="England">🇬🇧 Inglaterra</option>
+                        <option value="France">🇫🇷 Francia</option>
+                        <option value="Germany">🇩🇪 Alemania</option>
+                        <option value="Italy">🇮🇹 Italia</option>
+                        <option value="Austria">🇦🇹 Austria</option>
+                        <option value="Russia">🇷🇺 Rusia</option>
+                        <option value="Turkey">🇹🇷 Turquía</option>
+                      </select>
+                      {#if j.pais_reason}
+                        <div class="reason-tooltip">
+                          <span class="info-icon">ℹ️</span>
+                          <div class="tooltip-popover">{j.pais_reason}</div>
+                        </div>
+                      {/if}
+                    </div>
+                    {#if j.es_nuevo}
+                      <div class="tag-wrapper">
+                        <span class="tag tag-nuevo">Nuevo</span>
+                      </div>
+                    {:else}
+                      <div class="tag-wrapper">
+                        <span class="tag tag-antiguo">Antiguo</span>
                       </div>
                     {/if}
-                  </div>
-                  {#if j.es_nuevo}
-                    <div class="tag-wrapper">
-                      <span class="tag tag-nuevo">Nuevo</span>
-                    </div>
-                  {:else}
-                    <div class="tag-wrapper">
-                      <span class="tag tag-antiguo">Antiguo</span>
-                    </div>
-                  {/if}
-                  <Button variant="ghost" size="sm" iconOnly={true} icon="🔄" title="Intercambiar" onclick={() => handlePlayerClick(target)} />
-                </li>
-              {/each}
-            </ul>
-          </div>
-        {/each}
-      </div>
-    {/if}
-    {#if draftData.tickets_sobrantes.length > 0}
-      <div class="section">
-        <div class="section-title">Lista de espera</div>
-        {#each draftData.tickets_sobrantes as w, i (w.nombre)}
-          {@const target = { type: 'espera' as const, playerIndex: i } }
-          {@const isSelected = isSelectedSwap(target)}
-          <div class="waiting-item" class:swapping-active={isSelected}>
-            <span class="waiting-name">{w.nombre}</span>
-            <span class="waiting-cupos">{w.partidas_deseadas} cupos</span>
-            <Button variant="ghost" size="sm" iconOnly={true} icon="🔄" title="Intercambiar" onclick={() => handlePlayerClick(target)} />
-          </div>
-        {/each}
-      </div>
-    {/if}
-    <p style="color:var(--danger);font-size:12px;padding:4px 0">No se pudo generar el draft</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      iconOnly={true}
+                      icon="🔄"
+                      title="Intercambiar"
+                      onclick={() => handlePlayerClick(target)}
+                    />
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          {/each}
+        </div>
+      {/if}
+      {#if draftData.tickets_sobrantes.length > 0}
+        <div class="section">
+          <div class="section-title">Lista de espera</div>
+          {#each draftData.tickets_sobrantes as w, i (w.nombre)}
+            {@const target = { type: "espera" as const, playerIndex: i }}
+            {@const isSelected = isSelectedSwap(target)}
+            <div class="waiting-item" class:swapping-active={isSelected}>
+              <span class="waiting-name">{w.nombre}</span>
+              <span class="waiting-cupos">{w.partidas_deseadas} cupos</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly={true}
+                icon="🔄"
+                title="Intercambiar"
+                onclick={() => handlePlayerClick(target)}
+              />
+            </div>
+          {/each}
+        </div>
+      {/if}
+    {:else}
+      <p style="color:var(--danger);font-size:12px;padding:4px 0">
+        No se pudo generar el draft
+      </p>
     {/if}
   {/snippet}
 
   {#snippet footer()}
     {#if draftData}
-      <Button variant="secondary" fill={true} onclick={() => {
-        if (editingGameId) {
-          onOpenGame(editingGameId);
-        } else {
-          onClose();
-        }
-      }} disabled={saving}>Cancelar</Button>
-      <Button variant="primary" fill={true} icon={saving ? "⏳" : "✨"} onclick={handleSaveDraft} disabled={saving}>{saving ? "Guardando..." : "Confirmar y Guardar"}</Button>
+      <Button
+        variant="secondary"
+        fill={true}
+        onclick={() => {
+          if (editingGameId) {
+            onOpenGame(editingGameId);
+          } else {
+            onClose();
+          }
+        }}
+        disabled={saving}>Cancelar</Button
+      >
+      <Button
+        variant="primary"
+        fill={true}
+        icon={saving ? "⏳" : "✨"}
+        onclick={handleSaveDraft}
+        disabled={saving}
+        >{saving ? "Guardando..." : "Confirmar y Guardar"}</Button
+      >
     {/if}
   {/snippet}
 </PanelLayout>
@@ -604,7 +714,7 @@
 
   /* Little triangle pointer for the tooltip */
   .tooltip-popover::after {
-    content: '';
+    content: "";
     position: absolute;
     top: 100%;
     left: 50%;
@@ -618,7 +728,6 @@
     display: block;
   }
 
-  
   .swapping-active {
     background: #eff6ff;
     outline: 1px solid var(--accent);

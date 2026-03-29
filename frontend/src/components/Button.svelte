@@ -1,14 +1,14 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import type { Snippet } from "svelte";
 
   interface Props {
-    variant?: 'primary' | 'secondary' | 'success' | 'warning' | 'ghost';
+    variant?: "primary" | "secondary" | "success" | "warning" | "ghost";
     fill?: boolean;
     disabled?: boolean;
     icon?: string;
-    size?: 'md' | 'sm';
+    size?: "md" | "sm";
     iconOnly?: boolean;
-    type?: 'button' | 'submit' | 'reset';
+    type?: "button" | "submit" | "reset";
     class?: string;
     style?: string;
     title?: string;
@@ -17,32 +17,39 @@
   }
 
   let {
-    variant = 'secondary',
+    variant = "secondary",
     fill = false,
     disabled = false,
-    icon = '',
-    size = 'md',
+    icon = "",
+    size = "md",
     iconOnly = false,
-    type = 'button',
-    class: className = '',
-    style = '',
-    title = '',
+    type = "button",
+    class: className = "",
+    style = "",
+    title = "",
     onclick,
-    children
+    children,
   }: Props = $props();
 
   const variantClasses: Record<string, string> = {
-    primary: 'btn-primary',
-    secondary: 'btn-secondary',
-    success: 'btn-success',
-    warning: 'btn-warning',
-    ghost: 'btn-ghost'
+    primary: "btn-primary",
+    secondary: "btn-secondary",
+    success: "btn-success",
+    warning: "btn-warning",
+    ghost: "btn-ghost",
   };
 
   let finalClass = $derived(
-    ['btn', variantClasses[variant], size === 'sm' ? 'btn-sm' : '', fill ? 'flex-fill' : '', iconOnly ? 'btn-icon-only' : '', className]
+    [
+      "btn",
+      variantClasses[variant],
+      size === "sm" ? "btn-sm" : "",
+      fill ? "flex-fill" : "",
+      iconOnly ? "btn-icon-only" : "",
+      className,
+    ]
       .filter(Boolean)
-      .join(' ')
+      .join(" "),
   );
 
   function handleClick(e: MouseEvent) {
@@ -52,7 +59,14 @@
   }
 </script>
 
-<button {type} class={finalClass} {style} {title} {disabled} onclick={handleClick}>
+<button
+  {type}
+  class={finalClass}
+  {style}
+  {title}
+  {disabled}
+  onclick={handleClick}
+>
   {#if icon}<span class="btn-icon">{icon}</span>{/if}
   {#if children}<span>{@render children()}</span>{/if}
 </button>
@@ -76,30 +90,71 @@
     box-sizing: border-box;
     line-height: 1;
   }
-  .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .flex-fill { flex: 1 1 auto; width: 100%; }
-  
+  .btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .flex-fill {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
   /* Primary */
-  .btn-primary { background: var(--accent); color: white; border-color: var(--accent); }
-  .btn-primary:hover:not(:disabled) { background: #2563eb; }
-  
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: #2563eb;
+  }
+
   /* Secondary */
-  .btn-secondary { background: var(--surface2); border-color: var(--border); color: var(--text); }
-  .btn-secondary:hover:not(:disabled) { background: var(--border); }
-  
+  .btn-secondary {
+    background: var(--surface2);
+    border-color: var(--border);
+    color: var(--text);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--border);
+  }
+
   /* Success */
-  .btn-success { background: var(--success); color: white; border-color: var(--success); }
-  .btn-success:hover:not(:disabled) { background: #16a34a; }
-  
+  .btn-success {
+    background: var(--success);
+    color: white;
+    border-color: var(--success);
+  }
+  .btn-success:hover:not(:disabled) {
+    background: #16a34a;
+  }
+
   /* Warning */
-  .btn-warning { background: #eab308; color: #422006; border-color: #eab308; }
-  .btn-warning:hover:not(:disabled) { background: #ca8a04; }
-  
+  .btn-warning {
+    background: #eab308;
+    color: #422006;
+    border-color: #eab308;
+  }
+  .btn-warning:hover:not(:disabled) {
+    background: #ca8a04;
+  }
+
   /* Ghost */
-  .btn-ghost { background: transparent; border-color: transparent; color: var(--text); padding: 4px 8px; }
-  .btn-ghost:hover:not(:disabled) { background: var(--border); border-color: transparent; }
-  
+  .btn-ghost {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text);
+    padding: 4px 8px;
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--border);
+    border-color: transparent;
+  }
+
   /* Icon */
   .btn-icon {
     display: inline-flex;
@@ -107,10 +162,14 @@
     justify-content: center;
     line-height: 1;
   }
-  
+
   /* Sizes */
-  .btn-sm { padding: 4px 8px; font-size: 11px; gap: 4px; }
-  
+  .btn-sm {
+    padding: 4px 8px;
+    font-size: 11px;
+    gap: 4px;
+  }
+
   /* Icon Only */
   .btn-icon-only {
     padding: 0;

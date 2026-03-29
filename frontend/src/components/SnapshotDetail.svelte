@@ -1,6 +1,18 @@
 <script lang="ts">
-  import type { SnapshotDetail, EditPlayerRow, SimilarName, MergePair, NotionPlayer, OrganizarValidation } from "../types";
-  import { fetchSnapshot, renamePlayer, fetchNotionPlayers, saveSnapshot } from "../api";
+  import type {
+    SnapshotDetail,
+    EditPlayerRow,
+    SimilarName,
+    MergePair,
+    NotionPlayer,
+    OrganizarValidation,
+  } from "../types";
+  import {
+    fetchSnapshot,
+    renamePlayer,
+    fetchNotionPlayers,
+    saveSnapshot,
+  } from "../api";
   import { setActiveNodeId } from "../stores.svelte";
   import { validateOrganizar } from "../syncUtils";
   import { normalizeName } from "../utils";
@@ -16,11 +28,23 @@
     onOpenSnapshot: (id: number) => void;
     onOpenGame: (id: number) => void;
     onOpenGameDraft: (snapshotId: number) => void;
-    onEditDraft: (parentId: number, eventType: "sync" | "manual" | "edit", autoAction?: 'notion' | 'csv' | null, players?: EditPlayerRow[]) => void;
+    onEditDraft: (
+      parentId: number,
+      eventType: "sync" | "manual" | "edit",
+      autoAction?: "notion" | "csv" | null,
+      players?: EditPlayerRow[],
+    ) => void;
     onShowError: (title: string, output: string) => void;
   }
 
-  let { id, onChainUpdate, onOpenSnapshot, onOpenGameDraft, onEditDraft, onShowError }: Props = $props();
+  let {
+    id,
+    onChainUpdate,
+    onOpenSnapshot,
+    onOpenGameDraft,
+    onEditDraft,
+    onShowError,
+  }: Props = $props();
 
   let data = $state<SnapshotDetail | null>(null);
   let loading = $state(true);
@@ -68,11 +92,7 @@
     const rows = data.players;
     return [
       CSV_COLS.join(","),
-      ...rows.map((r) =>
-        CSV_COLS.map((c) =>
-          String(r[c] ?? ""),
-        ).join(","),
-      ),
+      ...rows.map((r) => CSV_COLS.map((c) => String(r[c] ?? "")).join(",")),
     ].join("\n");
   }
 
@@ -88,7 +108,10 @@
     if (!data?.players) return;
 
     if (data.players.length < 7) {
-      onShowError("Error al organizar", "Se necesitan al menos 7 jugadores para organizar partidas.");
+      onShowError(
+        "Error al organizar",
+        "Se necesitan al menos 7 jugadores para organizar partidas.",
+      );
       return;
     }
 
@@ -110,7 +133,10 @@
     const newName = prompt(`Renombrar jugador "${oldName}" a:`, oldName);
     if (!newName || newName === oldName) return;
     const result = await renamePlayer(oldName, newName);
-    if (result.error) { alert(`Error: ${result.error}`); return; }
+    if (result.error) {
+      alert(`Error: ${result.error}`);
+      return;
+    }
     await loadSnapshot();
     onChainUpdate();
   }
@@ -119,7 +145,7 @@
     if (data?.source === "notion_sync") {
       onShowError(
         "Acción no permitida",
-        "El snapshot base ya fue generado por notion_sync y aún no se ha jugado una partida."
+        "El snapshot base ya fue generado por notion_sync y aún no se ha jugado una partida.",
       );
       return;
     }
@@ -128,9 +154,12 @@
     try {
       const currentNames = (data?.players ?? []).map((p) => p.nombre);
       const response = await fetchNotionPlayers(currentNames);
-      
+
       if (response.error) {
-        onShowError("Error de Sincronización", response.error || "Error desconocido");
+        onShowError(
+          "Error de Sincronización",
+          response.error || "Error desconocido",
+        );
         isSyncing = false;
         return;
       }
@@ -163,12 +192,17 @@
       const normName = normalizeName(notionName);
 
       const notionPlayer = fetchedNotionPlayers.find(
-        (p) => normalizeName(p.nombre) === normName || p.alias?.some((a: string) => normalizeName(a) === normName)
+        (p) =>
+          normalizeName(p.nombre) === normName ||
+          p.alias?.some((a: string) => normalizeName(a) === normName),
       );
 
       if (notionPlayer) {
         return {
-          nombre: mergeInfo?.action === "merge_notion" ? notionPlayer.nombre : currentName,
+          nombre:
+            mergeInfo?.action === "merge_notion"
+              ? notionPlayer.nombre
+              : currentName,
           experiencia: notionPlayer.experiencia,
           juegos_este_ano: notionPlayer.juegos_este_ano,
           prioridad: row.prioridad,
@@ -239,9 +273,19 @@
   <PanelLayout scrollable={false}>
     {#snippet header()}
       <div class="section" style="margin-bottom: 16px;">
-        <div class="section-title">Snapshot #{id} · {sourceLabel(data?.source)}</div>
-        <div class="node-meta" style="margin-bottom:8px">{esc(data?.created_at)}</div>
-        <Button size="sm" variant={csvCopied ? 'success' : 'secondary'} icon={csvCopied ? "✅" : "📋"} fill={true} onclick={copyCsv}>{csvCopied ? "Copiado" : "Copiar tabla CSV"}</Button>
+        <div class="section-title">
+          Snapshot #{id} · {sourceLabel(data?.source)}
+        </div>
+        <div class="node-meta" style="margin-bottom:8px">
+          {esc(data?.created_at)}
+        </div>
+        <Button
+          size="sm"
+          variant={csvCopied ? "success" : "secondary"}
+          icon={csvCopied ? "✅" : "📋"}
+          fill={true}
+          onclick={copyCsv}>{csvCopied ? "Copiado" : "Copiar tabla CSV"}</Button
+        >
       </div>
       <div class="section-title" style="margin-bottom:6px">
         Jugadores <span
@@ -253,7 +297,7 @@
 
     {#snippet body()}
       <div class="table-wrap flex-table-wrap">
-    <table>
+        <table>
           <thead>
             <tr>
               <th>Nombre</th>
@@ -270,8 +314,7 @@
               {@const nombre = esc(r.nombre)}
               {@const expColor =
                 r.experiencia === "Nuevo" ? "#713f12" : "#166534"}
-              {@const expBg =
-                r.experiencia === "Nuevo" ? "#fef9c3" : "#f0fdf4"}
+              {@const expBg = r.experiencia === "Nuevo" ? "#fef9c3" : "#f0fdf4"}
               <tr>
                 <td><span class="player-name">{nombre}</span></td>
                 <td style="padding-left: 0; width: 32px;">
@@ -302,19 +345,33 @@
     {/snippet}
 
     {#snippet footer()}
-      <Button variant="secondary" fill={true} icon="📝" onclick={() => {
-        const playersToEdit = (data?.players || []).map((p) => ({
-          nombre: p.nombre,
-          experiencia: p.experiencia ?? "Nuevo",
-          juegos_este_ano: p.juegos_este_ano ?? 0,
-          prioridad: p.prioridad ?? 0,
-          partidas_deseadas: p.partidas_deseadas ?? 1,
-          partidas_gm: p.partidas_gm ?? 0
-        }));
-        onEditDraft(id, 'manual', null, playersToEdit);
-      }}>Editar</Button>
-      <Button variant="secondary" fill={true} icon="🔄" onclick={handleDirectSync} disabled={isSyncing}>{isSyncing ? "Sincronizando..." : "Sincronizar Notion"}</Button>
-      <Button variant="primary" fill={true} icon="▶️" onclick={handleOrganizar}>Organizar Partidas</Button>
+      <Button
+        variant="secondary"
+        fill={true}
+        icon="📝"
+        onclick={() => {
+          const playersToEdit = (data?.players || []).map((p) => ({
+            nombre: p.nombre,
+            experiencia: p.experiencia ?? "Nuevo",
+            juegos_este_ano: p.juegos_este_ano ?? 0,
+            prioridad: p.prioridad ?? 0,
+            partidas_deseadas: p.partidas_deseadas ?? 1,
+            partidas_gm: p.partidas_gm ?? 0,
+          }));
+          onEditDraft(id, "manual", null, playersToEdit);
+        }}>Editar</Button
+      >
+      <Button
+        variant="secondary"
+        fill={true}
+        icon="🔄"
+        onclick={handleDirectSync}
+        disabled={isSyncing}
+        >{isSyncing ? "Sincronizando..." : "Sincronizar Notion"}</Button
+      >
+      <Button variant="primary" fill={true} icon="▶️" onclick={handleOrganizar}
+        >Organizar Partidas</Button
+      >
     {/snippet}
   </PanelLayout>
 {/if}
@@ -328,7 +385,7 @@
 
 <OrganizarConfirmModal
   visible={showConfirm}
-  validation={validation}
+  {validation}
   onConfirm={executeOrganizar}
   onEdit={() => {
     showConfirm = false;
@@ -338,9 +395,9 @@
       juegos_este_ano: p.juegos_este_ano ?? 0,
       prioridad: p.prioridad ?? 0,
       partidas_deseadas: p.partidas_deseadas ?? 1,
-      partidas_gm: p.partidas_gm ?? 0
+      partidas_gm: p.partidas_gm ?? 0,
     }));
-    onEditDraft(id, 'manual', null, playersToEdit);
+    onEditDraft(id, "manual", null, playersToEdit);
   }}
   onCancel={() => {
     showConfirm = false;
@@ -361,7 +418,6 @@
     margin-bottom: 10px;
   }
 
-  
   .table-wrap {
     overflow-x: auto;
     border: 1px solid var(--border);

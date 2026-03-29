@@ -1,7 +1,12 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
-  
-  let { header, body, footer, scrollable = true }: {
+  import type { Snippet } from "svelte";
+
+  let {
+    header,
+    body,
+    footer,
+    scrollable = true,
+  }: {
     header?: Snippet;
     body: Snippet;
     footer?: Snippet;
@@ -13,7 +18,7 @@
   {#if header}
     <div class="panel-body-fixed">{@render header()}</div>
   {/if}
-  
+
   {#if scrollable}
     <div class="panel-scroll">{@render body()}</div>
   {:else}

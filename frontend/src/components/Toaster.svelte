@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ToastState } from "../types";
-  import Button from './Button.svelte';
+  import Button from "./Button.svelte";
 
   interface Toast {
     id: string;

@@ -1,6 +1,11 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import type { EditPlayerRow, SimilarName, MergePair, NotionPlayer } from "../types";
+  import type {
+    EditPlayerRow,
+    SimilarName,
+    MergePair,
+    NotionPlayer,
+  } from "../types";
   import { saveSnapshot, fetchNotionPlayers } from "../api";
   import { parsePlayersCsv, normalizeName } from "../utils";
   import { setActiveNodeId } from "../stores.svelte";
@@ -12,23 +17,36 @@
     parentId: number | null;
     initialPlayers: EditPlayerRow[];
     defaultEventType: "manual" | "sync" | "edit";
-    autoAction?: 'notion' | 'csv' | null;
+    autoAction?: "notion" | "csv" | null;
     onClose: () => void;
     onChainUpdate: () => void;
     onOpenSnapshot: (id: number) => void;
     onShowError: (title: string, output: string) => void;
   }
 
-  let { parentId, initialPlayers, defaultEventType, autoAction = null, onClose, onChainUpdate, onOpenSnapshot, onShowError }: Props = $props();
+  let {
+    parentId,
+    initialPlayers,
+    defaultEventType,
+    autoAction = null,
+    onClose,
+    onChainUpdate,
+    onOpenSnapshot,
+    onShowError,
+  }: Props = $props();
 
-  let draftPlayers = $state(untrack(() => initialPlayers.map((p) => ({
-    nombre: p.nombre,
-    experiencia: p.experiencia ?? "Nuevo",
-    juegos_este_ano: p.juegos_este_ano ?? 0,
-    prioridad: p.prioridad,
-    partidas_deseadas: p.partidas_deseadas,
-    partidas_gm: p.partidas_gm,
-  }))));
+  let draftPlayers = $state(
+    untrack(() =>
+      initialPlayers.map((p) => ({
+        nombre: p.nombre,
+        experiencia: p.experiencia ?? "Nuevo",
+        juegos_este_ano: p.juegos_este_ano ?? 0,
+        prioridad: p.prioridad,
+        partidas_deseadas: p.partidas_deseadas,
+        partidas_gm: p.partidas_gm,
+      })),
+    ),
+  );
   let eventType = $state(untrack(() => defaultEventType));
   let showCsvModal = $state(false);
   let csvText = $state("");
@@ -43,9 +61,9 @@
   $effect(() => {
     if (!autoActionExecuted && autoAction) {
       autoActionExecuted = true;
-      if (autoAction === 'notion') {
+      if (autoAction === "notion") {
         handleImportNotion();
-      } else if (autoAction === 'csv') {
+      } else if (autoAction === "csv") {
         showCsvModal = true;
       }
     }
@@ -80,7 +98,10 @@
   function handleImportCsv(): void {
     const parsed = parsePlayersCsv(csvText);
     if (parsed.length === 0) {
-      onShowError("Aviso / Error", "No se encontraron jugadores válidos en el CSV");
+      onShowError(
+        "Aviso / Error",
+        "No se encontraron jugadores válidos en el CSV",
+      );
       return;
     }
     draftPlayers = [...draftPlayers, ...parsed];
@@ -129,15 +150,20 @@
       const mergeInfo = mergeMap.get(player.nombre);
       const notionName = mergeInfo ? mergeInfo.to : player.nombre;
       const normName = normalizeName(notionName);
-      
+
       const notionPlayer = fetchedNotionPlayers.find(
-        (p) => normalizeName(p.nombre) === normName || p.alias?.some((a) => normalizeName(a) === normName)
+        (p) =>
+          normalizeName(p.nombre) === normName ||
+          p.alias?.some((a) => normalizeName(a) === normName),
       );
-      
+
       if (notionPlayer) {
         return {
           ...player,
-          nombre: mergeInfo?.action === "merge_notion" ? notionPlayer.nombre : player.nombre,
+          nombre:
+            mergeInfo?.action === "merge_notion"
+              ? notionPlayer.nombre
+              : player.nombre,
           experiencia: notionPlayer.experiencia,
           juegos_este_ano: notionPlayer.juegos_este_ano,
         };
@@ -147,7 +173,9 @@
 
     // Strict Roster Rule: Only add new players if creating from scratch (parentId === null)
     if (parentId === null) {
-      const existingNames = new Set(updatedPlayers.map((p) => normalizeName(p.nombre)));
+      const existingNames = new Set(
+        updatedPlayers.map((p) => normalizeName(p.nombre)),
+      );
       const newPlayers = fetchedNotionPlayers
         .filter((p) => !existingNames.has(normalizeName(p.nombre)))
         .map((p) => ({
@@ -183,7 +211,10 @@
 
   async function handleSave(): Promise<void> {
     if (draftPlayers.length === 0) {
-      onShowError("Aviso / Error", "Agrega al menos un jugador antes de guardar");
+      onShowError(
+        "Aviso / Error",
+        "Agrega al menos un jugador antes de guardar",
+      );
       return;
     }
 
@@ -222,14 +253,22 @@
     }
   }
 
-  function handleCheckboxChange(e: Event, index: number, field: "prioridad" | "partidas_gm"): void {
+  function handleCheckboxChange(
+    e: Event,
+    index: number,
+    field: "prioridad" | "partidas_gm",
+  ): void {
     const cb = e.target as HTMLInputElement;
     const updated = [...draftPlayers];
     updated[index]![field] = cb.checked ? 1 : 0;
     draftPlayers = updated;
   }
 
-  function handleNumberChange(e: Event, index: number, field: "juegos_este_ano" | "partidas_deseadas"): void {
+  function handleNumberChange(
+    e: Event,
+    index: number,
+    field: "juegos_este_ano" | "partidas_deseadas",
+  ): void {
     const input = e.target as HTMLInputElement;
     const updated = [...draftPlayers];
     updated[index]![field] = parseInt(input.value, 10) || 0;
@@ -274,80 +313,89 @@
   {#snippet body()}
     {#if draftPlayers.length > 0}
       <div class="table-wrap flex-table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Nombre</th>
-          <th>Exp.</th>
-          <th>Juegos</th>
-          <th>Prior.</th>
-          <th>Desea</th>
-          <th>GM</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each draftPlayers as player, i (i)}
-          {@const expColor =
-            player.experiencia === "Nuevo" ? "#713f12" : "#166534"}
-          {@const expBg =
-            player.experiencia === "Nuevo" ? "#fef9c3" : "#f0fdf4"}
-          <tr>
-            <td><input type="text" class="player-name-input" bind:value={player.nombre} placeholder="Nombre del jugador" /></td>
-            <td>
-              <span
-                style="font-size:10px;font-weight:700;color:{expColor};background:{expBg};padding:1px 6px;border-radius:4px"
-              >
-                {esc(player.experiencia)}
-              </span>
-            </td>
-            <td>
-              <input
-                type="number"
-                value={player.juegos_este_ano}
-                min="0"
-                style="width: 38px;"
-                onchange={(e) => handleNumberChange(e, i, "juegos_este_ano")}
-              />
-            </td>
-            <td>
-              <input
-                type="checkbox"
-                checked={player.prioridad === 1}
-                onchange={(e) => handleCheckboxChange(e, i, "prioridad")}
-              />
-            </td>
-            <td>
-              <input
-                type="number"
-                value={player.partidas_deseadas}
-                min="1"
-                max="9"
-                style="width: 38px;"
-                onchange={(e) => handleNumberChange(e, i, "partidas_deseadas")}
-              />
-            </td>
-            <td>
-              <input
-                type="checkbox"
-                checked={player.partidas_gm > 0}
-                onchange={(e) => handleCheckboxChange(e, i, "partidas_gm")}
-              />
-            </td>
-            <td>
-              <Button
-                variant="ghost"
-                size="sm"
-                iconOnly={true}
-                title="Eliminar"
-                onclick={() => handleDeletePlayer(i)}
-                icon="🗑"
-              />
-            </td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
+        <table>
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Exp.</th>
+              <th>Juegos</th>
+              <th>Prior.</th>
+              <th>Desea</th>
+              <th>GM</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each draftPlayers as player, i (i)}
+              {@const expColor =
+                player.experiencia === "Nuevo" ? "#713f12" : "#166534"}
+              {@const expBg =
+                player.experiencia === "Nuevo" ? "#fef9c3" : "#f0fdf4"}
+              <tr>
+                <td
+                  ><input
+                    type="text"
+                    class="player-name-input"
+                    bind:value={player.nombre}
+                    placeholder="Nombre del jugador"
+                  /></td
+                >
+                <td>
+                  <span
+                    style="font-size:10px;font-weight:700;color:{expColor};background:{expBg};padding:1px 6px;border-radius:4px"
+                  >
+                    {esc(player.experiencia)}
+                  </span>
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    value={player.juegos_este_ano}
+                    min="0"
+                    style="width: 38px;"
+                    onchange={(e) =>
+                      handleNumberChange(e, i, "juegos_este_ano")}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={player.prioridad === 1}
+                    onchange={(e) => handleCheckboxChange(e, i, "prioridad")}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    value={player.partidas_deseadas}
+                    min="1"
+                    max="9"
+                    style="width: 38px;"
+                    onchange={(e) =>
+                      handleNumberChange(e, i, "partidas_deseadas")}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={player.partidas_gm > 0}
+                    onchange={(e) => handleCheckboxChange(e, i, "partidas_gm")}
+                  />
+                </td>
+                <td>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    iconOnly={true}
+                    title="Eliminar"
+                    onclick={() => handleDeletePlayer(i)}
+                    icon="🗑"
+                  />
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
       </div>
     {:else}
       <div class="empty-draft">
@@ -358,8 +406,26 @@
   {/snippet}
 
   {#snippet footer()}
-    <Button variant="secondary" fill={true} onclick={onClose} disabled={saving}>Cancelar</Button>
-    <Button variant="primary" fill={true} icon={saving ? "⏳" : "✨"} onclick={handleSave} disabled={saving || draftPlayers.length === 0} title={draftPlayers.length === 0 ? "Agrega al menos un jugador para guardar" : ""}>{saving ? "Guardando..." : (eventType === 'sync' ? 'Guardar Sincronización' : (parentId ? 'Guardar Edición' : 'Guardar Nueva Lista'))}</Button>
+    <Button variant="secondary" fill={true} onclick={onClose} disabled={saving}
+      >Cancelar</Button
+    >
+    <Button
+      variant="primary"
+      fill={true}
+      icon={saving ? "⏳" : "✨"}
+      onclick={handleSave}
+      disabled={saving || draftPlayers.length === 0}
+      title={draftPlayers.length === 0
+        ? "Agrega al menos un jugador para guardar"
+        : ""}
+      >{saving
+        ? "Guardando..."
+        : eventType === "sync"
+          ? "Guardar Sincronización"
+          : parentId
+            ? "Guardar Edición"
+            : "Guardar Nueva Lista"}</Button
+    >
   {/snippet}
 </PanelLayout>
 
@@ -380,12 +446,8 @@
         rows="10"
       ></textarea>
       <div class="modal-actions">
-        <Button variant="secondary" onclick={handleCancelCsv}>
-          Cancelar
-        </Button>
-        <Button variant="primary" onclick={handleImportCsv}>
-          Importar
-        </Button>
+        <Button variant="secondary" onclick={handleCancelCsv}>Cancelar</Button>
+        <Button variant="primary" onclick={handleImportCsv}>Importar</Button>
       </div>
     </div>
   </div>

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { SimilarName, ResolutionAction, MergePair } from "../types";
   import { esc } from "../utils";
-  import Button from './Button.svelte';
+  import Button from "./Button.svelte";
 
   interface Props {
     visible: boolean;
@@ -17,7 +17,9 @@
 
   let currentPair = $derived(pairs[currentIndex]);
   let total = $derived(pairs.length);
-  let similarity = $derived(currentPair ? Math.round(currentPair.similarity * 100) : 0);
+  let similarity = $derived(
+    currentPair ? Math.round(currentPair.similarity * 100) : 0,
+  );
 
   function handleAction(action: ResolutionAction): void {
     if (!currentPair) return;
@@ -28,10 +30,10 @@
     } else {
       const merges: MergePair[] = decisions
         .filter((d) => d.action !== "skip")
-        .map((d) => ({ 
-          from: d.pair.snapshot, 
+        .map((d) => ({
+          from: d.pair.snapshot,
           to: d.pair.notion,
-          action: d.action
+          action: d.action,
         }));
       onComplete(merges);
     }
@@ -57,7 +59,9 @@
         <span class="resolution-icon">🔍</span>
         <span class="resolution-title">Nombres similares</span>
       </div>
-      <div class="resolution-counter">Conflicto {currentIndex + 1} de {total}</div>
+      <div class="resolution-counter">
+        Conflicto {currentIndex + 1} de {total}
+      </div>
       {#if currentPair}
         <div class="resolution-pair">
           <div class="resolution-side">
@@ -80,30 +84,29 @@
             variant="primary"
             title="Fusionar y adoptar el nombre principal de Notion"
             onclick={() => handleAction("merge_notion")}
-            icon="📋"
-          >Usar nombre Notion</Button>
+            icon="📋">Usar nombre Notion</Button
+          >
           <Button
             variant="secondary"
             title="Fusionar manteniendo el nombre local actual"
             onclick={() => handleAction("merge_local")}
-            icon="📱"
-          >Mantener local</Button>
+            icon="📱">Mantener local</Button
+          >
           <Button
             variant="ghost"
             title="No realizar ninguna acción de fusión"
             onclick={() => handleAction("skip")}
-            icon="⏭"
-          >Omitir</Button>
+            icon="⏭">Omitir</Button
+          >
         </div>
         <p class="resolution-hint">
-          💡 <strong>Mantener local</strong> vincula los datos pero conserva el nombre del snapshot. 
-          Recuerda actualizar el nombre o añadir el alias en Notion para futuras sincronizaciones.
+          💡 <strong>Mantener local</strong> vincula los datos pero conserva el nombre
+          del snapshot. Recuerda actualizar el nombre o añadir el alias en Notion
+          para futuras sincronizaciones.
         </p>
       {/if}
       <div class="resolution-footer">
-        <Button variant="ghost" onclick={handleStop}>
-          Detener resolución
-        </Button>
+        <Button variant="ghost" onclick={handleStop}>Detener resolución</Button>
       </div>
     </div>
   </div>

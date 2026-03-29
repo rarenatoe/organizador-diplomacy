@@ -10,10 +10,10 @@
 </script>
 
 <script lang="ts">
-  import Button from './Button.svelte';
+  import Button from "./Button.svelte";
 
   interface Props {
-    variant?: 'success' | 'secondary' | 'primary' | 'warning' | 'ghost';
+    variant?: "success" | "secondary" | "primary" | "warning" | "ghost";
     fill?: boolean;
     disabled?: boolean;
     icon?: string;
@@ -33,7 +33,7 @@
     style,
     title,
     text,
-    noHandler = false
+    noHandler = false,
   }: Props = $props();
 
   function handleClick() {
@@ -42,12 +42,12 @@
 </script>
 
 <Button
-  {...(variant !== undefined && { variant })}
-  {...(fill !== undefined && { fill })}
-  {...(disabled !== undefined && { disabled })}
-  {...(icon !== undefined && { icon })}
-  {...(className !== undefined && { class: className })}
-  {...(style !== undefined && { style })}
-  {...(title !== undefined && { title })}
-  {...(!noHandler && { onclick: handleClick })}
->{text}</Button>
+  {...variant !== undefined && { variant }}
+  {...fill !== undefined && { fill }}
+  {...disabled !== undefined && { disabled }}
+  {...icon !== undefined && { icon }}
+  {...className !== undefined && { class: className }}
+  {...style !== undefined && { style }}
+  {...title !== undefined && { title }}
+  {...!noHandler && { onclick: handleClick }}>{text}</Button
+>

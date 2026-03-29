@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { clickOutside } from "../clickOutside";
-  import Button from './Button.svelte';
+  import Button from "./Button.svelte";
 
   interface Props {
     title: string;
@@ -13,18 +13,27 @@
   let { title, open, onClose, children }: Props = $props();
 </script>
 
-<aside 
-  class="panel" 
-  class:open 
+<aside
+  class="panel"
+  class:open
   use:clickOutside={{
-    ignoreSelectors: ['.node', 'header', '.modal-overlay', '.toast'],
-    callback: () => { if (open) onClose(); }
+    ignoreSelectors: [".node", "header", ".modal-overlay", ".toast"],
+    callback: () => {
+      if (open) onClose();
+    },
   }}
 >
   <div class="panel-inner">
     <div class="panel-header">
       <h2 id="panel-title">{title}</h2>
-      <Button variant="ghost" size="sm" iconOnly={true} onclick={onClose} icon="✕" title="Cerrar" />
+      <Button
+        variant="ghost"
+        size="sm"
+        iconOnly={true}
+        onclick={onClose}
+        icon="✕"
+        title="Cerrar"
+      />
     </div>
     <div class="panel-body" id="panel-body">
       {@render children()}
@@ -82,5 +91,4 @@
     flex: 1;
     padding: 0;
   }
-
-  </style>
+</style>

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { OrganizarValidation } from "../types";
   import { esc } from "../utils";
-  import Button from './Button.svelte';
+  import Button from "./Button.svelte";
 
   interface Props {
     visible: boolean;
@@ -14,11 +14,9 @@
   let { visible, validation, onConfirm, onEdit, onCancel }: Props = $props();
 
   let displayedExcluded = $derived(
-    validation?.excludedPlayers.slice(0, 5) ?? []
+    validation?.excludedPlayers.slice(0, 5) ?? [],
   );
-  let extraCount = $derived(
-    (validation?.excludedPlayers.length ?? 0) - 5
-  );
+  let extraCount = $derived((validation?.excludedPlayers.length ?? 0) - 5);
 </script>
 
 {#if visible && validation}
@@ -33,14 +31,20 @@
         {#if validation.isAllOnes}
           <div class="warning-item">
             <span class="warning-icon">⚠️</span>
-            <p>Todos los jugadores tienen 1 partida deseada (posible lista sin editar).</p>
+            <p>
+              Todos los jugadores tienen 1 partida deseada (posible lista sin
+              editar).
+            </p>
           </div>
         {/if}
 
         {#if validation.gmShortage}
           <div class="warning-item">
             <span class="warning-icon">⚠️</span>
-            <p>Faltan GMs: Se proyectan {validation.gmShortage.required} partidas pero solo hay {validation.gmShortage.assigned} GM(s) asignado(s).</p>
+            <p>
+              Faltan GMs: Se proyectan {validation.gmShortage.required} partidas pero
+              solo hay {validation.gmShortage.assigned} GM(s) asignado(s).
+            </p>
           </div>
         {/if}
 
@@ -63,12 +67,8 @@
         <Button variant="primary" onclick={onConfirm}>
           Organizar de todos modos
         </Button>
-        <Button variant="secondary" onclick={onEdit}>
-          Volver a Editar
-        </Button>
-        <Button variant="ghost" onclick={onCancel}>
-          Cancelar
-        </Button>
+        <Button variant="secondary" onclick={onEdit}>Volver a Editar</Button>
+        <Button variant="ghost" onclick={onCancel}>Cancelar</Button>
       </div>
     </div>
   </div>

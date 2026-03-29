@@ -6,6 +6,9 @@ pre-commit:
     python-test:
       glob: "backend/**/*.py"
       run: uv run python -m pytest -q
+    frontend-format:
+      glob: "frontend/src/**/*.{ts,svelte,css,html}"
+      run: bunx prettier --write --plugin=prettier-plugin-svelte {staged_files}
     frontend-typecheck:
       glob: "frontend/src/**/*.{ts,svelte}"
       run: bun run typecheck
