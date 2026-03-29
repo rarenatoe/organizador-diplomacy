@@ -131,22 +131,22 @@
       
       if (response.error) {
         onShowError("Error de Sincronización", response.error || "Error desconocido");
+        isSyncing = false;
         return;
       }
 
       fetchedNotionPlayers = response.players;
 
       if (response.similar_names && response.similar_names.length > 0) {
-        // Show resolution modal
+        // Show resolution modal - isSyncing remains true until modal completes
         resolutionPairs = response.similar_names;
         resolutionVisible = true;
       } else {
-        // No conflicts, merge directly
+        // No conflicts, merge directly - executeSyncMerge will handle isSyncing reset
         await executeSyncMerge([]);
       }
     } catch (e) {
       onShowError("Error de conexión", String(e));
-    } finally {
       isSyncing = false;
     }
   }
@@ -194,10 +194,12 @@
       });
 
       if (result.error) {
-        onShowError("Error de Sincronización", result.error || "Error desconocido");
+        // Handle backend errors properly, including the Strict Guard message
+        onShowError("Error de Sincronización", result.error);
         return;
       }
 
+      // Only trigger updates if the sync was successful
       onChainUpdate();
       if (result.snapshot_id !== undefined) {
         setActiveNodeId(result.snapshot_id as number);
@@ -206,9 +208,11 @@
     } catch (e) {
       onShowError("Error de conexión", String(e));
     } finally {
+      // Reset all sync-related state
       resolutionVisible = false;
       resolutionPairs = [];
       fetchedNotionPlayers = [];
+      isSyncing = false;
     }
   }
 
@@ -220,6 +224,7 @@
     resolutionVisible = false;
     resolutionPairs = [];
     fetchedNotionPlayers = [];
+    isSyncing = false;
   }
 
   $effect(() => {

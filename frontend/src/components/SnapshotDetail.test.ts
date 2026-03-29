@@ -702,4 +702,221 @@ describe("SnapshotDetail", () => {
       );
     });
   });
+
+  describe("Sync State Management Regression Tests", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("should reset isSyncing state when fetchNotionPlayers returns an error", async () => {
+      const { fetchSnapshot, fetchNotionPlayers } = await import("../api");
+      const onShowError = vi.fn();
+
+      // Mock a valid manual snapshot so sync button is enabled
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [
+          {
+            nombre: "P1",
+            experiencia: "Nuevo",
+            juegos_este_ano: 0,
+            prioridad: 0,
+            partidas_deseadas: 1,
+            partidas_gm: 0,
+          },
+        ],
+      });
+
+      // Mock fetchNotionPlayers to return an error
+      (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        error: "API limit reached",
+        players: [],
+        similar_names: [],
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError,
+        },
+      });
+
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Click sync button
+      const syncBtn: HTMLButtonElement = screen.getByRole("button", {
+        name: /Sincronizar Notion/i,
+      });
+      await fireEvent.click(syncBtn);
+
+      // Wait for error to be handled
+      await waitFor(() => {
+        expect(onShowError).toHaveBeenCalledWith(
+          "Error de Sincronización",
+          "API limit reached",
+        );
+      });
+
+      // Assert that sync button is no longer disabled and text has reverted
+      expect(syncBtn.disabled).toBe(false);
+      expect(syncBtn.textContent).toBe("🔄 Sincronizar Notion");
+    });
+
+    it("should reset isSyncing state when saveSnapshot returns an error", async () => {
+      const { fetchSnapshot, fetchNotionPlayers, saveSnapshot } =
+        await import("../api");
+      const onShowError = vi.fn();
+
+      // Mock a valid manual snapshot so sync button is enabled
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [
+          {
+            nombre: "P1",
+            experiencia: "Nuevo",
+            juegos_este_ano: 0,
+            prioridad: 0,
+            partidas_deseadas: 1,
+            partidas_gm: 0,
+          },
+        ],
+      });
+
+      // Mock fetchNotionPlayers to return success with no similar names (so it proceeds directly to merge)
+      (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        players: [],
+        similar_names: [],
+        error: undefined,
+      });
+
+      // Mock saveSnapshot to return an error
+      (saveSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        error: "Backend strict guard rejected save",
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError,
+        },
+      });
+
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Click sync button
+      const syncBtn: HTMLButtonElement = screen.getByRole("button", {
+        name: /Sincronizar Notion/i,
+      });
+      await fireEvent.click(syncBtn);
+
+      // Wait for error to be handled
+      await waitFor(() => {
+        expect(onShowError).toHaveBeenCalledWith(
+          "Error de Sincronización",
+          "Backend strict guard rejected save",
+        );
+      });
+
+      // Assert that sync button is no longer disabled and text has reverted
+      expect(syncBtn.disabled).toBe(false);
+      expect(syncBtn.textContent).toBe("🔄 Sincronizar Notion");
+    });
+
+    it("should reset isSyncing state when fetchNotionPlayers throws a network exception", async () => {
+      // Use real timers for this test to avoid async issues with promise rejection
+      vi.useRealTimers();
+
+      const { fetchSnapshot, fetchNotionPlayers } = await import("../api");
+      const onShowError = vi.fn();
+
+      // Mock a valid manual snapshot so sync button is enabled
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [
+          {
+            nombre: "P1",
+            experiencia: "Nuevo",
+            juegos_este_ano: 0,
+            prioridad: 0,
+            partidas_deseadas: 1,
+            partidas_gm: 0,
+          },
+        ],
+      });
+
+      // Mock fetchNotionPlayers to reject with a network error
+      (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error("Network Error"),
+      );
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError,
+        },
+      });
+
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Click sync button
+      const syncBtn: HTMLButtonElement = screen.getByRole("button", {
+        name: /Sincronizar Notion/i,
+      });
+      await fireEvent.click(syncBtn);
+
+      // Wait for the rejected promise to be processed
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Verify error was shown
+      expect(onShowError).toHaveBeenCalledWith(
+        "Error de conexión",
+        "Error: Network Error",
+      );
+
+      // Assert that sync button is no longer disabled and text has reverted
+      expect(syncBtn.disabled).toBe(false);
+      expect(syncBtn.textContent).toBe("🔄 Sincronizar Notion");
+
+      // Restore fake timers for other tests
+      vi.useFakeTimers();
+    });
+  });
 });
