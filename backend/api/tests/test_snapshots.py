@@ -1,0 +1,291 @@
+"""
+test_snapshots.py — Tests for /api/snapshot endpoints.
+
+Tests snapshot CRUD operations and deletion cascade.
+"""
+from __future__ import annotations
+
+from typing import Any
+
+import pytest
+from sqlalchemy import select
+
+from backend.db.crud import (
+    add_player_to_snapshot,
+    create_game_event,
+    create_snapshot,
+    get_or_create_player,
+    get_snapshot_players,
+)
+from backend.db.models import Event, Snapshot, SnapshotPlayer
+
+pytestmark = pytest.mark.asyncio
+
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+
+async def make_snapshot_with_players(
+    db_session: Any, n: int = 5, source: str = "notion_sync"
+) -> int:
+    """Creates a snapshot with n players and returns snapshot_id."""
+    snap_id = await create_snapshot(db_session, source)
+    for i in range(n):
+        pid = await get_or_create_player(db_session, f"P{snap_id}_{i}")
+        await add_player_to_snapshot(
+            db_session, snap_id, pid, "Antiguo", 0, 1, 2, 0
+        )
+    await db_session.commit()
+    return snap_id
+
+
+# ── GET /api/snapshot/<id> ────────────────────────────────────────────────────
+
+
+class TestApiSnapshotDetail:
+    async def test_snapshot_not_found(self, client: Any) -> None:
+        resp = await client.get("/api/snapshot/99999")
+        assert resp.status_code == 404
+
+    async def test_snapshot_found_returns_player_list(
+        self, client: Any, db_session: Any
+    ) -> None:
+        snap_id = await make_snapshot_with_players(db_session, n=3)
+        resp = await client.get(f"/api/snapshot/{snap_id}")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["id"] == snap_id
+        assert "players" in data
+        assert len(data["players"]) == 3
+        # Check player data structure
+        if data["players"]:
+            p = data["players"][0]
+            for key in ("nombre", "experiencia", "juegos_este_ano"):
+                assert key in p
+
+    async def test_snapshot_includes_source(self, client: Any, db_session: Any) -> None:
+        snap_id = await make_snapshot_with_players(db_session, n=1, source="manual")
+        resp = await client.get(f"/api/snapshot/{snap_id}")
+        data = resp.json()
+        assert data["source"] == "manual"
+
+
+# ── GET /api/snapshot ─────────────────────────────────────────────────────────
+
+
+class TestApiSnapshotList:
+    async def test_empty_list(self, client: Any) -> None:
+        resp = await client.get("/api/snapshot")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["snapshots"] == []
+
+    async def test_list_returns_snapshots(self, client: Any, db_session: Any) -> None:
+        snap_id = await make_snapshot_with_players(db_session, n=5)
+        resp = await client.get("/api/snapshot")
+        data = resp.json()
+        assert len(data["snapshots"]) >= 1
+        ids = [s["id"] for s in data["snapshots"]]
+        assert snap_id in ids
+
+    async def test_list_includes_player_count(self, client: Any, db_session: Any) -> None:
+        await make_snapshot_with_players(db_session, n=7)
+        resp = await client.get("/api/snapshot")
+        data = resp.json()
+        for snap in data["snapshots"]:
+            assert "player_count" in snap
+
+
+# ── DELETE /api/snapshot/<id> ─────────────────────────────────────────────────
+
+
+class TestApiSnapshotDelete:
+    async def test_delete_nonexistent_returns_404(self, client: Any) -> None:
+        resp = await client.delete("/api/snapshot/99999")
+        assert resp.status_code == 404
+
+    async def test_delete_snapshot_removes_it(self, client: Any, db_session: Any) -> None:
+        snap_id = await make_snapshot_with_players(db_session, n=5)
+        resp = await client.delete(f"/api/snapshot/{snap_id}")
+        assert resp.status_code == 200
+        # Verify deleted
+        result = await db_session.execute(
+            select(Snapshot).where(Snapshot.id == snap_id)
+        )
+        assert result.scalar_one_or_none() is None
+
+    async def test_delete_cascade_removes_players(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Deleting a snapshot should remove its SnapshotPlayer entries."""
+        snap_id = await make_snapshot_with_players(db_session, n=5)
+        # Get player IDs before delete
+        result = await db_session.execute(
+            select(SnapshotPlayer).where(SnapshotPlayer.snapshot_id == snap_id)
+        )
+        before_count = len(result.scalars().all())
+        assert before_count == 5
+        # Delete snapshot
+        await client.delete(f"/api/snapshot/{snap_id}")
+        await db_session.commit()
+        # Verify cascade delete worked
+        result = await db_session.execute(
+            select(SnapshotPlayer).where(SnapshotPlayer.snapshot_id == snap_id)
+        )
+        after_count = len(result.scalars().all())
+        assert after_count == 0
+
+    async def test_delete_with_game_event_cascade(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Deleting a snapshot should cascade to related game events and their data."""
+        snap1 = await make_snapshot_with_players(db_session, n=14)
+        snap2 = await create_snapshot(db_session, "organizar")
+        await db_session.commit()
+        # Create a game event linking snap1 -> snap2
+        event_id = await create_game_event(db_session, snap1, snap2, 1, "copypaste")
+        await db_session.commit()
+        # Delete the source snapshot
+        resp = await client.delete(f"/api/snapshot/{snap1}")
+        assert resp.status_code == 200
+        await db_session.commit()
+        # Expire all to force fresh query
+        db_session.expire_all()
+        # Verify game event is deleted
+        result = await db_session.execute(
+            select(Event).where(Event.id == event_id)
+        )
+        assert result.scalar_one_or_none() is None
+
+
+# ── POST /api/snapshot ─────────────────────────────────────────────────────────
+
+
+class TestApiSnapshotCreate:
+    async def test_create_without_parent(self, client: Any) -> None:
+        """Creating a snapshot without parent_id creates a root snapshot."""
+        resp = await client.post(
+            "/api/snapshot",
+            json={"source": "manual", "players": []},
+        )
+        assert resp.status_code in (200, 201)
+        data = resp.json()
+        # FastAPI returns snapshot_id
+        snap_id = data.get("snapshot_id") or data.get("id")
+        assert snap_id is not None
+
+    async def test_create_with_parent(self, client: Any, db_session: Any) -> None:
+        """Creating a snapshot with parent_id links it to parent."""
+        parent_id = await make_snapshot_with_players(db_session, n=5)
+        resp = await client.post(
+            "/api/snapshot",
+            json={
+                "source": "manual",
+                "parent_id": parent_id,
+                "players": [],
+            },
+        )
+        assert resp.status_code in (200, 201)
+        data = resp.json()
+        # Verify the new snapshot is linked to parent via an event
+        new_id = data["snapshot_id"]
+        result = await db_session.execute(
+            select(Event).where(
+                Event.output_snapshot_id == new_id
+            )
+        )
+        event = result.scalar_one_or_none()
+        assert event is not None
+        assert event.source_snapshot_id == parent_id
+
+    async def test_create_preserves_roster_in_place(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Creating a snapshot with same roster as parent should update in place."""
+        parent_id = await make_snapshot_with_players(db_session, n=5)
+        # Get current player list
+        players_before = await get_snapshot_players(db_session, parent_id)
+        # Create child with same roster
+        resp = await client.post(
+            "/api/snapshot",
+            json={
+                "source": "notion_sync",
+                "parent_id": parent_id,
+                "players": players_before,
+            },
+        )
+        # Should update in place, not create new snapshot
+        assert resp.status_code == 200
+
+    async def test_create_snapshot_adds_players(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Creating a snapshot should add provided players."""
+        players = [
+            {
+                "nombre": f"Player{i}",
+                "experiencia": "Antiguo",
+                "juegos_este_ano": i,
+                "prioridad": 1,
+                "partidas_deseadas": 2,
+                "partidas_gm": 0,
+            }
+            for i in range(3)
+        ]
+        resp = await client.post(
+            "/api/snapshot",
+            json={"source": "manual", "players": players},
+        )
+        assert resp.status_code in (200, 201)
+        data = resp.json()
+        snap_id = data["snapshot_id"]
+        # Verify players were added
+        from backend.db.crud import get_snapshot_players
+        db_players = await get_snapshot_players(db_session, snap_id)
+        assert len(db_players) == 3
+
+
+# ── POST /api/snapshot/<id>/save ──────────────────────────────────────────────
+
+
+class TestApiSnapshotSave:
+    async def test_save_snapshot_manual(self, client: Any, db_session: Any) -> None:
+        """Saving a snapshot should update its players and metadata."""
+        snap_id = await make_snapshot_with_players(db_session, n=3)
+        new_players = [
+            {
+                "nombre": f"NewPlayer{i}",
+                "experiencia": "Nuevo",
+                "juegos_este_ano": 0,
+                "prioridad": 1,
+                "partidas_deseadas": 1,
+                "partidas_gm": 0,
+            }
+            for i in range(2)
+        ]
+        resp = await client.post(
+            f"/api/snapshot/{snap_id}/save",
+            json={
+                "source": "manual",
+                "players": new_players,
+            },
+        )
+        assert resp.status_code == 200
+        # Verify players were replaced
+        from backend.db.crud import get_snapshot_players
+        db_players = await get_snapshot_players(db_session, snap_id)
+        assert len(db_players) == 2
+        names = {p["nombre"] for p in db_players}
+        assert names == {"NewPlayer0", "NewPlayer1"}
+
+    async def test_save_notion_sync(self, client: Any, db_session: Any) -> None:
+        """Saving with notion_sync source should work."""
+        parent_id = await make_snapshot_with_players(db_session, n=5)
+        resp = await client.post(
+            f"/api/snapshot/{parent_id}/save",
+            json={
+                "source": "notion_sync",
+                "players": [],
+            },
+        )
+        assert resp.status_code in (200, 201)

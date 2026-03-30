@@ -10,8 +10,11 @@ Cubre reglas complejas de ordenación y prioridad:
 
 Los tests básicos de corrección viven en test_organizador.py.
 """
+from __future__ import annotations
+
 import random
 import unittest
+from typing import Any
 
 from .core import calcular_partidas
 from .models import Jugador
@@ -27,10 +30,17 @@ def _j(
     partidas_gm: int = 0,
 ) -> Jugador:
     """Crea un Jugador con valores por defecto sensatos."""
-    return Jugador(nombre, experiencia, juegos_ano, prioridad, partidas_deseadas, partidas_gm)
+    return Jugador(
+        nombre=nombre,
+        experiencia=experiencia,
+        juegos_ano=juegos_ano,
+        prioridad=prioridad,
+        partidas_deseadas=partidas_deseadas,
+        partidas_gm=partidas_gm,
+    )
 
 
-def _pool(n: int, prefix: str = "J", **kwargs) -> list[Jugador]:
+def _pool(n: int, prefix: str = "J", **kwargs: Any) -> list[Jugador]:
     """Crea N jugadores con nombres consecutivos (J0, J1, …)."""
     return [_j(f"{prefix}{i}", **kwargs) for i in range(n)]
 
@@ -52,6 +62,7 @@ class TestCalcularPartidasPrioridad(unittest.TestCase):
                 + [_j("Extra", juegos_ano=5)]
             )
             res = calcular_partidas(jugadores)
+            assert res is not None
             todos = {j.nombre for mesa in res.mesas for j in mesa.jugadores}
             self.assertIn("Nuevo1", todos, f"Nuevo1 no entró (seed={seed})")
 
@@ -65,6 +76,7 @@ class TestCalcularPartidasPrioridad(unittest.TestCase):
                 + [_j("Extra", juegos_ano=5)]
             )
             res = calcular_partidas(jugadores)
+            assert res is not None
             todos = {j.nombre for mesa in res.mesas for j in mesa.jugadores}
             self.assertIn("Prior", todos, f"Prior no entró (seed={seed})")
 
@@ -78,6 +90,7 @@ class TestCalcularPartidasPrioridad(unittest.TestCase):
                 + [_j("Extra", juegos_ano=5)]
             )
             res = calcular_partidas(jugadores)
+            assert res is not None
             todos = {j.nombre for mesa in res.mesas for j in mesa.jugadores}
             self.assertIn("SinJuegos", todos, f"SinJuegos no entró (seed={seed})")
 
@@ -106,7 +119,7 @@ class TestCalcularPartidasGM(unittest.TestCase):
         """Un GM puede aparecer como jugador en una mesa distinta a la que arbitra."""
         jugadores = _pool(13) + [_j("GM1", partidas_deseadas=2, partidas_gm=1)]
         res = calcular_partidas(jugadores)
-        self.assertIsNotNone(res)
+        assert res is not None
         todos = {j.nombre for mesa in res.mesas for j in mesa.jugadores}
         self.assertIn("GM1", todos, "GM1 debería poder jugar en la mesa que no arbitra")
 
@@ -114,7 +127,7 @@ class TestCalcularPartidasGM(unittest.TestCase):
         """El GM asignado aparece como árbitro en al menos una mesa."""
         jugadores = _pool(13) + [_j("GM1", partidas_deseadas=2, partidas_gm=1)]
         res = calcular_partidas(jugadores)
-        self.assertIsNotNone(res)
+        assert res is not None
         self.assertTrue(any(m.gm and m.gm.nombre == "GM1" for m in res.mesas),
                         "GM1 no aparece como árbitro en ninguna mesa")
 
@@ -125,7 +138,7 @@ class TestCalcularPartidasGM(unittest.TestCase):
             _j("GM2", partidas_gm=1),
         ]
         res = calcular_partidas(jugadores)
-        self.assertIsNotNone(res)
+        assert res is not None
         for mesa in res.mesas:
             self.assertIsInstance(mesa.gm, (Jugador, type(None)))
 
@@ -138,7 +151,7 @@ class TestCalcularPartidasGM(unittest.TestCase):
                 _j("GM2", partidas_deseadas=2, partidas_gm=1),
             ]
             res = calcular_partidas(jugadores)
-            self.assertIsNotNone(res)
+            assert res is not None
             mesas_gm1 = {i for i, m in enumerate(res.mesas) if m.gm and m.gm.nombre == "GM1"}
             mesas_gm2 = {i for i, m in enumerate(res.mesas) if m.gm and m.gm.nombre == "GM2"}
             self.assertEqual(
@@ -152,7 +165,7 @@ class TestCalcularPartidasGM(unittest.TestCase):
         for seed in range(20):
             random.seed(seed)
             res = calcular_partidas(jugadores)
-            self.assertIsNotNone(res)
+            assert res is not None
             mesas_jugadas = sum(1 for mesa in res.mesas for j in mesa.jugadores if j.nombre == "GM1")
             mesas_arbitradas = sum(1 for m in res.mesas if m.gm and m.gm.nombre == "GM1")
             self.assertLessEqual(mesas_jugadas, len(res.mesas) - mesas_arbitradas)
@@ -163,7 +176,7 @@ class TestCalcularPartidasGM(unittest.TestCase):
             random.seed(seed)
             jugadores = _pool(14) + [_j("GM1", partidas_deseadas=2, partidas_gm=1)]
             res = calcular_partidas(jugadores)
-            self.assertIsNotNone(res)
+            assert res is not None
 
             todos = {j.nombre for mesa in res.mesas for j in mesa.jugadores}
             sobrantes = {j.nombre for j in res.tickets_sobrantes}
@@ -184,7 +197,7 @@ class TestCalcularPartidasGM(unittest.TestCase):
                 _j("GM1", partidas_deseadas=2, partidas_gm=1),   # weight 1.5 como jugador
             ]
             res = calcular_partidas(jugadores)
-            self.assertIsNotNone(res)
+            assert res is not None
             todos = {j.nombre for mesa in res.mesas for j in mesa.jugadores}
             sobrantes = {j.nombre for j in res.tickets_sobrantes}
 
@@ -208,6 +221,7 @@ class TestCalcularPartidasGM(unittest.TestCase):
             random.seed(seed)
             jugadores = _pool(12, juegos_ano=0) + [_j("X", juegos_ano=10, partidas_deseadas=2)]
             res = calcular_partidas(jugadores)
+            assert res is not None
             mesas_de_x = sum(1 for m in res.mesas if any(j.nombre == "X" for j in m.jugadores))
             self.assertEqual(mesas_de_x, 2, f"X no aparece en 2 mesas distintas (seed={seed})")
 
@@ -225,7 +239,7 @@ class TestCalcularPartidasBalance(unittest.TestCase):
             random.seed(seed)
             jugadores = _pool(14, juegos_ano=0) + [_j("Veterano", juegos_ano=8)]
             res = calcular_partidas(jugadores)
-            self.assertIsNotNone(res)
+            assert res is not None
             todos = {j.nombre for mesa in res.mesas for j in mesa.jugadores}
             sobrantes = {j.nombre for j in res.tickets_sobrantes}
             for i in range(14):
@@ -244,7 +258,7 @@ class TestCalcularPartidasBalance(unittest.TestCase):
                 _j("JeanCarlos", juegos_ano=3, partidas_deseadas=2),
             ]
             res = calcular_partidas(jugadores)
-            self.assertIsNotNone(res)
+            assert res is not None
             todos = {j.nombre for mesa in res.mesas for j in mesa.jugadores}
             for j in jugadores:
                 self.assertIn(
@@ -267,7 +281,7 @@ class TestCalcularPartidasBalance(unittest.TestCase):
                 _j("JeanCarlos", partidas_deseadas=2),
             ]
             res = calcular_partidas(jugadores)
-            self.assertIsNotNone(res)
+            assert res is not None
             todos = {j.nombre for mesa in res.mesas for j in mesa.jugadores}
             for j in jugadores:
                 self.assertIn(

@@ -10,8 +10,11 @@ Los tests avanzados de prioridad, GM y balanceo de liga
 viven en test_algoritmo.py.
 Los tests de db.py y db_views.py viven en test_db.py.
 """
+from __future__ import annotations
+
 import random
 import unittest
+from typing import Any
 
 from .core import calcular_partidas
 from .models import Jugador, ResultadoPartidas
@@ -27,10 +30,17 @@ def _j(
     partidas_gm: int = 0,
 ) -> Jugador:
     """Crea un Jugador con valores por defecto sensatos."""
-    return Jugador(nombre, experiencia, juegos_ano, prioridad, partidas_deseadas, partidas_gm)
+    return Jugador(
+        nombre=nombre,
+        experiencia=experiencia,
+        juegos_ano=juegos_ano,
+        prioridad=prioridad,
+        partidas_deseadas=partidas_deseadas,
+        partidas_gm=partidas_gm,
+    )
 
 
-def _pool(n: int, prefix: str = "J", **kwargs) -> list[Jugador]:
+def _pool(n: int, prefix: str = "J", **kwargs: Any) -> list[Jugador]:
     """Crea N jugadores con nombres consecutivos (J0, J1, …)."""
     return [_j(f"{prefix}{i}", **kwargs) for i in range(n)]
 
@@ -96,14 +106,14 @@ class TestCalcularPartidas(unittest.TestCase):
 
     def test_exactamente_siete_forma_una_partida(self):
         res = calcular_partidas(_pool(7))
-        self.assertIsNotNone(res)
+        assert res is not None
         self.assertIsInstance(res, ResultadoPartidas)
         self.assertEqual(len(res.mesas), 1)
         self.assertEqual(len(res.mesas[0].jugadores), 7)
 
     def test_catorce_jugadores_forman_dos_partidas(self):
         res = calcular_partidas(_pool(14))
-        self.assertIsNotNone(res)
+        assert res is not None
         self.assertEqual(len(res.mesas), 2)
 
     def test_tickets_multiples_cuentan_correctamente(self):
@@ -113,14 +123,14 @@ class TestCalcularPartidas(unittest.TestCase):
             _j("Multi2", partidas_deseadas=2),
         ]
         res = calcular_partidas(jugadores)
-        self.assertIsNotNone(res)
+        assert res is not None
         self.assertEqual(len(res.mesas), 2)
 
     # ── Corrección de las mesas ───────────────────────────────────────────────
 
     def test_cada_mesa_tiene_exactamente_siete_jugadores(self):
         res = calcular_partidas(_pool(14))
-        self.assertIsNotNone(res)
+        assert res is not None
         for mesa in res.mesas:
             self.assertEqual(len(mesa.jugadores), 7)
 
@@ -141,7 +151,7 @@ class TestCalcularPartidas(unittest.TestCase):
             _j("Multi2", partidas_deseadas=2),
         ]
         res = calcular_partidas(jugadores)
-        self.assertIsNotNone(res)
+        assert res is not None
         for nombre in ("Multi1", "Multi2"):
             mesas_del_jugador = [
                 i for i, mesa in enumerate(res.mesas)
@@ -156,7 +166,7 @@ class TestCalcularPartidas(unittest.TestCase):
         """Con una mezcla suficiente, cada mesa debe tener nuevos y antiguos."""
         jugadores = _pool(6, prefix="N", experiencia="Nuevo") + _pool(8, prefix="A")
         res = calcular_partidas(jugadores)
-        self.assertIsNotNone(res)
+        assert res is not None
         for mesa in res.mesas:
             self.assertTrue(any(j.es_nuevo for j in mesa.jugadores), "Mesa sin jugadores nuevos")
             self.assertTrue(any(not j.es_nuevo for j in mesa.jugadores), "Mesa sin jugadores antiguos")
@@ -174,14 +184,14 @@ class TestCalcularPartidas(unittest.TestCase):
         """Un solo GM para una sola mesa es configuración válida."""
         jugadores = _pool(7) + [_j("GM1", partidas_gm=1)]
         res = calcular_partidas(jugadores)  # no debe lanzar excepción
-        self.assertIsNotNone(res)
+        assert res is not None
 
     # ── Lista de espera ───────────────────────────────────────────────────────
 
     def test_lista_de_espera_contiene_jugadores_sobrantes(self):
         """Con 15 jugadores (2 mesas = 14 cupos), 1 debe quedar en espera."""
         res = calcular_partidas(_pool(15))
-        self.assertIsNotNone(res)
+        assert res is not None
         self.assertEqual(len(res.mesas), 2)
         total_colocados = sum(len(m.jugadores) for m in res.mesas)
         total_sobrantes = len(res.tickets_sobrantes)
@@ -190,7 +200,7 @@ class TestCalcularPartidas(unittest.TestCase):
     def test_todos_entran_cuando_hay_cupos_exactos(self):
         """Si los tickets caben exactamente, la lista de espera debe estar vacía."""
         res = calcular_partidas(_pool(14))
-        self.assertIsNotNone(res)
+        assert res is not None
         self.assertEqual(len(res.tickets_sobrantes), 0)
 
 

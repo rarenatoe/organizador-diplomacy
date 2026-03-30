@@ -1,12 +1,18 @@
 """
 cache_daemon.py – Background process for periodic Notion data caching.
 """
+
 from __future__ import annotations
 
+import asyncio
 import concurrent.futures
 import os
 import threading
 import time
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import sqlite3
 from datetime import datetime
 from typing import TYPE_CHECKING
 
@@ -14,7 +20,7 @@ from dotenv import load_dotenv
 from notion_client import Client
 
 if TYPE_CHECKING:
-    import sqlite3
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db import db
 from backend.sync.notion_sync import (
@@ -28,25 +34,22 @@ from backend.sync.notion_sync import (
 
 
 def update_notion_cache(
-    conn: sqlite3.Connection,
-    client: Client,
-    db_id: str,
-    part_db_id: str
+    conn: sqlite3.Connection, client: Client, db_id: str, part_db_id: str
 ) -> None:
     """
     Fetches all player data from Notion and updates the local notion_cache table.
     """
     año_actual = datetime.now().year
-    
+
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future_pages = executor.submit(descargar_todos, client, db_id)
         future_conteo = executor.submit(conteo_partidas_este_ano, client, part_db_id, año_actual)
-        
+
         pages = future_pages.result()
         conteo_por_jugador = future_conteo.result()
 
     last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+
     for page in pages:
         props = page.get("properties", {})
         nombre_prop = props.get("Nombre")
@@ -55,18 +58,18 @@ def update_notion_cache(
         nombre = extraer_nombre(nombre_prop)
         if not nombre:
             continue
-            
+
         part_prop = props.get("Participaciones")
         experiencia_val = experiencia(part_prop) if part_prop else "Nuevo"
-        
+
         player_id = page["id"].replace("-", "")
         juegos = conteo_por_jugador.get(player_id, 0)
-        
+
         countries_data = {
             key: extraer_numero(props.get(notion_name, {}))
             for key, notion_name in COUNTRY_PROPS.items()
         }
-        
+
         conn.execute(
             """
             INSERT OR REPLACE INTO notion_cache
@@ -87,17 +90,17 @@ def update_notion_cache(
                 countries_data["c_austria"],
                 countries_data["c_russia"],
                 countries_data["c_turkey"],
-                last_updated
-            )
+                last_updated,
+            ),
         )
     conn.commit()
 
 
-def _run_sync_loop() -> None:
+def run_sync_loop() -> None:
     """Infinite loop for the background thread."""
     load_dotenv()
-    token      = os.getenv("NOTION_TOKEN")
-    db_id      = os.getenv("NOTION_DATABASE_ID")
+    token = os.getenv("NOTION_TOKEN")
+    db_id = os.getenv("NOTION_DATABASE_ID")
     part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
 
     if not all([token, db_id, part_db_id]) or not token or token.startswith("secret_XXX"):
@@ -109,7 +112,7 @@ def _run_sync_loop() -> None:
     assert part_db_id is not None
 
     client = Client(auth=token)
-    
+
     while True:
         print(f" [Cache Daemon] Starting sync at {datetime.now()}")
         conn = db.get_db()
@@ -120,11 +123,142 @@ def _run_sync_loop() -> None:
             print(f" [Cache Daemon] Error during sync: {e}")
         finally:
             conn.close()
-            
-        time.sleep(900) # 15 minutes
+
+        time.sleep(900)  # 15 minutes
+
+
+# ── Async versions for FastAPI ───────────────────────────────────────────────
+
+
+async def update_notion_cache_async(
+    session: AsyncSession, client: Client, db_id: str, part_db_id: str
+) -> None:
+    """
+    Async version of update_notion_cache that uses AsyncSession.
+    Fetches all player data from Notion and updates the local notion_cache table.
+    """
+    import concurrent.futures
+    from datetime import datetime
+
+    from sqlalchemy import select
+
+    from backend.db.models import NotionCache
+
+    año_actual = datetime.now().year
+
+    # Run Notion API calls in thread pool (they're blocking I/O)
+    loop = asyncio.get_event_loop()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_pages = executor.submit(descargar_todos, client, db_id)
+        future_conteo = executor.submit(conteo_partidas_este_ano, client, part_db_id, año_actual)
+
+        pages = await loop.run_in_executor(None, future_pages.result)
+        conteo_por_jugador = await loop.run_in_executor(None, future_conteo.result)
+
+    last_updated = datetime.now()
+
+    for page in pages:
+        props = page.get("properties", {})
+        nombre_prop = props.get("Nombre")
+        if not nombre_prop:
+            continue
+        nombre = extraer_nombre(nombre_prop)
+        if not nombre:
+            continue
+
+        part_prop = props.get("Participaciones")
+        experiencia_val = experiencia(part_prop) if part_prop else "Nuevo"
+
+        player_id = page["id"].replace("-", "")
+        juegos = conteo_por_jugador.get(player_id, 0)
+
+        countries_data = {
+            key: extraer_numero(props.get(notion_name, {}))
+            for key, notion_name in COUNTRY_PROPS.items()
+        }
+
+        # Check if cache entry exists
+        result = await session.execute(
+            select(NotionCache).where(NotionCache.notion_id == page["id"])
+        )
+        existing = result.scalar_one_or_none()
+
+        if existing:
+            # Update existing
+            existing.nombre = nombre
+            existing.experiencia = experiencia_val
+            existing.juegos_este_ano = juegos
+            existing.c_england = countries_data["c_england"]
+            existing.c_france = countries_data["c_france"]
+            existing.c_germany = countries_data["c_germany"]
+            existing.c_italy = countries_data["c_italy"]
+            existing.c_austria = countries_data["c_austria"]
+            existing.c_russia = countries_data["c_russia"]
+            existing.c_turkey = countries_data["c_turkey"]
+            existing.last_updated = last_updated
+        else:
+            # Create new
+            cache_entry = NotionCache(
+                notion_id=page["id"],
+                nombre=nombre,
+                experiencia=experiencia_val,
+                juegos_este_ano=juegos,
+                c_england=countries_data["c_england"],
+                c_france=countries_data["c_france"],
+                c_germany=countries_data["c_germany"],
+                c_italy=countries_data["c_italy"],
+                c_austria=countries_data["c_austria"],
+                c_russia=countries_data["c_russia"],
+                c_turkey=countries_data["c_turkey"],
+                last_updated=last_updated,
+            )
+            session.add(cache_entry)
+
+
+async def daemon_loop() -> None:
+    """
+    Async daemon loop that runs indefinitely with asyncio.sleep.
+    """
+    load_dotenv()
+    token = os.getenv("NOTION_TOKEN")
+    db_id = os.getenv("NOTION_DATABASE_ID")
+    part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
+
+    if not all([token, db_id, part_db_id]) or not token or token.startswith("secret_XXX"):
+        print(" [Cache Daemon] Skipping background sync: Missing Notion credentials.")
+        return
+
+    # Type assertions for mypy/pyright
+    assert db_id is not None
+    assert part_db_id is not None
+
+    client = Client(auth=token)
+    from sqlalchemy.ext.asyncio.session import AsyncSession
+
+    from backend.db.connection import async_engine
+
+    while True:
+        print(f" [Cache Daemon] Starting sync at {datetime.now()}")
+        async with AsyncSession(async_engine) as session:
+            try:
+                await update_notion_cache_async(session, client, db_id, part_db_id)
+                await session.commit()
+                print(" [Cache Daemon] Sync complete. Sleeping for 15 minutes.")
+            except Exception as e:
+                await session.rollback()
+                print(f" [Cache Daemon] Error during sync: {e}")
+            finally:
+                await session.close()
+
+        await asyncio.sleep(900)  # 15 minutes
+
+
+async def start_background_sync_async() -> None:
+    """Starts the async background daemon."""
+    asyncio.create_task(daemon_loop())
 
 
 def start_background_sync() -> None:
     """Starts the background daemon thread."""
-    thread = threading.Thread(target=_run_sync_loop, daemon=True)
+    thread = threading.Thread(target=run_sync_loop, daemon=True)
     thread.start()

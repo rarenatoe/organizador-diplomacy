@@ -36,7 +36,8 @@ def organizar_partidas(
 
     snapshot_id is required — no default to latest.
     """
-    conn = db.get_db(db.DB_PATH if directorio == DATA_DIR else directorio / "diplomacy.db")
+    db_path = str(db.DB_PATH if directorio == DATA_DIR else directorio / "diplomacy.db")
+    conn = db.get_db(db_path)
 
     # ── Validate snapshot ────────────────────────────────────────────────────
     if snapshot_id is None:
@@ -48,8 +49,12 @@ def organizar_partidas(
     rows = db.get_snapshot_players(conn, snapshot_id)
     jugadores: list[Jugador] = [
         Jugador(
-            r["nombre"], r["experiencia"], r["juegos_este_ano"],
-            str(bool(r["prioridad"])), r["partidas_deseadas"], r["partidas_gm"],
+            nombre=r["nombre"],
+            experiencia=r["experiencia"],
+            juegos_ano=r["juegos_este_ano"],
+            prioridad=str(bool(r["prioridad"])),
+            partidas_deseadas=r["partidas_deseadas"],
+            partidas_gm=r["partidas_gm"],
         )
         for r in rows
     ]
@@ -102,7 +107,7 @@ def organizar_partidas(
             mesa_id = db_game.create_mesa(conn, ge_id, mesa.numero, gm_pid)
             for orden, jugador in enumerate(mesa.jugadores, start=1):
                 pid = db.get_or_create_player(conn, jugador.nombre)
-                db_game.add_mesa_player(conn, mesa_id, pid, orden)
+                db_game.add_mesa_player(conn, mesa_id, pid, orden, jugador.pais or None)
 
         conteo_espera: Counter[str] = Counter(
             j.nombre for j in resultado.tickets_sobrantes

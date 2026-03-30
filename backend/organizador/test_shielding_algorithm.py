@@ -12,12 +12,12 @@ class TestShieldingAlgorithm(unittest.TestCase):
     def test_algorithm_runs_without_errors(self):
         """The algorithm should execute without throwing exceptions."""
         players = [
-            Jugador("Alice", "Antiguo", 5, "False", 1, 0,
-                     1, 1, 1, 0, 0, 0, 0),
-            Jugador("Bob", "Antiguo", 3, "False", 1, 0,
-                     0, 0, 0, 0, 0, 0),
-            Jugador("Charlie", "Antiguo", 2, "False", 1, 0,
-                     0, 0, 0, 0, 0, 0),
+            Jugador(nombre="Alice", experiencia="Antiguo", juegos_ano=5, prioridad="False", partidas_deseadas=1, partidas_gm=0,
+                     c_england=1, c_france=1, c_germany=1, c_italy=0, c_austria=0, c_russia=0, c_turkey=0),
+            Jugador(nombre="Bob", experiencia="Antiguo", juegos_ano=3, prioridad="False", partidas_deseadas=1, partidas_gm=0,
+                     c_england=0, c_france=0, c_germany=0, c_italy=0, c_austria=0, c_russia=0, c_turkey=0),
+            Jugador(nombre="Charlie", experiencia="Antiguo", juegos_ano=2, prioridad="False", partidas_deseadas=1, partidas_gm=0,
+                     c_england=0, c_france=0, c_germany=0, c_italy=0, c_austria=0, c_russia=0, c_turkey=0),
         ]
         
         # This should not raise any exceptions
@@ -29,12 +29,12 @@ class TestShieldingAlgorithm(unittest.TestCase):
     def test_cursed_players_get_shields_assigned(self):
         """Players with country history should get shield assignments."""
         players = [
-            Jugador("Alice", "Antiguo", 5, "False", 1, 0,
-                     2, 0, 0, 0, 0, 0),  # Cursed in England
-            Jugador("Bob", "Antiguo", 1, "False", 1, 0,
-                     0, 0, 0, 0, 0, 0),  # Clean history
-            Jugador("Charlie", "Antiguo", 1, "False", 1, 0,
-                     0, 0, 0, 0, 0, 0),  # Clean history
+            Jugador(nombre="Alice", experiencia="Antiguo", juegos_ano=5, prioridad="False", partidas_deseadas=1, partidas_gm=0,
+                     c_england=2, c_france=0, c_germany=0, c_italy=0, c_austria=0, c_russia=0, c_turkey=0),  # Cursed in England
+            Jugador(nombre="Bob", experiencia="Antiguo", juegos_ano=1, prioridad="False", partidas_deseadas=1, partidas_gm=0,
+                     c_england=0, c_france=0, c_germany=0, c_italy=0, c_austria=0, c_russia=0, c_turkey=0),  # Clean history
+            Jugador(nombre="Charlie", experiencia="Antiguo", juegos_ano=1, prioridad="False", partidas_deseadas=1, partidas_gm=0,
+                     c_england=0, c_france=0, c_germany=0, c_italy=0, c_austria=0, c_russia=0, c_turkey=0),  # Clean history
         ]
         
         assign_countries_to_mesa(players)
@@ -46,12 +46,12 @@ class TestShieldingAlgorithm(unittest.TestCase):
     def test_no_cursed_players_remain_unassigned(self):
         """Players without country history should remain unassigned."""
         players = [
-            Jugador("Alice", "Antiguo", 5, "False", 1, 0,
-                     1, 1, 1, 0, 0, 0, 0),  # All countries 1 game
-            Jugador("Bob", "Antiguo", 3, "False", 1, 0,
-                     0, 0, 0, 0, 0, 0),  # All countries 0 games
-            Jugador("Charlie", "Antiguo", 2, "False", 1, 0,
-                     0, 0, 0, 0, 0, 0),  # All countries 0 games
+            Jugador(nombre="Alice", experiencia="Antiguo", juegos_ano=5, prioridad="False", partidas_deseadas=1, partidas_gm=0,
+                     c_england=1, c_france=1, c_germany=1, c_italy=0, c_austria=0, c_russia=0, c_turkey=0),  # All countries 1 game
+            Jugador(nombre="Bob", experiencia="Antiguo", juegos_ano=3, prioridad="False", partidas_deseadas=1, partidas_gm=0,
+                     c_england=0, c_france=0, c_germany=0, c_italy=0, c_austria=0, c_russia=0, c_turkey=0),  # All countries 0 games
+            Jugador(nombre="Charlie", experiencia="Antiguo", juegos_ano=2, prioridad="False", partidas_deseadas=1, partidas_gm=0,
+                     c_england=0, c_france=0, c_germany=0, c_italy=0, c_austria=0, c_russia=0, c_turkey=0),  # All countries 0 games
         ]
         
         assign_countries_to_mesa(players)
@@ -64,11 +64,11 @@ class TestShieldingAlgorithm(unittest.TestCase):
         """The algorithm must pick player with the lowest count for the cursed country."""
         players = [
             # Alice is cursed in England (2 games).
-            Jugador("Alice", "Antiguo", 5, "False", 1, 0, 2, 0, 0, 0, 0, 0, 0),
+            Jugador(nombre="Alice", experiencia="Antiguo", juegos_ano=5, prioridad="False", partidas_deseadas=1, partidas_gm=0, c_england=2, c_france=0, c_germany=0, c_italy=0, c_austria=0, c_russia=0, c_turkey=0),
             # Bob has played England once (1 game).
-            Jugador("Bob", "Antiguo", 3, "False", 1, 0, 1, 0, 0, 0, 0, 0, 0),
+            Jugador(nombre="Bob", experiencia="Antiguo", juegos_ano=3, prioridad="False", partidas_deseadas=1, partidas_gm=0, c_england=1, c_france=0, c_germany=0, c_italy=0, c_austria=0, c_russia=0, c_turkey=0),
             # Charlie has never played England (0 games).
-            Jugador("Charlie", "Antiguo", 2, "False", 1, 0, 0, 0, 0, 0, 0, 0, 0),
+            Jugador(nombre="Charlie", experiencia="Antiguo", juegos_ano=2, prioridad="False", partidas_deseadas=1, partidas_gm=0, c_england=0, c_france=0, c_germany=0, c_italy=0, c_austria=0, c_russia=0, c_turkey=0),
         ]
         
         assign_countries_to_mesa(players)

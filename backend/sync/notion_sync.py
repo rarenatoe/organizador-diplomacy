@@ -32,17 +32,22 @@ Requisitos:
     - Archivo .env con NOTION_TOKEN, NOTION_DATABASE_ID y
       NOTION_PARTICIPACIONES_DB_ID
 """
+
 from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import contextlib
 import difflib
 import json
 import os
 import sys
 from collections import defaultdict
 from datetime import datetime
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    import sqlite3
 
 from dotenv import load_dotenv
 from notion_client import Client
@@ -53,24 +58,25 @@ from backend.db import db
 # ── Player field defaults for first-time Notion players ──────────────────────
 
 FIELD_DEFAULTS: dict[str, int] = {
-    "prioridad":         0,
+    "prioridad": 0,
     "partidas_deseadas": 1,
-    "partidas_gm":       0,
+    "partidas_gm": 0,
 }
 
 # ── Country property mapping ──────────────────────────────────────────────────
 
 COUNTRY_PROPS: dict[str, str] = {
     "c_england": "∀ 🇬🇧",
-    "c_france":  "∀ 🇫🇷",
+    "c_france": "∀ 🇫🇷",
     "c_germany": "∀ 🇩🇪",
-    "c_italy":   "∀ 🇮🇹",
+    "c_italy": "∀ 🇮🇹",
     "c_austria": "∀ 🇦🇹",
-    "c_russia":  "∀ 🇷🇺",
-    "c_turkey":  "∀ 🇹🇷",
+    "c_russia": "∀ 🇷🇺",
+    "c_turkey": "∀ 🇹🇷",
 }
 
 # ── Helpers de extracción ─────────────────────────────────────────────────────
+
 
 def extraer_numero(prop: dict[str, Any]) -> int:
     """Extrae un número de una propiedad number o formula."""
@@ -95,12 +101,13 @@ def experiencia(participaciones_prop: dict[str, Any]) -> str:
 
 # ── Name similarity detection ────────────────────────────────────────────────
 
-def _normalize_name(name: str) -> str:
+
+def normalize_name(name: str) -> str:
     """Normalize a name for comparison: lowercase, strip, collapse whitespace."""
     return " ".join(name.lower().split())
 
 
-def _words_match(word_a: str, word_b: str) -> float:
+def words_match(word_a: str, word_b: str) -> float:
     """
     Check similarity between two words using difflib.
     Handles typos, prefixes, and abbreviations.
@@ -108,77 +115,76 @@ def _words_match(word_a: str, word_b: str) -> float:
     """
     if not word_a or not word_b:
         return 0.0
-    
+
     wa = word_a.lower().rstrip(".")
     wb = word_b.lower().rstrip(".")
-    
+
     if wa == wb:
         return 1.0
-        
+
     # Check if one is a prefix of the other (at least 1 char)
     # This handles abbreviations like "P." for "Paul"
-    if (len(wa) >= 1 and len(wb) >= 1 and 
-        (wb.startswith(wa) or wa.startswith(wb))):
-        return 0.8 # Prefix match is good but not perfect
-        
+    if len(wa) >= 1 and len(wb) >= 1 and (wb.startswith(wa) or wa.startswith(wb)):
+        return 0.8  # Prefix match is good but not perfect
+
     # Probabilistic match for typos
     return difflib.SequenceMatcher(None, wa, wb).ratio()
 
 
-def _similarity(a: str, b: str) -> float:
+def similarity(a: str, b: str) -> float:
     """
     Calculate similarity ratio between two names (0.0 to 1.0).
     Uses Token-Set + Probabilistic matching.
     """
-    norm_a = _normalize_name(a)
-    norm_b = _normalize_name(b)
-    
+    norm_a = normalize_name(a)
+    norm_b = normalize_name(b)
+
     if not norm_a and not norm_b:
         return 1.0
     if not norm_a or not norm_b:
         return 0.0
-        
+
     words_a = norm_a.split()
     words_b = norm_b.split()
-    
+
     # We want to see how many words from the shorter name find a match in the longer name
     short_words = words_a if len(words_a) <= len(words_b) else words_b
     long_words = words_b if len(words_a) <= len(words_b) else words_a
-    
+
     matched_count = 0.0
     used_long_indices: set[int] = set()
-    
+
     for sw in short_words:
         best_word_sim = 0.0
         best_idx = -1
-        
+
         for i, lw in enumerate(long_words):
             if i in used_long_indices:
                 continue
-            sim = _words_match(sw, lw)
+            sim = words_match(sw, lw)
             if sim > best_word_sim:
                 best_word_sim = sim
                 best_idx = i
-        
-        if best_word_sim >= 0.85: # High confidence word match
+
+        if best_word_sim >= 0.85:  # High confidence word match
             matched_count += 1.0
             used_long_indices.add(best_idx)
-        elif best_word_sim >= 0.5: # Partial word match
+        elif best_word_sim >= 0.5:  # Partial word match
             matched_count += best_word_sim
             used_long_indices.add(best_idx)
-            
+
     # Score is matched words over total words in the longer name
     score = matched_count / len(long_words)
-    
+
     # BONUS: If it's a perfect prefix match (all words of shorter name match)
     # and the difference is only 1 word, we boost the similarity to 0.8
     if matched_count == len(short_words) and len(long_words) - len(short_words) == 1:
         return max(0.8, score)
-        
+
     return score
 
 
-def _detect_similar_names(
+def detect_similar_names(
     notion_players: dict[str, dict[str, Any]] | list[dict[str, Any]],
     snapshot_names: list[str],
     threshold: float = 0.75,
@@ -189,34 +195,33 @@ def _detect_similar_names(
     """
     # Normalize notion_players input to list of dicts if it's a map
     players_list = (
-        list(notion_players.values()) if isinstance(notion_players, dict) 
-        else notion_players
+        list(notion_players.values()) if isinstance(notion_players, dict) else notion_players
     )
-    
+
     # Pre-normalize all snapshot names for Step 1 & 2
-    norm_snapshots = {name: _normalize_name(name) for name in snapshot_names}
-    
+    norm_snapshots = {name: normalize_name(name) for name in snapshot_names}
+
     potential_matches: list[dict[str, Any]] = []
-    
+
     # Step 1 & 2: Exact & Alias Matches (Filter them out)
     # We want to find names that DON'T match exactly but are similar
-    
+
     # Track exact matches to avoid comparing them for similarity
     exact_matches_snapshot: set[str] = set()
-    
+
     for player_data in players_list:
         notion_main_name = player_data["nombre"]
-        norm_notion_main = _normalize_name(notion_main_name)
-        notion_aliases = [_normalize_name(a) for a in player_data.get("alias", [])]
-        
+        norm_notion_main = normalize_name(notion_main_name)
+        notion_aliases = [normalize_name(a) for a in player_data.get("alias", [])]
+
         for snap_name in snapshot_names:
             norm_snap = norm_snapshots[snap_name]
-            
+
             # Step 1: Exact Match
             if norm_notion_main == norm_snap:
                 exact_matches_snapshot.add(snap_name)
                 continue
-                
+
             # Step 2: Explicit Alias Match
             if norm_snap in notion_aliases:
                 exact_matches_snapshot.add(snap_name)
@@ -228,40 +233,42 @@ def _detect_similar_names(
     for player_data in players_list:
         notion_main_name = player_data["nombre"]
         notion_variations = [notion_main_name] + player_data.get("alias", [])
-        
+
         for snap_name in snapshot_names:
             if snap_name in exact_matches_snapshot:
                 continue
-                
+
             # Check similarity against all variations, keep best
             best_sim = 0.0
             for var in notion_variations:
-                sim = _similarity(var, snap_name)
+                sim = similarity(var, snap_name)
                 if sim > best_sim:
                     best_sim = sim
-            
+
             if best_sim >= threshold:
-                potential_matches.append({
-                    "notion": notion_main_name,
-                    "snapshot": snap_name,
-                    "similarity": round(best_sim, 3)
-                })
+                potential_matches.append(
+                    {
+                        "notion": notion_main_name,
+                        "snapshot": snap_name,
+                        "similarity": round(best_sim, 3),
+                    }
+                )
 
     # Step 4: Bi-Directional Ambiguity Detection (1-to-Many)
     # If a name maps to multiple candidates, they are all conflicts.
     # Group by notion and by snapshot to detect 1-to-Many in both directions.
     notion_to_snaps: defaultdict[str, set[str]] = defaultdict(set)
     snap_to_notions: defaultdict[str, set[str]] = defaultdict(set)
-    
+
     for m in potential_matches:
         notion_to_snaps[m["notion"]].add(m["snapshot"])
         snap_to_notions[m["snapshot"]].add(m["notion"])
-        
-    # All potential matches found in Step 3 are technically conflicts 
+
+    # All potential matches found in Step 3 are technically conflicts
     # since they are not exact matches but are above threshold.
     # The ambiguity detection is already implicit if we return all matches.
     # We just need to make sure they are unique and sorted.
-    
+
     unique_matches: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for m in potential_matches:
@@ -269,27 +276,39 @@ def _detect_similar_names(
         if key not in seen:
             unique_matches.append(m)
             seen.add(key)
-            
+
     unique_matches.sort(key=lambda x: x["similarity"], reverse=True)
     return unique_matches
 
 
 # ── Existing player data (from DB) ──────────────────────────────────────
 
+
 def _leer_snapshot_existente(
-    conn: db.sqlite3.Connection,
+    conn: sqlite3.Connection,
     snapshot_id: int | None = None,
 ) -> dict[str, dict[str, Any]]:
     """Returns nombre → row dict from the given snapshot (or {} if None)."""
     if snapshot_id is None:
         return {}
-    return {
-        r["nombre"]: r
-        for r in db.get_snapshot_players(conn, snapshot_id)
-    }
+    return {r["nombre"]: r for r in db.get_snapshot_players(conn, snapshot_id)}
 
 
-# ── Partidas del año actual ──────────────────────────────────────────────────
+def add_snapshot_player(
+    conn: sqlite3.Connection,
+    snap_id: int,
+    player_id: int,
+    experiencia: str,
+    juegos: int,
+    prioridad: int,
+    partidas_deseadas: int,
+    partidas_gm: int,
+) -> None:
+    """Adds a player to the given snapshot."""
+    db.add_player_to_snapshot(
+        conn, snap_id, player_id, experiencia, juegos, prioridad, partidas_deseadas, partidas_gm
+    )
+
 
 def conteo_partidas_este_ano(
     client: Client,
@@ -306,7 +325,9 @@ def conteo_partidas_este_ano(
     no está conectada a la integración, el valor será None y se advertirá al
     usuario (todos los conteos quedarán en 0).
     """
-    db_info: dict[str, Any] = cast("dict[str, Any]", client.databases.retrieve(database_id=participaciones_db_id))
+    db_info: dict[str, Any] = cast(
+        "dict[str, Any]", client.databases.retrieve(database_id=participaciones_db_id)
+    )
     data_sources = db_info.get("data_sources", [])
     if not data_sources:
         raise RuntimeError(
@@ -330,14 +351,7 @@ def conteo_partidas_este_ano(
         kwargs: dict[str, Any] = {
             "data_source_id": ds_id,
             "result_type": "page",
-            "filter": {
-                "property": "Temporada",
-                "rollup": {
-                    "number": {
-                        "equals": año
-                    }
-                }
-            }
+            "filter": {"property": "Temporada", "rollup": {"number": {"equals": año}}},
         }
         if prop_ids:
             kwargs["filter_properties"] = prop_ids
@@ -377,6 +391,7 @@ def conteo_partidas_este_ano(
 
 # ── Descarga desde Notion ─────────────────────────────────────────────────────
 
+
 def descargar_todos(
     client: Client,
     database_id: str,
@@ -387,7 +402,9 @@ def descargar_todos(
     notion-client ≥2.7 eliminó databases.query(); hay que obtener el
     data_source_id desde databases.retrieve() y luego usar data_sources.query().
     """
-    db_info: dict[str, Any] = cast("dict[str, Any]", client.databases.retrieve(database_id=database_id))
+    db_info: dict[str, Any] = cast(
+        "dict[str, Any]", client.databases.retrieve(database_id=database_id)
+    )
     data_sources = db_info.get("data_sources", [])
     if not data_sources:
         raise RuntimeError(
@@ -423,9 +440,11 @@ def descargar_todos(
     return pages
 
 
-def _find_notion_player(name: str, notion_players: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+def find_notion_player(
+    name: str, notion_players: dict[str, dict[str, Any]]
+) -> dict[str, Any] | None:
     """Finds a Notion player by name or alias."""
-    norm_name = _normalize_name(name)
+    norm_name = normalize_name(name)
     # Exact name match
     if norm_name in notion_players:
         return notion_players[norm_name]
@@ -438,35 +457,58 @@ def _find_notion_player(name: str, notion_players: dict[str, dict[str, Any]]) ->
 
 # ── Entrypoint ────────────────────────────────────────────────────────────────
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Descarga jugadores desde Notion y crea un snapshot en la DB"
     )
-    parser.add_argument("--dry-run", action="store_true",
-                        help="Muestra el resultado sin escribir en la DB")
-    parser.add_argument("--force", action="store_true",
-                        help="Crea un snapshot aunque los datos sean idénticos al último")
-    parser.add_argument("--snapshot", type=int, default=None,
-                        help="ID del snapshot base (default: último snapshot en la DB)")
-    parser.add_argument("--detect-only", action="store_true",
-                        help="Detecta nombres similares sin crear snapshot (output JSON)")
-    parser.add_argument("--merges", type=str, default=None,
-                        help='JSON con fusiones confirmadas: {"merges": [{"from": "Name1", "to": "Name2"}]}')
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Muestra el resultado sin escribir en la DB"
+    )
+    parser.add_argument(
+        "--force", action="store_true", help="Crea un snapshot aunque los datos sean idénticos"
+    )
+    parser.add_argument(
+        "--snapshot",
+        type=int,
+        default=None,
+        help="ID del snapshot base (default: último snapshot en la DB)",
+    )
+    parser.add_argument(
+        "--detect-only",
+        action="store_true",
+        help="Detecta nombres similares sin crear snapshot (output JSON)",
+    )
+    parser.add_argument(
+        "--merges",
+        type=str,
+        default=None,
+        help='JSON con fusiones confirmadas: {"merges": [{"from": "Name1", "to": "Name2"}]}',
+    )
     args = parser.parse_args()
 
     load_dotenv()
-    token      = os.getenv("NOTION_TOKEN")
-    db_id      = os.getenv("NOTION_DATABASE_ID")
+    token = os.getenv("NOTION_TOKEN")
+    db_id = os.getenv("NOTION_DATABASE_ID")
     part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
 
     if not token or token.startswith("secret_XXX"):
-        print("❌  NOTION_TOKEN no configurado. Copia .env.example → .env y rellénalo.", file=sys.stderr)
+        print(
+            "❌  NOTION_TOKEN no configurado. Copia .env.example → .env y rellénalo.",
+            file=sys.stderr,
+        )
         sys.exit(1)
     if not db_id or "XXX" in db_id:
-        print("❌  NOTION_DATABASE_ID no configurado. Copia .env.example → .env y rellénalo.", file=sys.stderr)
+        print(
+            "❌  NOTION_DATABASE_ID no configurado. Copia .env.example → .env y rellénalo.",
+            file=sys.stderr,
+        )
         sys.exit(1)
     if not part_db_id or "XXX" in part_db_id:
-        print("❌  NOTION_PARTICIPACIONES_DB_ID no configurado. Copia .env.example → .env y rellénalo.", file=sys.stderr)
+        print(
+            "❌  NOTION_PARTICIPACIONES_DB_ID no configurado. Copia .env.example → .env y rellénalo.",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     año_actual = datetime.now().year
@@ -476,14 +518,18 @@ def main() -> None:
     try:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future_pages = executor.submit(descargar_todos, client, db_id)
-            future_conteo = executor.submit(conteo_partidas_este_ano, client, part_db_id, año_actual)
-            
+            future_conteo = executor.submit(
+                conteo_partidas_este_ano, client, part_db_id, año_actual
+            )
+
             pages = future_pages.result()
             conteo_por_jugador = future_conteo.result()
     except APIResponseError as e:
         print(f"\n❌  Error de API Notion: {e}", file=sys.stderr)
         sys.exit(1)
-    print(f"{len(pages)} jugador(es), {sum(conteo_por_jugador.values())} partida(s) en {año_actual}.")
+    print(
+        f"{len(pages)} jugador(es), {sum(conteo_por_jugador.values())} partida(s) en {año_actual}."
+    )
 
     conn = db.get_db()
     source_snapshot_id = args.snapshot
@@ -491,7 +537,9 @@ def main() -> None:
     # ── Require snapshot if database has existing data ────────────────────────
     has_snapshots = conn.execute("SELECT 1 FROM snapshots LIMIT 1").fetchone() is not None
     if source_snapshot_id is None and has_snapshots:
-        print("❌  Error: Snapshot ID is required because the database is not empty.", file=sys.stderr)
+        print(
+            "❌  Error: Snapshot ID is required because the database is not empty.", file=sys.stderr
+        )
         print("   You must specify which snapshot to branch from.", file=sys.stderr)
         print("   Usa --snapshot <ID> para especificar el snapshot base.", file=sys.stderr)
         conn.close()
@@ -520,27 +568,31 @@ def main() -> None:
         nombre = extraer_nombre(nombre_prop)
         if not nombre:
             continue
-        
+
         # Experiencia ← total histórico de Participaciones
         part_prop = props.get("Participaciones")
         experiencia_val = experiencia(part_prop) if part_prop else "Nuevo"
-        
+
         # Juegos_Este_Ano ← conteo filtrado por año (indexado por page ID del jugador)
         player_id = page["id"].replace("-", "")
         juegos = conteo_por_jugador.get(player_id, 0)
-        
+
         # Alias extraction
         alias_prop = props.get("Alias")
-        alias_text = "".join(p.get("plain_text", "") for p in alias_prop.get("rich_text", [])) if alias_prop else ""
+        alias_text = (
+            "".join(p.get("plain_text", "") for p in alias_prop.get("rich_text", []))
+            if alias_prop
+            else ""
+        )
         alias_list = [a.strip().lower() for a in alias_text.split(",") if a.strip()]
-        
+
         # Country history extraction
         countries_data = {
             key: extraer_numero(props.get(notion_name, {}))
             for key, notion_name in COUNTRY_PROPS.items()
         }
-        
-        notion_players[_normalize_name(nombre)] = {
+
+        notion_players[normalize_name(nombre)] = {
             "notion_id": page["id"],
             "nombre": nombre,
             "experiencia": experiencia_val,
@@ -548,12 +600,12 @@ def main() -> None:
             "alias": alias_list,
             **countries_data,
         }
-    
+
     # ── Detect-only mode: output similar names as JSON ────────────────────────
     # We must do this BEFORE building `filas` so we use the raw incoming Notion names
     if args.detect_only:
         snapshot_names = list(existentes.keys())
-        similar = _detect_similar_names(notion_players, snapshot_names)
+        similar = detect_similar_names(notion_players, snapshot_names)
         result = {
             "notion_count": len(notion_players),
             "snapshot_count": len(snapshot_names),
@@ -565,10 +617,10 @@ def main() -> None:
 
     # ── Build new snapshot: start with all existing players, update from Notion ──
     filas: list[dict[str, Any]] = []
-    
+
     if source_snapshot_id is not None:
-        merged_notion_normalized = {_normalize_name(v["to"]) for v in merges.values()}
-        
+        merged_notion_normalized = {normalize_name(v["to"]) for v in merges.values()}
+
         # Start with all players from the existing snapshot
         for nombre, existente in existentes.items():
             # 1. Check if this player was explicitly merged via the UI dialog
@@ -576,57 +628,84 @@ def main() -> None:
                 merge_info: dict[str, str] = merges[nombre]
                 notion_name = merge_info["to"]
                 action = merge_info["action"]
-                notion_norm = _normalize_name(notion_name)
-                
+                notion_norm = normalize_name(notion_name)
+
                 if notion_norm in notion_players:
                     notion_data = notion_players[notion_norm]
-                    filas.append({
-                        "Nombre":            notion_data["nombre"] if action == "merge_notion" else nombre,
-                        "Experiencia":       notion_data["experiencia"],
-                        "Juegos_Este_Ano":   notion_data["juegos"],
-                        "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
-                        "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
-                        "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
-                        **{c: notion_data[c] for c in COUNTRY_PROPS},
-                    })
+                    filas.append(
+                        {
+                            "Nombre": notion_data["nombre"] if action == "merge_notion" else nombre,
+                            "Experiencia": notion_data["experiencia"],
+                            "Juegos_Este_Ano": notion_data["juegos"],
+                            "prioridad": int(
+                                existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
+                            ),
+                            "partidas_deseadas": int(
+                                existente.get(
+                                    "partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"]
+                                )
+                            ),
+                            "partidas_gm": int(
+                                existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
+                            ),
+                            **{c: notion_data[c] for c in COUNTRY_PROPS},
+                        }
+                    )
                     continue
-            
+
             # 2. Check if this player exists in Notion (exact match or alias match)
-            notion_data = _find_notion_player(nombre, notion_players)
-            if notion_data and _normalize_name(notion_data["nombre"]) not in merged_notion_normalized:
-                filas.append({
-                    "Nombre":            nombre, # Keep local name
-                    "Experiencia":       notion_data["experiencia"],
-                    "Juegos_Este_Ano":   notion_data["juegos"],
-                    "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
-                    "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
-                    "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
-                    **{c: notion_data[c] for c in COUNTRY_PROPS},
-                })
+            notion_data = find_notion_player(nombre, notion_players)
+            if (
+                notion_data
+                and normalize_name(notion_data["nombre"]) not in merged_notion_normalized
+            ):
+                filas.append(
+                    {
+                        "Nombre": nombre,  # Keep local name
+                        "Experiencia": notion_data["experiencia"],
+                        "Juegos_Este_Ano": notion_data["juegos"],
+                        "prioridad": int(existente.get("prioridad", FIELD_DEFAULTS["prioridad"])),
+                        "partidas_deseadas": int(
+                            existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])
+                        ),
+                        "partidas_gm": int(
+                            existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
+                        ),
+                        **{c: notion_data[c] for c in COUNTRY_PROPS},
+                    }
+                )
             elif nombre not in merges:
                 # 3. Keep existing data (player not in Notion and not merged)
-                filas.append({
-                    "Nombre":            nombre,
-                    "Experiencia":       existente.get("experiencia", "Nuevo"),
-                    "Juegos_Este_Ano":   int(existente.get("juegos_este_ano", 0)),
-                    "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
-                    "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
-                    "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
-                    **{c: existente.get(c, 0) for c in COUNTRY_PROPS},
-                })
+                filas.append(
+                    {
+                        "Nombre": nombre,
+                        "Experiencia": existente.get("experiencia", "Nuevo"),
+                        "Juegos_Este_Ano": int(existente.get("juegos_este_ano", 0)),
+                        "prioridad": int(existente.get("prioridad", FIELD_DEFAULTS["prioridad"])),
+                        "partidas_deseadas": int(
+                            existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])
+                        ),
+                        "partidas_gm": int(
+                            existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
+                        ),
+                        **{c: existente.get(c, 0) for c in COUNTRY_PROPS},
+                    }
+                )
 
     else:
         # No existing snapshot - use all Notion players directly from our lookup
         for _, notion_data in notion_players.items():
-            filas.append({
-                "Nombre":            notion_data["nombre"],
-                "Experiencia":       notion_data["experiencia"],
-                "Juegos_Este_Ano":   notion_data["juegos"],
-                "prioridad":         FIELD_DEFAULTS["prioridad"],
-                "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
-                "partidas_gm":       FIELD_DEFAULTS["partidas_gm"],
-                **{c: notion_data[c] for c in COUNTRY_PROPS},
-            })
+            filas.append(
+                {
+                    "Nombre": notion_data["nombre"],
+                    "Experiencia": notion_data["experiencia"],
+                    "Juegos_Este_Ano": notion_data["juegos"],
+                    "prioridad": FIELD_DEFAULTS["prioridad"],
+                    "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
+                    "partidas_gm": FIELD_DEFAULTS["partidas_gm"],
+                    **{c: notion_data[c] for c in COUNTRY_PROPS},
+                }
+            )
 
     nuevos: list[str] = [f["Nombre"] for f in filas if f["Nombre"] not in existentes]
     print(f"⟳  {len(filas)} jugador(es) procesados ({len(nuevos)} nuevo(s)).")
@@ -642,7 +721,11 @@ def main() -> None:
         return
 
     # ── Content-addressed guard: skip if data hasn't changed ──────────────────
-    if source_snapshot_id is not None and not args.force and db.snapshots_have_same_roster(conn, source_snapshot_id, filas):
+    if (
+        source_snapshot_id is not None
+        and not args.force
+        and db.snapshots_have_same_roster(conn, source_snapshot_id, filas)
+    ):
         print("✓  Los datos de Notion coinciden con el último snapshot — sin cambios.")
         print("   Usa --force para crear un snapshot igualmente.")
         conn.close()
@@ -652,53 +735,61 @@ def main() -> None:
     try:
         # Check if source_snapshot_id is a leaf node (has no children)
         if source_snapshot_id is not None:
-            has_children = conn.execute(
-                "SELECT 1 FROM events WHERE source_snapshot_id = ? LIMIT 1",
-                (source_snapshot_id,)
-            ).fetchone() is not None
-            
+            has_children = (
+                conn.execute(
+                    "SELECT 1 FROM events WHERE source_snapshot_id = ? LIMIT 1",
+                    (source_snapshot_id,),
+                ).fetchone()
+                is not None
+            )
+
             # If source is a leaf node, update in-place
             if not has_children:
                 # Update the existing snapshot in-place
                 conn.execute(
                     "UPDATE snapshots SET source = 'notion_sync' WHERE id = ?",
-                    (source_snapshot_id,)
+                    (source_snapshot_id,),
                 )
-                
+
                 # Clear old roster
                 conn.execute(
-                    "DELETE FROM snapshot_players WHERE snapshot_id = ?",
-                    (source_snapshot_id,)
+                    "DELETE FROM snapshot_players WHERE snapshot_id = ?", (source_snapshot_id,)
                 )
-                
+
                 # Insert new players
                 for fila in filas:
                     pid = db.get_or_create_player(conn, fila["Nombre"])
                     db.add_snapshot_player(
-                        conn, source_snapshot_id, pid,
+                        conn,
+                        source_snapshot_id,
+                        pid,
                         fila["Experiencia"],
                         fila["Juegos_Este_Ano"],
                         fila["prioridad"],
                         fila["partidas_deseadas"],
-                        fila["partidas_gm"]
+                        fila["partidas_gm"],
                     )
-                
+
                 conn.commit()
                 conn.close()
-                print(f"✓  Snapshot #{source_snapshot_id} actualizado in-place con {len(filas)} jugador(es).")
+                print(
+                    f"✓  Snapshot #{source_snapshot_id} actualizado in-place con {len(filas)} jugador(es)."
+                )
                 return
-        
+
         # For internal nodes or no source, create new snapshot
         snap_id = db.create_snapshot(conn, "notion_sync")
         for fila in filas:
             pid = db.get_or_create_player(conn, fila["Nombre"])
             db.add_snapshot_player(
-                conn, snap_id, pid,
+                conn,
+                snap_id,
+                pid,
                 fila["Experiencia"],
                 fila["Juegos_Este_Ano"],
                 fila["prioridad"],
                 fila["partidas_deseadas"],
-                fila["partidas_gm"]
+                fila["partidas_gm"],
             )
         db.create_sync_event(conn, source_snapshot_id, snap_id)
         conn.commit()
@@ -713,6 +804,52 @@ def main() -> None:
         print(f"   sync_event: snapshot #{source_snapshot_id} → #{snap_id}")
     else:
         print("   (primer sync — sin snapshot anterior)")
+
+
+# ── Async background entrypoint for FastAPI ───────────────────────────────────
+
+
+async def run_notion_sync_background(
+    snapshot_id: int | None = None,
+    *,
+    force: bool = False,
+) -> None:
+    """
+    Async wrapper to run notion_sync in the background with a new AsyncSession.
+    This is called by FastAPI BackgroundTasks.
+    """
+    import asyncio
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        # Run the synchronous main() in a thread pool
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(
+            None,
+            lambda: _run_sync_in_thread(snapshot_id, force=force),
+        )
+    except Exception as exc:
+        # Log the error but don't propagate to avoid breaking the response
+        logger.error(f"Background notion sync failed: {exc}")
+        # In production, this error is logged but doesn't affect the API response
+
+
+def _run_sync_in_thread(snapshot_id: int | None, *, force: bool) -> None:
+    """Helper to run sync in a thread with proper argument parsing."""
+    import sys
+
+    # Build command line args for main()
+    args = ["notion_sync"]
+    if snapshot_id is not None:
+        args.extend(["--snapshot", str(snapshot_id)])
+    if force:
+        args.append("--force")
+
+    sys.argv = args
+    with contextlib.suppress(SystemExit):
+        main()  # argparse calls sys.exit()
 
 
 if __name__ == "__main__":

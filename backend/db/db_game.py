@@ -1,21 +1,14 @@
 """
-db_game.py – Game-event persistence helpers.
+DEPRECATED: Legacy game event persistence functions.
 
-Handles creation of game_events, mesas, mesa_players, waiting_list,
-and the post-game output snapshot (source='organizar').
+This module exists only for backward compatibility with legacy CLI scripts.
+New code should use async modules in backend.db.crud instead.
 
-All write helpers do NOT commit — callers commit after all writes succeed.
-
-Public API
-──────────
-  create_game_event(conn, input_snapshot_id, output_snapshot_id,
-                    intentos, copypaste_text)          → int
-  create_mesa(conn, game_event_id, numero, gm_player_id)         → int
-  add_mesa_player(conn, mesa_id, player_id, orden)               → None
-  add_waiting_player(conn, game_event_id, player_id,
-                     orden, cupos_faltantes)           → None
-  create_output_snapshot(conn, input_snapshot_id, resultado)     → int
+Used by:
+- backend/organizador/organizador.py (legacy CLI script)
+- backend/organizador/persistence.py (legacy sync functions)
 """
+
 from __future__ import annotations
 
 from collections import Counter
@@ -26,22 +19,85 @@ if TYPE_CHECKING:
 
     from backend.organizador.models import ResultadoPartidas
 
-from .db import add_snapshot_player, create_event, create_snapshot, get_snapshot_players
+from backend.db import db
 
-# ── Game events ────────────────────────────────────────────────────────────────
+
+def create_output_snapshot(
+    conn: sqlite3.Connection,
+    input_snapshot_id: int,
+    resultado: ResultadoPartidas,
+) -> int:
+    """
+    DEPRECATED: Creates post-game snapshot based on game results.
+    Use async persistence functions in backend.organizador.persistence_async for new code.
+    """
+    # Count games played per player
+    cupos_jugados: Counter[str] = Counter(
+        j.nombre for mesa in resultado.mesas for j in mesa.jugadores
+    )
+
+    # Track players in waiting list
+    nombres_en_espera: set[str] = {j.nombre for j in resultado.tickets_sobrantes}
+
+    # Create new snapshot
+    snap_id = db.create_snapshot(conn, "organizar")
+
+    # Copy all players from input snapshot with updated stats
+    for p in db.get_snapshot_players(conn, input_snapshot_id):
+        nombre = p["nombre"]
+        jugadas = cupos_jugados[nombre]
+        fue_promovido = p["experiencia"] == "Nuevo" and jugadas > 0
+
+        pid = conn.execute("SELECT id FROM players WHERE nombre = ?", (nombre,)).fetchone()["id"]
+
+        db.add_snapshot_player(
+            conn,
+            snap_id,
+            pid,
+            "Antiguo" if fue_promovido else p["experiencia"],
+            p["juegos_este_ano"] + jugadas,
+            1 if nombre in nombres_en_espera else 0,  # prioridad
+            p["partidas_deseadas"],
+            0,  # partidas_gm reset
+        )
+
+    return snap_id
+
 
 def create_game_event(
     conn: sqlite3.Connection,
-    input_snapshot_id: int,
+    source_snapshot_id: int,
     output_snapshot_id: int,
     intentos: int,
     copypaste_text: str,
 ) -> int:
-    """Inserts a game event row and its game_details. Delegates to create_event. Does NOT commit."""
-    return create_event(
-        conn, "game", input_snapshot_id, output_snapshot_id,
-        details={"intentos": intentos, "copypaste_text": copypaste_text},
+    """
+    DEPRECATED: Creates a game event with details.
+    Use crud.create_game_event() with AsyncSession for new code.
+    """
+    # Create graph node
+    conn.execute("INSERT INTO graph_nodes (entity_type) VALUES ('event')")
+    event_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+    # Create event
+    conn.execute(
+        """
+        INSERT INTO events (id, type, source_snapshot_id, output_snapshot_id)
+        VALUES (?, 'game', ?, ?)
+        """,
+        (event_id, source_snapshot_id, output_snapshot_id),
     )
+
+    # Create game details
+    conn.execute(
+        """
+        INSERT INTO game_details (event_id, intentos, copypaste_text)
+        VALUES (?, ?, ?)
+        """,
+        (event_id, intentos, copypaste_text),
+    )
+
+    return event_id
 
 
 def create_mesa(
@@ -50,12 +106,18 @@ def create_mesa(
     numero: int,
     gm_player_id: int | None,
 ) -> int:
-    """Inserts a mesas row. Does NOT commit."""
-    cur = conn.execute(
-        "INSERT INTO mesas (event_id, numero, gm_player_id) VALUES (?, ?, ?)",
+    """
+    DEPRECATED: Creates a mesa (game table).
+    Use crud.create_mesa() with AsyncSession for new code.
+    """
+    conn.execute(
+        """
+        INSERT INTO mesas (event_id, numero, gm_player_id)
+        VALUES (?, ?, ?)
+        """,
         (event_id, numero, gm_player_id),
     )
-    return cur.lastrowid  # type: ignore[return-value]
+    return conn.execute("SELECT last_insert_rowid()").fetchone()[0]
 
 
 def add_mesa_player(
@@ -63,12 +125,18 @@ def add_mesa_player(
     mesa_id: int,
     player_id: int,
     orden: int,
-    pais: str = "",
+    pais: str | None = None,
 ) -> None:
-    """Inserts one mesa_players row. Does NOT commit."""
+    """
+    DEPRECATED: Adds a player to a mesa.
+    Use crud.add_mesa_player() with AsyncSession for new code.
+    """
     conn.execute(
-        "INSERT INTO mesa_players (mesa_id, player_id, orden, pais) VALUES (?, ?, ?, ?)",
-        (mesa_id, player_id, orden, pais),
+        """
+        INSERT INTO mesa_players (mesa_id, player_id, orden, pais)
+        VALUES (?, ?, ?, ?)
+        """,
+        (mesa_id, player_id, orden, pais or ""),
     )
 
 
@@ -79,57 +147,14 @@ def add_waiting_player(
     orden: int,
     cupos_faltantes: int,
 ) -> None:
-    """Inserts one waiting_list row. Does NOT commit."""
+    """
+    DEPRECATED: Adds a player to the waiting list.
+    Use crud.add_waiting_player() with AsyncSession for new code.
+    """
     conn.execute(
         """
-        INSERT INTO waiting_list
-            (event_id, player_id, orden, cupos_faltantes)
+        INSERT INTO waiting_list (event_id, player_id, orden, cupos_faltantes)
         VALUES (?, ?, ?, ?)
         """,
         (event_id, player_id, orden, cupos_faltantes),
     )
-
-
-# ── Post-game snapshot ─────────────────────────────────────────────────────────
-
-def create_output_snapshot(
-    conn: sqlite3.Connection,
-    input_snapshot_id: int,
-    resultado: ResultadoPartidas,
-) -> int:
-    """
-    Creates the post-game snapshot (source='organizar') by copying all players
-    from the input snapshot and applying game results:
-
-      - juegos_este_ano  += tables played as a player (GMing does not count)
-      - prioridad         = 1 if left on waiting list, 0 otherwise
-      - experiencia       = 'Antiguo' if was Nuevo and played ≥ 1 table
-      - partidas_gm       = 0  (reassigned manually each event)
-      - partidas_deseadas = unchanged
-
-    Does NOT commit.
-    """
-    cupos_jugados: Counter[str] = Counter(
-        j.nombre for mesa in resultado.mesas for j in mesa.jugadores
-    )
-    nombres_en_espera: set[str] = {j.nombre for j in resultado.tickets_sobrantes}
-
-    snap_id = create_snapshot(conn, "organizar")
-
-    for p in get_snapshot_players(conn, input_snapshot_id):
-        nombre = p["nombre"]
-        jugadas = cupos_jugados[nombre]
-        fue_promovido = p["experiencia"] == "Nuevo" and jugadas > 0
-        pid = conn.execute(
-            "SELECT id FROM players WHERE nombre = ?", (nombre,)
-        ).fetchone()["id"]
-        add_snapshot_player(
-            conn, snap_id, pid,
-            "Antiguo" if fue_promovido else p["experiencia"],
-            p["juegos_este_ano"] + jugadas,
-            1 if nombre in nombres_en_espera else 0,
-            p["partidas_deseadas"],
-            0,  # partidas_gm reset
-        )
-
-    return snap_id

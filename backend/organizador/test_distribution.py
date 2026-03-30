@@ -1,21 +1,30 @@
 """
 Unit tests for distribution.py - run_distribution_loop and distribuir_tickets.
 """
+from __future__ import annotations
+
 import unittest
 
 from .distribution import distribuir_tickets, run_distribution_loop
 from .models import Jugador
 
 
-def _j(nombre: str, d=1, g=0, exp="Antiguo", j=0):
-    return Jugador(nombre, exp, j, "False", d, g)
+def _j(nombre: str, d: int = 1, g: int = 0, exp: str = "Antiguo", j: int = 0) -> Jugador:
+    return Jugador(
+        nombre=nombre,
+        experiencia=exp,
+        juegos_ano=j,
+        prioridad="False",
+        partidas_deseadas=d,
+        partidas_gm=g,
+    )
 
 class TestDistribution(unittest.TestCase):
     def test_distribuir_tickets_fills_tables(self):
         # 7 tickets for 1 table
         jugadores = [_j(f"P{i}") for i in range(7)]
         weighted = [(1.0 + float(i), j) for i, j in enumerate(jugadores)]
-        partidas = [[]]
+        partidas: list[list[Jugador]] = [[]]
         
         rechazados = distribuir_tickets(weighted, partidas, {}, es_grupo_nuevo=True)
         
@@ -26,7 +35,7 @@ class TestDistribution(unittest.TestCase):
         # 2 tickets for same player, only 1 table. Must reject the second.
         j = _j("P1", d=2)
         weighted = [(1.0, j), (2.0, j)]
-        partidas = [[]]
+        partidas: list[list[Jugador]] = [[]]
         
         rechazados = distribuir_tickets(weighted, partidas, {}, es_grupo_nuevo=True)
         
@@ -44,7 +53,7 @@ class TestDistribution(unittest.TestCase):
             mesas_estimadas=2, mesas_reales=2, minimo_teorico=0
         )
         
-        self.assertIsNotNone(res)
+        assert res is not None
         self.assertEqual(len(res.mesas), 2)
         self.assertEqual(len(res.tickets_sobrantes), 0)
 
@@ -62,7 +71,7 @@ class TestDistribution(unittest.TestCase):
             mesas_estimadas=2, mesas_reales=2, minimo_teorico=0
         )
         
-        self.assertIsNotNone(res)
+        assert res is not None
         for mesa in res.mesas:
             if mesa.gm and mesa.gm.nombre == "GM1":
                 player_names = [p.nombre for p in mesa.jugadores]

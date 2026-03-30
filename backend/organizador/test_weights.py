@@ -7,8 +7,15 @@ from .models import Jugador
 from .weights import build_weighted_tickets
 
 
-def _j(nombre: str, d=1, g=0, exp="Antiguo", j=0):
-    return Jugador(nombre, exp, j, "False", d, g)
+def _j(nombre: str, d: int = 1, g: int = 0, exp: str = "Antiguo", j: int = 0):
+    return Jugador(
+        nombre=nombre,
+        experiencia=exp,
+        juegos_ano=j,
+        prioridad="False",
+        partidas_deseadas=d,
+        partidas_gm=g,
+    )
 
 class TestWeights(unittest.TestCase):
     def test_build_weighted_tickets_basic(self):
@@ -31,6 +38,7 @@ class TestWeights(unittest.TestCase):
         
         self.assertEqual(estimadas, 2)
         self.assertEqual(reales, 2)
+        self.assertEqual(minimo, 0)
         self.assertEqual(len(gms), 1)
         # GM has 1 ticket as player (default)
         self.assertEqual(len(tickets), 14)

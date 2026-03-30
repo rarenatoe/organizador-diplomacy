@@ -130,8 +130,8 @@ class TestFormatterIntegration:
             minimo_teorico=0,
         )
         
-        # Test that the to_dict() method works
-        resultado_dict = resultado.to_dict()
+        # Test that the model_dump() method works
+        resultado_dict = resultado.model_dump()
         assert resultado_dict["mesas"][0]["jugadores"][0]["pais"] == "England"
         
         # Test that formatting translates it

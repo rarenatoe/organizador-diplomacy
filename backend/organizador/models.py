@@ -1,78 +1,54 @@
 """
 models.py – Domain types shared across organizador.py, formatter.py, and viewer.py.
 
-  Jugador           – a player with priority score logic
-  Mesa              – a game table (7 players + optional GM)
-  ResultadoPartidas – typed algorithm result
+  Jugador           – a player with priority score logic (Pydantic model)
+  Mesa              – a game table (7 players + optional GM) (Pydantic model)
+  ResultadoPartidas – typed algorithm result (Pydantic model)
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
+
+from pydantic import BaseModel, Field
 
 # ── CSV column reference ───────────────────────────────────────────────────────
 # Columns: Nombre, Experiencia, Juegos_Este_Ano, Prioridad, Partidas_Deseadas, Partidas_GM
 
 
-class Jugador:
-    def __init__(
-        self,
-        nombre: str,
-        experiencia: str,
-        juegos_ano: str | int,
-        prioridad: str,
-        partidas_deseadas: str | int,
-        partidas_gm: str | int = 0,
-        c_england: int = 0,
-        c_france: int = 0,
-        c_germany: int = 0,
-        c_italy: int = 0,
-        c_austria: int = 0,
-        c_russia: int = 0,
-        c_turkey: int = 0,
-        pais: str = "",
-        pais_reason: str | None = None,
-    ) -> None:
-        self.nombre: str = nombre
-        self.es_nuevo: bool = (experiencia.strip().lower() == "nuevo")
-        self.juegos_ano: int = int(juegos_ano)
-        self.tiene_prioridad: bool = str(prioridad).strip().lower() in ("true", "1")
-        self.partidas_deseadas: int = int(partidas_deseadas)
-        # How many tables this player will referee as GM (0 = not a GM).
-        # The algorithm assigns which specific table(s) automatically.
-        self.partidas_gm: int = int(partidas_gm)
-        
-        # Country history counts
-        self.c_england: int = int(c_england)
-        self.c_france: int = int(c_france)
-        self.c_germany: int = int(c_germany)
-        self.c_italy: int = int(c_italy)
-        self.c_austria: int = int(c_austria)
-        self.c_russia: int = int(c_russia)
-        self.c_turkey: int = int(c_turkey)
-        self.pais: str = pais
-        self.pais_reason: str | None = pais_reason
+class Jugador(BaseModel):
+    """A player with priority score logic."""
 
-    def to_dict(self) -> dict[str, Any]:
-        d: dict[str, Any] = {
-            "nombre": self.nombre,
-            "es_nuevo": self.es_nuevo,
-            "juegos_ano": self.juegos_ano,
-            "tiene_prioridad": self.tiene_prioridad,
-            "partidas_deseadas": self.partidas_deseadas,
-            "partidas_gm": self.partidas_gm,
-            "c_england": self.c_england,
-            "c_france": self.c_france,
-            "c_germany": self.c_germany,
-            "c_italy": self.c_italy,
-            "c_austria": self.c_austria,
-            "c_russia": self.c_russia,
-            "c_turkey": self.c_turkey,
-            "pais": self.pais,
-        }
-        if self.pais_reason is not None:
-            d["pais_reason"] = self.pais_reason
-        return d
+    nombre: str
+    experiencia: str
+    juegos_ano: str | int
+    prioridad: str
+    partidas_deseadas: str | int
+    partidas_gm: str | int = 0
+    c_england: int = 0
+    c_france: int = 0
+    c_germany: int = 0
+    c_italy: int = 0
+    c_austria: int = 0
+    c_russia: int = 0
+    c_turkey: int = 0
+    pais: str = ""
+    pais_reason: str | None = None
+
+    # Computed fields (set during initialization)
+    es_nuevo: bool = Field(default=False)
+    tiene_prioridad: bool = Field(default=False)
+
+    def model_post_init(self, __context: Any) -> None:  # noqa: ARG002  # vulture: ignore
+        """Parse string inputs and compute derived fields after initialization."""
+        # Parse string inputs to proper types
+        object.__setattr__(self, "es_nuevo", self.experiencia.strip().lower() == "nuevo")
+        object.__setattr__(
+            self, "tiene_prioridad", str(self.prioridad).strip().lower() in ("true", "1")
+        )
+        # Ensure integer fields are properly typed
+        object.__setattr__(self, "juegos_ano", int(self.juegos_ano))
+        object.__setattr__(self, "partidas_deseadas", int(self.partidas_deseadas))
+        object.__setattr__(self, "partidas_gm", int(self.partidas_gm))
 
     @property
     def puntaje_prioridad(self) -> float:
@@ -92,36 +68,21 @@ class Jugador:
         """
         if self.es_nuevo or self.tiene_prioridad:
             return 0.0
-        return min(0.05 + self.juegos_ano * 0.15, 0.90)
+        return min(0.05 + int(self.juegos_ano) * 0.15, 0.90)
 
 
-@dataclass
-class Mesa:
+class Mesa(BaseModel):
     """A game table with its players and optional Game Master."""
-    numero: int                        # 1-based, for display
+
+    numero: int  # 1-based, for display
     jugadores: list[Jugador]
     gm: Jugador | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "numero": self.numero,
-            "jugadores": [j.to_dict() for j in self.jugadores],
-            "gm": self.gm.to_dict() if self.gm else None,
-        }
 
-
-@dataclass
-class ResultadoPartidas:
+class ResultadoPartidas(BaseModel):
     """Typed algorithm result. Attribute access instead of dict keys."""
+
     mesas: list[Mesa]
     tickets_sobrantes: list[Jugador]
-    minimo_teorico: int = 0    # tickets that cannot fit in any scenario
-    intentos_usados: int = 0   # retry-loop iterations consumed
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "mesas": [m.to_dict() for m in self.mesas],
-            "tickets_sobrantes": [j.to_dict() for j in self.tickets_sobrantes],
-            "minimo_teorico": self.minimo_teorico,
-            "intentos_usados": self.intentos_usados
-        }
+    minimo_teorico: int = 0  # tickets that cannot fit in any scenario
+    intentos_usados: int = 0  # retry-loop iterations consumed

@@ -43,7 +43,7 @@ def formatear_copypaste(resultado: ResultadoPartidas) -> str:
     Section ready to copy-paste (WhatsApp, Discord, etc.).
     Names only — no experience metadata or decorations.
     """
-    return formatear_copypaste_from_dict(resultado.to_dict())
+    return formatear_copypaste_from_dict(resultado.model_dump())
 
 
 def formatear_copypaste_from_dict(resultado_dict: dict[str, Any]) -> str:
@@ -153,7 +153,7 @@ def construir_proyeccion(
     for jugador in jugadores:
         jugadas: int = cupos_jugados[jugador.nombre]
         como_gm: int = cupos_gm[jugador.nombre]
-        actual: int = jugador.juegos_ano
+        actual: int = int(jugador.juegos_ano)
         proyectado: int = actual + jugadas
         filas.append((proyectado, jugador.nombre, actual, jugadas, como_gm, proyectado))
 
