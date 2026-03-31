@@ -66,6 +66,4 @@ venvPath = "."
 venv = ".venv"
 
 [project.scripts]
-viewer      = "backend.main:app"
-organizar   = "backend.organizador:organizar_partidas"
-notion-sync = "backend.notion_sync:main"
+viewer = "backend.main:app"

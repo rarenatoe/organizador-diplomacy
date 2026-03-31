@@ -1,59 +1,32 @@
 """
-notion_sync.py  –  Sincroniza la base de datos de jugadores desde Notion.
+notion_sync.py – Async Notion synchronization module.
 
-Uso:
-    uv run python notion_sync.py              # descarga y crea un snapshot en la DB
-    uv run python notion_sync.py --dry-run    # muestra lo que se escribiría sin tocar la DB
-    uv run python notion_sync.py --force      # fuerza la creación aunque los datos sean idénticos
-    uv run python notion_sync.py --detect-only # detecta nombres similares sin crear snapshot
-    uv run python notion_sync.py --merges '{"merges": [{"from": "Name1", "to": "Name2"}]}' # aplica fusiones
-
-Qué viene de Notion:
-    Nombre          → propiedad 'Nombre' (title) de la DB Jugadores
-    Experiencia     → 'Antiguo' si Participaciones (relation) tiene ≥1 entrada,
-                       'Nuevo' si está vacía (conteo histórico total)
-    Juegos_Este_Ano → partidas del año en curso: se consulta la DB Participaciones
-                       filtrando por Temporada == año actual, y se cruza con los
-                       IDs de la relation de cada jugador.
-                       (La formula 'Nro. Partidas' siempre retorna 0 vía API —
-                        limitación conocida de Notion con relations.)
-
-Qué se preserva del último snapshot (no existe en Notion):
-    prioridad        → se conserva del snapshot anterior; default 0 para jugadores nuevos
-    partidas_deseadas → se conserva del snapshot anterior; default 1 para jugadores nuevos
-    partidas_gm      → se conserva del snapshot anterior; default 0 para jugadores nuevos
-
-Guard de datos idénticos:
-    Si los campos de Notion (Nombre, Experiencia, Juegos_Este_Ano) coinciden
-    exactamente con el último snapshot en la DB, no se crea un snapshot nuevo.
-    Usa --force para forzar la creación de todos modos.
-
-Requisitos:
-    - Archivo .env con NOTION_TOKEN, NOTION_DATABASE_ID y
-      NOTION_PARTICIPACIONES_DB_ID
+Downloads player data from Notion and creates snapshots in the database.
+This module provides async functions for use with FastAPI background tasks.
 """
 
 from __future__ import annotations
 
-import argparse
+import asyncio
 import concurrent.futures
-import contextlib
 import difflib
-import json
+import logging
 import os
-import sys
 from collections import defaultdict
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, cast
-
-if TYPE_CHECKING:
-    import sqlite3
 
 from dotenv import load_dotenv
 from notion_client import Client
 from notion_client.errors import APIResponseError
 
-from backend.db import db
+from backend.db import crud
+from backend.db.connection import async_engine
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 # ── Player field defaults for first-time Notion players ──────────────────────
 
@@ -281,33 +254,55 @@ def detect_similar_names(
     return unique_matches
 
 
-# ── Existing player data (from DB) ──────────────────────────────────────
+# ── Descarga desde Notion ─────────────────────────────────────────────────────
 
 
-def _leer_snapshot_existente(
-    conn: sqlite3.Connection,
-    snapshot_id: int | None = None,
-) -> dict[str, dict[str, Any]]:
-    """Returns nombre → row dict from the given snapshot (or {} if None)."""
-    if snapshot_id is None:
-        return {}
-    return {r["nombre"]: r for r in db.get_snapshot_players(conn, snapshot_id)}
+def descargar_todos(
+    client: Client,
+    database_id: str,
+) -> list[dict[str, Any]]:
+    """
+    Descarga todas las páginas de la DB paginando automáticamente.
 
-
-def add_snapshot_player(
-    conn: sqlite3.Connection,
-    snap_id: int,
-    player_id: int,
-    experiencia: str,
-    juegos: int,
-    prioridad: int,
-    partidas_deseadas: int,
-    partidas_gm: int,
-) -> None:
-    """Adds a player to the given snapshot."""
-    db.add_player_to_snapshot(
-        conn, snap_id, player_id, experiencia, juegos, prioridad, partidas_deseadas, partidas_gm
+    notion-client ≥2.7 eliminó databases.query(); hay que obtener el
+    data_source_id desde databases.retrieve() y luego usar data_sources.query().
+    """
+    db_info: dict[str, Any] = cast(
+        "dict[str, Any]", client.databases.retrieve(database_id=database_id)
     )
+    data_sources = db_info.get("data_sources", [])
+    if not data_sources:
+        raise RuntimeError(
+            f"La base de datos '{database_id}' no tiene data_sources. "
+            "Asegúrate de que la integración tenga acceso de lectura."
+        )
+    data_source_id: str = data_sources[0]["id"]
+
+    # Payload reduction: get property IDs for required fields
+    prop_ids: list[str] = []
+    props = db_info.get("properties", {})
+    required_names = ["Nombre", "Participaciones", "Alias"] + list(COUNTRY_PROPS.values())
+    for name in required_names:
+        if name in props:
+            prop_ids.append(props[name]["id"])
+
+    pages: list[dict[str, Any]] = []
+    cursor: str | None = None
+    while True:
+        kwargs: dict[str, Any] = {
+            "data_source_id": data_source_id,
+            "result_type": "page",
+        }
+        if prop_ids:
+            kwargs["filter_properties"] = prop_ids
+        if cursor:
+            kwargs["start_cursor"] = cursor
+        response: dict[str, Any] = cast("dict[str, Any]", client.data_sources.query(**kwargs))
+        pages.extend(response.get("results", []))
+        if not response.get("has_more"):
+            break
+        cursor = response.get("next_cursor")
+    return pages
 
 
 def conteo_partidas_este_ano(
@@ -380,64 +375,12 @@ def conteo_partidas_este_ano(
         cursor = response.get("next_cursor")
 
     if sin_temporada > 0 and not conteo:
-        print(
-            f"  ⚠️  {sin_temporada} participación(es) sin Temporada (rollup None). "
-            "Conecta la DB 'Partida' a la integración para obtener Juegos_Este_Año correcto.",
-            file=sys.stderr,
+        logger.warning(
+            f"{sin_temporada} participación(es) sin Temporada (rollup None). "
+            "Conecta la DB 'Partida' a la integración para obtener Juegos_Este_Año correcto."
         )
 
     return conteo
-
-
-# ── Descarga desde Notion ─────────────────────────────────────────────────────
-
-
-def descargar_todos(
-    client: Client,
-    database_id: str,
-) -> list[dict[str, Any]]:
-    """
-    Descarga todas las páginas de la DB paginando automáticamente.
-
-    notion-client ≥2.7 eliminó databases.query(); hay que obtener el
-    data_source_id desde databases.retrieve() y luego usar data_sources.query().
-    """
-    db_info: dict[str, Any] = cast(
-        "dict[str, Any]", client.databases.retrieve(database_id=database_id)
-    )
-    data_sources = db_info.get("data_sources", [])
-    if not data_sources:
-        raise RuntimeError(
-            f"La base de datos '{database_id}' no tiene data_sources. "
-            "Asegúrate de que la integración tenga acceso de lectura."
-        )
-    data_source_id: str = data_sources[0]["id"]
-
-    # Payload reduction: get property IDs for required fields
-    prop_ids: list[str] = []
-    props = db_info.get("properties", {})
-    required_names = ["Nombre", "Participaciones", "Alias"] + list(COUNTRY_PROPS.values())
-    for name in required_names:
-        if name in props:
-            prop_ids.append(props[name]["id"])
-
-    pages: list[dict[str, Any]] = []
-    cursor: str | None = None
-    while True:
-        kwargs: dict[str, Any] = {
-            "data_source_id": data_source_id,
-            "result_type": "page",
-        }
-        if prop_ids:
-            kwargs["filter_properties"] = prop_ids
-        if cursor:
-            kwargs["start_cursor"] = cursor
-        response: dict[str, Any] = cast("dict[str, Any]", client.data_sources.query(**kwargs))
-        pages.extend(response.get("results", []))
-        if not response.get("has_more"):
-            break
-        cursor = response.get("next_cursor")
-    return pages
 
 
 def find_notion_player(
@@ -455,111 +398,55 @@ def find_notion_player(
     return None
 
 
-# ── Entrypoint ────────────────────────────────────────────────────────────────
+# ── Core sync logic ──────────────────────────────────────────────────────────
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Descarga jugadores desde Notion y crea un snapshot en la DB"
-    )
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Muestra el resultado sin escribir en la DB"
-    )
-    parser.add_argument(
-        "--force", action="store_true", help="Crea un snapshot aunque los datos sean idénticos"
-    )
-    parser.add_argument(
-        "--snapshot",
-        type=int,
-        default=None,
-        help="ID del snapshot base (default: último snapshot en la DB)",
-    )
-    parser.add_argument(
-        "--detect-only",
-        action="store_true",
-        help="Detecta nombres similares sin crear snapshot (output JSON)",
-    )
-    parser.add_argument(
-        "--merges",
-        type=str,
-        default=None,
-        help='JSON con fusiones confirmadas: {"merges": [{"from": "Name1", "to": "Name2"}]}',
-    )
-    args = parser.parse_args()
-
+async def _fetch_notion_data() -> tuple[list[dict[str, Any]], dict[str, int], Client]:
+    """
+    Fetch player data from Notion API.
+    Returns (pages, conteo_por_jugador, client).
+    """
     load_dotenv()
     token = os.getenv("NOTION_TOKEN")
     db_id = os.getenv("NOTION_DATABASE_ID")
     part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
 
     if not token or token.startswith("secret_XXX"):
-        print(
-            "❌  NOTION_TOKEN no configurado. Copia .env.example → .env y rellénalo.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        raise RuntimeError("NOTION_TOKEN no configurado")
     if not db_id or "XXX" in db_id:
-        print(
-            "❌  NOTION_DATABASE_ID no configurado. Copia .env.example → .env y rellénalo.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        raise RuntimeError("NOTION_DATABASE_ID no configurado")
     if not part_db_id or "XXX" in part_db_id:
-        print(
-            "❌  NOTION_PARTICIPACIONES_DB_ID no configurado. Copia .env.example → .env y rellénalo.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        raise RuntimeError("NOTION_PARTICIPACIONES_DB_ID no configurado")
 
     año_actual = datetime.now().year
     client = Client(auth=token)
 
-    print("⟳  Conectando a Notion...", end=" ", flush=True)
-    try:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_pages = executor.submit(descargar_todos, client, db_id)
-            future_conteo = executor.submit(
-                conteo_partidas_este_ano, client, part_db_id, año_actual
-            )
+    # Run Notion API calls in thread pool (they're blocking I/O)
+    loop = asyncio.get_event_loop()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_pages = executor.submit(descargar_todos, client, db_id)
+        future_conteo = executor.submit(
+            conteo_partidas_este_ano, client, part_db_id, año_actual
+        )
 
-            pages = future_pages.result()
-            conteo_por_jugador = future_conteo.result()
-    except APIResponseError as e:
-        print(f"\n❌  Error de API Notion: {e}", file=sys.stderr)
-        sys.exit(1)
-    print(
-        f"{len(pages)} jugador(es), {sum(conteo_por_jugador.values())} partida(s) en {año_actual}."
+        pages = await loop.run_in_executor(None, future_pages.result)
+        conteo_por_jugador = await loop.run_in_executor(None, future_conteo.result)
+
+    logger.info(
+        f"Notion sync: {len(pages)} jugador(es), "
+        f"{sum(conteo_por_jugador.values())} partida(s) en {año_actual}."
     )
 
-    conn = db.get_db()
-    source_snapshot_id = args.snapshot
+    return pages, conteo_por_jugador, client
 
-    # ── Require snapshot if database has existing data ────────────────────────
-    has_snapshots = conn.execute("SELECT 1 FROM snapshots LIMIT 1").fetchone() is not None
-    if source_snapshot_id is None and has_snapshots:
-        print(
-            "❌  Error: Snapshot ID is required because the database is not empty.", file=sys.stderr
-        )
-        print("   You must specify which snapshot to branch from.", file=sys.stderr)
-        print("   Usa --snapshot <ID> para especificar el snapshot base.", file=sys.stderr)
-        conn.close()
-        sys.exit(1)
 
-    existentes = _leer_snapshot_existente(conn, source_snapshot_id)
-
-    # ── Parse merges if provided ──────────────────────────────────────────────
-    merges: dict[str, dict[str, str]] = {}  # from_name → {"to": notion_name, "action": action}
-    if args.merges:
-        try:
-            merges_data = json.loads(args.merges)
-            for m in merges_data.get("merges", []):
-                merges[m["from"]] = {"to": m["to"], "action": m.get("action", "merge_local")}
-        except (json.JSONDecodeError, KeyError) as e:
-            print(f"❌  Error parsing --merges JSON: {e}", file=sys.stderr)
-            sys.exit(1)
-
-    # ── Build Notion player lookup (for updating existing players) ──────────
+def _build_notion_players_lookup(
+    pages: list[dict[str, Any]],
+    conteo_por_jugador: dict[str, int],
+) -> dict[str, dict[str, Any]]:
+    """Build a lookup dict of Notion players by normalized name."""
     notion_players: dict[str, dict[str, Any]] = {}
+
     for page in pages:
         props = page.get("properties", {})
         nombre_prop = props.get("Nombre")
@@ -601,31 +488,112 @@ def main() -> None:
             **countries_data,
         }
 
-    # ── Detect-only mode: output similar names as JSON ────────────────────────
-    # We must do this BEFORE building `filas` so we use the raw incoming Notion names
-    if args.detect_only:
-        snapshot_names = list(existentes.keys())
-        similar = detect_similar_names(notion_players, snapshot_names)
-        result = {
-            "notion_count": len(notion_players),
-            "snapshot_count": len(snapshot_names),
-            "similar_names": similar,
-        }
-        print(json.dumps(result, ensure_ascii=False, indent=2))
-        conn.close()
-        return
+    return notion_players
 
-    # ── Build new snapshot: start with all existing players, update from Notion ──
+
+async def _check_snapshot_has_children(session: AsyncSession, snapshot_id: int) -> bool:
+    """Check if a snapshot has any child events."""
+    from sqlalchemy import select
+
+    from backend.db.models import Event
+
+    result = await session.execute(
+        select(Event).where(Event.source_snapshot_id == snapshot_id).limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def _update_snapshot_in_place(
+    session: AsyncSession,
+    snapshot_id: int,
+    filas: list[dict[str, Any]],
+) -> None:
+    """Update an existing snapshot in-place with new player data."""
+    from sqlalchemy import delete, update
+
+    from backend.db.models import Snapshot, SnapshotPlayer
+
+    # Update the existing snapshot source
+    await session.execute(
+        update(Snapshot).where(Snapshot.id == snapshot_id).values(source="notion_sync")
+    )
+
+    # Clear old roster
+    await session.execute(
+        delete(SnapshotPlayer).where(SnapshotPlayer.snapshot_id == snapshot_id)
+    )
+
+    # Insert new players
+    for fila in filas:
+        pid = await crud.get_or_create_player(session, fila["Nombre"])
+        await crud.add_player_to_snapshot(
+            session,
+            snapshot_id,
+            pid,
+            fila["Experiencia"],
+            fila["Juegos_Este_Ano"],
+            fila["prioridad"],
+            fila["partidas_deseadas"],
+            fila["partidas_gm"],
+        )
+
+    logger.info(f"Snapshot #{snapshot_id} updated in-place with {len(filas)} jugador(es).")
+
+
+async def _create_new_snapshot(
+    session: AsyncSession,
+    source_snapshot_id: int | None,
+    filas: list[dict[str, Any]],
+) -> int:
+    """Create a new snapshot with player data and sync event."""
+    snap_id = await crud.create_snapshot(session, "notion_sync")
+
+    for fila in filas:
+        pid = await crud.get_or_create_player(session, fila["Nombre"])
+        await crud.add_player_to_snapshot(
+            session,
+            snap_id,
+            pid,
+            fila["Experiencia"],
+            fila["Juegos_Este_Ano"],
+            fila["prioridad"],
+            fila["partidas_deseadas"],
+            fila["partidas_gm"],
+        )
+
+    # Create sync event only if we have a source snapshot
+    if source_snapshot_id is not None:
+        await crud.create_sync_event(session, source_snapshot_id, snap_id)
+
+    logger.info(f"Snapshot #{snap_id} created with {len(filas)} jugador(es).")
+    return snap_id
+
+
+async def _build_snapshot_rows(
+    session: AsyncSession,
+    source_snapshot_id: int | None,
+    notion_players: dict[str, dict[str, Any]],
+    merges: dict[str, dict[str, str]] | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Build the list of player rows for the new snapshot.
+    Combines existing snapshot data with Notion updates.
+    """
     filas: list[dict[str, Any]] = []
+    merges = merges or {}
 
     if source_snapshot_id is not None:
+        # Get existing players from source snapshot
+        existentes_list = await crud.get_snapshot_players(session, source_snapshot_id)
+        existentes = {p["nombre"]: p for p in existentes_list}
+
         merged_notion_normalized = {normalize_name(v["to"]) for v in merges.values()}
 
         # Start with all players from the existing snapshot
         for nombre, existente in existentes.items():
             # 1. Check if this player was explicitly merged via the UI dialog
             if nombre in merges:
-                merge_info: dict[str, str] = merges[nombre]
+                merge_info = merges[nombre]
                 notion_name = merge_info["to"]
                 action = merge_info["action"]
                 notion_norm = normalize_name(notion_name)
@@ -634,7 +602,9 @@ def main() -> None:
                     notion_data = notion_players[notion_norm]
                     filas.append(
                         {
-                            "Nombre": notion_data["nombre"] if action == "merge_notion" else nombre,
+                            "Nombre": notion_data["nombre"]
+                            if action == "merge_notion"
+                            else nombre,
                             "Experiencia": notion_data["experiencia"],
                             "Juegos_Este_Ano": notion_data["juegos"],
                             "prioridad": int(
@@ -664,9 +634,13 @@ def main() -> None:
                         "Nombre": nombre,  # Keep local name
                         "Experiencia": notion_data["experiencia"],
                         "Juegos_Este_Ano": notion_data["juegos"],
-                        "prioridad": int(existente.get("prioridad", FIELD_DEFAULTS["prioridad"])),
+                        "prioridad": int(
+                            existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
+                        ),
                         "partidas_deseadas": int(
-                            existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])
+                            existente.get(
+                                "partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"]
+                            )
                         ),
                         "partidas_gm": int(
                             existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
@@ -681,9 +655,13 @@ def main() -> None:
                         "Nombre": nombre,
                         "Experiencia": existente.get("experiencia", "Nuevo"),
                         "Juegos_Este_Ano": int(existente.get("juegos_este_ano", 0)),
-                        "prioridad": int(existente.get("prioridad", FIELD_DEFAULTS["prioridad"])),
+                        "prioridad": int(
+                            existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
+                        ),
                         "partidas_deseadas": int(
-                            existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])
+                            existente.get(
+                                "partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"]
+                            )
                         ),
                         "partidas_gm": int(
                             existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
@@ -691,7 +669,6 @@ def main() -> None:
                         **{c: existente.get(c, 0) for c in COUNTRY_PROPS},
                     }
                 )
-
     else:
         # No existing snapshot - use all Notion players directly from our lookup
         for _, notion_data in notion_players.items():
@@ -707,150 +684,104 @@ def main() -> None:
                 }
             )
 
-    nuevos: list[str] = [f["Nombre"] for f in filas if f["Nombre"] not in existentes]
-    print(f"⟳  {len(filas)} jugador(es) procesados ({len(nuevos)} nuevo(s)).")
-    if nuevos:
-        print(f"   Nuevos: {', '.join(nuevos)}")
-
-    if args.dry_run:
-        print("\n── dry-run: snapshot que se crearía ──")
-        for fila in filas:
-            print(f"  {fila['Nombre']} | {fila['Experiencia']} | {fila['Juegos_Este_Ano']}")
-        print("\n(No se escribió nada en la DB)")
-        conn.close()
-        return
-
-    # ── Content-addressed guard: skip if data hasn't changed ──────────────────
-    if (
-        source_snapshot_id is not None
-        and not args.force
-        and db.snapshots_have_same_roster(conn, source_snapshot_id, filas)
-    ):
-        print("✓  Los datos de Notion coinciden con el último snapshot — sin cambios.")
-        print("   Usa --force para crear un snapshot igualmente.")
-        conn.close()
-        return
-
-    # ── Persist new snapshot atomically ───────────────────────────────────────
-    try:
-        # Check if source_snapshot_id is a leaf node (has no children)
-        if source_snapshot_id is not None:
-            has_children = (
-                conn.execute(
-                    "SELECT 1 FROM events WHERE source_snapshot_id = ? LIMIT 1",
-                    (source_snapshot_id,),
-                ).fetchone()
-                is not None
-            )
-
-            # If source is a leaf node, update in-place
-            if not has_children:
-                # Update the existing snapshot in-place
-                conn.execute(
-                    "UPDATE snapshots SET source = 'notion_sync' WHERE id = ?",
-                    (source_snapshot_id,),
-                )
-
-                # Clear old roster
-                conn.execute(
-                    "DELETE FROM snapshot_players WHERE snapshot_id = ?", (source_snapshot_id,)
-                )
-
-                # Insert new players
-                for fila in filas:
-                    pid = db.get_or_create_player(conn, fila["Nombre"])
-                    db.add_snapshot_player(
-                        conn,
-                        source_snapshot_id,
-                        pid,
-                        fila["Experiencia"],
-                        fila["Juegos_Este_Ano"],
-                        fila["prioridad"],
-                        fila["partidas_deseadas"],
-                        fila["partidas_gm"],
-                    )
-
-                conn.commit()
-                conn.close()
-                print(
-                    f"✓  Snapshot #{source_snapshot_id} actualizado in-place con {len(filas)} jugador(es)."
-                )
-                return
-
-        # For internal nodes or no source, create new snapshot
-        snap_id = db.create_snapshot(conn, "notion_sync")
-        for fila in filas:
-            pid = db.get_or_create_player(conn, fila["Nombre"])
-            db.add_snapshot_player(
-                conn,
-                snap_id,
-                pid,
-                fila["Experiencia"],
-                fila["Juegos_Este_Ano"],
-                fila["prioridad"],
-                fila["partidas_deseadas"],
-                fila["partidas_gm"],
-            )
-        db.create_sync_event(conn, source_snapshot_id, snap_id)
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        conn.close()
-        raise
-
-    conn.close()
-    print(f"✓  Snapshot #{snap_id} creado con {len(filas)} jugador(es).")
-    if source_snapshot_id is not None:
-        print(f"   sync_event: snapshot #{source_snapshot_id} → #{snap_id}")
-    else:
-        print("   (primer sync — sin snapshot anterior)")
+    return filas
 
 
-# ── Async background entrypoint for FastAPI ───────────────────────────────────
+# ── Public API ───────────────────────────────────────────────────────────────
 
 
 async def run_notion_sync_background(
     snapshot_id: int | None = None,
     *,
     force: bool = False,
-) -> None:
+    merges: dict[str, dict[str, str]] | None = None,
+) -> int | None:
     """
-    Async wrapper to run notion_sync in the background with a new AsyncSession.
-    This is called by FastAPI BackgroundTasks.
-    """
-    import asyncio
-    import logging
+    Async entrypoint to run notion sync in the background.
 
-    logger = logging.getLogger(__name__)
+    Downloads player data from Notion, compares with existing snapshot,
+    and creates/updates a snapshot in the database.
+
+    Args:
+        snapshot_id: Source snapshot ID to branch from (None for initial sync)
+        force: Force creation even if data hasn't changed
+        merges: Optional dict of player name merges {from_name: {"to": to_name, "action": action}}
+
+    Returns:
+        The new or updated snapshot ID, or None if skipped due to no changes
+    """
+    from sqlalchemy.ext.asyncio import AsyncSession
 
     try:
-        # Run the synchronous main() in a thread pool
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(
-            None,
-            lambda: _run_sync_in_thread(snapshot_id, force=force),
-        )
-    except Exception as exc:
-        # Log the error but don't propagate to avoid breaking the response
-        logger.error(f"Background notion sync failed: {exc}")
-        # In production, this error is logged but doesn't affect the API response
+        # Fetch data from Notion
+        pages, conteo_por_jugador, _client = await _fetch_notion_data()
 
+        # Build Notion players lookup
+        notion_players = _build_notion_players_lookup(pages, conteo_por_jugador)
 
-def _run_sync_in_thread(snapshot_id: int | None, *, force: bool) -> None:
-    """Helper to run sync in a thread with proper argument parsing."""
-    import sys
+        async with AsyncSession(async_engine) as session:
+            try:
+                # Check if database has existing snapshots
+                latest_id = await crud.get_latest_snapshot_id(session)
+                has_snapshots = latest_id is not None
 
-    # Build command line args for main()
-    args = ["notion_sync"]
-    if snapshot_id is not None:
-        args.extend(["--snapshot", str(snapshot_id)])
-    if force:
-        args.append("--force")
+                if snapshot_id is None and has_snapshots:
+                    logger.error(
+                        "Snapshot ID is required because the database is not empty."
+                    )
+                    return None
 
-    sys.argv = args
-    with contextlib.suppress(SystemExit):
-        main()  # argparse calls sys.exit()
+                # Build snapshot rows combining existing and Notion data
+                filas = await _build_snapshot_rows(
+                    session, snapshot_id, notion_players, merges
+                )
 
+                existing_names: set[str] = (
+                    {p["nombre"] for p in await crud.get_snapshot_players(session, snapshot_id)}
+                    if snapshot_id is not None
+                    else set()
+                )
+                nuevos = [f["Nombre"] for f in filas if f["Nombre"] not in existing_names]
 
-if __name__ == "__main__":
-    main()
+                logger.info(
+                    f"{len(filas)} jugador(es) procesados ({len(nuevos)} nuevo(s))."
+                )
+                if nuevos:
+                    logger.info(f"Nuevos: {', '.join(nuevos)}")
+
+                # Content-addressed guard: skip if data hasn't changed
+                if (
+                    snapshot_id is not None
+                    and not force
+                    and await crud.snapshots_have_same_roster(session, snapshot_id, filas)
+                ):
+                    logger.info(
+                        "Los datos de Notion coinciden con el último snapshot — sin cambios."
+                    )
+                    return None
+
+                # Check if source snapshot is a leaf node (no children)
+                if snapshot_id is not None:
+                    has_children = await _check_snapshot_has_children(session, snapshot_id)
+
+                    if not has_children:
+                        # Update in-place for leaf nodes
+                        await _update_snapshot_in_place(session, snapshot_id, filas)
+                        await session.commit()
+                        return snapshot_id
+
+                # Create new snapshot for internal nodes or initial sync
+                new_snap_id = await _create_new_snapshot(session, snapshot_id, filas)
+                await session.commit()
+                return new_snap_id
+
+            except Exception:
+                await session.rollback()
+                raise
+
+    except APIResponseError as e:
+        logger.error(f"Error de API Notion: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Background notion sync failed: {e}")
+        raise

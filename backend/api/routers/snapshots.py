@@ -23,7 +23,7 @@ from backend.db.crud import (
 )
 from backend.db.models import Snapshot, SnapshotPlayer
 from backend.db.views import get_snapshot_detail
-from backend.sync.cache_daemon import update_notion_cache_async
+from backend.sync.cache_daemon import update_notion_cache
 from backend.sync.notion_sync import detect_similar_names
 
 router = APIRouter(prefix="/api/snapshot")
@@ -291,7 +291,7 @@ async def api_snapshot_save(
             from backend.db.models import Event as EventModel
 
             result = await session.execute(
-                select(EventModel).where(EventModel.source_snapshot_id == parent_id)
+                select(EventModel).where(EventModel.source_snapshot_id == parent_id).limit(1)
             )
             has_children: bool = result.scalar_one_or_none() is not None
 
@@ -491,7 +491,7 @@ async def api_notion_force_refresh(
 
     client = Client(auth=token)
     try:
-        await update_notion_cache_async(session, client, db_id, part_db_id)
+        await update_notion_cache(session, client, db_id, part_db_id)
         await session.commit()
         return {"success": True, "message": "Cache updated successfully"}
     except Exception as exc:

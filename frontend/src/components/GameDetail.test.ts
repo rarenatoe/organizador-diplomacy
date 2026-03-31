@@ -333,4 +333,81 @@ describe("GameDetail", () => {
       );
     });
   });
+
+  describe("pais_reason DOM rendering", () => {
+    it("renders info icon and tooltip only for players with pais_reason", async () => {
+      render(GameDetail, {
+        props: {
+          id: 1,
+          openGameDraft: vi.fn(),
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Find all info icons (should only be for Alice who has pais_reason)
+      const infoIcons = document.querySelectorAll(".info-icon");
+      expect(infoIcons.length).toBe(1);
+
+      // Find all reason tooltips (should only be for Alice)
+      const reasonTooltips = document.querySelectorAll(".reason-tooltip");
+      expect(reasonTooltips.length).toBe(1);
+
+      // Verify the tooltip contains the reason text
+      const tooltipText = reasonTooltips[0]?.textContent;
+      expect(tooltipText).toContain(
+        "Cualquier jugador disponible podía recibir este país",
+      );
+    });
+
+    it("renders no info icons when no players have pais_reason", async () => {
+      // Override the mock for this specific test
+      const mockFetchGame = vi.fn().mockResolvedValue({
+        id: 2,
+        created_at: "2024-01-01T00:00:00Z",
+        intentos: 3,
+        copypaste: "Player1\nPlayer2",
+        input_snapshot_id: 10,
+        output_snapshot_id: 20,
+        mesas: [
+          {
+            numero: 1,
+            gm: "GameMaster1",
+            jugadores: [
+              { nombre: "Alice", etiqueta: "Nuevo", pais: "England" }, // No pais_reason
+              { nombre: "Bob", etiqueta: "Antiguo", pais: "France" }, // No pais_reason
+            ],
+          },
+        ],
+        waiting_list: [],
+      });
+
+      // Temporarily replace the mock
+      const originalMock = vi.mocked(await import("../api")).fetchGame;
+      vi.mocked(await import("../api")).fetchGame = mockFetchGame;
+
+      render(GameDetail, {
+        props: {
+          id: 2,
+          openGameDraft: vi.fn(),
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Verify no info icons or tooltips are rendered
+      const infoIcons = document.querySelectorAll(".info-icon");
+      expect(infoIcons.length).toBe(0);
+
+      const reasonTooltips = document.querySelectorAll(".reason-tooltip");
+      expect(reasonTooltips.length).toBe(0);
+
+      // Restore original mock
+      vi.mocked(await import("../api")).fetchGame = originalMock;
+    });
+  });
 });

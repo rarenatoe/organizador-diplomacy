@@ -42,7 +42,7 @@ class TestApiRunNotionSync:
     ) -> None:
         """Background tasks are added successfully even if they will fail later."""
         with patch(
-            "backend.sync.notion_sync._run_sync_in_thread",
+            "backend.sync.notion_sync.run_notion_sync_background",
             side_effect=Exception("Sync failed"),
         ):
             resp = await client.post("/api/run/notion_sync", json={})
@@ -109,7 +109,7 @@ class TestApiNotionForceRefresh:
     ) -> None:
         """Force refresh should trigger an immediate cache update."""
         with patch(
-            "backend.api.routers.sync.update_notion_cache_async",
+            "backend.api.routers.sync.update_notion_cache",
             new_callable=AsyncMock,
         ) as mock_update:
             resp = await client.post("/api/notion/force_refresh")
@@ -123,7 +123,7 @@ class TestApiNotionForceRefresh:
     ) -> None:
         """Force refresh should return a success message."""
         with patch(
-            "backend.api.routers.sync.update_notion_cache_async",
+            "backend.api.routers.sync.update_notion_cache",
             new_callable=AsyncMock,
         ):
             resp = await client.post("/api/notion/force_refresh")

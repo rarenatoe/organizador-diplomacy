@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from backend.db.connection import async_engine
-from backend.sync.cache_daemon import update_notion_cache_async
+from backend.sync.cache_daemon import update_notion_cache
 from backend.sync.notion_sync import run_notion_sync_background
 
 router = APIRouter()
@@ -83,7 +83,7 @@ async def _run_cache_refresh() -> None:
 
     async with AsyncSession(async_engine) as session:
         try:
-            await update_notion_cache_async(session, client, db_id, part_db_id)
+            await update_notion_cache(session, client, db_id, part_db_id)
             await session.commit()
             print("[Cache Refresh] Completed successfully")
         except Exception as e:

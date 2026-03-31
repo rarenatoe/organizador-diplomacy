@@ -140,7 +140,7 @@ async def api_game_save(
             output_snapshot_id: int = game_row.output_snapshot_id
 
             # Check if it's a leaf node (no events source from it)
-            stmt2 = select(Event).where(Event.source_snapshot_id == output_snapshot_id)
+            stmt2 = select(Event).where(Event.source_snapshot_id == output_snapshot_id).limit(1)
             result2 = await session.execute(stmt2)
             is_leaf: bool = result2.scalar_one_or_none() is None
 

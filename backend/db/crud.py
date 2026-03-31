@@ -119,17 +119,17 @@ async def rename_player(session: AsyncSession, old_name: str, new_name: str) -> 
 
         # Check if old player is orphaned
         result = await session.execute(
-            select(SnapshotPlayer).where(SnapshotPlayer.player_id == old_id)
+            select(SnapshotPlayer).where(SnapshotPlayer.player_id == old_id).limit(1)
         )
         has_snapshot_links = result.scalar_one_or_none() is not None
 
-        result = await session.execute(select(Mesa).where(Mesa.gm_player_id == old_id))
+        result = await session.execute(select(Mesa).where(Mesa.gm_player_id == old_id).limit(1))
         has_gm_links = result.scalar_one_or_none() is not None
 
-        result = await session.execute(select(MesaPlayer).where(MesaPlayer.player_id == old_id))
+        result = await session.execute(select(MesaPlayer).where(MesaPlayer.player_id == old_id).limit(1))
         has_mesa_links = result.scalar_one_or_none() is not None
 
-        result = await session.execute(select(WaitingList).where(WaitingList.player_id == old_id))
+        result = await session.execute(select(WaitingList).where(WaitingList.player_id == old_id).limit(1))
         has_waiting_links = result.scalar_one_or_none() is not None
 
         if not any([has_snapshot_links, has_gm_links, has_mesa_links, has_waiting_links]):
