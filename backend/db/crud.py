@@ -567,7 +567,12 @@ async def get_notion_cache(session: AsyncSession) -> list[dict[str, Any]]:
 
 
 async def add_mesa_player(
-    session: AsyncSession, mesa_id: int, player_id: int, orden: int, pais: str
+    session: AsyncSession,
+    mesa_id: int,
+    player_id: int,
+    orden: int,
+    pais: str,
+    pais_reason: str | None = None,
 ) -> None:
     """Add a player to a mesa."""
     mp = MesaPlayer(
@@ -575,6 +580,7 @@ async def add_mesa_player(
         player_id=player_id,
         orden=orden,
         pais=pais,
+        pais_reason=pais_reason,
     )
     session.add(mp)
 

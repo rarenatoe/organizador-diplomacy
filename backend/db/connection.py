@@ -41,6 +41,14 @@ async def init_db() -> None:
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+        # Migration: add pais_reason column if it doesn't exist
+        from sqlalchemy import text
+
+        cursor = await conn.execute(text("PRAGMA table_info(mesa_players)"))
+        columns = [row[1] for row in cursor.fetchall()]
+        if "pais_reason" not in columns:
+            await conn.execute(text("ALTER TABLE mesa_players ADD COLUMN pais_reason TEXT"))
+
 
 async def get_session() -> AsyncGenerator[AsyncSession]:
     """

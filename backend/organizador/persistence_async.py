@@ -56,7 +56,14 @@ async def save_game_draft_async(
             mesa_obj.gm_player_id = gm_pid
         for orden, jugador in enumerate(mesa.get("jugadores", []), start=1):
             pid = await get_or_create_player(session, jugador["nombre"])
-            await add_mesa_player(session, mesa_id, pid, orden, jugador.get("pais", ""))
+            await add_mesa_player(
+                session,
+                mesa_id,
+                pid,
+                orden,
+                jugador.get("pais", ""),
+                jugador.get("pais_reason"),
+            )
 
     # 5. Create waiting list
     waiting_players = draft_data.get("tickets_sobrantes", [])
@@ -190,7 +197,14 @@ async def update_game_draft_async(
             mesa_obj.gm_player_id = gm_pid
         for orden, jugador in enumerate(mesa.get("jugadores", []), start=1):
             pid = await get_or_create_player(session, jugador["nombre"])
-            await add_mesa_player(session, mesa_id, pid, orden, jugador.get("pais", ""))
+            await add_mesa_player(
+                session,
+                mesa_id,
+                pid,
+                orden,
+                jugador.get("pais", ""),
+                jugador.get("pais_reason"),
+            )
 
     # 5. Create waiting list
     waiting_players = draft_data.get("tickets_sobrantes", [])

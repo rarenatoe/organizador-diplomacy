@@ -5,11 +5,12 @@ models.py – Domain types shared across organizador.py, formatter.py, and viewe
   Mesa              – a game table (7 players + optional GM) (Pydantic model)
   ResultadoPartidas – typed algorithm result (Pydantic model)
 """
+
 from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # ── CSV column reference ───────────────────────────────────────────────────────
 # Columns: Nombre, Experiencia, Juegos_Este_Ano, Prioridad, Partidas_Deseadas, Partidas_GM
@@ -20,10 +21,10 @@ class Jugador(BaseModel):
 
     nombre: str
     experiencia: str
-    juegos_ano: str | int
+    juegos_ano: int
     prioridad: str
-    partidas_deseadas: str | int
-    partidas_gm: str | int = 0
+    partidas_deseadas: int
+    partidas_gm: int = 0
     c_england: int = 0
     c_france: int = 0
     c_germany: int = 0
@@ -38,17 +39,19 @@ class Jugador(BaseModel):
     es_nuevo: bool = Field(default=False)
     tiene_prioridad: bool = Field(default=False)
 
+    @field_validator("juegos_ano", "partidas_deseadas", "partidas_gm", mode="before")
+    @classmethod
+    def coerce_to_int(cls, v: Any) -> int:
+        """Coerce string or int values to int."""
+        return int(v)
+
     def model_post_init(self, __context: Any) -> None:  # noqa: ARG002  # vulture: ignore
-        """Parse string inputs and compute derived fields after initialization."""
+        """Compute derived fields after initialization."""
         # Parse string inputs to proper types
         object.__setattr__(self, "es_nuevo", self.experiencia.strip().lower() == "nuevo")
         object.__setattr__(
             self, "tiene_prioridad", str(self.prioridad).strip().lower() in ("true", "1")
         )
-        # Ensure integer fields are properly typed
-        object.__setattr__(self, "juegos_ano", int(self.juegos_ano))
-        object.__setattr__(self, "partidas_deseadas", int(self.partidas_deseadas))
-        object.__setattr__(self, "partidas_gm", int(self.partidas_gm))
 
     @property
     def puntaje_prioridad(self) -> float:

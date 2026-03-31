@@ -16,8 +16,14 @@ vi.mock("../api", () => ({
         numero: 1,
         gm: "GameMaster1",
         jugadores: [
-          { nombre: "Alice", etiqueta: "Nuevo", pais: "England" },
-          { nombre: "Bob", etiqueta: "Antiguo", pais: "France" },
+          {
+            nombre: "Alice",
+            etiqueta: "Nuevo",
+            pais: "England",
+            pais_reason:
+              "Cualquier jugador disponible podía recibir este país; se asignó para evitar que Charlie lo repita (3 veces).",
+          },
+          { nombre: "Bob", etiqueta: "Antiguo", pais: "France" }, // No pais_reason
         ],
       },
     ],
@@ -149,10 +155,10 @@ describe("GameDetail", () => {
     });
     await fireEvent.click(playersButton);
 
-    // Verify clipboard.writeText was called
+    // Verify clipboard.writeText was called with seat numbering and translated countries
     expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
     expect(mockClipboard.writeText).toHaveBeenCalledWith(
-      "Alice (England)\nBob (France)",
+      "1. Alice (Inglaterra*)\n2. Bob (Francia)\n\n* Cualquier jugador disponible podía recibir este país; se asignó para evitar que Charlie lo repita (3 veces).",
     );
 
     // Verify button text changes to "Copiado"
@@ -288,6 +294,43 @@ describe("GameDetail", () => {
       const wrapper = tag.closest(".tag-wrapper");
       expect(wrapper).toBeInTheDocument();
       expect(wrapper?.tagName).toBe("DIV");
+    });
+  });
+
+  describe("pais_reason clipboard integration", () => {
+    it("includes footnote marker in clipboard copy for player with pais_reason", async () => {
+      render(GameDetail, {
+        props: {
+          id: 1,
+          openGameDraft: vi.fn(),
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Click the copy players button
+      const playersButton = screen.getByRole("button", {
+        name: /Copiar jugadores/i,
+      });
+      await fireEvent.click(playersButton);
+
+      // Verify the clipboard includes footnote marker (asterisk) for Alice
+      expect(mockClipboard.writeText).toHaveBeenCalledWith(
+        expect.stringContaining("Alice (Inglaterra*)"),
+      );
+
+      // Verify Bob has no asterisk (no pais_reason)
+      const clipboardText = mockClipboard.writeText.mock
+        .calls[0]?.[0] as string;
+      expect(clipboardText).toContain("Bob (Francia)");
+      expect(clipboardText).not.toContain("Bob (Francia*)");
+
+      // Verify the clipboard includes the footnote explanation
+      expect(clipboardText).toContain(
+        "* Cualquier jugador disponible podía recibir este país",
+      );
     });
   });
 });

@@ -117,7 +117,7 @@ export async function saveSnapshot(payload: {
 export async function fetchNotionPlayers(
   snapshotNames: string[] = [],
 ): Promise<NotionFetchResponse> {
-  return safeFetch<NotionFetchResponse>("/api/notion/fetch", {
+  return safeFetch<NotionFetchResponse>("/api/snapshot/notion/fetch", {
     method: "POST",
     // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
     headers: { "Content-Type": "application/json" },

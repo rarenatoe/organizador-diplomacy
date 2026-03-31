@@ -102,6 +102,42 @@ class TestCopypasteFormatting:
 class TestFormatterIntegration:
     """Test integration with ResultadoPartidas model."""
     
+    def test_formatear_copypaste_with_pais_reason_footnotes(self):
+        """Test that pais_reason appears as footnotes with asterisks."""
+        resultado_dict = {
+            "mesas": [
+                {
+                    "numero": 1,
+                    "gm": {"nombre": "GameMaster1"},
+                    "jugadores": [
+                        {"nombre": "Alice", "pais": "England", "pais_reason": "Test reason 1"},
+                        {"nombre": "Bob", "pais": "France", "pais_reason": "Test reason 1"},  # Same reason
+                        {"nombre": "Charlie", "pais": "Germany", "pais_reason": "Different reason"},
+                        {"nombre": "Dave", "pais": "Italy"},  # No reason
+                    ]
+                }
+            ],
+            "tickets_sobrantes": []
+        }
+        
+        result = formatear_copypaste_from_dict(resultado_dict)
+        lines = result.split("\n")
+        
+        # Check footnote markers on player lines
+        assert "Alice (Inglaterra*)" in result
+        assert "Bob (Francia*)" in result  # Same asterisk as Alice
+        assert "Charlie (Alemania**)" in result  # Double asterisk
+        assert "Dave (Italia)" in result  # No asterisk
+        
+        # Check footnotes appear at the bottom
+        assert "* Test reason 1" in result
+        assert "** Different reason" in result
+        
+        # Verify footnote comes after player list for the mesa
+        alice_line = next(i for i, line in enumerate(lines) if "Alice" in line)
+        footnote_line = next(i for i, line in enumerate(lines) if "* Test reason 1" in line)
+        assert footnote_line > alice_line, "Footnote should appear after player listing"
+
     def test_resultado_partidas_with_translation(self):
         """Test that ResultadoPartidas.to_dict() works with translation."""
         # Create test data

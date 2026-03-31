@@ -4,6 +4,7 @@ export interface PlayerData {
   nombre: string;
   etiqueta: string;
   pais?: string | null;
+  pais_reason?: string | null;
   es_nuevo?: boolean;
   juegos_este_ano?: number;
   prioridad?: number;

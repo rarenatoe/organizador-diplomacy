@@ -55,9 +55,35 @@ def formatear_copypaste_from_dict(resultado_dict: dict[str, Any]) -> str:
         gm_nombre = mesa.get("gm", {}).get("nombre") if mesa.get("gm") else None
         gm_str: str = f"  |  GM: {gm_nombre}" if gm_nombre else ""
         lineas.append(f"Partida {mesa['numero']}{gm_str}")
+
+        # Track footnotes for this mesa
+        footnotes: dict[str, str] = {}
+        footnote_counter = 0
+
         for i, jugador in enumerate(mesa.get("jugadores", [])):
-            pais_str = f" ({translate_country(jugador.get('pais'))})" if jugador.get('pais') else ""
+            pais = jugador.get("pais")
+            pais_reason = jugador.get("pais_reason")
+            if pais:
+                translated = translate_country(pais)
+                if pais_reason:
+                    # Get or create footnote marker for this reason
+                    if pais_reason not in footnotes:
+                        footnote_counter += 1
+                        footnotes[pais_reason] = "*" * footnote_counter
+                    marker = footnotes[pais_reason]
+                    pais_str = f" ({translated}{marker})"
+                else:
+                    pais_str = f" ({translated})"
+            else:
+                pais_str = ""
             lineas.append(f"  {i + 1}. {jugador['nombre']}{pais_str}")
+
+        # Add footnotes if any
+        if footnotes:
+            lineas.append("")
+            for reason, marker in footnotes.items():
+                lineas.append(f"{marker} {reason}")
+
         lineas.append("")
     
     sobrantes = resultado_dict.get("tickets_sobrantes", [])
@@ -89,10 +115,32 @@ def formatear_resultado(
         antiguos: int = sum(1 for j in mesa.jugadores if not j.es_nuevo)
         gm_str: str = f"GM: {mesa.gm.nombre}" if mesa.gm else "⚠️  Sin GM asignado"
         lineas.append(f"\n[ Partida {mesa.numero} ]  Nuevos: {nuevos}  Antiguos: {antiguos}  {gm_str}")
+
+        # Track footnotes for this mesa
+        footnotes: dict[str, str] = {}
+        footnote_counter = 0
+
         for j, jugador in enumerate(mesa.jugadores):
-            pais_str = f" ({translate_country(jugador.pais)})" if jugador.pais else ""
+            pais_str = ""
+            if jugador.pais:
+                translated = translate_country(jugador.pais)
+                if jugador.pais_reason:
+                    # Get or create footnote marker for this reason
+                    if jugador.pais_reason not in footnotes:
+                        footnote_counter += 1
+                        footnotes[jugador.pais_reason] = "*" * footnote_counter
+                    marker = footnotes[jugador.pais_reason]
+                    pais_str = f" ({translated}{marker})"
+                else:
+                    pais_str = f" ({translated})"
             etiqueta: str = "Nuevo" if jugador.es_nuevo else f"Antiguo ({jugador.juegos_ano} juegos)"
             lineas.append(f"  {j + 1}. {jugador.nombre}{pais_str}  —  {etiqueta}")
+
+        # Add footnotes if any
+        if footnotes:
+            lineas.append("")
+            for reason, marker in footnotes.items():
+                lineas.append(f"  {marker} {reason}")
 
     # Unique GMs who referee at least one table, in order of appearance
     gms_vistos: set[str] = set()

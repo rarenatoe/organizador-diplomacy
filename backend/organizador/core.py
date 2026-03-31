@@ -51,7 +51,7 @@ def assign_countries_to_mesa(jugadores: list[Jugador]) -> None:
         if best_shield_player:
             best_shield_player.pais = country
             times = "veces" if count > 1 else "vez"
-            best_shield_player.pais_reason = f"Asignación protectora: Se le asignó este país para evitar que {cursed_player.nombre} lo repita ({count} {times})."
+            best_shield_player.pais_reason = f"Cualquier jugador disponible podía recibir este país; se asignó para evitar que {cursed_player.nombre} lo repita ({count} {times})."
 
 # ── Algorithm Orchestrator ───────────────────────────────────────────────────
 

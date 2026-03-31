@@ -198,7 +198,8 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[st
                    COALESCE(nc.c_austria, 0) AS c_austria,
                    COALESCE(nc.c_russia, 0) AS c_russia,
                    COALESCE(nc.c_turkey, 0) AS c_turkey,
-                   mp.pais
+                   mp.pais,
+                   mp.pais_reason
             FROM   mesa_players mp
             JOIN   players      p  ON p.id  = mp.player_id
             JOIN   snapshot_players sp
@@ -217,7 +218,8 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[st
                 {
                     "nombre": p[0],
                     "etiqueta": etiqueta,
-                    "pais": p[12] or "",  # Convert None to empty string
+                    "pais": p[13] or "",  # Convert None to empty string
+                    "pais_reason": p[14] if len(p) > 14 else None,
                     "es_nuevo": p[1] == "Nuevo",
                     "experiencia": p[1],
                     "juegos_este_ano": p[2],

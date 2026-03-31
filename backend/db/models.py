@@ -21,8 +21,8 @@ class GraphNode(Base, kw_only=True):
     entity_type: Mapped[str] = mapped_column()
 
     # Relationships
-    snapshot: Mapped[Snapshot | None] = relationship(uselist=False, default=None)
-    event: Mapped[Event | None] = relationship(uselist=False, default=None)
+    snapshot: Mapped[Snapshot | None] = relationship(uselist=False, init=False)
+    event: Mapped[Event | None] = relationship(uselist=False, init=False)
 
 
 class Player(Base, kw_only=True):
@@ -34,11 +34,11 @@ class Player(Base, kw_only=True):
     nombre: Mapped[str] = mapped_column(unique=True)
 
     # Relationships
-    snapshot_links: Mapped[list[SnapshotPlayer]] = relationship(default_factory=list)
-    mesa_links: Mapped[list[MesaPlayer]] = relationship(viewonly=True, default_factory=list)
-    mesas_as_gm: Mapped[list[Mesa]] = relationship(back_populates="gm_player", default_factory=list)
+    snapshot_links: Mapped[list[SnapshotPlayer]] = relationship(init=False)
+    mesa_links: Mapped[list[MesaPlayer]] = relationship(init=False)
+    mesas_as_gm: Mapped[list[Mesa]] = relationship(back_populates="gm_player", init=False)
     waiting_list_entries: Mapped[list[WaitingList]] = relationship(
-        back_populates="player", default_factory=list
+        back_populates="player", init=False
     )
 
 
@@ -78,10 +78,10 @@ class Event(Base, kw_only=True):
     output_snapshot_id: Mapped[int] = mapped_column(ForeignKey("snapshots.id"))
 
     # Relationships
-    game_detail: Mapped[GameDetail | None] = relationship(default=None)
-    mesas: Mapped[list[Mesa]] = relationship(back_populates="event", default_factory=list)
+    game_detail: Mapped[GameDetail | None] = relationship(init=False)
+    mesas: Mapped[list[Mesa]] = relationship(back_populates="event", init=False)
     waiting_list: Mapped[list[WaitingList]] = relationship(
-        back_populates="event", default_factory=list
+        back_populates="event", init=False
     )
 
 
@@ -106,9 +106,9 @@ class Mesa(Base, kw_only=True):
     gm_player_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"), default=None)
 
     # Relationships
-    event: Mapped[Event | None] = relationship(back_populates="mesas", init=False, default=None)
-    gm_player: Mapped[Player | None] = relationship(back_populates="mesas_as_gm", default=None)
-    mesa_players: Mapped[list[MesaPlayer]] = relationship(viewonly=True, default_factory=list)
+    event: Mapped[Event] = relationship(back_populates="mesas", init=False)
+    gm_player: Mapped[Player | None] = relationship(back_populates="mesas_as_gm", init=False)
+    mesa_players: Mapped[list[MesaPlayer]] = relationship(init=False)
 
 
 class MesaPlayer(Base, kw_only=True):
@@ -120,10 +120,11 @@ class MesaPlayer(Base, kw_only=True):
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), primary_key=True)
     orden: Mapped[int] = mapped_column()
     pais: Mapped[str] = mapped_column()
+    pais_reason: Mapped[str | None] = mapped_column(default=None)
 
-    # Relationships - viewonly to prevent PK synchronization issues
-    mesa: Mapped[Mesa | None] = relationship(viewonly=True, default=None)
-    player: Mapped[Player | None] = relationship(viewonly=True, default=None)
+    # Relationships
+    mesa: Mapped[Mesa] = relationship(init=False)
+    player: Mapped[Player] = relationship(init=False)
 
 
 class WaitingList(Base, kw_only=True):
@@ -137,9 +138,9 @@ class WaitingList(Base, kw_only=True):
     cupos_faltantes: Mapped[int] = mapped_column()
 
     # Relationships
-    event: Mapped[Event | None] = relationship(back_populates="waiting_list", default=None)
-    player: Mapped[Player | None] = relationship(
-        back_populates="waiting_list_entries", default=None
+    event: Mapped[Event] = relationship(back_populates="waiting_list", init=False)
+    player: Mapped[Player] = relationship(
+        back_populates="waiting_list_entries", init=False
     )
 
 

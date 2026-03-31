@@ -75,7 +75,66 @@
       c_russia: player.c_russia ?? 0,
       c_turkey: player.c_turkey ?? 0,
       pais: player.pais || null,
+      pais_reason: player.pais_reason || null,
     };
+  }
+
+  // Country name translations from English to Spanish
+  const countryTranslations: Record<string, string> = {
+    England: "Inglaterra",
+    France: "Francia",
+    Germany: "Alemania",
+    Italy: "Italia",
+    Austria: "Austria",
+    Russia: "Rusia",
+    Turkey: "Turquía",
+  };
+
+  function translateCountry(pais: string): string {
+    return countryTranslations[pais] || pais;
+  }
+
+  function getMesaCopyText(mesa: any): string {
+    const footnotes: Record<string, string> = {};
+    let footnoteCounter = 0;
+
+    // Build player lines and collect footnotes
+    const playerLines: string[] = [];
+    let index = 1;
+    for (const jugador of mesa.jugadores) {
+      let line = `${index}. ${jugador.nombre}`;
+      if (jugador.pais) {
+        const translated = translateCountry(jugador.pais);
+        if (jugador.pais_reason) {
+          // Get or create footnote marker
+          if (!footnotes[jugador.pais_reason]) {
+            footnoteCounter++;
+            footnotes[jugador.pais_reason] = "*".repeat(footnoteCounter);
+          }
+          const marker = footnotes[jugador.pais_reason];
+          line += ` (${translated}${marker})`;
+        } else {
+          line += ` (${translated})`;
+        }
+      }
+      playerLines.push(line);
+      index++;
+    }
+
+    // Build footnote lines
+    const footnoteLines: string[] = [];
+    for (const [reason, marker] of Object.entries(footnotes)) {
+      footnoteLines.push(`${marker} ${reason}`);
+    }
+
+    // Combine all lines
+    const allLines = [...playerLines];
+    if (footnoteLines.length > 0) {
+      allLines.push("");
+      allLines.push(...footnoteLines);
+    }
+
+    return allLines.join("\n");
   }
 
   $effect(() => {
@@ -147,9 +206,7 @@
         <div class="section">
           <div class="section-title">Partidas ({mesas.length})</div>
           {#each mesas as mesa (mesa.numero)}
-            {@const playersTxt = mesa.jugadores
-              .map((j) => (j.pais ? `${j.nombre} (${j.pais})` : j.nombre))
-              .join("\n")}
+            {@const playersTxt = getMesaCopyText(mesa)}
             <div class="mesa-card">
               <div class="mesa-header">
                 <span class="mesa-title">Partida {mesa.numero}</span>
@@ -165,7 +222,13 @@
                     <span class="p-num">{i + 1}.</span>
                     <span class="p-name"
                       >{esc(j.nombre)}
-                      {j.pais ? getCountryEmoji(j.pais) : ""}</span
+                      {j.pais ? getCountryEmoji(j.pais) : ""}
+                      {#if j.pais_reason}
+                        <span class="reason-tooltip">
+                          <span class="info-icon">ℹ️</span>
+                          <span class="tooltip-popover">{j.pais_reason}</span>
+                        </span>
+                      {/if}</span
                     >
                     {#if j.etiqueta === "Nuevo"}
                       <div class="tag-wrapper">
@@ -329,7 +392,7 @@
   }
 
   .p-name {
-    overflow: hidden;
+    overflow: visible;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-weight: 500;
@@ -381,5 +444,61 @@
     color: #92400e;
     font-size: 11px;
     text-align: right;
+  }
+
+  .reason-tooltip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: help;
+    margin-left: 4px;
+  }
+
+  .info-icon {
+    font-size: 11px;
+    opacity: 0.7;
+    transition: opacity 0.15s;
+  }
+
+  .reason-tooltip:hover .info-icon {
+    opacity: 1;
+  }
+
+  .tooltip-popover {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1f2937;
+    color: #f9fafb;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    white-space: normal;
+    width: max-content;
+    max-width: 220px;
+    z-index: 9999;
+    margin-bottom: 6px;
+    box-shadow: var(--shadow-md);
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  /* Little triangle pointer for the tooltip */
+  .tooltip-popover::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -4px;
+    border-width: 4px;
+    border-style: solid;
+    border-color: #1f2937 transparent transparent transparent;
+  }
+
+  .reason-tooltip:hover .tooltip-popover {
+    display: block;
   }
 </style>
