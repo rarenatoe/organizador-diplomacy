@@ -14,35 +14,91 @@ import type {
   SaveDraftRequest,
 } from "./types";
 
+// ── Error Handling ────────────────────────────────────────────────────────────
+
+interface FastAPIValidationError {
+  loc: (string | number)[];
+  msg: string;
+  type: string;
+}
+
+interface ErrorResponse {
+  detail?: FastAPIValidationError[] | string;
+  error?: string;
+}
+
+function isErrorResponse(data: unknown): data is ErrorResponse {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    ("detail" in data || "error" in data)
+  );
+}
+
+function isFastAPIValidationError(
+  detail: unknown,
+): detail is FastAPIValidationError[] {
+  return (
+    Array.isArray(detail) &&
+    detail.length > 0 &&
+    typeof detail[0] === "object" &&
+    detail[0] !== null &&
+    "msg" in detail[0]
+  );
+}
+
+async function safeFetch<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, options);
+  const data: unknown = await res.json();
+
+  if (!res.ok) {
+    if (!isErrorResponse(data)) {
+      return { error: "Error de servidor" } as T;
+    }
+
+    // Handle 422 validation errors - extract msg strings from detail array
+    if (res.status === 422 && isFastAPIValidationError(data.detail)) {
+      const messages = data.detail.map((err) => err.msg);
+      return { error: messages.join("; ") } as T;
+    }
+
+    // Handle FastAPI HTTPException - normalize "detail" to "error"
+    if (typeof data.detail === "string") {
+      return { error: data.detail } as T;
+    }
+
+    // Fallback for other errors
+    return { error: data.error || "Error de servidor" } as T;
+  }
+
+  return data as T;
+}
+
 // ── Chain ─────────────────────────────────────────────────────────────────────
 
 export async function fetchChain(): Promise<ChainData> {
-  const res = await fetch("/api/chain");
-  return (await res.json()) as ChainData;
+  return safeFetch<ChainData>("/api/chain");
 }
 
 // ── Snapshot ──────────────────────────────────────────────────────────────────
 
 export async function fetchSnapshot(id: number): Promise<SnapshotDetail> {
-  const res = await fetch(`/api/snapshot/${id}`);
-  return (await res.json()) as SnapshotDetail;
+  return safeFetch<SnapshotDetail>(`/api/snapshot/${id}`);
 }
 
 export async function deleteSnapshot(id: number): Promise<DeleteResult> {
-  const res = await fetch(`/api/snapshot/${id}`, { method: "DELETE" });
-  return (await res.json()) as DeleteResult;
+  return safeFetch<DeleteResult>(`/api/snapshot/${id}`, { method: "DELETE" });
 }
 
 export async function createSnapshot(
   players: EditPlayerRow[],
 ): Promise<SnapshotSaveResponse> {
-  const res = await fetch("/api/snapshot/new", {
+  return safeFetch<SnapshotSaveResponse>("/api/snapshot/new", {
     method: "POST",
     // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ players }),
   });
-  return (await res.json()) as SnapshotSaveResponse;
 }
 
 export async function saveSnapshot(payload: {
@@ -50,56 +106,51 @@ export async function saveSnapshot(payload: {
   event_type: string;
   players: EditPlayerRow[];
 }): Promise<SnapshotSaveResponse> {
-  const res = await fetch("/api/snapshot/save", {
+  return safeFetch<SnapshotSaveResponse>("/api/snapshot/save", {
     method: "POST",
     // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
-  return (await res.json()) as SnapshotSaveResponse;
 }
 
 export async function fetchNotionPlayers(
   snapshotNames: string[] = [],
 ): Promise<NotionFetchResponse> {
-  const res = await fetch("/api/notion/fetch", {
+  return safeFetch<NotionFetchResponse>("/api/notion/fetch", {
     method: "POST",
     // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ snapshot_names: snapshotNames }),
   });
-  return (await res.json()) as NotionFetchResponse;
 }
 
 // ── Game ──────────────────────────────────────────────────────────────────────
 
 export async function fetchGame(id: number): Promise<GameDetail> {
-  const res = await fetch(`/api/game/${id}`);
-  return (await res.json()) as GameDetail;
+  return safeFetch<GameDetail>(`/api/game/${id}`);
 }
 
 export async function fetchGameDraft(
   snapshotId: number,
 ): Promise<DraftResponse> {
-  const res = await fetch("/api/game/draft", {
+  return safeFetch<DraftResponse>("/api/game/draft", {
     method: "POST",
     // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ snapshot_id: snapshotId }),
   });
-  return (await res.json()) as DraftResponse;
 }
 
 export async function saveGameDraft(
   request: SaveDraftRequest,
 ): Promise<SaveDraftResponse> {
-  const res = await fetch("/api/game/save", {
+  return safeFetch<SaveDraftResponse>("/api/game/save", {
     method: "POST",
     // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
   });
-  return (await res.json()) as SaveDraftResponse;
 }
 
 // ── Player ────────────────────────────────────────────────────────────────────
@@ -108,11 +159,10 @@ export async function renamePlayer(
   oldName: string,
   newName: string,
 ): Promise<{ error?: string }> {
-  const res = await fetch("/api/player/rename", {
+  return safeFetch<{ error?: string }>("/api/player/rename", {
     method: "POST",
     // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ old_name: oldName, new_name: newName }),
   });
-  return (await res.json()) as { error?: string };
 }

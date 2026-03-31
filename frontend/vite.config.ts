@@ -10,7 +10,7 @@ export default defineConfig({
     outDir: resolve(__dirname, "static"),
     emptyOutDir: false,
     rollupOptions: {
-      input: "index.html",
+      input: resolve(__dirname, "src/index.html"),
       output: {
         entryFileNames: "app.js",
         assetFileNames: "[name].[ext]",
