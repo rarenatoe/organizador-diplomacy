@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 from sqlalchemy import select
 
-from backend.db.models import Event, Mesa
+from backend.db.models import GameTable, TimelineEdge
 
 pytestmark = pytest.mark.asyncio
 
@@ -59,7 +59,9 @@ class TestApiGameDraft:
         """Calling /api/game/draft must NOT create any events in the DB."""
         snap_id = await make_snapshot_with_players(db_session, 14)
         await client.post("/api/game/draft", json={"snapshot_id": snap_id})
-        result = await db_session.execute(select(Event).where(Event.type == "game"))
+        result = await db_session.execute(
+            select(TimelineEdge).where(TimelineEdge.edge_type == "game")
+        )
         event_count = len(result.scalars().all())
         assert event_count == 0
 
@@ -87,7 +89,7 @@ class TestApiGameDraft:
         if "mesas" not in data or not data["mesas"]:
             return
         first_player = data["mesas"][0]["jugadores"][0]
-        for key in ("nombre", "es_nuevo", "juegos_ano", "tiene_prioridad"):
+        for key in ("nombre", "es_nuevo", "juegos_este_ano", "tiene_prioridad"):
             assert key in first_player, f"Missing key '{key}' in player dict"
 
 
@@ -130,10 +132,10 @@ class TestApiGameSave:
         print(f"\n>>> Save response status: {save_resp.status_code}")
         print(f">>> Save response body: {save_resp.text}\n")
         game_id = save_resp.json()["game_id"]
-        result = await db_session.execute(select(Event).where(Event.id == game_id))
+        result = await db_session.execute(select(TimelineEdge).where(TimelineEdge.id == game_id))
         event = result.scalar_one_or_none()
         assert event is not None
-        assert event.type == "game"
+        assert event.edge_type == "game"
 
     async def test_save_draft_persists_correct_mesa_count(
         self, client: Any, db_session: Any
@@ -145,7 +147,9 @@ class TestApiGameSave:
             "/api/game/save", json={"snapshot_id": snap_id, "draft": draft}
         )
         game_id = save_resp.json()["game_id"]
-        result = await db_session.execute(select(Mesa).where(Mesa.event_id == game_id))
+        result = await db_session.execute(
+            select(GameTable).where(GameTable.timeline_edge_id == game_id)
+        )
         mesas = result.scalars().all()
         assert len(mesas) == len(draft["mesas"])
 
@@ -181,7 +185,9 @@ class TestApiGameSave:
 
         # Verify the game exists and is a leaf node initially
         result = await db_session.execute(
-            select(Event).where(Event.id == original_game_id, Event.type == "game")
+            select(TimelineEdge).where(
+                TimelineEdge.id == original_game_id, TimelineEdge.edge_type == "game"
+            )
         )
         game_row = result.scalar_one_or_none()
         assert game_row is not None
@@ -189,13 +195,13 @@ class TestApiGameSave:
 
         # Verify it's a leaf node (no events source from it)
         result = await db_session.execute(
-            select(Event).where(Event.source_snapshot_id == output_snapshot_id)
+            select(TimelineEdge).where(TimelineEdge.source_snapshot_id == output_snapshot_id)
         )
         is_leaf = result.scalar_one_or_none() is None
         assert is_leaf, "Game should be a leaf node initially"
 
         # Count events before update
-        result = await db_session.execute(select(Event))
+        result = await db_session.execute(select(TimelineEdge))
         events_before = len(result.scalars().all())
 
         # 2. Send a new POST to /api/game/save including editing_game_id
@@ -217,23 +223,23 @@ class TestApiGameSave:
         assert updated_game_id == original_game_id, "Should return same game_id for in-place update"
 
         # Assert that it did not create a new row in the events table
-        result = await db_session.execute(select(Event))
+        result = await db_session.execute(select(TimelineEdge))
         events_after = len(result.scalars().all())
         assert events_after == events_before, "Should not create new event for in-place update"
 
         # Verify the game details were updated (intentos should be 999)
         result = await db_session.execute(
-            select(GameDetail).where(GameDetail.event_id == original_game_id)
+            select(GameDetail).where(GameDetail.timeline_edge_id == original_game_id)
         )
         updated_details = result.scalar_one_or_none()
         assert updated_details is not None
-        assert updated_details.intentos == 999, "Game details should be updated in-place"
+        assert updated_details.attempts == 999, "Game details should be updated in-place"
 
     async def test_save_draft_with_editing_game_id_internal_node(
         self, client: Any, db_session: Any
     ) -> None:
         """Test fallback behavior when the game is an internal node (has children)."""
-        from backend.db.crud import create_event, create_snapshot
+        from backend.db.crud import create_branch_edge, create_snapshot
         from backend.db.models import GameDetail
 
         # 1. Setup a game
@@ -248,7 +254,9 @@ class TestApiGameSave:
 
         # Get the output snapshot of the original game
         result = await db_session.execute(
-            select(Event).where(Event.id == original_game_id, Event.type == "game")
+            select(TimelineEdge).where(
+                TimelineEdge.id == original_game_id, TimelineEdge.edge_type == "game"
+            )
         )
         game_row = result.scalar_one_or_none()
         assert game_row is not None
@@ -257,18 +265,18 @@ class TestApiGameSave:
         # 2. Create a new manual snapshot originating from that game's output snapshot
         # (this makes the game's output snapshot an internal node with children)
         child_snapshot_id = await create_snapshot(db_session, "manual")
-        await create_event(db_session, "edit", output_snapshot_id, child_snapshot_id)
+        await create_branch_edge(db_session, output_snapshot_id, child_snapshot_id)
         await db_session.commit()
 
         # Verify the original game is now an internal node (has children)
         result = await db_session.execute(
-            select(Event).where(Event.source_snapshot_id == output_snapshot_id)
+            select(TimelineEdge).where(TimelineEdge.source_snapshot_id == output_snapshot_id)
         )
         is_leaf = result.scalar_one_or_none() is None
         assert not is_leaf, "Game should now be an internal node"
 
         # Count events before update
-        result = await db_session.execute(select(Event))
+        result = await db_session.execute(select(TimelineEdge))
         events_before = len(result.scalars().all())
 
         # 3. Send a POST to /api/game/save including editing_game_id
@@ -290,25 +298,25 @@ class TestApiGameSave:
         assert new_game_id != original_game_id, "Should return new game_id for internal node"
 
         # Assert that it creates a new branch in the events table
-        result = await db_session.execute(select(Event))
+        result = await db_session.execute(select(TimelineEdge))
         events_after = len(result.scalars().all())
         assert events_after == events_before + 1, "Should create new event for internal node"
 
         # Verify the new game exists and has the updated intentos
         result = await db_session.execute(
-            select(GameDetail).where(GameDetail.event_id == new_game_id)
+            select(GameDetail).where(GameDetail.timeline_edge_id == new_game_id)
         )
         new_details = result.scalar_one_or_none()
         assert new_details is not None
-        assert new_details.intentos == 777, "New game should have updated intentos"
+        assert new_details.attempts == 777, "New game should have updated intentos"
 
         # Verify the original game is unchanged
         result = await db_session.execute(
-            select(GameDetail).where(GameDetail.event_id == original_game_id)
+            select(GameDetail).where(GameDetail.timeline_edge_id == original_game_id)
         )
         original_details = result.scalar_one_or_none()
         assert original_details is not None
-        assert original_details.intentos != 777, "Original game should remain unchanged"
+        assert original_details.attempts != 777, "Original game should remain unchanged"
 
 
 # ── Regression Tests ──────────────────────────────────────────────────────────

@@ -16,33 +16,34 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.models import (
-    Event,
     GameDetail,
+    GameTable,
     GraphNode,
-    Mesa,
-    MesaPlayer,
     NotionCache,
     Player,
     Snapshot,
+    SnapshotHistory,
     SnapshotPlayer,
+    TablePlayer,
+    TimelineEdge,
     WaitingList,
 )
 
 if TYPE_CHECKING:
-    from backend.organizador.models import ResultadoPartidas
+    from backend.organizador.models import DraftResult
 
 
 # ── Players ────────────────────────────────────────────────────────────────────
 
 
-async def get_or_create_player(session: AsyncSession, nombre: str) -> int:
+async def get_or_create_player(session: AsyncSession, name: str) -> int:
     """Returns the player id, inserting a new row if the name is unknown."""
-    result = await session.execute(select(Player).where(Player.nombre == nombre))
+    result = await session.execute(select(Player).where(Player.name == name))
     player = result.scalar_one_or_none()
     if player:
         return player.id
 
-    new_player: Player = Player(nombre=nombre)
+    new_player: Player = Player(name=name)
     session.add(new_player)
     await session.flush()
     return new_player.id
@@ -55,7 +56,7 @@ async def rename_player(session: AsyncSession, old_name: str, new_name: str) -> 
     Returns True if successful.
     """
     # Check if old name exists
-    result = await session.execute(select(Player).where(Player.nombre == old_name))
+    result = await session.execute(select(Player).where(Player.name == old_name))
     old_player = result.scalar_one_or_none()
     if not old_player:
         return False
@@ -63,7 +64,7 @@ async def rename_player(session: AsyncSession, old_name: str, new_name: str) -> 
     old_id = old_player.id
 
     # Check if new name already exists
-    result = await session.execute(select(Player).where(Player.nombre == new_name))
+    result = await session.execute(select(Player).where(Player.name == new_name))
     new_player = result.scalar_one_or_none()
 
     if new_player:
@@ -92,26 +93,26 @@ async def rename_player(session: AsyncSession, old_name: str, new_name: str) -> 
             .values(player_id=new_id)
         )
 
-        # Handle mesa_players conflicts
+        # Handle table_players conflicts
         result = await session.execute(
-            select(MesaPlayer.mesa_id).where(MesaPlayer.player_id == new_id)
+            select(TablePlayer.table_id).where(TablePlayer.player_id == new_id)
         )
-        new_player_mesas = {row for row in result.scalars().all()}
+        new_player_tables = {row for row in result.scalars().all()}
 
-        if new_player_mesas:
+        if new_player_tables:
             await session.execute(
-                delete(MesaPlayer)
-                .where(MesaPlayer.player_id == old_id)
-                .where(MesaPlayer.mesa_id.in_(new_player_mesas))
+                delete(TablePlayer)
+                .where(TablePlayer.player_id == old_id)
+                .where(TablePlayer.table_id.in_(new_player_tables))
             )
 
         await session.execute(
-            update(MesaPlayer).where(MesaPlayer.player_id == old_id).values(player_id=new_id)
+            update(TablePlayer).where(TablePlayer.player_id == old_id).values(player_id=new_id)
         )
 
         # Update other references
         await session.execute(
-            update(Mesa).where(Mesa.gm_player_id == old_id).values(gm_player_id=new_id)
+            update(GameTable).where(GameTable.gm_player_id == old_id).values(gm_player_id=new_id)
         )
         await session.execute(
             update(WaitingList).where(WaitingList.player_id == old_id).values(player_id=new_id)
@@ -123,22 +124,28 @@ async def rename_player(session: AsyncSession, old_name: str, new_name: str) -> 
         )
         has_snapshot_links = result.scalar_one_or_none() is not None
 
-        result = await session.execute(select(Mesa).where(Mesa.gm_player_id == old_id).limit(1))
+        result = await session.execute(
+            select(GameTable).where(GameTable.gm_player_id == old_id).limit(1)
+        )
         has_gm_links = result.scalar_one_or_none() is not None
 
-        result = await session.execute(select(MesaPlayer).where(MesaPlayer.player_id == old_id).limit(1))
-        has_mesa_links = result.scalar_one_or_none() is not None
+        result = await session.execute(
+            select(TablePlayer).where(TablePlayer.player_id == old_id).limit(1)
+        )
+        has_table_links = result.scalar_one_or_none() is not None
 
-        result = await session.execute(select(WaitingList).where(WaitingList.player_id == old_id).limit(1))
+        result = await session.execute(
+            select(WaitingList).where(WaitingList.player_id == old_id).limit(1)
+        )
         has_waiting_links = result.scalar_one_or_none() is not None
 
-        if not any([has_snapshot_links, has_gm_links, has_mesa_links, has_waiting_links]):
+        if not any([has_snapshot_links, has_gm_links, has_table_links, has_waiting_links]):
             await session.execute(delete(Player).where(Player.id == old_id))
 
         return True
     else:
         # Simple rename
-        old_player.nombre = new_name
+        old_player.name = new_name
         return True
 
 
@@ -146,21 +153,21 @@ async def add_player_to_snapshot(
     session: AsyncSession,
     snapshot_id: int,
     player_id: int,
-    experiencia: str,
-    juegos_este_ano: int,
-    prioridad: int,
-    partidas_deseadas: int,
-    partidas_gm: int,
+    experience: str,
+    games_this_year: int,
+    priority: int,
+    desired_games: int,
+    gm_games: int,
 ) -> None:
     """Link a player to a snapshot with game data."""
     sp = SnapshotPlayer(
         snapshot_id=snapshot_id,
         player_id=player_id,
-        experiencia=experiencia,
-        juegos_este_ano=juegos_este_ano,
-        prioridad=prioridad,
-        partidas_deseadas=partidas_deseadas,
-        partidas_gm=partidas_gm,
+        experience=experience,
+        games_this_year=games_this_year,
+        priority=priority,
+        desired_games=desired_games,
+        gm_games=gm_games,
     )
     session.add(sp)
 
@@ -207,12 +214,12 @@ async def snapshots_have_same_roster(
 
     # Build comparison dict
     snap_dict: dict[str, dict[str, Any]] = {
-        player.nombre: {
-            "experiencia": sp.experiencia,
-            "juegos_este_ano": sp.juegos_este_ano,
-            "prioridad": sp.prioridad,
-            "partidas_deseadas": sp.partidas_deseadas,
-            "partidas_gm": sp.partidas_gm,
+        player.name: {
+            "experiencia": sp.experience,
+            "juegos_este_ano": sp.games_this_year,
+            "prioridad": sp.priority,
+            "partidas_deseadas": sp.desired_games,
+            "partidas_gm": sp.gm_games,
         }
         for sp, player in rows
     }
@@ -237,20 +244,20 @@ async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[
     result = await session.execute(
         select(SnapshotPlayer, Player, NotionCache)
         .join(Player)
-        .outerjoin(NotionCache, Player.nombre == NotionCache.nombre)
+        .outerjoin(NotionCache, Player.name == NotionCache.name)
         .where(SnapshotPlayer.snapshot_id == snapshot_id)
-        .order_by(SnapshotPlayer.prioridad.desc(), Player.nombre)
+        .order_by(SnapshotPlayer.priority.desc(), Player.name)
     )
     rows = result.all()
 
     return [
         {
-            "nombre": player.nombre,
-            "experiencia": sp.experiencia,
-            "juegos_este_ano": sp.juegos_este_ano,
-            "prioridad": sp.prioridad,
-            "partidas_deseadas": sp.partidas_deseadas,
-            "partidas_gm": sp.partidas_gm,
+            "nombre": player.name,
+            "experiencia": sp.experience,
+            "juegos_este_ano": sp.games_this_year,
+            "prioridad": sp.priority,
+            "partidas_deseadas": sp.desired_games,
+            "partidas_gm": sp.gm_games,
             "c_england": cache.c_england if cache else 0,
             "c_france": cache.c_france if cache else 0,
             "c_germany": cache.c_germany if cache else 0,
@@ -266,88 +273,197 @@ async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[
 # ── Events ───────────────────────────────────────────────────────────────────
 
 
-async def create_event(
+async def create_timeline_edge(
     session: AsyncSession,
-    event_type: str,
+    edge_type: str,
     source_snapshot_id: int | None,
     output_snapshot_id: int,
 ) -> int:
-    """Create a new event and return its ID."""
+    """Create a new timeline edge and return its ID."""
     # Create graph node
-    node = GraphNode(entity_type="event")
+    node = GraphNode(entity_type="timeline_edge")
     session.add(node)
     await session.flush()
     node_id = node.id
 
-    # Create event
-    event = Event(
+    # Create timeline edge
+    edge = TimelineEdge(
         id=node_id,
-        type=event_type,
+        edge_type=edge_type,
         source_snapshot_id=source_snapshot_id,
         output_snapshot_id=output_snapshot_id,
     )
-    session.add(event)
+    session.add(edge)
     await session.flush()
-    return event.id
+    return edge.id
 
 
-async def create_sync_event(
+async def create_branch_edge(
     session: AsyncSession, source_snapshot_id: int, output_snapshot_id: int
 ) -> int:
-    """Create a sync event."""
-    return await create_event(session, "sync", source_snapshot_id, output_snapshot_id)
+    """Create a branch edge."""
+    return await create_timeline_edge(session, "branch", source_snapshot_id, output_snapshot_id)
 
 
-async def create_game_event(
+async def squash_linear_branch(session: AsyncSession, snapshot_id: int) -> None:
+    """
+    Squashes linear branch chains into a single snapshot.
+    If a snapshot has EXACTLY ONE outgoing edge, and that edge is NOT a game,
+    this function absorbs the child snapshot into the parent.
+    """
+    from sqlalchemy import delete, select, update
+
+    from backend.db.models import GraphNode, Snapshot, SnapshotHistory, SnapshotPlayer, TimelineEdge
+
+    # Query outgoing edges from this snapshot
+    result = await session.execute(
+        select(TimelineEdge).where(TimelineEdge.source_snapshot_id == snapshot_id)
+    )
+    outgoing_edges = result.scalars().all()
+
+    # Only squash if exactly 1 outgoing edge and it's NOT a game
+    if len(outgoing_edges) != 1:
+        return
+
+    edge = outgoing_edges[0]
+    if edge.edge_type == "game":
+        return
+
+    child_id = edge.output_snapshot_id
+
+    # Step 0: Inherit source and timestamp from child
+    child_snap_result = await session.execute(select(Snapshot).where(Snapshot.id == child_id))
+    child_snap = child_snap_result.scalar_one()
+    await session.execute(
+        update(Snapshot)
+        .where(Snapshot.id == snapshot_id)
+        .values(source=child_snap.source, created_at=child_snap.created_at)
+    )
+
+    # Step 1: Move child's outgoing edges to parent
+    await session.execute(
+        update(TimelineEdge)
+        .where(TimelineEdge.source_snapshot_id == child_id)
+        .values(source_snapshot_id=snapshot_id)
+    )
+
+    # Step 2: Move child's history to parent
+    await session.execute(
+        update(SnapshotHistory)
+        .where(SnapshotHistory.snapshot_id == child_id)
+        .values(snapshot_id=snapshot_id)
+    )
+
+    # Step 3: Delete parent's current roster
+    await session.execute(delete(SnapshotPlayer).where(SnapshotPlayer.snapshot_id == snapshot_id))
+
+    # Step 4: Move child's roster to parent
+    await session.execute(
+        update(SnapshotPlayer)
+        .where(SnapshotPlayer.snapshot_id == child_id)
+        .values(snapshot_id=snapshot_id)
+    )
+
+    # Step 5: Delete the branch edge
+    await session.execute(delete(TimelineEdge).where(TimelineEdge.id == edge.id))
+    await session.execute(delete(GraphNode).where(GraphNode.id == edge.id))
+
+    # Step 6: Delete child snapshot and its graph node
+    await session.execute(delete(Snapshot).where(Snapshot.id == child_id))
+    await session.execute(delete(GraphNode).where(GraphNode.id == child_id))
+
+    # Step 7: Recursively check if we need to squash again
+    await squash_linear_branch(session, snapshot_id)
+
+
+async def create_game_edge(
     session: AsyncSession,
     source_snapshot_id: int,
     output_snapshot_id: int,
-    intentos: int,
-    copypaste_text: str,
+    attempts: int,
+    share_text: str,
 ) -> int:
-    """Create a game event with details."""
-    event_id = await create_event(session, "game", source_snapshot_id, output_snapshot_id)
+    """Create a game edge with details."""
+    edge_id = await create_timeline_edge(session, "game", source_snapshot_id, output_snapshot_id)
 
     detail = GameDetail(
-        event_id=event_id,
-        intentos=intentos,
-        copypaste_text=copypaste_text,
+        timeline_edge_id=edge_id,
+        attempts=attempts,
+        share_text=share_text,
     )
     session.add(detail)
-    return event_id
+    return edge_id
 
 
 async def delete_snapshot_cascade(session: AsyncSession, snapshot_id: int) -> bool:
     """Delete a snapshot and all its dependent data."""
+    # Delete snapshot history logs
+    await session.execute(delete(SnapshotHistory).where(SnapshotHistory.snapshot_id == snapshot_id))
+
     # Delete snapshot players
     await session.execute(delete(SnapshotPlayer).where(SnapshotPlayer.snapshot_id == snapshot_id))
 
-    # Delete events that source from this snapshot
-    result = await session.execute(select(Event).where(Event.source_snapshot_id == snapshot_id))
-    events = result.scalars().all()
+    # Delete incoming timeline edges (where this snapshot is output)
+    result = await session.execute(
+        select(TimelineEdge).where(TimelineEdge.output_snapshot_id == snapshot_id)
+    )
+    incoming_edges = result.scalars().all()
 
-    for event in events:
-        # Delete event details
-        await session.execute(delete(GameDetail).where(GameDetail.event_id == event.id))
+    for edge in incoming_edges:
+        # Delete edge details
+        await session.execute(delete(GameDetail).where(GameDetail.timeline_edge_id == edge.id))
 
-        # Delete mesas
-        result = await session.execute(select(Mesa).where(Mesa.event_id == event.id))
-        mesas = result.scalars().all()
+        # Delete game tables
+        result = await session.execute(
+            select(GameTable).where(GameTable.timeline_edge_id == edge.id)
+        )
+        tables = result.scalars().all()
 
-        for mesa in mesas:
-            # Delete mesa players
-            await session.execute(delete(MesaPlayer).where(MesaPlayer.mesa_id == mesa.id))
+        for table in tables:
+            # Delete table players
+            await session.execute(delete(TablePlayer).where(TablePlayer.table_id == table.id))
 
-        await session.execute(delete(Mesa).where(Mesa.event_id == event.id))
+        await session.execute(delete(GameTable).where(GameTable.timeline_edge_id == edge.id))
 
         # Delete waiting list
-        await session.execute(delete(WaitingList).where(WaitingList.event_id == event.id))
+        await session.execute(delete(WaitingList).where(WaitingList.timeline_edge_id == edge.id))
 
-        # Delete the event itself
-        await session.execute(delete(Event).where(Event.id == event.id))
+        # Delete the timeline edge itself
+        await session.execute(delete(TimelineEdge).where(TimelineEdge.id == edge.id))
 
         # Delete graph node
-        await session.execute(delete(GraphNode).where(GraphNode.id == event.id))
+        await session.execute(delete(GraphNode).where(GraphNode.id == edge.id))
+
+    # Delete outgoing timeline edges (where this snapshot is source)
+    result = await session.execute(
+        select(TimelineEdge).where(TimelineEdge.source_snapshot_id == snapshot_id)
+    )
+    outgoing_edges = result.scalars().all()
+
+    for edge in outgoing_edges:
+        # Delete edge details
+        await session.execute(delete(GameDetail).where(GameDetail.timeline_edge_id == edge.id))
+
+        # Delete game tables
+        result = await session.execute(
+            select(GameTable).where(GameTable.timeline_edge_id == edge.id)
+        )
+        tables = result.scalars().all()
+
+        for table in tables:
+            # Delete table players
+            await session.execute(delete(TablePlayer).where(TablePlayer.table_id == table.id))
+
+        await session.execute(delete(GameTable).where(GameTable.timeline_edge_id == edge.id))
+
+        # Delete waiting list
+        await session.execute(delete(WaitingList).where(WaitingList.timeline_edge_id == edge.id))
+
+        # Delete the timeline edge itself
+        await session.execute(delete(TimelineEdge).where(TimelineEdge.id == edge.id))
+
+        # Delete graph node
+        await session.execute(delete(GraphNode).where(GraphNode.id == edge.id))
 
     # Delete snapshot
     await session.execute(delete(Snapshot).where(Snapshot.id == snapshot_id))
@@ -378,7 +494,7 @@ async def create_manual_snapshot(
         if base is None:
             continue
 
-        result = await session.execute(select(Player).where(Player.nombre == nombre))
+        result = await session.execute(select(Player).where(Player.name == nombre))
         player: Player | None = result.scalar_one_or_none()
         if not player:
             continue
@@ -395,7 +511,7 @@ async def create_manual_snapshot(
         )
 
     # Create event
-    await create_event(session, "manual", source_snapshot_id, snap_id)
+    await create_timeline_edge(session, "manual", source_snapshot_id, snap_id)
     return snap_id
 
 
@@ -427,7 +543,7 @@ async def create_root_manual_snapshot(
 async def save_game(
     session: AsyncSession,
     input_snapshot_id: int,
-    resultado: ResultadoPartidas,
+    resultado: DraftResult,
     intentos: int,
     copypaste_text: str,
 ) -> int:
@@ -437,18 +553,18 @@ async def save_game(
 
     # Count cupos jugados per player
     cupos_jugados: Counter[str] = Counter()
-    for mesa in resultado.mesas:
-        for jugador in mesa.jugadores:
-            cupos_jugados[jugador.nombre] += 1
+    for table in resultado.tables:
+        for player in table.players:  # type: ignore
+            cupos_jugados[player.name] += 1  # type: ignore
 
-    nombres_en_espera: set[str] = {j.nombre for j in resultado.tickets_sobrantes}
+    nombres_en_espera: set[str] = {j.name for j in resultado.waitlist_players}
 
     for p in await get_snapshot_players(session, input_snapshot_id):
         nombre = p["nombre"]
         jugadas = cupos_jugados[nombre]
         fue_promovido = p["experiencia"] == "Nuevo" and jugadas > 0
 
-        result = await session.execute(select(Player).where(Player.nombre == nombre))
+        result = await session.execute(select(Player).where(Player.name == nombre))
         player: Player | None = result.scalar_one_or_none()
         if not player:
             continue
@@ -465,47 +581,45 @@ async def save_game(
         )
 
     # Create event and details
-    event_id = await create_game_event(
-        session, input_snapshot_id, snap_id, intentos, copypaste_text
-    )
+    edge_id = await create_game_edge(session, input_snapshot_id, snap_id, intentos, copypaste_text)
 
     # Save mesas
-    for mesa in resultado.mesas:
-        mesa_obj = Mesa(event_id=event_id, numero=mesa.numero)
-        session.add(mesa_obj)
+    for table in resultado.tables:
+        table_obj = GameTable(timeline_edge_id=edge_id, table_number=table.table_number)
+        session.add(table_obj)
         await session.flush()
-        mesa_id = mesa_obj.id
+        table_id = table_obj.id
 
         # Save GM if present
-        if mesa.gm:
-            result = await session.execute(select(Player).where(Player.nombre == mesa.gm.nombre))
+        if table.gm:
+            result = await session.execute(select(Player).where(Player.name == table.gm.name))
             gm_player = result.scalar_one_or_none()
             if gm_player:
-                mesa_obj.gm_player_id = gm_player.id
+                table_obj.gm_player_id = gm_player.id
 
         # Save players
-        for orden, jugador in enumerate(mesa.jugadores, 1):
-            result = await session.execute(select(Player).where(Player.nombre == jugador.nombre))
-            player = result.scalar_one_or_none()
-            if player:
-                mesa_player = MesaPlayer(
-                    mesa_id=mesa_id,
-                    player_id=player.id,
-                    orden=orden,
-                    pais=jugador.pais,
+        for orden, player in enumerate(table.players, 1):  # type: ignore
+            result = await session.execute(select(Player).where(Player.name == player.name))  # type: ignore
+            db_player = result.scalar_one_or_none()
+            if db_player:
+                table_player = TablePlayer(
+                    table_id=table_id,
+                    player_id=db_player.id,
+                    seat_order=orden,
+                    country=player.country,  # type: ignore
                 )
-                session.add(mesa_player)
+                session.add(table_player)
 
     # Save waiting list
-    for orden, jugador in enumerate(resultado.tickets_sobrantes, 1):
-        result = await session.execute(select(Player).where(Player.nombre == jugador.nombre))
-        player = result.scalar_one_or_none()
-        if player:
+    for orden, player in enumerate(resultado.waitlist_players, 1):  # type: ignore
+        result = await session.execute(select(Player).where(Player.name == player.name))  # type: ignore
+        db_player = result.scalar_one_or_none()
+        if db_player:
             waiting = WaitingList(
-                event_id=event_id,
-                player_id=player.id,
-                orden=orden,
-                cupos_faltantes=int(jugador.partidas_deseadas),
+                timeline_edge_id=edge_id,
+                player_id=db_player.id,
+                list_order=orden,
+                missing_spots=int(player.desired_games),  # type: ignore
             )
             session.add(waiting)
 
@@ -524,9 +638,9 @@ async def update_notion_cache(session: AsyncSession, rows: list[dict[str, Any]])
     for r in rows:
         cache = NotionCache(
             notion_id=r["notion_id"],
-            nombre=r["nombre"],
-            experiencia=r["experiencia"],
-            juegos_este_ano=int(r["juegos_este_ano"]),
+            name=r["nombre"],
+            experience=r["experiencia"],
+            games_this_year=int(r["juegos_este_ano"]),
             c_england=int(r.get("c_england", 0)),
             c_france=int(r.get("c_france", 0)),
             c_germany=int(r.get("c_germany", 0)),
@@ -541,15 +655,15 @@ async def update_notion_cache(session: AsyncSession, rows: list[dict[str, Any]])
 
 async def get_notion_cache(session: AsyncSession) -> list[dict[str, Any]]:
     """Get all cached Notion data."""
-    result = await session.execute(select(NotionCache).order_by(NotionCache.nombre))
+    result = await session.execute(select(NotionCache).order_by(NotionCache.name))
     rows = result.scalars().all()
 
     return [
         {
             "notion_id": r.notion_id,
-            "nombre": r.nombre,
-            "experiencia": r.experiencia,
-            "juegos_este_ano": r.juegos_este_ano,
+            "nombre": r.name,
+            "experiencia": r.experience,
+            "juegos_este_ano": r.games_this_year,
             "c_england": r.c_england,
             "c_france": r.c_france,
             "c_germany": r.c_germany,
@@ -566,48 +680,72 @@ async def get_notion_cache(session: AsyncSession) -> list[dict[str, Any]]:
 # ── Mesa Management ─────────────────────────────────────────────────────────
 
 
-async def add_mesa_player(
+async def add_table_player(
     session: AsyncSession,
-    mesa_id: int,
+    table_id: int,
     player_id: int,
-    orden: int,
-    pais: str,
-    pais_reason: str | None = None,
+    seat_order: int,
+    country: str,
+    country_reason: str | None = None,
 ) -> None:
-    """Add a player to a mesa."""
-    mp = MesaPlayer(
-        mesa_id=mesa_id,
+    """Add a player to a game table."""
+    tp = TablePlayer(
+        table_id=table_id,
         player_id=player_id,
-        orden=orden,
-        pais=pais,
-        pais_reason=pais_reason,
+        seat_order=seat_order,
+        country=country,
+        country_reason=country_reason,
     )
-    session.add(mp)
+    session.add(tp)
 
 
 async def add_waiting_player(
     session: AsyncSession,
-    event_id: int,
+    timeline_edge_id: int,
     player_id: int,
-    orden: int,
-    cupos_faltantes: int,
+    list_order: int,
+    missing_spots: int,
 ) -> None:
     """Add a player to the waiting list."""
     wl = WaitingList(
-        event_id=event_id,
+        timeline_edge_id=timeline_edge_id,
         player_id=player_id,
-        orden=orden,
-        cupos_faltantes=cupos_faltantes,
+        list_order=list_order,
+        missing_spots=missing_spots,
     )
     session.add(wl)
 
 
-async def create_mesa(session: AsyncSession, event_id: int, numero: int) -> int:
-    """Create a new mesa and return its ID."""
+async def create_game_table(session: AsyncSession, timeline_edge_id: int, table_number: int) -> int:
+    """Create a new game table and return its ID."""
     from sqlalchemy import insert
 
-    stmt = insert(Mesa).values(event_id=event_id, numero=numero).returning(Mesa.id)
+    stmt = (
+        insert(GameTable)
+        .values(timeline_edge_id=timeline_edge_id, table_number=table_number)
+        .returning(GameTable.id)
+    )
     result = await session.execute(stmt)
     await session.flush()
     row = result.scalar_one()
     return row
+
+
+# ── History Logging ─────────────────────────────────────────────────────────────
+
+
+async def log_snapshot_history(
+    session: AsyncSession,
+    snapshot_id: int,
+    action_type: str,
+    summary: str,
+    previous_state: dict[str, object],
+) -> None:
+    """Log a snapshot history entry."""
+    history_entry = SnapshotHistory(
+        snapshot_id=snapshot_id,
+        action_type=action_type,
+        summary=summary,
+        previous_state=previous_state,
+    )
+    session.add(history_entry)

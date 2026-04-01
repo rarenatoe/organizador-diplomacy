@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime  # noqa: TCH003
 
-from sqlalchemy import ForeignKey, func
+from sqlalchemy import JSON, ForeignKey, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, mapped_column, relationship
 
 
@@ -22,7 +22,7 @@ class GraphNode(Base, kw_only=True):
 
     # Relationships
     snapshot: Mapped[Snapshot | None] = relationship(uselist=False, init=False)
-    event: Mapped[Event | None] = relationship(uselist=False, init=False)
+    timeline_edge: Mapped[TimelineEdge | None] = relationship(uselist=False, init=False)
 
 
 class Player(Base, kw_only=True):
@@ -31,12 +31,12 @@ class Player(Base, kw_only=True):
     __tablename__ = "players"
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
-    nombre: Mapped[str] = mapped_column(unique=True)
+    name: Mapped[str] = mapped_column(unique=True)
 
     # Relationships
     snapshot_links: Mapped[list[SnapshotPlayer]] = relationship(init=False)
-    mesa_links: Mapped[list[MesaPlayer]] = relationship(init=False)
-    mesas_as_gm: Mapped[list[Mesa]] = relationship(back_populates="gm_player", init=False)
+    table_player_links: Mapped[list[TablePlayer]] = relationship(init=False)
+    tables_as_gm: Mapped[list[GameTable]] = relationship(back_populates="gm_player", init=False)
     waiting_list_entries: Mapped[list[WaitingList]] = relationship(
         back_populates="player", init=False
     )
@@ -51,6 +51,11 @@ class Snapshot(Base, kw_only=True):
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     source: Mapped[str] = mapped_column()
 
+    # Relationships
+    history_logs: Mapped[list[SnapshotHistory]] = relationship(
+        init=False, cascade="all, delete-orphan"
+    )
+
 
 class SnapshotPlayer(Base, kw_only=True):
     """Many-to-many link between snapshots and players with game data."""
@@ -59,86 +64,86 @@ class SnapshotPlayer(Base, kw_only=True):
 
     snapshot_id: Mapped[int] = mapped_column(ForeignKey("snapshots.id"), primary_key=True)
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), primary_key=True)
-    experiencia: Mapped[str] = mapped_column()
-    juegos_este_ano: Mapped[int] = mapped_column(default=0)
-    prioridad: Mapped[int] = mapped_column(default=0)
-    partidas_deseadas: Mapped[int] = mapped_column(default=1)
-    partidas_gm: Mapped[int] = mapped_column(default=0)
+    experience: Mapped[str] = mapped_column()
+    games_this_year: Mapped[int] = mapped_column(default=0)
+    priority: Mapped[int] = mapped_column(default=0)
+    desired_games: Mapped[int] = mapped_column(default=1)
+    gm_games: Mapped[int] = mapped_column(default=0)
 
 
-class Event(Base, kw_only=True):
-    """Events: sync, game, or edit operations."""
+class TimelineEdge(Base, kw_only=True):
+    """Timeline edges: games (jornadas) or manual 'what if' branches."""
 
-    __tablename__ = "events"
+    __tablename__ = "timeline_edges"
 
     id: Mapped[int] = mapped_column(ForeignKey("graph_nodes.id"), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
-    type: Mapped[str] = mapped_column()
+    edge_type: Mapped[str] = mapped_column()  # 'game' or 'branch'
     source_snapshot_id: Mapped[int | None] = mapped_column(ForeignKey("snapshots.id"), default=None)
     output_snapshot_id: Mapped[int] = mapped_column(ForeignKey("snapshots.id"))
 
     # Relationships
     game_detail: Mapped[GameDetail | None] = relationship(init=False)
-    mesas: Mapped[list[Mesa]] = relationship(back_populates="event", init=False)
+    game_tables: Mapped[list[GameTable]] = relationship(back_populates="timeline_edge", init=False)
     waiting_list: Mapped[list[WaitingList]] = relationship(
-        back_populates="event", init=False
+        back_populates="timeline_edge", init=False
     )
 
 
 class GameDetail(Base, kw_only=True):
-    """Additional details for game events."""
+    """Additional details for game timeline edges."""
 
     __tablename__ = "game_details"
 
-    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), primary_key=True)
-    intentos: Mapped[int] = mapped_column(default=0)
-    copypaste_text: Mapped[str] = mapped_column()
+    timeline_edge_id: Mapped[int] = mapped_column(ForeignKey("timeline_edges.id"), primary_key=True)
+    attempts: Mapped[int] = mapped_column(default=0)
+    share_text: Mapped[str] = mapped_column()
 
 
-class Mesa(Base, kw_only=True):
-    """Game tables (mesas) for a game event."""
+class GameTable(Base, kw_only=True):
+    """Game tables for a timeline edge."""
 
-    __tablename__ = "mesas"
+    __tablename__ = "game_tables"
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
-    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), init=True)
-    numero: Mapped[int] = mapped_column()
+    timeline_edge_id: Mapped[int] = mapped_column(ForeignKey("timeline_edges.id"), init=True)
+    table_number: Mapped[int] = mapped_column()
     gm_player_id: Mapped[int | None] = mapped_column(ForeignKey("players.id"), default=None)
 
     # Relationships
-    event: Mapped[Event] = relationship(back_populates="mesas", init=False)
-    gm_player: Mapped[Player | None] = relationship(back_populates="mesas_as_gm", init=False)
-    mesa_players: Mapped[list[MesaPlayer]] = relationship(init=False)
+    timeline_edge: Mapped[TimelineEdge] = relationship(back_populates="game_tables", init=False)
+    gm_player: Mapped[Player | None] = relationship(back_populates="tables_as_gm", init=False)
+    table_players: Mapped[list[TablePlayer]] = relationship(init=False)
 
 
-class MesaPlayer(Base, kw_only=True):
-    """Players assigned to a specific mesa."""
+class TablePlayer(Base, kw_only=True):
+    """Players assigned to a specific game table."""
 
-    __tablename__ = "mesa_players"
+    __tablename__ = "table_players"
 
-    mesa_id: Mapped[int] = mapped_column(ForeignKey("mesas.id"), primary_key=True)
+    table_id: Mapped[int] = mapped_column(ForeignKey("game_tables.id"), primary_key=True)
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), primary_key=True)
-    orden: Mapped[int] = mapped_column()
-    pais: Mapped[str] = mapped_column()
-    pais_reason: Mapped[str | None] = mapped_column(default=None)
+    seat_order: Mapped[int] = mapped_column()
+    country: Mapped[str] = mapped_column()
+    country_reason: Mapped[str | None] = mapped_column(default=None)
 
     # Relationships
-    mesa: Mapped[Mesa] = relationship(init=False)
+    game_table: Mapped[GameTable] = relationship(init=False)
     player: Mapped[Player] = relationship(init=False)
 
 
 class WaitingList(Base, kw_only=True):
-    """Players waiting for a spot in a game event."""
+    """Players waiting for a spot in a timeline edge."""
 
     __tablename__ = "waiting_list"
 
-    event_id: Mapped[int] = mapped_column(ForeignKey("events.id"), primary_key=True)
+    timeline_edge_id: Mapped[int] = mapped_column(ForeignKey("timeline_edges.id"), primary_key=True)
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), primary_key=True)
-    orden: Mapped[int] = mapped_column()
-    cupos_faltantes: Mapped[int] = mapped_column()
+    list_order: Mapped[int] = mapped_column()
+    missing_spots: Mapped[int] = mapped_column()
 
     # Relationships
-    event: Mapped[Event] = relationship(back_populates="waiting_list", init=False)
+    timeline_edge: Mapped[TimelineEdge] = relationship(back_populates="waiting_list", init=False)
     player: Mapped[Player] = relationship(
         back_populates="waiting_list_entries", init=False
     )
@@ -150,9 +155,9 @@ class NotionCache(Base, kw_only=True):
     __tablename__ = "notion_cache"
 
     notion_id: Mapped[str] = mapped_column(primary_key=True)
-    nombre: Mapped[str] = mapped_column()
-    experiencia: Mapped[str] = mapped_column()
-    juegos_este_ano: Mapped[int] = mapped_column(default=0)
+    name: Mapped[str] = mapped_column()
+    experience: Mapped[str] = mapped_column()
+    games_this_year: Mapped[int] = mapped_column(default=0)
     c_england: Mapped[int] = mapped_column(default=0)
     c_france: Mapped[int] = mapped_column(default=0)
     c_germany: Mapped[int] = mapped_column(default=0)
@@ -161,3 +166,16 @@ class NotionCache(Base, kw_only=True):
     c_russia: Mapped[int] = mapped_column(default=0)
     c_turkey: Mapped[int] = mapped_column(default=0)
     last_updated: Mapped[datetime] = mapped_column()
+
+
+class SnapshotHistory(Base, kw_only=True):
+    """Audit log for snapshot mutations."""
+
+    __tablename__ = "snapshot_history"
+
+    id: Mapped[int] = mapped_column(primary_key=True, init=False)
+    snapshot_id: Mapped[int] = mapped_column(ForeignKey("snapshots.id"))
+    created_at: Mapped[datetime] = mapped_column(default=func.now())
+    action_type: Mapped[str] = mapped_column()  # e.g., 'notion_sync', 'manual_edit'
+    summary: Mapped[str] = mapped_column()  # Human readable text for the UI
+    previous_state: Mapped[dict[str, object]] = mapped_column(JSON)  # Raw dict of the roster before the change

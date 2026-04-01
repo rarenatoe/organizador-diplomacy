@@ -17,6 +17,7 @@ from backend.db.crud import get_snapshot_players
 from backend.db.models import (
     Player,
     Snapshot,
+    SnapshotHistory,
 )
 
 
@@ -53,16 +54,16 @@ async def build_chain_data(session: AsyncSession) -> dict[str, Any]:
 
     latest_id = max(snap_rows)
 
-    # Get all edges from unified events table
+    # Get all edges from unified timeline_edges table
     edges_query = text("""
-        SELECT e.id, e.created_at, e.type, e.source_snapshot_id, e.output_snapshot_id,
-               gd.intentos,
+        SELECT e.id, e.created_at, e.edge_type, e.source_snapshot_id, e.output_snapshot_id,
+               gd.attempts,
                COUNT(DISTINCT m.id)  AS mesa_count,
-               (SELECT COUNT(*) FROM waiting_list wl WHERE wl.event_id = e.id)
+               (SELECT COUNT(*) FROM waiting_list wl WHERE wl.timeline_edge_id = e.id)
                                      AS espera_count
-        FROM   events e
-        LEFT JOIN game_details gd ON gd.event_id = e.id
-        LEFT JOIN mesas m ON m.event_id = e.id
+        FROM   timeline_edges e
+        LEFT JOIN game_details gd ON gd.timeline_edge_id = e.id
+        LEFT JOIN game_tables m ON m.timeline_edge_id = e.id
         WHERE  e.source_snapshot_id IS NOT NULL
         GROUP  BY e.id
     """)
@@ -141,6 +142,27 @@ async def get_snapshot_detail(session: AsyncSession, snapshot_id: int) -> dict[s
     if not snap:
         return None
 
+    # Query snapshot history (audit log of in-place edits)
+    history_result = await session.execute(
+        select(SnapshotHistory)
+        .where(SnapshotHistory.snapshot_id == snapshot_id)
+        .order_by(SnapshotHistory.created_at.desc())
+    )
+    history_entries = history_result.scalars().all()
+
+    # Serialize history for the frontend
+    history = [
+        {
+            "id": entry.id,
+            "created_at": entry.created_at.isoformat()
+            if hasattr(entry.created_at, "isoformat")
+            else str(entry.created_at),
+            "action_type": entry.action_type,
+            "summary": entry.summary,
+        }
+        for entry in history_entries
+    ]
+
     return {
         "id": snap.id,
         "created_at": snap.created_at.isoformat()
@@ -148,6 +170,7 @@ async def get_snapshot_detail(session: AsyncSession, snapshot_id: int) -> dict[s
         else str(snap.created_at),
         "source": snap.source,
         "players": await get_snapshot_players(session, snapshot_id),
+        "history": history,
     }
 
 
@@ -156,10 +179,10 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[st
     # Get game event basic info
     ge_query = text("""
         SELECT e.id, e.created_at, e.source_snapshot_id, e.output_snapshot_id,
-               gd.intentos, gd.copypaste_text
-        FROM   events e
-        JOIN   game_details gd ON gd.event_id = e.id
-        WHERE  e.id = :event_id AND e.type = 'game'
+               gd.attempts, gd.share_text
+        FROM   timeline_edges e
+        JOIN   game_details gd ON gd.timeline_edge_id = e.id
+        WHERE  e.id = :event_id AND e.edge_type = 'game'
     """)
     result = await session.execute(ge_query, {"event_id": event_id})
     ge = result.first()
@@ -170,7 +193,7 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[st
 
     # Get mesas data
     mesas_query = text("""
-        SELECT id, numero, gm_player_id FROM mesas WHERE event_id = :event_id ORDER BY numero
+        SELECT id, table_number, gm_player_id FROM game_tables WHERE timeline_edge_id = :event_id ORDER BY table_number
     """)
     result = await session.execute(mesas_query, {"event_id": event_id})
     mesa_rows = result.all()
@@ -183,14 +206,14 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[st
         # Get GM name
         gm_name: str | None = None
         if gm_player_id is not None:
-            result = await session.execute(select(Player.nombre).where(Player.id == gm_player_id))
+            result = await session.execute(select(Player.name).where(Player.id == gm_player_id))
             gm_row = result.scalar_one_or_none()
             gm_name = gm_row if gm_row else None
 
         # Get players for this mesa
         players_query = text("""
-            SELECT p.nombre, sp.experiencia, sp.juegos_este_ano, sp.prioridad,
-                   sp.partidas_deseadas, sp.partidas_gm,
+            SELECT p.name, sp.experience, sp.games_this_year, sp.priority,
+                   sp.desired_games, sp.gm_games,
                    COALESCE(nc.c_england, 0) AS c_england,
                    COALESCE(nc.c_france, 0) AS c_france,
                    COALESCE(nc.c_germany, 0) AS c_germany,
@@ -198,16 +221,16 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[st
                    COALESCE(nc.c_austria, 0) AS c_austria,
                    COALESCE(nc.c_russia, 0) AS c_russia,
                    COALESCE(nc.c_turkey, 0) AS c_turkey,
-                   mp.pais,
-                   mp.pais_reason
-            FROM   mesa_players mp
+                   mp.country,
+                   mp.country_reason
+            FROM   table_players mp
             JOIN   players      p  ON p.id  = mp.player_id
             JOIN   snapshot_players sp
                    ON sp.player_id   = mp.player_id
                    AND sp.snapshot_id = :input_sid
-            LEFT  JOIN notion_cache nc ON nc.nombre = p.nombre
-            WHERE  mp.mesa_id = :mesa_id
-            ORDER  BY mp.orden
+            LEFT  JOIN notion_cache nc ON nc.name = p.name
+            WHERE  mp.table_id = :mesa_id
+            ORDER  BY mp.seat_order
         """)
         result = await session.execute(players_query, {"input_sid": input_sid, "mesa_id": mesa_id})
 
@@ -247,9 +270,9 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[st
 
     # Get waiting list
     waiting_query = text("""
-        SELECT p.nombre, wl.cupos_faltantes,
-               sp.experiencia, sp.juegos_este_ano, sp.prioridad,
-               sp.partidas_deseadas, sp.partidas_gm,
+        SELECT p.name, wl.missing_spots,
+               sp.experience, sp.games_this_year, sp.priority,
+               sp.desired_games, sp.gm_games,
                COALESCE(nc.c_england, 0) AS c_england,
                COALESCE(nc.c_france, 0) AS c_france,
                COALESCE(nc.c_germany, 0) AS c_germany,
@@ -262,9 +285,9 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[st
         JOIN   snapshot_players sp
                ON sp.player_id   = wl.player_id
                AND sp.snapshot_id = :input_sid
-        LEFT  JOIN notion_cache nc ON nc.nombre = p.nombre
-        WHERE  wl.event_id = :event_id
-        ORDER  BY wl.orden
+        LEFT  JOIN notion_cache nc ON nc.name = p.name
+        WHERE  wl.timeline_edge_id = :event_id
+        ORDER  BY wl.list_order
     """)
     result = await session.execute(waiting_query, {"input_sid": input_sid, "event_id": event_id})
 

@@ -40,7 +40,7 @@ async def api_player_rename(
             raise HTTPException(status_code=400, detail="old_name and new_name are the same")
 
         # Check if old player exists (404 if not)
-        result = await session.execute(select(Player).where(Player.nombre == request.old_name))
+        result = await session.execute(select(Player).where(Player.name == request.old_name))
         old_player = result.scalar_one_or_none()
         if not old_player:
             raise HTTPException(

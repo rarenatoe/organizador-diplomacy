@@ -3,23 +3,23 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .models import Jugador, ResultadoPartidas
+    from .models import DraftPlayer, DraftResult
 
 # ── Country Assignment Algorithm ───────────────────────────────────────────
 
-def assign_countries_to_mesa(jugadores: list[Jugador]) -> None:
+def assign_countries_to_table(players: list[DraftPlayer]) -> None:
     """
     Assign countries to players using a "shielding" strategy.
     Only assigns countries to prevent players from repeating countries they've played 2+ times.
     """
     # Initialize all players with no country
-    for player in jugadores:
-        player.pais = ""
-        player.pais_reason = None
+    for player in players:
+        player.country = ""
+        player.country_reason = None
     
     # Identify cursed players (those with >= 2 games in any country)
-    cursed_assignments: list[tuple[Jugador, str, int]] = []
-    for player in jugadores:
+    cursed_assignments: list[tuple[DraftPlayer, str, int]] = []
+    for player in players:
         country_counts = {
             "England": player.c_england,
             "France": player.c_france,
@@ -37,11 +37,11 @@ def assign_countries_to_mesa(jugadores: list[Jugador]) -> None:
     # For each cursed assignment, find a shield player
     for cursed_player, country, count in cursed_assignments:
         # Find the best shield player (no country assigned, lowest historical count for this country)
-        best_shield_player: Jugador | None = None
+        best_shield_player: DraftPlayer | None = None
         best_shield_count = float('inf')
         
-        for potential_shield in jugadores:
-            if potential_shield.pais == "" and potential_shield != cursed_player:
+        for potential_shield in players:
+            if potential_shield.country == "" and potential_shield != cursed_player:
                 shield_count = getattr(potential_shield, f"c_{country.lower()}", 0)
                 if shield_count < best_shield_count:
                     best_shield_count = shield_count
@@ -49,43 +49,43 @@ def assign_countries_to_mesa(jugadores: list[Jugador]) -> None:
         
         # Assign the shield player
         if best_shield_player:
-            best_shield_player.pais = country
+            best_shield_player.country = country
             times = "veces" if count > 1 else "vez"
-            best_shield_player.pais_reason = f"Cualquier jugador disponible podía recibir este país; se asignó para evitar que {cursed_player.nombre} lo repita ({count} {times})."
+            best_shield_player.country_reason = f"Cualquier jugador disponible podía recibir este país; se asignó para evitar que {cursed_player.name} lo repita ({count} {times})."
 
 # ── Algorithm Orchestrator ───────────────────────────────────────────────────
 
-def calcular_partidas(jugadores: list[Jugador]) -> ResultadoPartidas | None:
+def calculate_matches(players: list[DraftPlayer]) -> DraftResult | None:
     """
-    Núcleo del algoritmo orquestado. Devuelve un ResultadoPartidas, 
-    o None si no hay suficientes jugadores para armar una partida.
-    Lanza ValueError si la configuración de GMs es inválida.
+    Core algorithm orchestrator. Returns a DraftResult,
+    or None if there are not enough players to form a game.
+    Raises ValueError if the GM configuration is invalid.
     """
     from .distribution import run_distribution_loop
     from .weights import build_weighted_tickets
 
     (
-        mesas_estimadas,
-        mesas_reales,
-        minimo_teorico,
-        gms_activos,
+        estimated_tables,
+        actual_tables,
+        theoretical_minimum,
+        active_gms,
         weighted_tickets
-    ) = build_weighted_tickets(jugadores)
+    ) = build_weighted_tickets(players)
 
-    if mesas_reales == 0:
+    if actual_tables == 0:
         return None
 
-    # Assign countries to each mesa before running distribution
-    for mesa in range(mesas_reales):
-        mesa_players = [jugadores[i] for i in range(mesa * 7, (mesa + 1) * 7) if i < len(jugadores)]
-        assign_countries_to_mesa(mesa_players)
+    # Assign countries to each table before running distribution
+    for table in range(actual_tables):
+        table_players = [players[i] for i in range(table * 7, (table + 1) * 7) if i < len(players)]
+        assign_countries_to_table(table_players)
 
     return run_distribution_loop(
-        jugadores=jugadores,
+        players=players,
         weighted_tickets=weighted_tickets,
-        gms_activos=gms_activos,
-        mesas_estimadas=mesas_estimadas,
-        mesas_reales=mesas_reales,
-        minimo_teorico=minimo_teorico,
-        max_intentos=200
+        active_gms=active_gms,
+        estimated_tables=estimated_tables,
+        actual_tables=actual_tables,
+        theoretical_minimum=theoretical_minimum,
+        max_attempts=200
     )

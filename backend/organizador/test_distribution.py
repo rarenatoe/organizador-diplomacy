@@ -5,39 +5,39 @@ from __future__ import annotations
 
 import unittest
 
-from .distribution import distribuir_tickets, run_distribution_loop
-from .models import Jugador
+from .distribution import distribute_tickets, run_distribution_loop
+from .models import DraftPlayer
 
 
-def _j(nombre: str, d: int = 1, g: int = 0, exp: str = "Antiguo", j: int = 0) -> Jugador:
-    return Jugador(
-        nombre=nombre,
-        experiencia=exp,
-        juegos_ano=j,
-        prioridad="False",
-        partidas_deseadas=d,
-        partidas_gm=g,
+def _j(name: str, d: int = 1, g: int = 0, exp: str = "Antiguo", j: int = 0) -> DraftPlayer:
+    return DraftPlayer(
+        name=name,
+        experience=exp,
+        games_this_year=j,
+        priority="False",
+        desired_games=d,
+        gm_games=g,
     )
 
 class TestDistribution(unittest.TestCase):
-    def test_distribuir_tickets_fills_tables(self):
+    def test_distribute_tickets_fills_tables(self):
         # 7 tickets for 1 table
         jugadores = [_j(f"P{i}") for i in range(7)]
         weighted = [(1.0 + float(i), j) for i, j in enumerate(jugadores)]
-        partidas: list[list[Jugador]] = [[]]
+        partidas: list[list[DraftPlayer]] = [[]]
         
-        rechazados = distribuir_tickets(weighted, partidas, {}, es_grupo_nuevo=True)
+        rechazados = distribute_tickets(weighted, partidas, {}, is_new_group=True)
         
         self.assertEqual(len(rechazados), 0)
         self.assertEqual(len(partidas[0]), 7)
 
-    def test_distribuir_tickets_rejects_duplicates(self):
+    def test_distribute_tickets_rejects_duplicates(self):
         # 2 tickets for same player, only 1 table. Must reject the second.
         j = _j("P1", d=2)
         weighted = [(1.0, j), (2.0, j)]
-        partidas: list[list[Jugador]] = [[]]
+        partidas: list[list[DraftPlayer]] = [[]]
         
-        rechazados = distribuir_tickets(weighted, partidas, {}, es_grupo_nuevo=True)
+        rechazados = distribute_tickets(weighted, partidas, {}, is_new_group=True)
         
         self.assertEqual(len(rechazados), 1)
         self.assertEqual(len(partidas[0]), 1)
@@ -50,12 +50,12 @@ class TestDistribution(unittest.TestCase):
         
         res = run_distribution_loop(
             jugadores, weighted, [], 
-            mesas_estimadas=2, mesas_reales=2, minimo_teorico=0
+            estimated_tables=2, actual_tables=2, theoretical_minimum=0
         )
         
         assert res is not None
-        self.assertEqual(len(res.mesas), 2)
-        self.assertEqual(len(res.tickets_sobrantes), 0)
+        self.assertEqual(len(res.tables), 2)
+        self.assertEqual(len(res.waitlist_players), 0)
 
     def test_gm_blocking_logic(self):
         # GM1 arbitrates Table 1 (index 0). 
@@ -68,13 +68,13 @@ class TestDistribution(unittest.TestCase):
         # Force GM1 to arbitrate Table 1
         res = run_distribution_loop(
             jugadores, weighted, [gm], 
-            mesas_estimadas=2, mesas_reales=2, minimo_teorico=0
+            estimated_tables=2, actual_tables=2, theoretical_minimum=0
         )
         
         assert res is not None
-        for mesa in res.mesas:
-            if mesa.gm and mesa.gm.nombre == "GM1":
-                player_names = [p.nombre for p in mesa.jugadores]
+        for table in res.tables:
+            if table.gm and table.gm.name == "GM1":
+                player_names = [p.name for p in table.players]
                 self.assertNotIn("GM1", player_names)
 
 if __name__ == "__main__":

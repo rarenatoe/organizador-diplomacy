@@ -11,17 +11,17 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.session import AsyncSession
 
 from backend.db.crud import (
-    add_mesa_player,
     add_player_to_snapshot,
+    add_table_player,
     add_waiting_player,
-    create_game_event,
-    create_mesa,
+    create_game_edge,
+    create_game_table,
     create_snapshot,
     get_or_create_player,
     get_snapshot_players,
 )
-from backend.db.models import GameDetail, Mesa
-from backend.organizador.formatter import formatear_copypaste_from_dict
+from backend.db.models import GameDetail, GameTable
+from backend.organizador.formatter import format_copypaste_from_dict
 
 
 async def save_game_draft_async(
@@ -35,43 +35,43 @@ async def save_game_draft_async(
     out_id = await _create_output_snapshot_from_draft_async(session, input_snapshot_id, draft_data)
 
     # 2. Format copypaste text
-    copypaste = formatear_copypaste_from_dict(draft_data)
+    copypaste = format_copypaste_from_dict(draft_data)
 
     # 3. Create the game event with details
-    intentos = draft_data.get("intentos_usados", 0)
-    event_id = await create_game_event(session, input_snapshot_id, out_id, intentos, copypaste)
+    attempts = draft_data.get("intentos_usados", 0)
+    event_id = await create_game_edge(session, input_snapshot_id, out_id, attempts, copypaste)
 
-    # 4. Create mesas and mesa_players
-    for mesa in draft_data.get("mesas", []):
+    # 4. Create tables and table_players
+    for table in draft_data.get("mesas", []):
         gm_pid: int | None = None
-        gm_nombre = mesa.get("gm", {}).get("nombre") if mesa.get("gm") else None
+        gm_nombre = table.get("gm", {}).get("nombre") if table.get("gm") else None
         if gm_nombre:
             gm_pid = await get_or_create_player(session, gm_nombre)
 
-        mesa_id = await create_mesa(session, event_id, mesa["numero"])
+        table_id = await create_game_table(session, event_id, table["numero"])
         if gm_pid:
             # Set GM player
-            result = await session.execute(select(Mesa).where(Mesa.id == mesa_id))
-            mesa_obj = result.scalar_one()
-            mesa_obj.gm_player_id = gm_pid
-        for orden, jugador in enumerate(mesa.get("jugadores", []), start=1):
-            pid = await get_or_create_player(session, jugador["nombre"])
-            await add_mesa_player(
+            result = await session.execute(select(GameTable).where(GameTable.id == table_id))
+            table_obj = result.scalar_one()
+            table_obj.gm_player_id = gm_pid
+        for order, player in enumerate(table.get("jugadores", []), start=1):
+            pid = await get_or_create_player(session, player["nombre"])
+            await add_table_player(
                 session,
-                mesa_id,
+                table_id,
                 pid,
-                orden,
-                jugador.get("pais", ""),
-                jugador.get("pais_reason"),
+                order,
+                player.get("pais", ""),
+                player.get("pais_reason"),
             )
 
     # 5. Create waiting list
     waiting_players = draft_data.get("tickets_sobrantes", [])
-    conteo_espera: Counter[str] = Counter(j["nombre"] for j in waiting_players)
+    waitlist_count: Counter[str] = Counter(j["nombre"] for j in waiting_players)
 
-    for orden, (nombre, cupos) in enumerate(conteo_espera.items(), start=1):
-        pid = await get_or_create_player(session, nombre)
-        await add_waiting_player(session, event_id, pid, orden, cupos)
+    for order, (name, slots) in enumerate(waitlist_count.items(), start=1):
+        pid = await get_or_create_player(session, name)
+        await add_waiting_player(session, event_id, pid, order, slots)
 
     return event_id
 
@@ -80,31 +80,31 @@ async def _create_output_snapshot_from_draft_async(
     session: AsyncSession, input_snapshot_id: int, draft_data: dict[str, Any]
 ) -> int:
     """Async version: Creates the post-game snapshot based on draft data."""
-    cupos_jugados: Counter[str] = Counter()
+    slots_played: Counter[str] = Counter()
     for mesa in draft_data.get("mesas", []):
         for j in mesa.get("jugadores", []):
-            cupos_jugados[j["nombre"]] += 1
+            slots_played[j["nombre"]] += 1
 
-    nombres_en_espera: set[str] = {j["nombre"] for j in draft_data.get("tickets_sobrantes", [])}
+    names_in_waitlist: set[str] = {j["nombre"] for j in draft_data.get("tickets_sobrantes", [])}
 
     snap_id = await create_snapshot(session, "organizar")
 
     rows = await get_snapshot_players(session, input_snapshot_id)
     for p in rows:
-        nombre = p["nombre"]
-        jugadas = cupos_jugados[nombre]
-        fue_promovido = p["experiencia"] == "Nuevo" and jugadas > 0
+        name = p["nombre"]
+        played = slots_played[name]
+        was_promoted = p["experiencia"] == "Nuevo" and played > 0
 
         # Get or create player
-        pid = await get_or_create_player(session, nombre)
+        pid = await get_or_create_player(session, name)
 
         await add_player_to_snapshot(
             session,
             snap_id,
             pid,
-            "Antiguo" if fue_promovido else p["experiencia"],
-            p["juegos_este_ano"] + jugadas,
-            1 if nombre in nombres_en_espera else 0,
+            "Antiguo" if was_promoted else p["experiencia"],
+            p["juegos_este_ano"] + played,
+            1 if name in names_in_waitlist else 0,
             p["partidas_deseadas"],
             0,  # partidas_gm reset
         )
@@ -125,29 +125,31 @@ async def update_game_draft_async(
     """
 
     # 1. Update game_details in place
-    copypaste = formatear_copypaste_from_dict(draft_data)
-    intentos = draft_data.get("intentos_usados", 0)
+    copypaste = format_copypaste_from_dict(draft_data)
+    attempts = draft_data.get("intentos_usados", 0)
 
     # Update GameDetail
-    result = await session.execute(select(GameDetail).where(GameDetail.event_id == game_id))
+    result = await session.execute(select(GameDetail).where(GameDetail.timeline_edge_id == game_id))
     gd = result.scalar_one_or_none()
     if gd:
-        gd.intentos = intentos
-        gd.copypaste_text = copypaste
+        gd.attempts = attempts
+        gd.share_text = copypaste
 
-    # 2. Delete existing mesas and waiting_list for this game
+    # 2. Delete existing game_tables and waiting_list for this game
     # Use raw SQL for delete operations
     await session.execute(
         text(
-            "DELETE FROM mesa_players WHERE mesa_id IN (SELECT id FROM mesas WHERE event_id = :event_id)"
+            "DELETE FROM table_players WHERE table_id IN (SELECT id FROM game_tables WHERE timeline_edge_id = :timeline_edge_id)"
         ),
-        {"event_id": game_id},
+        {"timeline_edge_id": game_id},
     )
     await session.execute(
-        text("DELETE FROM mesas WHERE event_id = :event_id"), {"event_id": game_id}
+        text("DELETE FROM game_tables WHERE timeline_edge_id = :timeline_edge_id"),
+        {"timeline_edge_id": game_id},
     )
     await session.execute(
-        text("DELETE FROM waiting_list WHERE event_id = :event_id"), {"event_id": game_id}
+        text("DELETE FROM waiting_list WHERE timeline_edge_id = :timeline_edge_id"),
+        {"timeline_edge_id": game_id},
     )
 
     # 3. Delete output snapshot roster and re-insert
@@ -157,61 +159,61 @@ async def update_game_draft_async(
     )
 
     # Re-create the output snapshot with updated player data
-    cupos_jugados: Counter[str] = Counter()
-    for mesa in draft_data.get("mesas", []):
-        for j in mesa.get("jugadores", []):
-            cupos_jugados[j["nombre"]] += 1
+    slots_played: Counter[str] = Counter()
+    for table in draft_data.get("mesas", []):
+        for j in table.get("jugadores", []):
+            slots_played[j["nombre"]] += 1
 
-    nombres_en_espera: set[str] = {j["nombre"] for j in draft_data.get("tickets_sobrantes", [])}
+    names_in_waitlist: set[str] = {j["nombre"] for j in draft_data.get("tickets_sobrantes", [])}
 
     rows = await get_snapshot_players(session, input_snapshot_id)
     for p in rows:
-        nombre = p["nombre"]
-        jugadas = cupos_jugados[nombre]
-        fue_promovido = p["experiencia"] == "Nuevo" and jugadas > 0
-        pid = await get_or_create_player(session, nombre)
+        name = p["nombre"]
+        played = slots_played[name]
+        was_promoted = p["experiencia"] == "Nuevo" and played > 0
+        pid = await get_or_create_player(session, name)
 
         await add_player_to_snapshot(
             session,
             output_snapshot_id,
             pid,
-            "Antiguo" if fue_promovido else p["experiencia"],
-            p["juegos_este_ano"] + jugadas,
-            1 if nombre in nombres_en_espera else 0,
+            "Antiguo" if was_promoted else p["experiencia"],
+            p["juegos_este_ano"] + played,
+            1 if name in names_in_waitlist else 0,
             p["partidas_deseadas"],
             0,  # partidas_gm reset
         )
 
-    # 4. Re-insert mesas and waiting_list
-    for mesa in draft_data.get("mesas", []):
+    # 4. Re-insert tables and waiting_list
+    for table in draft_data.get("mesas", []):
         gm_pid: int | None = None
-        gm_nombre = mesa.get("gm", {}).get("nombre") if mesa.get("gm") else None
+        gm_nombre = table.get("gm", {}).get("nombre") if table.get("gm") else None
         if gm_nombre:
             gm_pid = await get_or_create_player(session, gm_nombre)
 
-        mesa_id = await create_mesa(session, game_id, mesa["numero"])
+        table_id = await create_game_table(session, game_id, table["numero"])
         if gm_pid:
             # Set GM player
-            result = await session.execute(select(Mesa).where(Mesa.id == mesa_id))
-            mesa_obj = result.scalar_one()
-            mesa_obj.gm_player_id = gm_pid
-        for orden, jugador in enumerate(mesa.get("jugadores", []), start=1):
-            pid = await get_or_create_player(session, jugador["nombre"])
-            await add_mesa_player(
+            result = await session.execute(select(GameTable).where(GameTable.id == table_id))
+            table_obj = result.scalar_one()
+            table_obj.gm_player_id = gm_pid
+        for order, player in enumerate(table.get("jugadores", []), start=1):
+            pid = await get_or_create_player(session, player["nombre"])
+            await add_table_player(
                 session,
-                mesa_id,
+                table_id,
                 pid,
-                orden,
-                jugador.get("pais", ""),
-                jugador.get("pais_reason"),
+                order,
+                player.get("pais", ""),
+                player.get("pais_reason"),
             )
 
     # 5. Create waiting list
     waiting_players = draft_data.get("tickets_sobrantes", [])
-    conteo_espera: Counter[str] = Counter(j["nombre"] for j in waiting_players)
+    waitlist_count: Counter[str] = Counter(j["nombre"] for j in waiting_players)
 
-    for orden, (nombre, cupos) in enumerate(conteo_espera.items(), start=1):
-        pid = await get_or_create_player(session, nombre)
-        await add_waiting_player(session, game_id, pid, orden, cupos)
+    for order, (name, slots) in enumerate(waitlist_count.items(), start=1):
+        pid = await get_or_create_player(session, name)
+        await add_waiting_player(session, game_id, pid, order, slots)
 
     return game_id

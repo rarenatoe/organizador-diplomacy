@@ -17,6 +17,7 @@ router = APIRouter()
 class RunNotionSyncRequest(BaseModel):
     snapshot: int | None = None
     force: bool = False
+    merges: dict[str, dict[str, str]] | None = None
 
 
 @router.post("/api/run/notion_sync")
@@ -34,6 +35,7 @@ async def api_run_notion_sync(
             run_notion_sync_background,
             request.snapshot,
             force=request.force,
+            merges=request.merges,
         )
         return {
             "success": True,

@@ -20,11 +20,16 @@ from backend.db.crud import (
     create_root_manual_snapshot,
     delete_snapshot_cascade,
     get_or_create_player,
+    get_snapshot_players,
+    log_snapshot_history,
 )
 from backend.db.models import Snapshot, SnapshotPlayer
 from backend.db.views import get_snapshot_detail
 from backend.sync.cache_daemon import update_notion_cache
-from backend.sync.notion_sync import detect_similar_names
+from backend.sync.notion_sync import (
+    detect_similar_names,
+    normalize_name,
+)
 
 router = APIRouter(prefix="/api/snapshot")
 
@@ -98,7 +103,7 @@ async def api_create_snapshot_root(
     Creates a new snapshot. If parent_id is provided, links to parent via event.
     Returns: {"snapshot_id": <new_id>}
     """
-    from backend.db.crud import create_event, create_snapshot
+    from backend.db.crud import create_branch_edge, create_snapshot, get_or_create_player
 
     try:
         # If parent_id provided, check if parent exists
@@ -130,8 +135,7 @@ async def api_create_snapshot_root(
 
         # Create event linking to parent if provided
         if parent_id is not None:
-            event_type = "sync" if request.source == "notion_sync" else "edit"
-            await create_event(session, event_type, parent_id, snap_id)
+            await create_branch_edge(session, parent_id, snap_id)
 
         await session.commit()
         return {"snapshot_id": snap_id}
@@ -161,13 +165,33 @@ async def api_delete_snapshot(
     session: AsyncSession = Depends(get_session),  # noqa: B008
 ) -> dict[str, Any]:
     """Deletes a snapshot and all its dependent snapshots/events."""
+    from backend.db.crud import squash_linear_branch
+    from backend.db.models import TimelineEdge
+
     try:
         # Check if snapshot exists
         result = await session.execute(select(Snapshot).where(Snapshot.id == snapshot_id))
         if not result.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="not found")
 
+        # Collect parent snapshot IDs before deletion
+        result = await session.execute(
+            select(TimelineEdge.source_snapshot_id).where(
+                TimelineEdge.output_snapshot_id == snapshot_id
+            )
+        )
+        parent_ids: list[int] = [row for row in result.scalars().all() if row is not None]
+
+        # Delete the snapshot and all its edges
         deleted = await delete_snapshot_cascade(session, snapshot_id)
+
+        # Flush to ensure deletions are visible to the database session
+        await session.flush()
+
+        # Squash linear branches for each parent
+        for parent_id in parent_ids:
+            await squash_linear_branch(session, parent_id)
+
         await session.commit()
         return {"deleted": deleted}
     except HTTPException:
@@ -268,7 +292,7 @@ async def api_snapshot_save(
     """
     from backend.db.crud import (
         add_player_to_snapshot,
-        create_event,
+        create_branch_edge,
         create_snapshot,
         get_or_create_player,
     )
@@ -288,10 +312,10 @@ async def api_snapshot_save(
                 raise HTTPException(status_code=404, detail="parent snapshot not found")
 
             # Check if parent is a leaf node (has no children)
-            from backend.db.models import Event as EventModel
+            from backend.db.models import TimelineEdge
 
             result = await session.execute(
-                select(EventModel).where(EventModel.source_snapshot_id == parent_id).limit(1)
+                select(TimelineEdge).where(TimelineEdge.source_snapshot_id == parent_id).limit(1)
             )
             has_children: bool = result.scalar_one_or_none() is not None
 
@@ -300,6 +324,9 @@ async def api_snapshot_save(
                 source = "notion_sync" if event_type == "sync" else "manual"
                 # Update snapshot source
                 parent_row.source = source
+
+                # Fetch old roster before clearing
+                previous_players = await get_snapshot_players(session, parent_id)
 
                 # Clear old roster
                 from backend.db.models import SnapshotPlayer
@@ -323,6 +350,15 @@ async def api_snapshot_save(
                         player.partidas_deseadas,
                         player.partidas_gm,
                     )
+
+                # Log the history
+                await log_snapshot_history(
+                    session,
+                    snapshot_id=parent_id,
+                    action_type="manual_edit",
+                    summary="Edición manual del roster",
+                    previous_state={"players": previous_players}
+                )
 
                 await session.commit()
                 return {"snapshot_id": parent_id}
@@ -356,8 +392,7 @@ async def api_snapshot_save(
 
         # Create event linking parent to new snapshot if parent provided
         if parent_id is not None:
-            db_event_type = "sync" if event_type == "sync" else "edit"
-            await create_event(session, db_event_type, parent_id, snap_id)
+            await create_branch_edge(session, parent_id, snap_id)
 
         await session.commit()
         return {"snapshot_id": snap_id}
@@ -431,7 +466,7 @@ async def api_notion_fetch(
     from backend.db.models import NotionCache
 
     try:
-        result = await session.execute(select(NotionCache).order_by(NotionCache.nombre))
+        result = await session.execute(select(NotionCache).order_by(NotionCache.name))
         rows = result.scalars().all()
 
         if not rows:
@@ -443,9 +478,9 @@ async def api_notion_fetch(
         for r in rows:
             players.append(
                 {
-                    "nombre": r.nombre,
-                    "experiencia": r.experiencia,
-                    "juegos_este_ano": r.juegos_este_ano,
+                    "nombre": r.name,
+                    "experiencia": r.experience,
+                    "juegos_este_ano": r.games_this_year,
                     "c_england": r.c_england,
                     "c_france": r.c_france,
                     "c_germany": r.c_germany,
@@ -458,7 +493,12 @@ async def api_notion_fetch(
 
         similar_names = []
         if request.snapshot_names:
-            similar_names = detect_similar_names(players, request.snapshot_names)
+            # Create dict with normalized names as keys and player data as values
+            players_dict = {}
+            for p in players:
+                norm_name = normalize_name(p["nombre"])
+                players_dict[norm_name] = p
+            similar_names = detect_similar_names(players_dict, request.snapshot_names)  # type: ignore
 
         await session.commit()
         return {

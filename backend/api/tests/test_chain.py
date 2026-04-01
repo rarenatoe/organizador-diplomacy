@@ -3,13 +3,14 @@ test_chain.py — Tests for /api/chain endpoint.
 
 Tests the chain data structure and snapshot relationships.
 """
+
 from __future__ import annotations
 
 from typing import Any
 
 import pytest
 
-from backend.db.crud import create_game_event, create_snapshot
+from backend.db.crud import create_game_edge, create_snapshot
 
 pytestmark = pytest.mark.asyncio
 
@@ -39,11 +40,11 @@ class TestApiChain:
     async def test_sync_branch_not_a_root(self, client: Any, db_session: Any) -> None:
         """Snapshot produced by a sync_event must be a branch, not a root."""
         from backend.conftest import add_snapshot
-        from backend.db.crud import create_sync_event
+        from backend.db.crud import create_branch_edge
 
         snap1 = await add_snapshot(db_session)
         snap2 = await add_snapshot(db_session)
-        await create_sync_event(db_session, snap1, snap2)
+        await create_branch_edge(db_session, snap1, snap2)
         await db_session.commit()
         resp = await client.get("/api/chain")
         data = resp.json()
@@ -52,17 +53,17 @@ class TestApiChain:
         assert root["id"] == snap1
         assert len(root["branches"]) == 1
         branch = root["branches"][0]
-        assert branch["edge"]["type"] == "sync"
+        assert branch["edge"]["type"] == "branch"
         assert branch["output"]["id"] == snap2
 
     async def test_latest_flag_on_highest_id(self, client: Any, db_session: Any) -> None:
         """is_latest is True only on the snapshot with the highest id."""
         from backend.conftest import add_snapshot
-        from backend.db.crud import create_sync_event
+        from backend.db.crud import create_branch_edge
 
         snap1 = await add_snapshot(db_session)
         snap2 = await add_snapshot(db_session)
-        await create_sync_event(db_session, snap1, snap2)
+        await create_branch_edge(db_session, snap1, snap2)
         await db_session.commit()
         resp = await client.get("/api/chain")
         data = resp.json()
@@ -82,8 +83,8 @@ class TestApiChain:
         snap3 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
 
-        await create_game_event(db_session, snap1, snap2, 1, "copypaste1")
-        await create_game_event(db_session, snap1, snap3, 1, "copypaste2")
+        await create_game_edge(db_session, snap1, snap2, 1, "copypaste1")
+        await create_game_edge(db_session, snap1, snap3, 1, "copypaste2")
         await db_session.commit()
 
         resp = await client.get("/api/chain")

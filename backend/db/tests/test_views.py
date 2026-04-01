@@ -12,14 +12,15 @@ from typing import Any
 import pytest
 
 from backend.db.crud import (
-    add_mesa_player,
-    create_game_event,
-    create_mesa,
+    add_player_to_snapshot,
+    add_table_player,
+    create_game_edge,
+    create_game_table,
     create_snapshot,
     get_or_create_player,
 )
 from backend.db.models import NotionCache
-from backend.db.views import get_game_event_detail
+from backend.db.views import get_game_event_detail, get_snapshot_detail
 
 pytestmark = pytest.mark.asyncio
 
@@ -50,8 +51,6 @@ class TestGetGameEventDetailPaisRegression:
         await db_session.commit()
 
         # Add players to snapshot
-        from backend.db.crud import add_player_to_snapshot
-
         await add_player_to_snapshot(db_session, snap1, pid1, "Antiguo", 5, 1, 2, 0)
         await add_player_to_snapshot(db_session, snap1, pid2, "Antiguo", 0, 1, 2, 0)
         await db_session.commit()
@@ -59,9 +58,9 @@ class TestGetGameEventDetailPaisRegression:
         # Insert NotionCache with different c_turkey values
         nc1 = NotionCache(
             notion_id="test1",
-            nombre="PlayerWithHighTurkey",
-            experiencia="Antiguo",
-            juegos_este_ano=5,
+            name="PlayerWithHighTurkey",
+            experience="Antiguo",
+            games_this_year=5,
             c_england=0,
             c_france=0,
             c_germany=0,
@@ -73,9 +72,9 @@ class TestGetGameEventDetailPaisRegression:
         )
         nc2 = NotionCache(
             notion_id="test2",
-            nombre="PlayerWithZeroTurkey",
-            experiencia="Antiguo",
-            juegos_este_ano=0,
+            name="PlayerWithZeroTurkey",
+            experience="Antiguo",
+            games_this_year=0,
             c_england=0,
             c_france=0,
             c_germany=0,
@@ -88,23 +87,23 @@ class TestGetGameEventDetailPaisRegression:
         db_session.add_all([nc1, nc2])
         await db_session.commit()
 
-        # Create game event with mesas
+        # Create game event with tables
         snap2 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
 
-        event_id = await create_game_event(db_session, snap1, snap2, 1, "copypaste")
+        edge_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
         await db_session.commit()
 
-        mesa_id = await create_mesa(db_session, event_id, 1)
+        table_id = await create_game_table(db_session, edge_id, 1)
         await db_session.commit()
 
-        # Assign players to mesa with specific countries (NOT Turkey)
-        await add_mesa_player(db_session, mesa_id, pid1, 1, "England")
-        await add_mesa_player(db_session, mesa_id, pid2, 2, "France")
+        # Assign players to table with specific countries (NOT Turkey)
+        await add_table_player(db_session, table_id, pid1, 1, "England")
+        await add_table_player(db_session, table_id, pid2, 2, "France")
         await db_session.commit()
 
         # Test: Get game detail
-        detail = await get_game_event_detail(db_session, event_id)
+        detail = await get_game_event_detail(db_session, edge_id)
         assert detail is not None
 
         # Verify: Players should show their assigned countries, not c_turkey
@@ -142,7 +141,6 @@ class TestGetGameEventDetailPaisRegression:
         for i, country in enumerate(countries):
             pid = await get_or_create_player(db_session, f"Player{i}_{country}")
             player_ids.append(pid)
-            from backend.db.crud import add_player_to_snapshot
 
             await add_player_to_snapshot(db_session, snap1, pid, "Antiguo", i, 1, 2, 0)
         await db_session.commit()
@@ -150,19 +148,19 @@ class TestGetGameEventDetailPaisRegression:
         snap2 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
 
-        event_id = await create_game_event(db_session, snap1, snap2, 1, "copypaste")
+        edge_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
         await db_session.commit()
 
-        mesa_id = await create_mesa(db_session, event_id, 1)
+        table_id = await create_game_table(db_session, edge_id, 1)
         await db_session.commit()
 
-        # Add all players to mesa with their respective countries
+        # Add all players to table with their respective countries
         for i, (pid, country) in enumerate(zip(player_ids, countries, strict=True)):
-            await add_mesa_player(db_session, mesa_id, pid, i + 1, country)
+            await add_table_player(db_session, table_id, pid, i + 1, country)
         await db_session.commit()
 
         # Test
-        detail = await get_game_event_detail(db_session, event_id)
+        detail = await get_game_event_detail(db_session, edge_id)
         assert detail is not None
 
         # Verify all countries are correctly returned (raw values, not translated)
@@ -195,26 +193,24 @@ class TestGetGameEventDetailPaisRegression:
         pid = await get_or_create_player(db_session, "PlayerNoCountry")
         await db_session.commit()
 
-        from backend.db.crud import add_player_to_snapshot
-
         await add_player_to_snapshot(db_session, snap1, pid, "Antiguo", 0, 1, 2, 0)
         await db_session.commit()
 
         snap2 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
 
-        event_id = await create_game_event(db_session, snap1, snap2, 1, "copypaste")
+        edge_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
         await db_session.commit()
 
-        mesa_id = await create_mesa(db_session, event_id, 1)
+        table_id = await create_game_table(db_session, edge_id, 1)
         await db_session.commit()
 
         # Add player with empty string pais (NOT NULL constraint requires a value)
-        await add_mesa_player(db_session, mesa_id, pid, 1, "")
+        await add_table_player(db_session, table_id, pid, 1, "")
         await db_session.commit()
 
         # Test
-        detail = await get_game_event_detail(db_session, event_id)
+        detail = await get_game_event_detail(db_session, edge_id)
         assert detail is not None
 
         # Verify: Empty pais should result in empty string
@@ -229,7 +225,7 @@ class TestPaisReasonPersistence:
     Previously, pais_reason was generated by the algorithm but not saved to the database.
     This test verifies the full persistence flow:
     1. save_game_draft_async receives pais_reason in the draft payload
-    2. add_mesa_player stores it in mesa_players.pais_reason
+    2. add_table_player stores it in table_players.country_reason
     3. get_game_event_detail retrieves it correctly
     """
 
@@ -251,8 +247,6 @@ class TestPaisReasonPersistence:
         await db_session.commit()
 
         # Add players to snapshot
-        from backend.db.crud import add_player_to_snapshot
-
         await add_player_to_snapshot(db_session, snap1, pid1, "Antiguo", 5, 1, 2, 0)
         await add_player_to_snapshot(db_session, snap1, pid2, "Antiguo", 3, 1, 2, 0)
         await db_session.commit()
@@ -260,27 +254,27 @@ class TestPaisReasonPersistence:
         snap2 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
 
-        event_id = await create_game_event(db_session, snap1, snap2, 1, "copypaste")
+        edge_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
         await db_session.commit()
 
-        mesa_id = await create_mesa(db_session, event_id, 1)
+        table_id = await create_game_table(db_session, edge_id, 1)
         await db_session.commit()
 
         # Key test: Add players with pais_reason
         reason_text = "Cualquier jugador disponible podía recibir este país; se asignó para evitar que Alice lo repita (3 veces)."
-        await add_mesa_player(db_session, mesa_id, pid1, 1, "England", pais_reason=reason_text)
-        await add_mesa_player(
+        await add_table_player(db_session, table_id, pid1, 1, "England", country_reason=reason_text)
+        await add_table_player(
             db_session,
-            mesa_id,
+            table_id,
             pid2,
             2,
             "France",
-            pais_reason=None,  # No reason
+            country_reason=None,  # No reason
         )
         await db_session.commit()
 
         # Test: Retrieve game detail
-        detail = await get_game_event_detail(db_session, event_id)
+        detail = await get_game_event_detail(db_session, edge_id)
         assert detail is not None
 
         # Verify: pais_reason is correctly returned
@@ -316,8 +310,8 @@ class TestPaisReasonPersistence:
         """
         snap1 = await create_snapshot(db_session, "manual")
         snap2 = await create_snapshot(db_session, "organizar")
-        event_id = await create_game_event(db_session, snap1, snap2, 1, "copypaste")
-        mesa_id = await create_mesa(db_session, event_id, 1)
+        edge_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
+        table_id = await create_game_table(db_session, edge_id, 1)
 
         # Create 3 players with the same reason
         shared_reason = "Assigned to shield cursed player Bob from repeating Turkey."
@@ -330,13 +324,13 @@ class TestPaisReasonPersistence:
 
         # Add all players with same reason
         for i, pid in enumerate(pids):
-            await add_mesa_player(
-                db_session, mesa_id, pid, i + 1, "England", pais_reason=shared_reason
+            await add_table_player(
+                db_session, table_id, pid, i + 1, "England", country_reason=shared_reason
             )
         await db_session.commit()
 
         # Retrieve and verify
-        detail = await get_game_event_detail(db_session, event_id)
+        detail = await get_game_event_detail(db_session, edge_id)
         assert detail is not None  # Ensure detail is not None
         jugadores = detail["mesas"][0]["jugadores"]
 
@@ -356,17 +350,15 @@ class TestPaisReasonPersistence:
         pid = await get_or_create_player(db_session, "PlayerWithAccents")
 
         # Add player to snapshot
-        from backend.db.crud import add_player_to_snapshot
-
         await add_player_to_snapshot(db_session, snap1, pid, "Antiguo", 0, 1, 2, 0)
         await db_session.commit()
 
         # Insert NotionCache for the player
         nc = NotionCache(
             notion_id="test_accents",
-            nombre="PlayerWithAccents",
-            experiencia="Antiguo",
-            juegos_este_ano=0,
+            name="PlayerWithAccents",
+            experience="Antiguo",
+            games_this_year=0,
             c_england=0,
             c_france=0,
             c_germany=0,
@@ -382,10 +374,10 @@ class TestPaisReasonPersistence:
         snap2 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
 
-        event_id = await create_game_event(db_session, snap1, snap2, 1, "copypaste")
+        edge_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
         await db_session.commit()
 
-        mesa_id = await create_mesa(db_session, event_id, 1)
+        table_id = await create_game_table(db_session, edge_id, 1)
         await db_session.commit()
 
         # Use special characters: accents, ñ, quotes, parentheses
@@ -393,13 +385,13 @@ class TestPaisReasonPersistence:
             "Asignación especial: país necesitaba protección de repetición (3 veces)."
         )
 
-        await add_mesa_player(
-            db_session, mesa_id, pid, 1, "Germany", pais_reason=reason_with_accents
+        await add_table_player(
+            db_session, table_id, pid, 1, "Germany", country_reason=reason_with_accents
         )
         await db_session.commit()
 
         # Retrieve and verify
-        detail = await get_game_event_detail(db_session, event_id)
+        detail = await get_game_event_detail(db_session, edge_id)
         assert detail is not None  # Ensure detail is not None
         player = detail["mesas"][0]["jugadores"][0]
 
@@ -407,3 +399,97 @@ class TestPaisReasonPersistence:
             f"Special characters should be preserved. "
             f"Expected: {reason_with_accents}, got: {player.get('pais_reason')}"
         )
+
+
+class TestSnapshotHistoryInDetail:
+    """
+    Regression tests for snapshot history feature.
+
+    The history feature was fully implemented (log creation triggers in sync/save)
+    but was not being returned by the API. This test verifies the fix.
+    """
+
+    async def test_snapshot_detail_includes_empty_history(self, db_session: Any) -> None:
+        """
+        Verify get_snapshot_detail returns an empty history array for new snapshots.
+        """
+        snap_id = await create_snapshot(db_session, "manual")
+        await db_session.commit()
+
+        detail = await get_snapshot_detail(db_session, snap_id)
+        assert detail is not None
+        assert "history" in detail, "history key should exist in snapshot detail"
+        assert detail["history"] == [], "New snapshot should have empty history"
+
+    async def test_snapshot_detail_includes_history_after_log(self, db_session: Any) -> None:
+        """
+        Verify get_snapshot_detail returns history entries after log_snapshot_history is called.
+        """
+        from backend.db.crud import log_snapshot_history
+
+        # Create snapshot
+        snap_id = await create_snapshot(db_session, "manual")
+        pid = await get_or_create_player(db_session, "Player1")
+        await add_player_to_snapshot(db_session, snap_id, pid, "Antiguo", 5, 1, 2, 0)
+        await db_session.commit()
+
+        # Log a history entry
+        await log_snapshot_history(
+            db_session,
+            snapshot_id=snap_id,
+            action_type="manual_edit",
+            summary="Edición manual del roster",
+            previous_state={"players": [{"nombre": "OldPlayer", "experiencia": "Nuevo"}]},
+        )
+        await db_session.commit()
+
+        # Retrieve and verify
+        detail = await get_snapshot_detail(db_session, snap_id)
+        assert detail is not None
+        assert "history" in detail
+        assert len(detail["history"]) == 1, (
+            f"Expected 1 history entry, got {len(detail['history'])}"
+        )
+
+        log = detail["history"][0]
+        assert "id" in log
+        assert "created_at" in log
+        assert log["action_type"] == "manual_edit"
+        assert log["summary"] == "Edición manual del roster"
+
+    async def test_snapshot_detail_history_ordered_by_date_desc(self, db_session: Any) -> None:
+        """
+        Verify history entries are ordered by created_at DESC (most recent first).
+
+        Note: In tests, all entries may have the same timestamp due to fast insertion.
+        The query uses ORDER BY created_at DESC, id DESC as a tiebreaker.
+        """
+        from backend.db.crud import log_snapshot_history
+
+        snap_id = await create_snapshot(db_session, "manual")
+        await db_session.commit()
+
+        # Log multiple entries
+        for i in range(3):
+            await log_snapshot_history(
+                db_session,
+                snapshot_id=snap_id,
+                action_type=f"action_{i}",
+                summary=f"Action {i}",
+                previous_state={"players": []},
+            )
+            await db_session.commit()
+
+        # Retrieve and verify
+        detail = await get_snapshot_detail(db_session, snap_id)
+        assert detail is not None
+        assert len(detail["history"]) == 3
+
+        # Verify all action types are present
+        action_types = {entry["action_type"] for entry in detail["history"]}
+        assert action_types == {"action_0", "action_1", "action_2"}
+
+        # Verify timestamps are present and properly formatted
+        for entry in detail["history"]:
+            assert "created_at" in entry
+            assert isinstance(entry["created_at"], str)

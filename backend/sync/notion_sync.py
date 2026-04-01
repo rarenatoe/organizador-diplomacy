@@ -483,7 +483,7 @@ def _build_notion_players_lookup(
             "notion_id": page["id"],
             "nombre": nombre,
             "experiencia": experiencia_val,
-            "juegos": juegos,
+            "juegos_este_ano": juegos,
             "alias": alias_list,
             **countries_data,
         }
@@ -495,10 +495,10 @@ async def _check_snapshot_has_children(session: AsyncSession, snapshot_id: int) 
     """Check if a snapshot has any child events."""
     from sqlalchemy import select
 
-    from backend.db.models import Event
+    from backend.db.models import TimelineEdge
 
     result = await session.execute(
-        select(Event).where(Event.source_snapshot_id == snapshot_id).limit(1)
+        select(TimelineEdge).where(TimelineEdge.source_snapshot_id == snapshot_id).limit(1)
     )
     return result.scalar_one_or_none() is not None
 
@@ -513,6 +513,9 @@ async def _update_snapshot_in_place(
 
     from backend.db.models import Snapshot, SnapshotPlayer
 
+    # Fetch old roster before clearing
+    previous_players = await crud.get_snapshot_players(session, snapshot_id)
+
     # Update the existing snapshot source
     await session.execute(
         update(Snapshot).where(Snapshot.id == snapshot_id).values(source="notion_sync")
@@ -525,17 +528,26 @@ async def _update_snapshot_in_place(
 
     # Insert new players
     for fila in filas:
-        pid = await crud.get_or_create_player(session, fila["Nombre"])
+        pid = await crud.get_or_create_player(session, fila["nombre"])
         await crud.add_player_to_snapshot(
             session,
             snapshot_id,
             pid,
-            fila["Experiencia"],
-            fila["Juegos_Este_Ano"],
+            fila["experiencia"],
+            fila["juegos_este_ano"],
             fila["prioridad"],
             fila["partidas_deseadas"],
             fila["partidas_gm"],
         )
+
+    # Log the history
+    await crud.log_snapshot_history(
+        session,
+        snapshot_id=snapshot_id,
+        action_type="notion_sync",
+        summary=f"Sincronización con Notion ({len(filas)} jugadores)",
+        previous_state={"players": previous_players}
+    )
 
     logger.info(f"Snapshot #{snapshot_id} updated in-place with {len(filas)} jugador(es).")
 
@@ -549,21 +561,40 @@ async def _create_new_snapshot(
     snap_id = await crud.create_snapshot(session, "notion_sync")
 
     for fila in filas:
-        pid = await crud.get_or_create_player(session, fila["Nombre"])
+        pid = await crud.get_or_create_player(session, fila["nombre"])
         await crud.add_player_to_snapshot(
             session,
             snap_id,
             pid,
-            fila["Experiencia"],
-            fila["Juegos_Este_Ano"],
+            fila["experiencia"],
+            fila["juegos_este_ano"],
             fila["prioridad"],
             fila["partidas_deseadas"],
             fila["partidas_gm"],
         )
 
+    # Update Notion cache with country data (required for get_snapshot_players)
+    cache_rows = [
+        {
+            "notion_id": f"sync_{fila['nombre']}",  # Placeholder notion_id
+            "nombre": fila["nombre"],
+            "experiencia": fila["experiencia"],
+            "juegos_este_ano": fila["juegos_este_ano"],
+            "c_england": fila.get("c_england", 0),
+            "c_france": fila.get("c_france", 0),
+            "c_germany": fila.get("c_germany", 0),
+            "c_italy": fila.get("c_italy", 0),
+            "c_austria": fila.get("c_austria", 0),
+            "c_russia": fila.get("c_russia", 0),
+            "c_turkey": fila.get("c_turkey", 0),
+        }
+        for fila in filas
+    ]
+    await crud.update_notion_cache(session, cache_rows)
+
     # Create sync event only if we have a source snapshot
     if source_snapshot_id is not None:
-        await crud.create_sync_event(session, source_snapshot_id, snap_id)
+        await crud.create_branch_edge(session, source_snapshot_id, snap_id)
 
     logger.info(f"Snapshot #{snap_id} created with {len(filas)} jugador(es).")
     return snap_id
@@ -589,6 +620,9 @@ async def _build_snapshot_rows(
 
         merged_notion_normalized = {normalize_name(v["to"]) for v in merges.values()}
 
+        # Reverse mapping: merge target names -> merge info (for renamed players)
+        reverse_merges = {v["to"]: {"from": k, **v} for k, v in merges.items()}
+
         # Start with all players from the existing snapshot
         for nombre, existente in existentes.items():
             # 1. Check if this player was explicitly merged via the UI dialog
@@ -602,11 +636,40 @@ async def _build_snapshot_rows(
                     notion_data = notion_players[notion_norm]
                     filas.append(
                         {
-                            "Nombre": notion_data["nombre"]
+                            "nombre": notion_data["nombre"]
                             if action == "merge_notion"
                             else nombre,
-                            "Experiencia": notion_data["experiencia"],
-                            "Juegos_Este_Ano": notion_data["juegos"],
+                            "experiencia": notion_data["experiencia"],
+                            "juegos_este_ano": notion_data["juegos_este_ano"],
+                            "prioridad": int(
+                                existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
+                            ),
+                            "partidas_deseadas": int(
+                                existente.get(
+                                    "partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"]
+                                )
+                            ),
+                            "partidas_gm": int(
+                                existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
+                            ),
+                            **{c: notion_data[c] for c in COUNTRY_PROPS},
+                        }
+                    )
+                    continue
+
+            # 1b. Check if this player name is the TARGET of a merge (was renamed)
+            if nombre in reverse_merges:
+                merge_info = reverse_merges[nombre]
+                notion_name = nombre  # The renamed name is the Notion name
+                notion_norm = normalize_name(notion_name)
+
+                if notion_norm in notion_players:
+                    notion_data = notion_players[notion_norm]
+                    filas.append(
+                        {
+                            "nombre": notion_data["nombre"],
+                            "experiencia": notion_data["experiencia"],
+                            "juegos_este_ano": notion_data["juegos_este_ano"],
                             "prioridad": int(
                                 existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
                             ),
@@ -631,9 +694,9 @@ async def _build_snapshot_rows(
             ):
                 filas.append(
                     {
-                        "Nombre": nombre,  # Keep local name
-                        "Experiencia": notion_data["experiencia"],
-                        "Juegos_Este_Ano": notion_data["juegos"],
+                        "nombre": nombre,  # Keep local name
+                        "experiencia": notion_data["experiencia"],
+                        "juegos_este_ano": notion_data["juegos_este_ano"],
                         "prioridad": int(
                             existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
                         ),
@@ -648,13 +711,13 @@ async def _build_snapshot_rows(
                         **{c: notion_data[c] for c in COUNTRY_PROPS},
                     }
                 )
-            elif nombre not in merges:
+            else:
                 # 3. Keep existing data (player not in Notion and not merged)
                 filas.append(
                     {
-                        "Nombre": nombre,
-                        "Experiencia": existente.get("experiencia", "Nuevo"),
-                        "Juegos_Este_Ano": int(existente.get("juegos_este_ano", 0)),
+                        "nombre": nombre,
+                        "experiencia": existente.get("experiencia", "Nuevo"),
+                        "juegos_este_ano": int(existente.get("juegos_este_ano", 0)),
                         "prioridad": int(
                             existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
                         ),
@@ -674,9 +737,9 @@ async def _build_snapshot_rows(
         for _, notion_data in notion_players.items():
             filas.append(
                 {
-                    "Nombre": notion_data["nombre"],
-                    "Experiencia": notion_data["experiencia"],
-                    "Juegos_Este_Ano": notion_data["juegos"],
+                    "nombre": notion_data["nombre"],
+                    "experiencia": notion_data["experiencia"],
+                    "juegos_este_ano": notion_data["juegos_este_ano"],
                     "prioridad": FIELD_DEFAULTS["prioridad"],
                     "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
                     "partidas_gm": FIELD_DEFAULTS["partidas_gm"],
@@ -721,6 +784,12 @@ async def run_notion_sync_background(
 
         async with AsyncSession(async_engine) as session:
             try:
+                # Formal DB renaming for merge_notion actions (must happen before sync)
+                if merges:
+                    for old_name, merge_info in merges.items():
+                        if merge_info.get("action") == "merge_notion":
+                            await crud.rename_player(session, old_name, merge_info["to"])
+
                 # Check if database has existing snapshots
                 latest_id = await crud.get_latest_snapshot_id(session)
                 has_snapshots = latest_id is not None
@@ -741,7 +810,7 @@ async def run_notion_sync_background(
                     if snapshot_id is not None
                     else set()
                 )
-                nuevos = [f["Nombre"] for f in filas if f["Nombre"] not in existing_names]
+                nuevos = [f["nombre"] for f in filas if f["nombre"] not in existing_names]
 
                 logger.info(
                     f"{len(filas)} jugador(es) procesados ({len(nuevos)} nuevo(s))."
@@ -760,7 +829,6 @@ async def run_notion_sync_background(
                     )
                     return None
 
-                # Check if source snapshot is a leaf node (no children)
                 if snapshot_id is not None:
                     has_children = await _check_snapshot_has_children(session, snapshot_id)
 

@@ -4,9 +4,9 @@ formatter.py – Pure text generation for game results.
 All functions return strings or lists of strings. No file I/O.
 
 Functions:
-  formatear_copypaste           → share-ready text; stored in game_events.copypaste_text
-  formatear_resultado           → detailed event results for terminal output
-  construir_proyeccion          → per-player Juegos_Este_Ano projection table
+  format_copypaste              → share-ready text; stored in game_events.copypaste_text
+  format_result                 → detailed event results for terminal output
+  build_projection              → per-player games_this_year projection table
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from collections import Counter
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from .models import Jugador, Mesa, ResultadoPartidas
+    from .models import DraftPlayer, DraftResult, DraftTable
 
 SEP: str = "─" * 44
 
@@ -29,192 +29,190 @@ _COUNTRY_TRANSLATIONS: dict[str, str] = {
     "Turkey": "Turquía"
 }
 
-def translate_country(pais: str) -> str:
+def translate_country(country: str) -> str:
     """Translate English country name to Spanish."""
-    if not pais or pais == "":
+    if not country or country == "":
         return ""
-    return _COUNTRY_TRANSLATIONS.get(pais, pais)
+    return _COUNTRY_TRANSLATIONS.get(country, country)
 
 
 # ── Share section ──────────────────────────────────────────────────────────────
 
-def formatear_copypaste(resultado: ResultadoPartidas) -> str:
+def format_copypaste(result: DraftResult) -> str:
     """
     Section ready to copy-paste (WhatsApp, Discord, etc.).
     Names only — no experience metadata or decorations.
     """
-    return formatear_copypaste_from_dict(resultado.model_dump())
+    return format_copypaste_from_dict(result.model_dump())
 
 
-def formatear_copypaste_from_dict(resultado_dict: dict[str, Any]) -> str:
+def format_copypaste_from_dict(result_dict: dict[str, Any]) -> str:
     """
     Section ready to copy-paste from a dictionary representation.
     """
-    lineas: list[str] = []
-    for mesa in resultado_dict.get("mesas", []):
-        gm_nombre = mesa.get("gm", {}).get("nombre") if mesa.get("gm") else None
-        gm_str: str = f"  |  GM: {gm_nombre}" if gm_nombre else ""
-        lineas.append(f"Partida {mesa['numero']}{gm_str}")
+    lines: list[str] = []
+    for table in result_dict.get("tables", []):
+        gm_name = table.get("gm", {}).get("name") if table.get("gm") else None
+        gm_str: str = f"  |  GM: {gm_name}" if gm_name else ""
+        lines.append(f"Partida {table['table_number']}{gm_str}")
 
-        # Track footnotes for this mesa
+        # Track footnotes for this table
         footnotes: dict[str, str] = {}
         footnote_counter = 0
 
-        for i, jugador in enumerate(mesa.get("jugadores", [])):
-            pais = jugador.get("pais")
-            pais_reason = jugador.get("pais_reason")
-            if pais:
-                translated = translate_country(pais)
-                if pais_reason:
+        for i, player in enumerate(table.get("players", [])):
+            country = player.get("country")
+            country_reason = player.get("country_reason")
+            if country:
+                translated = translate_country(country)
+                if country_reason:
                     # Get or create footnote marker for this reason
-                    if pais_reason not in footnotes:
+                    if country_reason not in footnotes:
                         footnote_counter += 1
-                        footnotes[pais_reason] = "*" * footnote_counter
-                    marker = footnotes[pais_reason]
-                    pais_str = f" ({translated}{marker})"
+                        footnotes[country_reason] = "*" * footnote_counter
+                    marker = footnotes[country_reason]
+                    country_str = f" ({translated}{marker})"
                 else:
-                    pais_str = f" ({translated})"
+                    country_str = f" ({translated})"
             else:
-                pais_str = ""
-            lineas.append(f"  {i + 1}. {jugador['nombre']}{pais_str}")
+                country_str = ""
+            lines.append(f"  {i + 1}. {player['name']}{country_str}")
 
         # Add footnotes if any
         if footnotes:
-            lineas.append("")
+            lines.append("")
             for reason, marker in footnotes.items():
-                lineas.append(f"{marker} {reason}")
+                lines.append(f"{marker} {reason}")
 
-        lineas.append("")
+        lines.append("")
     
-    sobrantes = resultado_dict.get("tickets_sobrantes", [])
-    if sobrantes:
-        lineas.append("Lista de espera:")
-        vistos: set[str] = set()
-        for j in sobrantes:
-            nombre = j["nombre"]
-            if nombre not in vistos:
-                vistos.add(nombre)
-                lineas.append(f"  - {nombre}")
-    return "\n".join(lineas)
+    remaining = result_dict.get("waitlist_players", [])
+    if remaining:
+        lines.append("Lista de espera:")
+        seen: set[str] = set()
+        for j in remaining:
+            name = j["name"]
+            if name not in seen:
+                seen.add(name)
+                lines.append(f"  - {name}")
+    return "\n".join(lines)
 
 
 # ── Detail section ─────────────────────────────────────────────────────────────
 
-def formatear_resultado(
-    resultado: ResultadoPartidas,
+def format_result(
+    result: DraftResult,
     sep: str = SEP,
 ) -> list[str]:
-    """Returns lines for the DETALLE DEL EVENTO section."""
-    lineas: list[str] = [
-        f"  SE GENERARON {len(resultado.mesas)} PARTIDA(S)",
+    """Returns lines for the DETAIL DEL EVENTO section."""
+    lines: list[str] = [
+        f"  SE GENERARON {len(result.tables)} PARTIDA(S)",
         sep,
     ]
 
-    for mesa in resultado.mesas:
-        nuevos: int = sum(1 for j in mesa.jugadores if j.es_nuevo)
-        antiguos: int = sum(1 for j in mesa.jugadores if not j.es_nuevo)
-        gm_str: str = f"GM: {mesa.gm.nombre}" if mesa.gm else "⚠️  Sin GM asignado"
-        lineas.append(f"\n[ Partida {mesa.numero} ]  Nuevos: {nuevos}  Antiguos: {antiguos}  {gm_str}")
+    for table in result.tables:
+        new_players: int = sum(1 for j in table.players if j.is_new)
+        old_players: int = sum(1 for j in table.players if not j.is_new)
+        gm_str: str = f"GM: {table.gm.name}" if table.gm else "⚠️  Sin GM asignado"
+        lines.append(f"\n[ Partida {table.table_number} ]  Nuevos: {new_players}  Antiguos: {old_players}  {gm_str}")
 
-        # Track footnotes for this mesa
+        # Track footnotes for this table
         footnotes: dict[str, str] = {}
         footnote_counter = 0
 
-        for j, jugador in enumerate(mesa.jugadores):
-            pais_str = ""
-            if jugador.pais:
-                translated = translate_country(jugador.pais)
-                if jugador.pais_reason:
+        for j, player in enumerate(table.players):
+            country_str = ""
+            if player.country:
+                translated = translate_country(player.country)
+                if player.country_reason:
                     # Get or create footnote marker for this reason
-                    if jugador.pais_reason not in footnotes:
+                    if player.country_reason not in footnotes:
                         footnote_counter += 1
-                        footnotes[jugador.pais_reason] = "*" * footnote_counter
-                    marker = footnotes[jugador.pais_reason]
-                    pais_str = f" ({translated}{marker})"
+                        footnotes[player.country_reason] = "*" * footnote_counter
+                    marker = footnotes[player.country_reason]
+                    country_str = f" ({translated}{marker})"
                 else:
-                    pais_str = f" ({translated})"
-            etiqueta: str = "Nuevo" if jugador.es_nuevo else f"Antiguo ({jugador.juegos_ano} juegos)"
-            lineas.append(f"  {j + 1}. {jugador.nombre}{pais_str}  —  {etiqueta}")
+                    country_str = f" ({translated})"
+            label: str = "Nuevo" if player.is_new else f"Antiguo ({player.games_this_year} juegos)"
+            lines.append(f"  {j + 1}. {player.name}{country_str}  —  {label}")
 
         # Add footnotes if any
         if footnotes:
-            lineas.append("")
+            lines.append("")
             for reason, marker in footnotes.items():
-                lineas.append(f"  {marker} {reason}")
+                lines.append(f"  {marker} {reason}")
 
     # Unique GMs who referee at least one table, in order of appearance
-    gms_vistos: set[str] = set()
-    gms_activos: list[Jugador] = []
-    for mesa in resultado.mesas:
-        if mesa.gm and mesa.gm.nombre not in gms_vistos:
-            gms_vistos.add(mesa.gm.nombre)
-            gms_activos.append(mesa.gm)
+    gms_seen: set[str] = set()
+    active_gms: list[DraftPlayer] = []
+    for table in result.tables:
+        if table.gm and table.gm.name not in gms_seen:
+            gms_seen.add(table.gm.name)
+            active_gms.append(table.gm)
 
-    if gms_activos:
-        lineas += [f"\n{sep}", "  GAME MASTERS", sep]
-        for gm in gms_activos:
-            mesas_del_gm: list[Mesa] = [
-                m for m in resultado.mesas if m.gm and m.gm.nombre == gm.nombre
+    if active_gms:
+        lines += [f"\n{sep}", "  GAME MASTERS", sep]
+        for gm in active_gms:
+            gm_tables: list[DraftTable] = [
+                t for t in result.tables if t.gm and t.gm.name == gm.name
             ]
-            mesas_str: str = ", ".join(f"Partida {m.numero}" for m in mesas_del_gm)
-            mesas_como_jugador: int = sum(
-                1 for m in resultado.mesas
-                if any(j is gm for j in m.jugadores)
+            tables_str: str = ", ".join(f"Partida {t.table_number}" for t in gm_tables)
+            tables_as_player: int = sum(
+                1 for t in result.tables
+                if any(j is gm for j in t.players)
             )
-            lineas.append(
-                f"  {gm.nombre}: arbitra {mesas_str}  "
-                f"(quería jugar {gm.partidas_deseadas}, jugará {mesas_como_jugador})"
+            lines.append(
+                f"  {gm.name}: arbitra {tables_str}  "
+                f"(quería jugar {gm.desired_games}, jugará {tables_as_player})"
             )
 
-    if resultado.tickets_sobrantes:
-        lineas += [f"\n{sep}", "  JUGADORES EN LISTA DE ESPERA", sep]
-        conteo: Counter[str] = Counter(t.nombre for t in resultado.tickets_sobrantes)
-        for nombre, cupos in conteo.items():
-            sufijo = f"{cupos} cupo(s) sin asignar" if cupos > 1 else "1 cupo sin asignar"
-            lineas.append(f"  - {nombre}  ({sufijo})")
+    if result.waitlist_players:
+        lines += [f"\n{sep}", "  JUGADORES EN LISTA DE ESPERA", sep]
+        count: Counter[str] = Counter(t.name for t in result.waitlist_players)
+        for name, slots in count.items():
+            suffix = f"{slots} cupo(s) sin asignar" if slots > 1 else "1 cupo sin asignar"
+            lines.append(f"  - {name}  ({suffix})")
 
-    return lineas
+    return lines
 
 
 # ── Projection section ─────────────────────────────────────────────────────────
 
-def construir_proyeccion(
-    resultado: ResultadoPartidas,
-    jugadores: list[Jugador],
+def build_projection(
+    result: DraftResult,
+    players: list[DraftPlayer],
 ) -> list[str]:
     """
-    Projects each player's Juegos_Este_Ano after this event.
+    Projects each player's games_this_year after this event.
 
     Counts:
       +1 per table played as a player.
-      +0 for GMing (GMing does not add to Juegos_Este_Ano; the role is
-           reflected in the algorithm's weight system with a 0.5 factor).
+      +0 for GMing (GMing does not add to games_this_year; role is
+           reflected in algorithm's weight system with a 0.5 factor).
     """
-    cupos_jugados: Counter[str] = Counter(
-        j.nombre for mesa in resultado.mesas for j in mesa.jugadores
+    slots_played: Counter[str] = Counter(
+        j.name for table in result.tables for j in table.players
     )
-    cupos_gm: Counter[str] = Counter(
-        mesa.gm.nombre for mesa in resultado.mesas if mesa.gm is not None
+    gm_slots: Counter[str] = Counter(
+        table.gm.name for table in result.tables if table.gm is not None
     )
 
-    filas: list[tuple[int, str, int, int, int, int]] = []
-    for jugador in jugadores:
-        jugadas: int = cupos_jugados[jugador.nombre]
-        como_gm: int = cupos_gm[jugador.nombre]
-        actual: int = int(jugador.juegos_ano)
-        proyectado: int = actual + jugadas
-        filas.append((proyectado, jugador.nombre, actual, jugadas, como_gm, proyectado))
+    rows: list[tuple[int, str, int, int, int, int]] = []
+    for player in players:
+        played: int = slots_played[player.name]
+        as_gm: int = gm_slots[player.name]
+        current: int = int(player.games_this_year)
+        projected: int = current + played
+        rows.append((projected, player.name, current, played, as_gm, projected))
 
-    filas.sort(key=lambda r: (-r[0], r[1]))
+    rows.sort(key=lambda r: (-r[0], r[1]))
 
-    ancho: int = max(len(r[1]) for r in filas)
-    enc: str = f"  {'Jugador':{ancho}}  Actual  +Juega  +GM  Proyectado"
-    lineas: list[str] = [enc, "  " + "-" * (len(enc) - 2)]
-    for _, nombre, actual, jugadas, como_gm, proyectado in filas:
-        lineas.append(
-            f"  {nombre:{ancho}}    {actual:>3}     {jugadas:>3}   {como_gm:>2}         {proyectado:>3}"
+    width: int = max(len(r[1]) for r in rows)
+    header: str = f"  {'Player':{width}}  Actual  +Play  +GM  Projected"
+    lines: list[str] = [header, "  " + "-" * (len(header) - 2)]
+    for _, name, current, played, as_gm, projected in rows:
+        lines.append(
+            f"  {name:{width}}    {current:>3}     {played:>3}   {as_gm:>2}         {projected:>3}"
         )
 
-    return lineas
-
-
+    return lines

@@ -16,10 +16,10 @@ if TYPE_CHECKING:
 from backend.config import PROJECT_ROOT
 from backend.db.connection import get_session
 from backend.db.crud import get_snapshot_players
-from backend.db.models import Event
+from backend.db.models import TimelineEdge
 from backend.db.views import get_game_event_detail
-from backend.organizador.core import calcular_partidas
-from backend.organizador.models import Jugador, ResultadoPartidas
+from backend.organizador.core import calculate_matches
+from backend.organizador.models import DraftPlayer, DraftResult
 from backend.organizador.persistence_async import save_game_draft_async, update_game_draft_async
 
 router = APIRouter(prefix="/api/game")
@@ -59,21 +59,21 @@ async def api_game_draft(
 ) -> dict[str, Any]:
     """
     Generates a draft of game tables without saving to the database.
-    Returns: ResultadoPartidas as dict
+    Returns: DraftResult as dict
     """
     try:
         if not request.snapshot_id:
             raise HTTPException(status_code=400, detail="snapshot_id is required")
 
         rows: list[dict[str, Any]] = await get_snapshot_players(session, request.snapshot_id)
-        jugadores: list[Jugador] = [
-            Jugador(
-                nombre=r["nombre"],
-                experiencia=r["experiencia"],
-                juegos_ano=r["juegos_este_ano"],
-                prioridad=str(bool(r["prioridad"])),
-                partidas_deseadas=r["partidas_deseadas"],
-                partidas_gm=r["partidas_gm"],
+        jugadores: list[DraftPlayer] = [
+            DraftPlayer(
+                name=r["nombre"],
+                experience=r["experiencia"],
+                games_this_year=r["juegos_este_ano"],
+                priority=str(bool(r["prioridad"])),
+                desired_games=r["partidas_deseadas"],
+                gm_games=r["partidas_gm"],
                 c_england=r["c_england"],
                 c_france=r["c_france"],
                 c_germany=r["c_germany"],
@@ -86,21 +86,97 @@ async def api_game_draft(
         ]
 
         # Check for duplicates
-        duplicates = [n for n, c in Counter(j.nombre for j in jugadores).items() if c > 1]
+        duplicates = [n for n, c in Counter(j.name for j in jugadores).items() if c > 1]
         if duplicates:
             raise HTTPException(
                 status_code=400,
                 detail=f"Nombres duplicados en el snapshot: {', '.join(duplicates)}",
             )
 
-        resultado: ResultadoPartidas | None = calcular_partidas(jugadores)
+        resultado: DraftResult | None = calculate_matches(jugadores)
         if resultado is None:
             raise HTTPException(
                 status_code=400, detail="No hay suficientes jugadores para armar una partida."
             )
 
         await session.commit()
-        return resultado.model_dump()
+        
+        # Convert English DraftResult back to Spanish JSON for frontend
+        spanish_result = {
+            "mesas": [
+                {
+                    "numero": table.table_number,
+                    "gm": {
+                        "nombre": table.gm.name,
+                        "experiencia": table.gm.experience,
+                        "juegos_este_ano": table.gm.games_this_year,
+                        "prioridad": table.gm.priority,
+                        "partidas_deseadas": table.gm.desired_games,
+                        "partidas_gm": table.gm.gm_games,
+                        "c_england": table.gm.c_england,
+                        "c_france": table.gm.c_france,
+                        "c_germany": table.gm.c_germany,
+                        "c_italy": table.gm.c_italy,
+                        "c_austria": table.gm.c_austria,
+                        "c_russia": table.gm.c_russia,
+                        "c_turkey": table.gm.c_turkey,
+                        "pais": table.gm.country,
+                        "pais_reason": table.gm.country_reason,
+                        "es_nuevo": table.gm.is_new,
+                        "tiene_prioridad": table.gm.has_priority,
+                    } if table.gm else None,
+                    "jugadores": [
+                        {
+                            "nombre": player.name,
+                            "experiencia": player.experience,
+                            "juegos_este_ano": player.games_this_year,
+                            "prioridad": player.priority,
+                            "partidas_deseadas": player.desired_games,
+                            "partidas_gm": player.gm_games,
+                            "c_england": player.c_england,
+                            "c_france": player.c_france,
+                            "c_germany": player.c_germany,
+                            "c_italy": player.c_italy,
+                            "c_austria": player.c_austria,
+                            "c_russia": player.c_russia,
+                            "c_turkey": player.c_turkey,
+                            "pais": player.country,
+                            "pais_reason": player.country_reason,
+                            "es_nuevo": player.is_new,
+                            "tiene_prioridad": player.has_priority,
+                        }
+                        for player in table.players
+                    ],
+                }
+                for table in resultado.tables
+            ],
+            "tickets_sobrantes": [
+                {
+                    "nombre": player.name,
+                    "experiencia": player.experience,
+                    "juegos_este_ano": player.games_this_year,
+                    "prioridad": player.priority,
+                    "partidas_deseadas": player.desired_games,
+                    "partidas_gm": player.gm_games,
+                    "c_england": player.c_england,
+                    "c_france": player.c_france,
+                    "c_germany": player.c_germany,
+                    "c_italy": player.c_italy,
+                    "c_austria": player.c_austria,
+                    "c_russia": player.c_russia,
+                    "c_turkey": player.c_turkey,
+                    "pais": player.country,
+                    "pais_reason": player.country_reason,
+                    "es_nuevo": player.is_new,
+                    "tiene_prioridad": player.has_priority,
+                }
+                for player in resultado.waitlist_players
+            ],
+            "minimo_teorico": resultado.theoretical_minimum,
+            "intentos_usados": resultado.attempts_used,
+        }
+        
+        return spanish_result
     except HTTPException:
         raise
     except AttributeError as exc:
@@ -127,12 +203,12 @@ async def api_game_save(
 
         if request.editing_game_id is not None:
             # In-place editing: check if game is a leaf node
-            stmt = select(Event).where(
-                Event.id == request.editing_game_id,
-                Event.type == "game",
+            stmt = select(TimelineEdge).where(
+                TimelineEdge.id == request.editing_game_id,
+                TimelineEdge.edge_type == "game",
             )
             result = await session.execute(stmt)
-            game_row: Event | None = result.scalar_one_or_none()
+            game_row: TimelineEdge | None = result.scalar_one_or_none()
 
             if not game_row:
                 raise HTTPException(status_code=404, detail="Game not found")
@@ -140,7 +216,11 @@ async def api_game_save(
             output_snapshot_id: int = game_row.output_snapshot_id
 
             # Check if it's a leaf node (no events source from it)
-            stmt2 = select(Event).where(Event.source_snapshot_id == output_snapshot_id).limit(1)
+            stmt2 = (
+                select(TimelineEdge)
+                .where(TimelineEdge.source_snapshot_id == output_snapshot_id)
+                .limit(1)
+            )
             result2 = await session.execute(stmt2)
             is_leaf: bool = result2.scalar_one_or_none() is None
 

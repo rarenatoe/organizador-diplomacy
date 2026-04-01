@@ -13,14 +13,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import configure_mappers
 
 from backend.db.models import (
-    Event,
     GameDetail,
+    GameTable,
     GraphNode,
-    Mesa,
-    MesaPlayer,
     Player,
     Snapshot,
     SnapshotPlayer,
+    TablePlayer,
+    TimelineEdge,
     WaitingList,
 )
 
@@ -55,7 +55,7 @@ class TestModelInstantiation:
 
     async def test_player_instantiation(self, db_session: Any) -> None:
         """Player should instantiate without PK blank-out error."""
-        player = Player(nombre="TestPlayer")
+        player = Player(name="TestPlayer")
         db_session.add(player)
         await db_session.flush()
         assert player.id is not None
@@ -68,7 +68,7 @@ class TestModelInstantiation:
         await db_session.flush()
         snapshot = Snapshot(id=node.id, source="manual")
         db_session.add(snapshot)
-        player = Player(nombre="TestPlayer")
+        player = Player(name="TestPlayer")
         db_session.add(player)
         await db_session.flush()
 
@@ -76,11 +76,11 @@ class TestModelInstantiation:
         sp = SnapshotPlayer(
             snapshot_id=snapshot.id,
             player_id=player.id,
-            experiencia="Antiguo",
-            juegos_este_ano=0,
-            prioridad=1,
-            partidas_deseadas=2,
-            partidas_gm=0,
+            experience="Antiguo",
+            games_this_year=0,
+            priority=1,
+            desired_games=2,
+            gm_games=0,
         )
         db_session.add(sp)
         await db_session.flush()
@@ -94,7 +94,7 @@ class TestModelInstantiation:
         assert result.scalar_one() is not None
 
     async def test_event_instantiation(self, db_session: Any) -> None:
-        """Event should instantiate without PK blank-out error."""
+        """TimelineEdge should instantiate without PK blank-out error."""
         # Setup prerequisites
         node1 = GraphNode(entity_type="snapshot")
         db_session.add(node1)
@@ -102,22 +102,22 @@ class TestModelInstantiation:
         snapshot = Snapshot(id=node1.id, source="manual")
         db_session.add(snapshot)
 
-        node2 = GraphNode(entity_type="event")
+        node2 = GraphNode(entity_type="timeline_edge")
         db_session.add(node2)
         await db_session.flush()
 
-        event = Event(
+        edge = TimelineEdge(
             id=node2.id,
-            type="sync",
+            edge_type="branch",
             source_snapshot_id=node1.id,
             output_snapshot_id=node1.id,
         )
-        db_session.add(event)
+        db_session.add(edge)
         await db_session.flush()
-        assert event.id == node2.id
+        assert edge.id == node2.id
 
     async def test_mesa_instantiation(self, db_session: Any) -> None:
-        """Mesa should instantiate with required FK without blank-out error."""
+        """GameTable should instantiate with required FK without blank-out error."""
         # Setup prerequisites
         node1 = GraphNode(entity_type="snapshot")
         db_session.add(node1)
@@ -125,27 +125,27 @@ class TestModelInstantiation:
         snapshot = Snapshot(id=node1.id, source="manual")
         db_session.add(snapshot)
 
-        node2 = GraphNode(entity_type="event")
+        node2 = GraphNode(entity_type="timeline_edge")
         db_session.add(node2)
         await db_session.flush()
-        event = Event(
+        edge = TimelineEdge(
             id=node2.id,
-            type="game",
+            edge_type="game",
             source_snapshot_id=node1.id,
             output_snapshot_id=node1.id,
         )
-        db_session.add(event)
+        db_session.add(edge)
         await db_session.flush()
 
-        # Create Mesa with required event_id FK
-        mesa = Mesa(event_id=event.id, numero=1)
-        db_session.add(mesa)
+        # Create GameTable with required timeline_edge_id FK
+        table = GameTable(timeline_edge_id=edge.id, table_number=1)
+        db_session.add(table)
         await db_session.flush()
-        assert mesa.id is not None
-        assert mesa.event_id == event.id
+        assert table.id is not None
+        assert table.timeline_edge_id == edge.id
 
-    async def test_mesa_player_instantiation(self, db_session: Any) -> None:
-        """MesaPlayer (composite PK) should instantiate without errors."""
+    async def test_table_player_instantiation(self, db_session: Any) -> None:
+        """TablePlayer (composite PK) should instantiate without errors."""
         # Setup prerequisites
         node1 = GraphNode(entity_type="snapshot")
         db_session.add(node1)
@@ -153,38 +153,38 @@ class TestModelInstantiation:
         snapshot = Snapshot(id=node1.id, source="manual")
         db_session.add(snapshot)
 
-        node2 = GraphNode(entity_type="event")
+        node2 = GraphNode(entity_type="timeline_edge")
         db_session.add(node2)
         await db_session.flush()
-        event = Event(
+        edge = TimelineEdge(
             id=node2.id,
-            type="game",
+            edge_type="game",
             source_snapshot_id=node1.id,
             output_snapshot_id=node1.id,
         )
-        db_session.add(event)
+        db_session.add(edge)
         await db_session.flush()
 
-        mesa = Mesa(event_id=event.id, numero=1)
-        db_session.add(mesa)
-        player = Player(nombre="TestPlayer")
+        table = GameTable(timeline_edge_id=edge.id, table_number=1)
+        db_session.add(table)
+        player = Player(name="TestPlayer")
         db_session.add(player)
         await db_session.flush()
 
-        # Create MesaPlayer with explicit PKs
-        mp = MesaPlayer(
-            mesa_id=mesa.id,
+        # Create TablePlayer with explicit PKs
+        tp = TablePlayer(
+            table_id=table.id,
             player_id=player.id,
-            orden=1,
-            pais="England",
+            seat_order=1,
+            country="England",
         )
-        db_session.add(mp)
+        db_session.add(tp)
         await db_session.flush()
 
         result = await db_session.execute(
-            select(MesaPlayer).where(
-                MesaPlayer.mesa_id == mesa.id,
-                MesaPlayer.player_id == player.id,
+            select(TablePlayer).where(
+                TablePlayer.table_id == table.id,
+                TablePlayer.player_id == player.id,
             )
         )
         assert result.scalar_one() is not None
@@ -198,33 +198,33 @@ class TestModelInstantiation:
         snapshot = Snapshot(id=node1.id, source="manual")
         db_session.add(snapshot)
 
-        node2 = GraphNode(entity_type="event")
+        node2 = GraphNode(entity_type="timeline_edge")
         db_session.add(node2)
         await db_session.flush()
-        event = Event(
+        edge = TimelineEdge(
             id=node2.id,
-            type="game",
+            edge_type="game",
             source_snapshot_id=node1.id,
             output_snapshot_id=node1.id,
         )
-        db_session.add(event)
-        player = Player(nombre="TestPlayer")
+        db_session.add(edge)
+        player = Player(name="TestPlayer")
         db_session.add(player)
         await db_session.flush()
 
         # Create WaitingList with explicit PKs
         wl = WaitingList(
-            event_id=event.id,
+            timeline_edge_id=edge.id,
             player_id=player.id,
-            orden=1,
-            cupos_faltantes=2,
+            list_order=1,
+            missing_spots=2,
         )
         db_session.add(wl)
         await db_session.flush()
 
         result = await db_session.execute(
             select(WaitingList).where(
-                WaitingList.event_id == event.id,
+                WaitingList.timeline_edge_id == edge.id,
                 WaitingList.player_id == player.id,
             )
         )
@@ -239,27 +239,27 @@ class TestModelInstantiation:
         snapshot = Snapshot(id=node1.id, source="manual")
         db_session.add(snapshot)
 
-        node2 = GraphNode(entity_type="event")
+        node2 = GraphNode(entity_type="timeline_edge")
         db_session.add(node2)
         await db_session.flush()
-        event = Event(
+        edge = TimelineEdge(
             id=node2.id,
-            type="game",
+            edge_type="game",
             source_snapshot_id=node1.id,
             output_snapshot_id=node1.id,
         )
-        db_session.add(event)
+        db_session.add(edge)
         await db_session.flush()
 
-        # Create GameDetail using event's ID as PK
+        # Create GameDetail using edge's ID as PK
         gd = GameDetail(
-            event_id=event.id,
-            intentos=5,
-            copypaste_text="test data",
+            timeline_edge_id=edge.id,
+            attempts=5,
+            share_text="test data",
         )
         db_session.add(gd)
         await db_session.flush()
-        assert gd.event_id == event.id
+        assert gd.timeline_edge_id == edge.id
 
 
 # ── Relationship Configuration Tests ─────────────────────────────────────────
@@ -274,8 +274,8 @@ class TestRelationshipConfiguration:
         configure_mappers()
         # If we get here without warnings, relationships are properly configured
 
-    async def test_mesa_event_relationship(self, db_session: Any) -> None:
-        """Mesa.event relationship should work with non-nullable FK."""
+    async def test_game_table_timeline_edge_relationship(self, db_session: Any) -> None:
+        """GameTable.timeline_edge relationship should work with non-nullable FK."""
         # Setup
         node1 = GraphNode(entity_type="snapshot")
         db_session.add(node1)
@@ -283,35 +283,35 @@ class TestRelationshipConfiguration:
         snapshot = Snapshot(id=node1.id, source="manual")
         db_session.add(snapshot)
 
-        node2 = GraphNode(entity_type="event")
+        node2 = GraphNode(entity_type="timeline_edge")
         db_session.add(node2)
         await db_session.flush()
-        event = Event(
+        edge = TimelineEdge(
             id=node2.id,
-            type="game",
+            edge_type="game",
             source_snapshot_id=node1.id,
             output_snapshot_id=node1.id,
         )
-        db_session.add(event)
+        db_session.add(edge)
         await db_session.flush()
 
-        mesa = Mesa(event_id=event.id, numero=1)
-        db_session.add(mesa)
+        table = GameTable(timeline_edge_id=edge.id, table_number=1)
+        db_session.add(table)
         await db_session.flush()
 
         # Test relationship access
-        result = await db_session.execute(select(Mesa).where(Mesa.id == mesa.id))
-        fetched_mesa = result.scalar_one()
+        result = await db_session.execute(select(GameTable).where(GameTable.id == table.id))
+        fetched_table = result.scalar_one()
         # Relationship should be accessible (though lazy loading requires session)
-        assert fetched_mesa.event_id == event.id
+        assert fetched_table.timeline_edge_id == edge.id
 
-    async def test_player_mesa_links_relationship(self, db_session: Any) -> None:
-        """Player.mesa_links relationship should not cause PK blank-out."""
-        player = Player(nombre="TestPlayer")
+    async def test_player_table_player_links_relationship(self, db_session: Any) -> None:
+        """Player.table_player_links relationship should not cause PK blank-out."""
+        player = Player(name="TestPlayer")
         db_session.add(player)
         await db_session.flush()
 
-        # Player should have empty mesa_links (not None)
+        # Player should have empty table_player_links (not None)
         # Note: accessing relationship requires active session
         result = await db_session.execute(select(Player).where(Player.id == player.id))
         fetched_player = result.scalar_one()
@@ -324,18 +324,18 @@ class TestRelationshipConfiguration:
         await db_session.flush()
         snapshot = Snapshot(id=node.id, source="manual")
         db_session.add(snapshot)
-        player = Player(nombre="TestPlayer")
+        player = Player(name="TestPlayer")
         db_session.add(player)
         await db_session.flush()
 
         sp = SnapshotPlayer(
             snapshot_id=snapshot.id,
             player_id=player.id,
-            experiencia="Antiguo",
-            juegos_este_ano=0,
-            prioridad=1,
-            partidas_deseadas=2,
-            partidas_gm=0,
+            experience="Antiguo",
+            games_this_year=0,
+            priority=1,
+            desired_games=2,
+            gm_games=0,
         )
         db_session.add(sp)
         await db_session.flush()
@@ -367,39 +367,39 @@ class TestEdgeCases:
         snapshot = Snapshot(id=node1.id, source="manual")
         db_session.add(snapshot)
 
-        node2 = GraphNode(entity_type="event")
+        node2 = GraphNode(entity_type="timeline_edge")
         db_session.add(node2)
         await db_session.flush()
-        event = Event(
+        edge = TimelineEdge(
             id=node2.id,
-            type="game",
+            edge_type="game",
             source_snapshot_id=node1.id,
             output_snapshot_id=node1.id,
         )
-        db_session.add(event)
+        db_session.add(edge)
         await db_session.flush()
 
         # Create related objects
-        mesa = Mesa(event_id=event.id, numero=1)
-        db_session.add(mesa)
-        player = Player(nombre="TestPlayer")
+        table = GameTable(timeline_edge_id=edge.id, table_number=1)
+        db_session.add(table)
+        player = Player(name="TestPlayer")
         db_session.add(player)
         await db_session.flush()
 
-        mp = MesaPlayer(mesa_id=mesa.id, player_id=player.id, orden=1, pais="England")
-        db_session.add(mp)
+        tp = TablePlayer(table_id=table.id, player_id=player.id, seat_order=1, country="England")
+        db_session.add(tp)
         await db_session.commit()
 
         # Verify all objects persist correctly
-        result = await db_session.execute(select(Mesa).where(Mesa.id == mesa.id))
-        assert result.scalar_one().event_id == event.id
+        result = await db_session.execute(select(GameTable).where(GameTable.id == table.id))
+        assert result.scalar_one().timeline_edge_id == edge.id
 
         result = await db_session.execute(
-            select(MesaPlayer).where(
-                MesaPlayer.mesa_id == mesa.id,
-                MesaPlayer.player_id == player.id,
+            select(TablePlayer).where(
+                TablePlayer.table_id == table.id,
+                TablePlayer.player_id == player.id,
             )
         )
-        fetched_mp = result.scalar_one()
-        assert fetched_mp.mesa_id == mesa.id
-        assert fetched_mp.player_id == player.id
+        fetched_tp = result.scalar_one()
+        assert fetched_tp.table_id == table.id
+        assert fetched_tp.player_id == player.id

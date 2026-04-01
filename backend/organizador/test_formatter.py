@@ -1,7 +1,7 @@
 """Tests for formatter.py functionality."""
 
-from backend.organizador.formatter import formatear_copypaste_from_dict, translate_country
-from backend.organizador.models import Jugador, Mesa, ResultadoPartidas
+from backend.organizador.formatter import format_copypaste_from_dict, translate_country
+from backend.organizador.models import DraftPlayer, DraftResult, DraftTable
 
 
 class TestCountryTranslation:
@@ -32,24 +32,24 @@ class TestCountryTranslation:
 class TestCopypasteFormatting:
     """Test copypaste text formatting with country translations."""
     
-    def test_formatear_copypaste_with_countries(self):
+    def test_format_copypaste_with_countries(self):
         """Test copypaste formatting includes translated country names."""
-        resultado_dict = {
-            "mesas": [
+        result_dict = {
+            "tables": [
                 {
-                    "numero": 1,
-                    "gm": {"nombre": "GameMaster1"},
-                    "jugadores": [
-                        {"nombre": "Alice", "pais": "England"},
-                        {"nombre": "Bob", "pais": "France"},
-                        {"nombre": "Charlie", "pais": ""},
+                    "table_number": 1,
+                    "gm": {"name": "GameMaster1"},
+                    "players": [
+                        {"name": "Alice", "country": "England"},
+                        {"name": "Bob", "country": "France"},
+                        {"name": "Charlie", "country": ""},
                     ]
                 }
             ],
-            "tickets_sobrantes": []
+            "waitlist_players": []
         }
         
-        result = formatear_copypaste_from_dict(resultado_dict)
+        result = format_copypaste_from_dict(result_dict)
         
         # Check that country names are translated
         assert "Alice (Inglaterra)" in result
@@ -57,38 +57,38 @@ class TestCopypasteFormatting:
         assert "Charlie" in result  # No country
         assert "Partida 1  |  GM: GameMaster1" in result
     
-    def test_formatear_copypaste_without_gm(self):
+    def test_format_copypaste_without_gm(self):
         """Test copypaste formatting without a GM."""
-        resultado_dict = {
-            "mesas": [
+        result_dict = {
+            "tables": [
                 {
-                    "numero": 1,
+                    "table_number": 1,
                     "gm": None,
-                    "jugadores": [
-                        {"nombre": "Alice", "pais": "Germany"},
+                    "players": [
+                        {"name": "Alice", "country": "Germany"},
                     ]
                 }
             ],
-            "tickets_sobrantes": []
+            "waitlist_players": []
         }
         
-        result = formatear_copypaste_from_dict(resultado_dict)
+        result = format_copypaste_from_dict(result_dict)
         assert "Partida 1" in result
         assert "Alice (Alemania)" in result
         assert "GM:" not in result
     
-    def test_formatear_copypaste_with_waiting_list(self):
+    def test_format_copypaste_with_waiting_list(self):
         """Test copypaste formatting includes waiting list."""
-        resultado_dict = {
-            "mesas": [],
-            "tickets_sobrantes": [
-                {"nombre": "Player1"},
-                {"nombre": "Player2"},
-                {"nombre": "Player1"},  # Duplicate, should be deduped
+        result_dict = {
+            "tables": [],
+            "waitlist_players": [
+                {"name": "Player1"},
+                {"name": "Player2"},
+                {"name": "Player1"},  # Duplicate, should be deduped
             ]
         }
         
-        result = formatear_copypaste_from_dict(resultado_dict)
+        result = format_copypaste_from_dict(result_dict)
         lines = result.split("\n")
         
         assert "Lista de espera:" in result
@@ -102,25 +102,25 @@ class TestCopypasteFormatting:
 class TestFormatterIntegration:
     """Test integration with ResultadoPartidas model."""
     
-    def test_formatear_copypaste_with_pais_reason_footnotes(self):
-        """Test that pais_reason appears as footnotes with asterisks."""
-        resultado_dict = {
-            "mesas": [
+    def test_format_copypaste_with_country_reason_footnotes(self):
+        """Test that country_reason appears as footnotes with asterisks."""
+        result_dict = {
+            "tables": [
                 {
-                    "numero": 1,
-                    "gm": {"nombre": "GameMaster1"},
-                    "jugadores": [
-                        {"nombre": "Alice", "pais": "England", "pais_reason": "Test reason 1"},
-                        {"nombre": "Bob", "pais": "France", "pais_reason": "Test reason 1"},  # Same reason
-                        {"nombre": "Charlie", "pais": "Germany", "pais_reason": "Different reason"},
-                        {"nombre": "Dave", "pais": "Italy"},  # No reason
+                    "table_number": 1,
+                    "gm": {"name": "GameMaster1"},
+                    "players": [
+                        {"name": "Alice", "country": "England", "country_reason": "Test reason 1"},
+                        {"name": "Bob", "country": "France", "country_reason": "Test reason 1"},  # Same reason
+                        {"name": "Charlie", "country": "Germany", "country_reason": "Different reason"},
+                        {"name": "Dave", "country": "Italy"},  # No reason
                     ]
                 }
             ],
-            "tickets_sobrantes": []
+            "waitlist_players": []
         }
         
-        result = formatear_copypaste_from_dict(resultado_dict)
+        result = format_copypaste_from_dict(result_dict)
         lines = result.split("\n")
         
         # Check footnote markers on player lines
@@ -138,14 +138,14 @@ class TestFormatterIntegration:
         footnote_line = next(i for i, line in enumerate(lines) if "* Test reason 1" in line)
         assert footnote_line > alice_line, "Footnote should appear after player listing"
 
-    def test_resultado_partidas_with_translation(self):
-        """Test that ResultadoPartidas.to_dict() works with translation."""
+    def test_draft_result_with_translation(self):
+        """Test that DraftResult.to_dict() works with translation."""
         # Create test data
-        jugador1 = Jugador(
-            nombre="Alice",
-            prioridad="alta",
-            partidas_deseadas=1,
-            partidas_gm=0,
+        player1 = DraftPlayer(
+            name="Alice",
+            priority="alta",
+            desired_games=1,
+            gm_games=0,
             c_england=1,
             c_france=0,
             c_germany=0,
@@ -153,23 +153,23 @@ class TestFormatterIntegration:
             c_austria=0,
             c_russia=0,
             c_turkey=0,
-            pais="England",
-            experiencia="Nuevo",
-            juegos_ano=1,
+            country="England",
+            experience="Nuevo",
+            games_this_year=1,
         )
         
-        mesa = Mesa(numero=1, gm=None, jugadores=[jugador1])
-        resultado = ResultadoPartidas(
-            mesas=[mesa],
-            tickets_sobrantes=[],
-            intentos_usados=1,
-            minimo_teorico=0,
+        table = DraftTable(table_number=1, gm=None, players=[player1])
+        result = DraftResult(
+            tables=[table],
+            waitlist_players=[],
+            attempts_used=1,
+            theoretical_minimum=0,
         )
         
         # Test that the model_dump() method works
-        resultado_dict = resultado.model_dump()
-        assert resultado_dict["mesas"][0]["jugadores"][0]["pais"] == "England"
+        result_dict = result.model_dump()
+        assert result_dict["tables"][0]["players"][0]["country"] == "England"
         
         # Test that formatting translates it
-        formatted = formatear_copypaste_from_dict(resultado_dict)
+        formatted = format_copypaste_from_dict(result_dict)
         assert "Alice (Inglaterra)" in formatted

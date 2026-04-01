@@ -82,6 +82,7 @@
     loading = true;
     try {
       data = await fetchSnapshot(id);
+      console.log("Loaded snapshot data:", data);
     } finally {
       loading = false;
     }
@@ -181,6 +182,18 @@
   }
 
   async function executeSyncMerge(merges: MergePair[]): Promise<void> {
+    // Step 1: Explicitly rename players in DB before merging (preserves continuity)
+    for (const merge of merges) {
+      if (merge.action === "merge_notion") {
+        const renameRes = await renamePlayer(merge.from, merge.to);
+        if (renameRes.error) {
+          onShowError("Error al renombrar", renameRes.error);
+          isSyncing = false;
+          return;
+        }
+      }
+    }
+
     const mergeMap = new Map(merges.map((m) => [m.from, m]));
     const currentRows = data?.players ?? [];
 
@@ -234,6 +247,7 @@
       }
 
       // Only trigger updates if the sync was successful
+      await loadSnapshot(); // Force reactive update with new data
       onChainUpdate();
       if (result.snapshot_id !== undefined) {
         setActiveNodeId(result.snapshot_id as number);
@@ -342,6 +356,22 @@
           </tbody>
         </table>
       </div>
+      {#if data?.history && data.history.length > 0}
+        <div class="section-title" style="margin-top: 24px; margin-left: 18px;">
+          Historial de Cambios ({data.history.length})
+        </div>
+        <ul class="history-list">
+          {#each data.history as log (log.id)}
+            <li class="history-item">
+              <span class="history-date">
+                {new Date(log.created_at).toLocaleString()}
+              </span>
+              <span class="history-type">{log.action_type}</span>
+              <span class="history-summary">{log.summary}</span>
+            </li>
+          {/each}
+        </ul>
+      {/if}
     {/snippet}
 
     {#snippet footer()}
@@ -516,5 +546,48 @@
 
   .player-name {
     white-space: nowrap;
+  }
+
+  .history-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 18px 16px;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+  }
+
+  .history-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .history-item:last-child {
+    border-bottom: none;
+  }
+
+  .history-date {
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .history-type {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--accent);
+  }
+
+  .history-summary {
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.4;
   }
 </style>

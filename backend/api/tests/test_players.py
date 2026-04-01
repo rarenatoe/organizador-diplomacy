@@ -3,6 +3,7 @@ test_players.py — Tests for /api/player/rename and /api/snapshot/<id>/add-play
 
 Tests player renaming functionality.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -30,7 +31,14 @@ async def make_snapshot_with_player(
     snap_id = await create_snapshot(db_session, "manual")
     pid = await get_or_create_player(db_session, name)
     await add_player_to_snapshot(
-        db_session, snap_id, pid, experiencia, juegos_este_ano=0, prioridad=1, partidas_deseadas=2, partidas_gm=0
+        db_session,
+        snap_id,
+        pid,
+        experiencia,
+        games_this_year=0,
+        priority=1,
+        desired_games=2,
+        gm_games=0,
     )
     await db_session.commit()
     return snap_id, pid
@@ -52,9 +60,7 @@ class TestApiPlayerRename:
         )
         assert resp.status_code == 404
 
-    async def test_rename_existing_player_succeeds(
-        self, client: Any, db_session: Any
-    ) -> None:
+    async def test_rename_existing_player_succeeds(self, client: Any, db_session: Any) -> None:
         """Rename of an existing player must change their name."""
         _, pid = await make_snapshot_with_player(db_session, "Bob")
         resp = await client.post(
@@ -63,12 +69,11 @@ class TestApiPlayerRename:
         )
         assert resp.status_code == 200
         from backend.db.models import Player
-        result = await db_session.execute(
-            select(Player).where(Player.id == pid)
-        )
+
+        result = await db_session.execute(select(Player).where(Player.id == pid))
         player = result.scalar_one_or_none()
         assert player is not None
-        assert player.nombre == "Robert"
+        assert player.name == "Robert"
 
     async def test_rename_merges_when_in_different_snapshots(
         self, client: Any, db_session: Any
@@ -90,12 +95,8 @@ class TestApiPlayerRename:
         # Add two players to the same snapshot
         carol_id = await get_or_create_player(db_session, "Carol")
         diana_id = await get_or_create_player(db_session, "Diana")
-        await add_player_to_snapshot(
-            db_session, snap_id, carol_id, "Antiguo", 0, 1, 2, 0
-        )
-        await add_player_to_snapshot(
-            db_session, snap_id, diana_id, "Antiguo", 0, 1, 2, 0
-        )
+        await add_player_to_snapshot(db_session, snap_id, carol_id, "Antiguo", 0, 1, 2, 0)
+        await add_player_to_snapshot(db_session, snap_id, diana_id, "Antiguo", 0, 1, 2, 0)
         await db_session.commit()
         # Try to merge them - should fail
         resp = await client.post(
@@ -113,31 +114,28 @@ class TestApiPlayerRename:
         """
         snap_id, pid = await make_snapshot_with_player(db_session, "Eve")
         # Rename the player
-        await client.post(
-            "/api/player/rename", json={"old_name": "Eve", "new_name": "Evelyn"}
-        )
+        await client.post("/api/player/rename", json={"old_name": "Eve", "new_name": "Evelyn"})
         # Create a new snapshot after the rename
         snap_id2 = await create_snapshot(db_session, "manual")
         await add_player_to_snapshot(
             db_session,
             snap_id2,
             pid,
-            experiencia="Antiguo",
-            juegos_este_ano=0,
-            prioridad=1,
-            partidas_deseadas=2,
-            partidas_gm=0,
+            experience="Antiguo",
+            games_this_year=0,
+            priority=1,
+            desired_games=2,
+            gm_games=0,
         )
         await db_session.commit()
         # The old snapshot still has the old name
         from backend.db.crud import get_snapshot_players
+
         rows = await get_snapshot_players(db_session, snap_id)
         names = [r["nombre"] for r in rows]
         assert "Eve" in names or "Evelyn" in names
 
-    async def test_rename_is_global_across_snapshots(
-        self, client: Any, db_session: Any
-    ) -> None:
+    async def test_rename_is_global_across_snapshots(self, client: Any, db_session: Any) -> None:
         """
         Renaming a player must apply to ALL occurrences in ALL snapshots
         (they share the same player_id).
@@ -148,18 +146,17 @@ class TestApiPlayerRename:
             db_session,
             snap_id2,
             pid,
-            experiencia="Antiguo",
-            juegos_este_ano=0,
-            prioridad=1,
-            partidas_deseadas=2,
-            partidas_gm=0,
+            experience="Antiguo",
+            games_this_year=0,
+            priority=1,
+            desired_games=2,
+            gm_games=0,
         )
         await db_session.commit()
         # Rename the player
-        await client.post(
-            "/api/player/rename", json={"old_name": "Frank", "new_name": "Francis"}
-        )
+        await client.post("/api/player/rename", json={"old_name": "Frank", "new_name": "Francis"})
         from backend.db.crud import get_snapshot_players
+
         rows1 = await get_snapshot_players(db_session, snap_id)
         rows2 = await get_snapshot_players(db_session, snap_id2)
         names1 = [r["nombre"] for r in rows1]
@@ -176,14 +173,10 @@ class TestApiSnapshotAddPlayer:
     async def test_add_player_missing_name(self, client: Any, db_session: Any) -> None:
         snap_id = await create_snapshot(db_session, "manual")
         await db_session.commit()
-        resp = await client.post(
-            f"/api/snapshot/{snap_id}/add-player", json={}
-        )
+        resp = await client.post(f"/api/snapshot/{snap_id}/add-player", json={})
         assert resp.status_code == 422  # FastAPI validation error
 
-    async def test_add_player_to_snapshot_succeeds(
-        self, client: Any, db_session: Any
-    ) -> None:
+    async def test_add_player_to_snapshot_succeeds(self, client: Any, db_session: Any) -> None:
         """Adding a player increases the snapshot's player count."""
         from backend.db.crud import get_snapshot_players
 
@@ -208,9 +201,7 @@ class TestApiSnapshotAddPlayer:
         names = [r["nombre"] for r in rows_after]
         assert "Grace" in names
 
-    async def test_add_duplicate_player_reuses_id(
-        self, client: Any, db_session: Any
-    ) -> None:
+    async def test_add_duplicate_player_reuses_id(self, client: Any, db_session: Any) -> None:
         """Adding a player with an existing name must reuse the same player_id."""
         snap_id, pid = await make_snapshot_with_player(db_session, "Helen")
         resp = await client.post(

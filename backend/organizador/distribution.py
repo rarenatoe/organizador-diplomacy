@@ -2,130 +2,130 @@ from __future__ import annotations
 
 import random
 
-from .models import Jugador, Mesa, ResultadoPartidas
+from .models import DraftPlayer, DraftResult, DraftTable
 
 # ── Distribution Logic ───────────────────────────────────────────────────────
 
-def distribuir_tickets(
-    lista_tickets: list[tuple[float, Jugador]],
-    partidas: list[list[Jugador]],
-    gm_bloqueados: dict[str, set[int]],
+def distribute_tickets(
+    ticket_list: list[tuple[float, DraftPlayer]],
+    games: list[list[DraftPlayer]],
+    blocked_gms: dict[str, set[int]],
     *,
-    es_grupo_nuevo: bool,
-) -> list[Jugador]:
+    is_new_group: bool,
+) -> list[DraftPlayer]:
     """
     Distributes tickets into tables, respecting GM constraints and priority.
     """
-    # Más restringidos primero (GMs bloqueados en varias mesas tienen
-    # menos opciones; procesarlos antes evita que otros llenen su única
-    # mesa válida). Desempate por weight_after.
-    lista_tickets.sort(
+    # Most restricted first (GMs blocked in several tables have
+    # fewer options; processing them first prevents others from filling their only
+    # valid table). Tie-break by weight_after.
+    ticket_list.sort(
         key=lambda t: (
-            -len(gm_bloqueados.get(t[1].nombre, set())),
+            -len(blocked_gms.get(t[1].name, set())),
             t[0],
         )
     )
-    rechazados: list[Jugador] = []
-    for _weight, ticket in lista_tickets:
-        bloqueados: set[int] = gm_bloqueados.get(ticket.nombre, set())
-        partidas_validas: list[list[Jugador]] = [
-            p
-            for i, p in enumerate(partidas)
-            if len(p) < 7
-            and not any(j.nombre == ticket.nombre for j in p)
-            and i not in bloqueados
+    rejected: list[DraftPlayer] = []
+    for _weight, ticket in ticket_list:
+        blocked: set[int] = blocked_gms.get(ticket.name, set())
+        valid_games: list[list[DraftPlayer]] = [
+            g
+            for i, g in enumerate(games)
+            if len(g) < 7
+            and not any(j.name == ticket.name for j in g)
+            and i not in blocked
         ]
-        if not partidas_validas:
-            rechazados.append(ticket)
+        if not valid_games:
+            rejected.append(ticket)
             continue
-        random.shuffle(partidas_validas)
-        if es_grupo_nuevo:
-            partidas_validas.sort(key=lambda p: (sum(1 for j in p if j.es_nuevo), len(p)))
+        random.shuffle(valid_games)
+        if is_new_group:
+            valid_games.sort(key=lambda g: (sum(1 for j in g if j.is_new), len(g)))
         else:
-            partidas_validas.sort(key=lambda p: (sum(1 for j in p if not j.es_nuevo), len(p)))
-        partidas_validas[0].append(ticket)
-    return rechazados
+            valid_games.sort(key=lambda g: (sum(1 for j in g if not j.is_new), len(g)))
+        valid_games[0].append(ticket)
+    return rejected
 
 
 def run_distribution_loop(
-    jugadores: list[Jugador],
-    weighted_tickets: list[tuple[float, Jugador]],
-    gms_activos: list[Jugador],
-    mesas_estimadas: int,
-    mesas_reales: int,
-    minimo_teorico: int,
-    max_intentos: int = 200,
-) -> ResultadoPartidas | None:
+    players: list[DraftPlayer],
+    weighted_tickets: list[tuple[float, DraftPlayer]],
+    active_gms: list[DraftPlayer],
+    estimated_tables: int,
+    actual_tables: int,
+    theoretical_minimum: int,
+    max_attempts: int = 200,
+) -> DraftResult | None:
     """
     Runs the random distribution retry loop to find the best table arrangement.
     """
-    intentos: int = 0
-    mejor: ResultadoPartidas | None = None
+    attempts: int = 0
+    best: DraftResult | None = None
 
-    for _ in range(max_intentos):
-        intentos += 1
+    for _ in range(max_attempts):
+        attempts += 1
 
-        # Asignación aleatoria de mesas a GMs
-        indices_gm_pool: list[int] = list(range(mesas_estimadas))
-        random.shuffle(indices_gm_pool)
+        # Random assignment of tables to GMs
+        gm_pool_indices: list[int] = list(range(estimated_tables))
+        random.shuffle(gm_pool_indices)
 
         gm_indices: dict[str, list[int]] = {}
         ptr: int = 0
-        for gm in gms_activos:
-            gm_indices[gm.nombre] = indices_gm_pool[ptr : ptr + gm.partidas_gm]
-            ptr += gm.partidas_gm
+        for gm in active_gms:
+            gm_indices[gm.name] = gm_pool_indices[ptr : ptr + gm.gm_games]
+            ptr += gm.gm_games
 
-        gm_bloqueados: dict[str, set[int]] = {
-            nombre: set(indices) for nombre, indices in gm_indices.items()
+        blocked_gms: dict[str, set[int]] = {
+            name: set(indices) for name, indices in gm_indices.items()
         }
 
-        # Mezcla aleatoria para desempatar tickets con el mismo peso
-        tickets_iter: list[tuple[float, Jugador]] = list(weighted_tickets)
+        # Random shuffle to break ties for tickets with same weight
+        tickets_iter: list[tuple[float, DraftPlayer]] = list(weighted_tickets)
         random.shuffle(tickets_iter)
         tickets_iter.sort(key=lambda t: t[0])
 
-        tickets_aceptados = tickets_iter[: mesas_reales * 7]
-        sobrantes_iniciales: list[Jugador] = [j for _, j in tickets_iter[mesas_reales * 7 :]]
+        accepted_tickets = tickets_iter[: actual_tables * 7]
+        initial_remaining: list[DraftPlayer] = [j for _, j in tickets_iter[actual_tables * 7 :]]
 
-        tickets_nuevos: list[tuple[float, Jugador]] = [
-            (w, j) for w, j in tickets_aceptados if j.es_nuevo
+        new_tickets: list[tuple[float, DraftPlayer]] = [
+            (w, j) for w, j in accepted_tickets if j.is_new
         ]
-        tickets_antiguos: list[tuple[float, Jugador]] = [
-            (w, j) for w, j in tickets_aceptados if not j.es_nuevo
+        old_tickets: list[tuple[float, DraftPlayer]] = [
+            (w, j) for w, j in accepted_tickets if not j.is_new
         ]
 
-        partidas: list[list[Jugador]] = [[] for _ in range(mesas_reales)]
+        games: list[list[DraftPlayer]] = [[] for _ in range(actual_tables)]
 
-        rechazados_nuevos = distribuir_tickets(tickets_nuevos, partidas, gm_bloqueados, es_grupo_nuevo=True)
-        rechazados_antiguos = distribuir_tickets(tickets_antiguos, partidas, gm_bloqueados, es_grupo_nuevo=False)
-        tickets_sobrantes = sobrantes_iniciales + rechazados_nuevos + rechazados_antiguos
+        rejected_new = distribute_tickets(new_tickets, games, blocked_gms, is_new_group=True)
+        rejected_old = distribute_tickets(old_tickets, games, blocked_gms, is_new_group=False)
+        remaining_tickets = initial_remaining + rejected_new + rejected_old
 
-        # Construir mesas semánticas para este intento
-        mesa_a_gm: dict[int, Jugador] = {}
-        for nombre, indices in gm_indices.items():
-            gm_obj: Jugador = next(j for j in jugadores if j.nombre == nombre)
+        # Build semantic tables for this attempt
+        table_to_gm: dict[int, DraftPlayer] = {}
+        for name, indices in gm_indices.items():
+            gm_obj: DraftPlayer = next(j for j in players if j.name == name)
             for idx in indices:
-                if idx < mesas_reales:
-                    mesa_a_gm[idx] = gm_obj
+                if idx < actual_tables:
+                    table_to_gm[idx] = gm_obj
 
-        mesas: list[Mesa] = [
-            Mesa(numero=i + 1, jugadores=partidas[i], gm=mesa_a_gm.get(i))
-            for i in range(mesas_reales)
+        tables: list[DraftTable] = [
+            DraftTable(table_number=i + 1, players=games[i], gm=table_to_gm.get(i))
+            for i in range(actual_tables)
         ]
 
-        resultado = ResultadoPartidas(
-            mesas=mesas,
-            tickets_sobrantes=tickets_sobrantes,
-            minimo_teorico=minimo_teorico,
+        result = DraftResult(
+            tables=tables,
+            waitlist_players=remaining_tickets,
+            theoretical_minimum=theoretical_minimum,
         )
 
-        if mejor is None or len(resultado.tickets_sobrantes) < len(mejor.tickets_sobrantes):
-            mejor = resultado
+        if best is None or len(result.waitlist_players) < len(best.waitlist_players):
+            best = result
 
-        if len(mejor.tickets_sobrantes) == minimo_teorico:
-            break  # No se puede mejorar más; detener temprano
+        if len(best.waitlist_players) == theoretical_minimum:
+            break  # Cannot improve further; stop early
 
-    if mejor is not None:
-        mejor.intentos_usados = intentos
+    if best is not None:
+        best.attempts_used = attempts
 
-    return mejor
+    return best

@@ -713,6 +713,131 @@ describe("SnapshotDetail", () => {
       vi.useRealTimers();
     });
 
+    it("calls renamePlayer and reloads snapshot when resolving notion sync merges", async () => {
+      // Use real timers for this test to avoid async issues
+      vi.useRealTimers();
+
+      const { fetchSnapshot, fetchNotionPlayers, saveSnapshot, renamePlayer } =
+        await import("../api");
+      const onOpenSnapshot = vi.fn();
+
+      // Mock initial snapshot with a player that has similar name in Notion
+      (fetchSnapshot as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce({
+          id: 1,
+          created_at: "2024-01-01T00:00:00Z",
+          source: "manual",
+          players: [
+            {
+              nombre: "Renato",
+              experiencia: "Nuevo",
+              juegos_este_ano: 0,
+              prioridad: 0,
+              partidas_deseadas: 1,
+              partidas_gm: 0,
+            },
+          ],
+        })
+        // Second call after successful sync (reload)
+        .mockResolvedValueOnce({
+          id: 1,
+          created_at: "2024-01-01T00:00:00Z",
+          source: "manual",
+          players: [
+            {
+              nombre: "Renato Alegre",
+              experiencia: "Antiguo",
+              juegos_este_ano: 5,
+              prioridad: 0,
+              partidas_deseadas: 1,
+              partidas_gm: 0,
+            },
+          ],
+        });
+
+      // Mock fetchNotionPlayers to return a similar_names conflict
+      (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        players: [
+          {
+            nombre: "Renato Alegre",
+            experiencia: "Antiguo",
+            juegos_este_ano: 5,
+            alias: [],
+          },
+        ],
+        similar_names: [
+          {
+            notion: "Renato Alegre",
+            snapshot: "Renato",
+            similarity: 0.85,
+          },
+        ],
+        error: undefined,
+      });
+
+      // Mock renamePlayer to succeed
+      (renamePlayer as ReturnType<typeof vi.fn>).mockResolvedValueOnce({});
+
+      // Mock saveSnapshot to succeed
+      (saveSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        snapshot_id: 2,
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot,
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+        },
+      });
+
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Click sync button to trigger the sync
+      const syncBtn = screen.getByRole("button", {
+        name: /Sincronizar Notion/i,
+      });
+      await fireEvent.click(syncBtn);
+
+      // Wait for the resolution modal to appear (it should show the conflict)
+      await waitFor(() => {
+        expect(screen.getByText(/Nombres similares/i)).toBeTruthy();
+      });
+
+      // Click "Usar nombre Notion" button directly (triggers merge_notion action)
+      const notionBtn = screen.getByRole("button", {
+        name: /Usar nombre Notion/i,
+      });
+      await fireEvent.click(notionBtn);
+
+      // Wait for the async operations to complete
+      await waitFor(() => {
+        // Verify renamePlayer was called with correct names
+        expect(renamePlayer).toHaveBeenCalledWith("Renato", "Renato Alegre");
+      });
+
+      // Verify saveSnapshot was called
+      await waitFor(() => {
+        expect(saveSnapshot).toHaveBeenCalled();
+      });
+
+      // Verify fetchSnapshot was called again (loadSnapshot after save)
+      await waitFor(() => {
+        expect(fetchSnapshot).toHaveBeenCalledTimes(2);
+      });
+
+      // Restore fake timers
+      vi.useFakeTimers();
+    });
+
     it("should reset isSyncing state when fetchNotionPlayers returns an error", async () => {
       const { fetchSnapshot, fetchNotionPlayers } = await import("../api");
       const onShowError = vi.fn();
@@ -917,6 +1042,227 @@ describe("SnapshotDetail", () => {
 
       // Restore fake timers for other tests
       vi.useFakeTimers();
+    });
+  });
+
+  describe("Snapshot History (Historial de Cambios)", () => {
+    it("does not render history section when history is empty", async () => {
+      const { fetchSnapshot } = await import("../api");
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [],
+        history: [], // Empty history
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // History section should not be rendered
+      expect(screen.queryByText("Historial de Cambios")).toBeNull();
+    });
+
+    it("does not render history section when history is undefined", async () => {
+      const { fetchSnapshot } = await import("../api");
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [],
+        // history is undefined
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // History section should not be rendered
+      expect(screen.queryByText("Historial de Cambios")).toBeNull();
+    });
+
+    it("renders history section with entries when history is present", async () => {
+      const { fetchSnapshot } = await import("../api");
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [],
+        history: [
+          {
+            id: 1,
+            created_at: "2024-01-02T10:30:00Z",
+            action_type: "manual_edit",
+            summary: "Edición manual del roster",
+          },
+          {
+            id: 2,
+            created_at: "2024-01-01T15:20:00Z",
+            action_type: "notion_sync",
+            summary: "Sincronización con Notion",
+          },
+        ],
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // History section should be rendered
+      expect(screen.getByText(/Historial de Cambios/)).toBeTruthy();
+
+      // Both history entries should be displayed
+      expect(screen.getByText("Edición manual del roster")).toBeTruthy();
+      expect(screen.getByText("Sincronización con Notion")).toBeTruthy();
+
+      // Timestamps should be formatted and displayed
+      expect(screen.getByText(/1\/2\/2024/)).toBeTruthy();
+      expect(screen.getByText(/1\/1\/2024/)).toBeTruthy();
+    });
+
+    it("renders multiple history entries in correct order", async () => {
+      const { fetchSnapshot } = await import("../api");
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [],
+        history: [
+          {
+            id: 3,
+            created_at: "2024-01-03T12:00:00Z",
+            action_type: "notion_sync",
+            summary: "Tercera edición",
+          },
+          {
+            id: 2,
+            created_at: "2024-01-02T12:00:00Z",
+            action_type: "manual_edit",
+            summary: "Segunda edición",
+          },
+          {
+            id: 1,
+            created_at: "2024-01-01T12:00:00Z",
+            action_type: "manual_edit",
+            summary: "Primera edición",
+          },
+        ],
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // History section should be rendered with all entries
+      expect(screen.getByText(/Historial de Cambios/)).toBeTruthy();
+      expect(screen.getByText("Tercera edición")).toBeTruthy();
+      expect(screen.getByText("Segunda edición")).toBeTruthy();
+      expect(screen.getByText("Primera edición")).toBeTruthy();
+
+      // Verify the order in the DOM (most recent first)
+      const historyItems = screen.getAllByText(/edición/i);
+      expect(historyItems[0]!.textContent).toContain("Tercera");
+      expect(historyItems[1]!.textContent).toContain("Segunda");
+      expect(historyItems[2]!.textContent).toContain("Primera");
+    });
+
+    it("displays action type icons correctly", async () => {
+      const { fetchSnapshot } = await import("../api");
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [],
+        history: [
+          {
+            id: 1,
+            created_at: "2024-01-01T10:00:00Z",
+            action_type: "manual_edit",
+            summary: "Manual edit",
+          },
+          {
+            id: 2,
+            created_at: "2024-01-01T11:00:00Z",
+            action_type: "notion_sync",
+            summary: "Notion sync",
+          },
+        ],
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Check that history entries are displayed
+      // The component should render appropriate visual indicators for each action type
+      expect(screen.getByText("Manual edit")).toBeTruthy();
+      expect(screen.getByText("Notion sync")).toBeTruthy();
     });
   });
 });

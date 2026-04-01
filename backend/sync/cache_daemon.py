@@ -77,9 +77,9 @@ async def update_notion_cache(
 
         if existing:
             # Update existing
-            existing.nombre = nombre
-            existing.experiencia = experiencia_val
-            existing.juegos_este_ano = juegos
+            existing.name = nombre
+            existing.experience = experiencia_val
+            existing.games_this_year = juegos
             existing.c_england = countries_data["c_england"]
             existing.c_france = countries_data["c_france"]
             existing.c_germany = countries_data["c_germany"]
@@ -92,9 +92,9 @@ async def update_notion_cache(
             # Create new
             cache_entry = NotionCache(
                 notion_id=page["id"],
-                nombre=nombre,
-                experiencia=experiencia_val,
-                juegos_este_ano=juegos,
+                name=nombre,
+                experience=experiencia_val,
+                games_this_year=juegos,
                 c_england=countries_data["c_england"],
                 c_france=countries_data["c_france"],
                 c_germany=countries_data["c_germany"],

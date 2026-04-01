@@ -1,14 +1,14 @@
 """
-Tests de unidad para organizador.py y models.py
+Unit tests for organizador.py and models.py
 
-Cubre:
-  - Clase Jugador (atributos y puntaje de prioridad)
-  - _calcular_partidas: número de mesas, balance, duplicados,
-    reglas de GM básicas, lista de espera y casos de error.
+Covers:
+  - DraftPlayer class (attributes and priority score)
+  - calculate_matches: number of tables, balance, duplicates,
+    basic GM rules, waitlist and error cases.
 
-Los tests avanzados de prioridad, GM y balanceo de liga
-viven en test_algoritmo.py.
-Los tests de db.py y db_views.py viven en test_db.py.
+Advanced priority, GM and league balancing tests
+live in test_algoritmo.py.
+Database and db_views tests live in test_db.py.
 """
 from __future__ import annotations
 
@@ -16,32 +16,32 @@ import random
 import unittest
 from typing import Any
 
-from .core import calcular_partidas
-from .models import Jugador, ResultadoPartidas
+from .core import calculate_matches
+from .models import DraftPlayer, DraftResult
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _j(
-    nombre: str,
-    experiencia: str = "Antiguo",
-    juegos_ano: int = 0,
-    prioridad: str = "False",
-    partidas_deseadas: int = 1,
-    partidas_gm: int = 0,
-) -> Jugador:
-    """Crea un Jugador con valores por defecto sensatos."""
-    return Jugador(
-        nombre=nombre,
-        experiencia=experiencia,
-        juegos_ano=juegos_ano,
-        prioridad=prioridad,
-        partidas_deseadas=partidas_deseadas,
-        partidas_gm=partidas_gm,
+    name: str,
+    experience: str = "Veteran",
+    games_this_year: int = 0,
+    priority: str = "False",
+    desired_games: int = 1,
+    gm_games: int = 0,
+) -> DraftPlayer:
+    """Creates a DraftPlayer with sensible default values."""
+    return DraftPlayer(
+        name=name,
+        experience=experience,
+        games_this_year=games_this_year,
+        priority=priority,
+        desired_games=desired_games,
+        gm_games=gm_games,
     )
 
 
-def _pool(n: int, prefix: str = "J", **kwargs: Any) -> list[Jugador]:
-    """Crea N jugadores con nombres consecutivos (J0, J1, …)."""
+def _pool(n: int, prefix: str = "J", **kwargs: Any) -> list[DraftPlayer]:
+    """Creates N players with consecutive names (J0, J1, …)."""
     return [_j(f"{prefix}{i}", **kwargs) for i in range(n)]
 
 
@@ -49,43 +49,43 @@ def _pool(n: int, prefix: str = "J", **kwargs: Any) -> list[Jugador]:
 
 class TestJugador(unittest.TestCase):
 
-    def test_es_nuevo_true(self):
-        self.assertTrue(_j("A", experiencia="Nuevo").es_nuevo)
+    def test_is_new_true(self):
+        self.assertTrue(_j("A", experience="Nuevo").is_new)
 
-    def test_es_nuevo_false(self):
-        self.assertFalse(_j("A", experiencia="Antiguo").es_nuevo)
+    def test_is_new_false(self):
+        self.assertFalse(_j("A", experience="Antiguo").is_new)
 
-    def test_es_nuevo_case_insensitive(self):
-        self.assertTrue(_j("A", experiencia="NUEVO").es_nuevo)
+    def test_is_new_case_insensitive(self):
+        self.assertTrue(_j("A", experience="NUEVO").is_new)
 
-    def test_tiene_prioridad_true(self):
-        self.assertTrue(_j("A", prioridad="True").tiene_prioridad)
+    def test_has_priority_true(self):
+        self.assertTrue(_j("A", priority="True").has_priority)
 
-    def test_tiene_prioridad_false(self):
-        self.assertFalse(_j("A", prioridad="False").tiene_prioridad)
+    def test_has_priority_false(self):
+        self.assertFalse(_j("A", priority="False").has_priority)
 
     def test_puntaje_nuevo_es_cero(self):
         # Un jugador nuevo siempre tiene la máxima prioridad (0)
-        self.assertEqual(_j("A", experiencia="Nuevo", juegos_ano=10).puntaje_prioridad, 0)
+        self.assertEqual(_j("A", experience="Nuevo", games_this_year=10).priority_score, 0)
 
-    def test_puntaje_prioridad_flag_es_cero(self):
+    def test_priority_score_flag_es_cero(self):
         # El flag de prioridad también produce puntaje 0
-        self.assertEqual(_j("A", prioridad="True", juegos_ano=10).puntaje_prioridad, 0)
+        self.assertEqual(_j("A", priority="True", games_this_year=10).priority_score, 0)
 
     def test_puntaje_antiguo_sin_juegos_este_ano(self):
         # Antiguo con 0 juegos: penalización mínima (0.05) para distinguirlo del nuevo.
-        self.assertAlmostEqual(_j("A", juegos_ano=0).puntaje_prioridad, 0.05)
+        self.assertAlmostEqual(_j("A", games_this_year=0).priority_score, 0.05)
 
     def test_puntaje_antiguo_con_juegos(self):
         # 0.05 + 3 × 0.15 = 0.50
-        self.assertAlmostEqual(_j("A", juegos_ano=3).puntaje_prioridad, 0.50)
+        self.assertAlmostEqual(_j("A", games_this_year=3).priority_score, 0.50)
 
     def test_puntaje_cap_en_noventa(self):
         # Con muchos juegos la fracción no puede superar 0.90
-        self.assertAlmostEqual(_j("A", juegos_ano=10).puntaje_prioridad, 0.90)
+        self.assertAlmostEqual(_j("A", games_this_year=10).priority_score, 0.90)
 
-    def test_partidas_gm_se_almacena(self):
-        self.assertEqual(_j("A", partidas_gm=2).partidas_gm, 2)
+    def test_gm_games_se_almacena(self):
+        self.assertEqual(_j("A", gm_games=2).gm_games, 2)
 
 
 # ── Tests del algoritmo principal ─────────────────────────────────────────────
@@ -98,110 +98,110 @@ class TestCalcularPartidas(unittest.TestCase):
 
     # ── Casos base ────────────────────────────────────────────────────────────
 
-    def test_sin_jugadores_retorna_none(self):
-        self.assertIsNone(calcular_partidas([]))
+    def test_sin_players_retorna_none(self):
+        self.assertIsNone(calculate_matches([]))
 
-    def test_menos_de_siete_jugadores_retorna_none(self):
-        self.assertIsNone(calcular_partidas(_pool(6)))
+    def test_menos_de_siete_players_retorna_none(self):
+        self.assertIsNone(calculate_matches(_pool(6)))
 
     def test_exactamente_siete_forma_una_partida(self):
-        res = calcular_partidas(_pool(7))
+        res = calculate_matches(_pool(7))
         assert res is not None
-        self.assertIsInstance(res, ResultadoPartidas)
-        self.assertEqual(len(res.mesas), 1)
-        self.assertEqual(len(res.mesas[0].jugadores), 7)
+        self.assertIsInstance(res, DraftResult)
+        self.assertEqual(len(res.tables), 1)
+        self.assertEqual(len(res.tables[0].players), 7)
 
-    def test_catorce_jugadores_forman_dos_partidas(self):
-        res = calcular_partidas(_pool(14))
+    def test_catorce_players_forman_dos_partidas(self):
+        res = calculate_matches(_pool(14))
         assert res is not None
-        self.assertEqual(len(res.mesas), 2)
+        self.assertEqual(len(res.tables), 2)
 
     def test_tickets_multiples_cuentan_correctamente(self):
-        # 12 quieren 1 partida + 2 quieren 2 = 16 tickets → 2 mesas
-        jugadores = _pool(12) + [
-            _j("Multi1", partidas_deseadas=2),
-            _j("Multi2", partidas_deseadas=2),
+        # 12 quieren 1 partida + 2 quieren 2 = 16 tickets → 2 tables
+        players = _pool(12) + [
+            _j("Multi1", desired_games=2),
+            _j("Multi2", desired_games=2),
         ]
-        res = calcular_partidas(jugadores)
+        res = calculate_matches(players)
         assert res is not None
-        self.assertEqual(len(res.mesas), 2)
+        self.assertEqual(len(res.tables), 2)
 
-    # ── Corrección de las mesas ───────────────────────────────────────────────
+    # ── Corrección de las tables ───────────────────────────────────────────────
 
-    def test_cada_mesa_tiene_exactamente_siete_jugadores(self):
-        res = calcular_partidas(_pool(14))
+    def test_cada_table_tiene_exactamente_siete_players(self):
+        res = calculate_matches(_pool(14))
         assert res is not None
-        for mesa in res.mesas:
-            self.assertEqual(len(mesa.jugadores), 7)
+        for table in res.tables:
+            self.assertEqual(len(table.players), 7)
 
-    def test_sin_duplicados_por_mesa(self):
-        """Un jugador no puede aparecer dos veces in the same mesa."""
-        jugadores = _pool(10) + [_j("Multi", partidas_deseadas=2)]
-        res = calcular_partidas(jugadores)
+    def test_sin_duplicados_por_table(self):
+        """Un jugador no puede aparecer dos veces in the same table."""
+        players = _pool(10) + [_j("Multi", desired_games=2)]
+        res = calculate_matches(players)
         if res is None:
             return
-        for mesa in res.mesas:
-            nombres = [j.nombre for j in mesa.jugadores]
-            self.assertEqual(len(nombres), len(set(nombres)), "Hay duplicados en una mesa")
+        for table in res.tables:
+            names = [j.name for j in table.players]
+            self.assertEqual(len(names), len(set(names)), "Hay duplicados en una table")
 
-    def test_jugador_multipartida_en_mesas_distintas(self):
-        """Un jugador que quiere 2 partidas debe quedar en mesas diferentes."""
-        jugadores = _pool(12) + [
-            _j("Multi1", partidas_deseadas=2),
-            _j("Multi2", partidas_deseadas=2),
+    def test_jugador_multipartida_en_tables_distintas(self):
+        """Un jugador que quiere 2 partidas debe quedar en tables diferentes."""
+        players = _pool(12) + [
+            _j("Multi1", desired_games=2),
+            _j("Multi2", desired_games=2),
         ]
-        res = calcular_partidas(jugadores)
+        res = calculate_matches(players)
         assert res is not None
-        for nombre in ("Multi1", "Multi2"):
-            mesas_del_jugador = [
-                i for i, mesa in enumerate(res.mesas)
-                if any(j.nombre == nombre for j in mesa.jugadores)
+        for name in ("Multi1", "Multi2"):
+            tables_del_jugador = [
+                i for i, table in enumerate(res.tables)
+                if any(j.name == name for j in table.players)
             ]
-            self.assertEqual(len(set(mesas_del_jugador)), len(mesas_del_jugador),
-                             f"{nombre} aparece en la misma mesa más de una vez")
+            self.assertEqual(len(set(tables_del_jugador)), len(tables_del_jugador),
+                             f"{name} aparece en la misma table más de una vez")
 
     # ── Balance de experiencia ────────────────────────────────────────────────
 
-    def test_balance_nuevos_y_antiguos_por_mesa(self):
-        """Con una mezcla suficiente, cada mesa debe tener nuevos y antiguos."""
-        jugadores = _pool(6, prefix="N", experiencia="Nuevo") + _pool(8, prefix="A")
-        res = calcular_partidas(jugadores)
+    def test_balance_nuevos_y_antiguos_por_table(self):
+        """Con una mezcla suficiente, cada table debe tener nuevos y antiguos."""
+        players = _pool(6, prefix="N", experience="Nuevo") + _pool(8, prefix="A")
+        res = calculate_matches(players)
         assert res is not None
-        for mesa in res.mesas:
-            self.assertTrue(any(j.es_nuevo for j in mesa.jugadores), "Mesa sin jugadores nuevos")
-            self.assertTrue(any(not j.es_nuevo for j in mesa.jugadores), "Mesa sin jugadores antiguos")
+        for table in res.tables:
+            self.assertTrue(any(j.is_new for j in table.players), "Mesa sin players nuevos")
+            self.assertTrue(any(not j.is_new for j in table.players), "Mesa sin players antiguos")
 
     # ── Error de configuración ────────────────────────────────────────────────
 
     def test_error_mas_gm_slots_que_partidas(self):
-        """Si hay más slots de GM que mesas, debe lanzar ValueError."""
-        jugadores = _pool(7)  # 1 mesa
-        jugadores += [_j("GM1", partidas_gm=1), _j("GM2", partidas_gm=1)]
+        """Si hay más slots de GM que tables, debe lanzar ValueError."""
+        players = _pool(7)  # 1 table
+        players += [_j("GM1", gm_games=1), _j("GM2", gm_games=1)]
         with self.assertRaises(ValueError):
-            calcular_partidas(jugadores)
+            calculate_matches(players)
 
-    def test_un_gm_en_unica_mesa_no_es_error(self):
-        """Un solo GM para una sola mesa es configuración válida."""
-        jugadores = _pool(7) + [_j("GM1", partidas_gm=1)]
-        res = calcular_partidas(jugadores)  # no debe lanzar excepción
+    def test_un_gm_en_unica_table_no_es_error(self):
+        """Un solo GM para una sola table es configuración válida."""
+        players = _pool(7) + [_j("GM1", gm_games=1)]
+        res = calculate_matches(players)  # no debe lanzar excepción
         assert res is not None
 
     # ── Lista de espera ───────────────────────────────────────────────────────
 
-    def test_lista_de_espera_contiene_jugadores_sobrantes(self):
-        """Con 15 jugadores (2 mesas = 14 cupos), 1 debe quedar en espera."""
-        res = calcular_partidas(_pool(15))
+    def test_lista_de_espera_contiene_players_sobrantes(self):
+        """Con 15 players (2 tables = 14 cupos), 1 debe quedar en espera."""
+        res = calculate_matches(_pool(15))
         assert res is not None
-        self.assertEqual(len(res.mesas), 2)
-        total_colocados = sum(len(m.jugadores) for m in res.mesas)
-        total_sobrantes = len(res.tickets_sobrantes)
+        self.assertEqual(len(res.tables), 2)
+        total_colocados = sum(len(m.players) for m in res.tables)
+        total_sobrantes = len(res.waitlist_players)
         self.assertEqual(total_colocados + total_sobrantes, 15)
 
     def test_todos_entran_cuando_hay_cupos_exactos(self):
         """Si los tickets caben exactamente, la lista de espera debe estar vacía."""
-        res = calcular_partidas(_pool(14))
+        res = calculate_matches(_pool(14))
         assert res is not None
-        self.assertEqual(len(res.tickets_sobrantes), 0)
+        self.assertEqual(len(res.waitlist_players), 0)
 
 
 if __name__ == "__main__":

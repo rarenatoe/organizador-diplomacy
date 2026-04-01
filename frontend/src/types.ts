@@ -97,6 +97,7 @@ export interface SnapshotDetail {
   created_at: string;
   source: string;
   players?: EditPlayerRow[];
+  history?: HistoryLog[];
 }
 
 export interface GameDetail {
@@ -113,6 +114,13 @@ export interface GameDetail {
 export interface DeleteResult {
   deleted: number[];
   error?: string;
+}
+
+export interface HistoryLog {
+  id: number;
+  created_at: string;
+  action_type: string;
+  summary: string;
 }
 
 export interface EditPlayerRow {

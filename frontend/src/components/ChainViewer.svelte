@@ -1,14 +1,16 @@
 <script lang="ts">
   import type { SnapshotNode } from "../types";
   import { fetchChain } from "../api";
-  import { setSnapshotCount, setChainData } from "../stores.svelte";
-  import SnapshotGroupNode from "./SnapshotGroupNode.svelte";
-  import { groupSnapshots } from "../groupSnapshots";
+  import {
+    setSnapshotCount,
+    setChainData,
+    getActiveNodeId,
+  } from "../stores.svelte";
+  import GameNode from "./GameNode.svelte";
 
   interface Props {
     onOpenSnapshot: (id: number) => void;
     onOpenGame: (id: number) => void;
-    onOpenSync: (id: number) => void;
     onDeleteSnapshot: (id: number) => void;
     onNewDraft: (options?: { autoAction?: "notion" | "csv" }) => void;
     panelOpen?: boolean;
@@ -17,7 +19,6 @@
   let {
     onOpenSnapshot,
     onOpenGame,
-    onOpenSync,
     onDeleteSnapshot,
     onNewDraft,
     panelOpen = false,
@@ -25,9 +26,6 @@
 
   let loading = $state(true);
   let localRoots = $state<SnapshotNode[]>([]);
-
-  // Now this correctly tracks changes because localRoots is a $state rune
-  let groupedRoots = $derived(groupSnapshots(localRoots));
 
   export async function loadChain(): Promise<void> {
     loading = true;
@@ -54,6 +52,68 @@
     void loadChain();
   });
 </script>
+
+{#snippet renderTree(nodes: SnapshotNode[])}
+  {#each nodes as node (node.id)}
+    <div class="chain-row">
+      <div
+        class="node node-snapshot"
+        class:active={getActiveNodeId() === node.id}
+        data-id={node.id}
+        onclick={() => handleSelect(node.id)}
+        role="button"
+        tabindex="0"
+        onkeydown={(e) => e.key === "Enter" && handleSelect(node.id)}
+      >
+        <button
+          class="node-delete-btn"
+          title="Eliminar snapshot"
+          onclick={(e) => {
+            e.stopPropagation();
+            handleDelete(node.id);
+          }}>🗑</button
+        >
+
+        <div class="node-icon">📋</div>
+        <div class="node-label">Snapshot #{node.id}</div>
+        <div class="node-name">
+          {(node.created_at || "").split(" ")[0] ?? ""}
+        </div>
+        <div class="node-meta">
+          {(node.created_at || "").split(" ")[1] ?? ""}<br />
+          {node.player_count} jugadores · {node.source}
+        </div>
+
+        <div class="node-badges">
+          {#if node.is_latest}
+            <span class="badge badge-latest">Actual</span>
+          {/if}
+        </div>
+      </div>
+
+      {#if node.branches && node.branches.length > 0}
+        <div class="chain-fork">
+          {#each node.branches as branch, i (branch.edge?.id ?? i)}
+            {#if branch.output || (branch.edge && branch.edge.type === "game")}
+              <div class="chain-branch">
+                <span class="arrow">→</span>
+                {#if branch.edge && branch.edge.type === "game"}
+                  <GameNode node={branch.edge} onOpen={onOpenGame} />
+                  {#if branch.output}
+                    <span class="arrow">→</span>
+                  {/if}
+                {/if}
+                {#if branch.output}
+                  {@render renderTree([branch.output])}
+                {/if}
+              </div>
+            {/if}
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/each}
+{/snippet}
 
 <div class="chain-area">
   <div id="chain" class:panel-open={panelOpen}>
@@ -88,15 +148,9 @@
         </div>
       </div>
     {:else}
-      {#each groupedRoots as group (group.versions[0]!.snapshot.id)}
-        <SnapshotGroupNode
-          {group}
-          onSelect={handleSelect}
-          onDelete={handleDelete}
-          {onOpenGame}
-          {onOpenSync}
-        />
-      {/each}
+      <div class="tree-container">
+        {@render renderTree(localRoots)}
+      </div>
     {/if}
   </div>
 </div>
@@ -140,5 +194,148 @@
     opacity: 0.4;
     filter: grayscale(60%);
     box-shadow: none;
+  }
+
+  .tree-container {
+    display: flex;
+    flex-direction: row;
+    gap: 32px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 16px 0;
+  }
+  .chain-row {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .chain-fork {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .chain-branch {
+    display: flex;
+    align-items: center;
+  }
+  .arrow {
+    color: #9ca3af;
+    font-size: 18px;
+    padding: 0 6px;
+    flex-shrink: 0;
+    user-select: none;
+  }
+
+  /* Node base styles */
+  .node {
+    cursor: pointer;
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    width: 180px;
+    min-height: 160px;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    box-shadow: var(--shadow);
+    transition:
+      transform 0.15s,
+      box-shadow 0.15s,
+      border-color 0.15s;
+    border: 2px solid transparent;
+    user-select: none;
+    position: relative;
+  }
+  .node:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  :global(.node.active) {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    z-index: 45;
+  }
+
+  /* Snapshot node styling */
+  .node-snapshot {
+    background: var(--csv-bg);
+    border-color: var(--csv-border);
+  }
+  :global(.node.active.node-snapshot) {
+    border-color: var(--csv-border);
+  }
+
+  /* Node children styling */
+  .node-icon {
+    font-size: 20px;
+    margin-bottom: 5px;
+  }
+  .node-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+  .node-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    word-break: break-all;
+    line-height: 1.4;
+  }
+  .node-meta {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+    line-height: 1.6;
+  }
+
+  /* Delete button */
+  .node-delete-btn {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 11px;
+    opacity: 0;
+    transition:
+      opacity 0.15s,
+      background 0.15s;
+    padding: 2px 4px;
+    border-radius: 4px;
+    line-height: 1;
+  }
+  .node:hover .node-delete-btn,
+  :global(.node.active) .node-delete-btn {
+    opacity: 1;
+  }
+  .node-delete-btn:hover {
+    background: rgba(239, 68, 68, 0.15);
+  }
+
+  /* Badges */
+  .node-badges {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: auto;
+    min-height: 18px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 99px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-top: 5px;
+  }
+  .badge-latest {
+    background: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
   }
 </style>

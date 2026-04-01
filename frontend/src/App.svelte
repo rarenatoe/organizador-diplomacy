@@ -67,11 +67,6 @@
     setActiveNodeId(id);
   }
 
-  function openSync(id: number): void {
-    openPanel("Sync Notion", "sync", id);
-    setActiveNodeId(id);
-  }
-
   function openGameDraft(
     snapshotId: number,
     initialData?: DraftResponse,
@@ -150,7 +145,6 @@
     bind:this={chainViewer}
     onOpenSnapshot={openSnapshot}
     onOpenGame={openGame}
-    onOpenSync={openSync}
     onDeleteSnapshot={handleDeleteSnapshot}
     onNewDraft={(options) =>
       openDraft(null, "manual", options?.autoAction ?? null)}
