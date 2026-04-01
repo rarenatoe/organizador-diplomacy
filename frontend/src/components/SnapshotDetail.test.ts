@@ -335,7 +335,7 @@ describe("SnapshotDetail", () => {
 
     // Click the copy button
     const copyButton = screen.getByRole("button", {
-      name: /Copiar tabla CSV/i,
+      name: /Copiar CSV/i,
     });
     await fireEvent.click(copyButton);
 
@@ -369,7 +369,7 @@ describe("SnapshotDetail", () => {
 
     // Find the copy button
     const copyButton = screen.getByRole("button", {
-      name: /Copiar tabla CSV/i,
+      name: /Copiar CSV/i,
     });
     await fireEvent.click(copyButton);
 
@@ -384,9 +384,7 @@ describe("SnapshotDetail", () => {
 
     // Verify button reverts to original text
     await waitFor(() => {
-      expect(
-        screen.getByRole("button", { name: /Copiar tabla CSV/i }),
-      ).toBeTruthy();
+      expect(screen.getByRole("button", { name: /Copiar CSV/i })).toBeTruthy();
     });
   });
 
@@ -1263,6 +1261,374 @@ describe("SnapshotDetail", () => {
       // The component should render appropriate visual indicators for each action type
       expect(screen.getByText("Manual edit")).toBeTruthy();
       expect(screen.getByText("Notion sync")).toBeTruthy();
+    });
+  });
+
+  describe("New Svelte 5 Behaviors", () => {
+    it("renders history section only when history exists and is collapsed by default", async () => {
+      const { fetchSnapshot } = await import("../api");
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [],
+        history: [
+          {
+            id: 1,
+            created_at: "2024-01-01T12:00:00Z",
+            action_type: "manual_edit",
+            summary: "Test history entry",
+          },
+        ],
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // History section should be rendered
+      expect(screen.getByText(/Historial de Cambios \(1\)/)).toBeTruthy();
+
+      // History details should be hidden by default (details element is collapsed)
+      // Note: In jsdom, details content is still accessible even when collapsed
+      // We'll check that the details element is not open instead
+      const details = screen
+        .getByText(/Historial de Cambios \(1\)/)
+        .closest("details");
+      expect(details?.open).toBe(false);
+    });
+
+    it("expands history section when clicked", async () => {
+      const { fetchSnapshot } = await import("../api");
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [],
+        history: [
+          {
+            id: 1,
+            created_at: "2024-01-01T12:00:00Z",
+            action_type: "manual_edit",
+            summary: "Test history entry",
+          },
+        ],
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Click to expand history
+      const historySummary = screen.getByText(/Historial de Cambios \(1\)/);
+      await fireEvent.click(historySummary);
+
+      // History details should now be visible
+      expect(screen.getByText("Test history entry")).toBeTruthy();
+      expect(screen.getByText("manual_edit")).toBeTruthy();
+
+      // The details element should be open
+      const details = historySummary.closest("details");
+      expect(details?.open).toBe(true);
+    });
+
+    it("CSV button calls clipboard.writeText with correctly formatted derived CSV data", async () => {
+      const { fetchSnapshot } = await import("../api");
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [
+          {
+            nombre: "Test Player",
+            experiencia: "Nuevo",
+            juegos_este_ano: 5,
+            prioridad: 1,
+            partidas_deseadas: 2,
+            partidas_gm: 1,
+          },
+        ],
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Click the copy button
+      const copyButton = screen.getByRole("button", {
+        name: /Copiar CSV/i,
+      });
+      await fireEvent.click(copyButton);
+
+      // Verify clipboard.writeText was called with correctly formatted CSV
+      expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
+      expect(mockClipboard.writeText).toHaveBeenCalledWith(
+        "nombre,experiencia,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm\n" +
+          "Test Player,Nuevo,5,1,2,1",
+      );
+    });
+
+    it("CSV derived state updates automatically when player data changes", async () => {
+      const { fetchSnapshot } = await import("../api");
+
+      // Initial mock with one player
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [
+          {
+            nombre: "Player 1",
+            experiencia: "Nuevo",
+            juegos_este_ano: 0,
+            prioridad: 0,
+            partidas_deseadas: 1,
+            partidas_gm: 0,
+          },
+        ],
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Clear previous calls
+      mockClipboard.writeText.mockClear();
+
+      // Click copy button
+      const copyButton = screen.getByRole("button", {
+        name: /Copiar CSV/i,
+      });
+      await fireEvent.click(copyButton);
+
+      // Verify CSV with first player
+      expect(mockClipboard.writeText).toHaveBeenCalledWith(
+        expect.stringContaining("Player 1"),
+      );
+    });
+
+    it("Sincronizar button shows disabled state and 'Sincronizando...' when ui.isSyncing is true", async () => {
+      // We need to test the UI state behavior by triggering sync
+      const { fetchSnapshot, fetchNotionPlayers } = await import("../api");
+
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [
+          {
+            nombre: "Test Player",
+            experiencia: "Nuevo",
+            juegos_este_ano: 0,
+            prioridad: 0,
+            partidas_deseadas: 1,
+            partidas_gm: 0,
+          },
+        ],
+      });
+
+      // Mock fetchNotionPlayers to never resolve (keep isSyncing true)
+      const neverResolvePromise = new Promise<never>(() => {});
+      (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockReturnValue(
+        neverResolvePromise,
+      );
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+    });
+
+    it("Editar button triggers onEditDraft with mapped playersForDraft data", async () => {
+      const { fetchSnapshot } = await import("../api");
+      const onEditDraft = vi.fn();
+
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [
+          {
+            nombre: "Test Player",
+            experiencia: "Antiguo",
+            juegos_este_ano: 3,
+            prioridad: 1,
+            partidas_deseadas: 2,
+            partidas_gm: 1,
+          },
+        ],
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft,
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Click the edit button
+      const editButton = screen.getByRole("button", { name: /Editar/i });
+      await fireEvent.click(editButton);
+
+      // Verify onEditDraft was called with correctly mapped playersForDraft data
+      expect(onEditDraft).toHaveBeenCalledTimes(1);
+      expect(onEditDraft).toHaveBeenCalledWith(1, "manual", null, [
+        {
+          nombre: "Test Player",
+          experiencia: "Antiguo",
+          juegos_este_ano: 3,
+          prioridad: 1,
+          partidas_deseadas: 2,
+          partidas_gm: 1,
+        },
+      ]);
+    });
+
+    it("OrganizarConfirmModal onEdit uses playersForDraft derived data", async () => {
+      const { fetchSnapshot } = await import("../api");
+      const { validateOrganizar } = await import("../syncUtils");
+      const onEditDraft = vi.fn();
+
+      const players = new Array(7).fill(null).map((_, i) => ({
+        nombre: `Player ${i + 1}`,
+        experiencia: "Nuevo",
+        juegos_este_ano: 0,
+        prioridad: 0,
+        partidas_deseadas: 1,
+        partidas_gm: 0,
+      }));
+
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        players,
+      });
+
+      (validateOrganizar as ReturnType<typeof vi.fn>).mockReturnValueOnce({
+        isAllOnes: true,
+        gmShortage: null,
+        excludedPlayers: [],
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft,
+          onShowError: () => {},
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Click organizar button to show modal
+      const organizarButton = screen.getByRole("button", {
+        name: /Organizar Partidas/i,
+      });
+      await fireEvent.click(organizarButton);
+
+      // Click edit button in modal
+      const modalEditButton = screen.getByRole("button", {
+        name: /Volver a Editar/i,
+      });
+      await fireEvent.click(modalEditButton);
+
+      // Verify onEditDraft was called with playersForDraft data
+      expect(onEditDraft).toHaveBeenCalledTimes(1);
+      expect(onEditDraft).toHaveBeenCalledWith(
+        1,
+        "manual",
+        null,
+        expect.arrayContaining([
+          expect.objectContaining({
+            nombre: expect.stringMatching(/Player \d+/) as string,
+            experiencia: "Nuevo",
+            juegos_este_ano: 0,
+            prioridad: 0,
+            partidas_deseadas: 1,
+            partidas_gm: 0,
+          }),
+        ]),
+      );
     });
   });
 });

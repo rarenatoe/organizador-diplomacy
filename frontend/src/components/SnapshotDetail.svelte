@@ -47,14 +47,15 @@
   }: Props = $props();
 
   let data = $state<SnapshotDetail | null>(null);
-  let loading = $state(true);
-  let isSyncing = $state(false);
-  let resolutionVisible = $state(false);
+  const ui = $state({
+    loading: true,
+    isSyncing: false,
+    resolutionVisible: false,
+    showConfirm: false,
+    csvCopied: false,
+  });
   let resolutionPairs = $state<SimilarName[]>([]);
   let fetchedNotionPlayers = $state<NotionPlayer[]>([]);
-  let csvCopied = $state(false);
-
-  let showConfirm = $state(false);
   let validation = $state<OrganizarValidation | null>(null);
 
   const CSV_COLS = [
@@ -66,42 +67,47 @@
     "partidas_gm",
   ] as const;
 
-  function esc(s: string | null | undefined): string {
-    const el = document.createElement("span");
-    el.textContent = s ?? "";
-    return el.innerHTML;
-  }
-
   function sourceLabel(source: string | undefined): string {
     if (source === "notion_sync") return "☁️ Notion Sync";
     if (source === "organizar") return "▶ Organizar";
     return "📥 Manual";
   }
 
-  async function loadSnapshot(): Promise<void> {
-    loading = true;
-    try {
-      data = await fetchSnapshot(id);
-      console.log("Loaded snapshot data:", data);
-    } finally {
-      loading = false;
-    }
-  }
-
-  function getCsvText(): string {
+  const csvText = $derived(() => {
     if (!data?.players) return "";
     const rows = data.players;
     return [
       CSV_COLS.join(","),
       ...rows.map((r) => CSV_COLS.map((c) => String(r[c] ?? "")).join(",")),
     ].join("\n");
+  });
+
+  const playersForDraft = $derived(() => {
+    return (data?.players || []).map((p) => ({
+      nombre: p.nombre,
+      experiencia: p.experiencia ?? "Nuevo",
+      juegos_este_ano: p.juegos_este_ano ?? 0,
+      prioridad: p.prioridad ?? 0,
+      partidas_deseadas: p.partidas_deseadas ?? 1,
+      partidas_gm: p.partidas_gm ?? 0,
+    }));
+  });
+
+  async function loadSnapshot(): Promise<void> {
+    ui.loading = true;
+    try {
+      data = await fetchSnapshot(id);
+      console.log("Loaded snapshot data:", data);
+    } finally {
+      ui.loading = false;
+    }
   }
 
   async function copyCsv(): Promise<void> {
-    await navigator.clipboard.writeText(getCsvText());
-    csvCopied = true;
+    await navigator.clipboard.writeText(csvText());
+    ui.csvCopied = true;
     setTimeout(() => {
-      csvCopied = false;
+      ui.csvCopied = false;
     }, 1500);
   }
 
@@ -118,14 +124,14 @@
 
     validation = validateOrganizar(data.players);
     if (validation) {
-      showConfirm = true;
+      ui.showConfirm = true;
     } else {
       await executeOrganizar();
     }
   }
 
   async function executeOrganizar(): Promise<void> {
-    showConfirm = false;
+    ui.showConfirm = false;
     // Open the game draft panel instead of running the script directly
     onOpenGameDraft(id);
   }
@@ -151,7 +157,7 @@
       return;
     }
 
-    isSyncing = true;
+    ui.isSyncing = true;
     try {
       const currentNames = (data?.players ?? []).map((p) => p.nombre);
       const response = await fetchNotionPlayers(currentNames);
@@ -161,7 +167,7 @@
           "Error de Sincronización",
           response.error || "Error desconocido",
         );
-        isSyncing = false;
+        ui.isSyncing = false;
         return;
       }
 
@@ -170,14 +176,14 @@
       if (response.similar_names && response.similar_names.length > 0) {
         // Show resolution modal - isSyncing remains true until modal completes
         resolutionPairs = response.similar_names;
-        resolutionVisible = true;
+        ui.resolutionVisible = true;
       } else {
         // No conflicts, merge directly - executeSyncMerge will handle isSyncing reset
         await executeSyncMerge([]);
       }
     } catch (e) {
       onShowError("Error de conexión", String(e));
-      isSyncing = false;
+      ui.isSyncing = false;
     }
   }
 
@@ -188,7 +194,7 @@
         const renameRes = await renamePlayer(merge.from, merge.to);
         if (renameRes.error) {
           onShowError("Error al renombrar", renameRes.error);
-          isSyncing = false;
+          ui.isSyncing = false;
           return;
         }
       }
@@ -257,10 +263,10 @@
       onShowError("Error de conexión", String(e));
     } finally {
       // Reset all sync-related state
-      resolutionVisible = false;
+      ui.resolutionVisible = false;
       resolutionPairs = [];
       fetchedNotionPlayers = [];
-      isSyncing = false;
+      ui.isSyncing = false;
     }
   }
 
@@ -269,10 +275,10 @@
   }
 
   function handleResolutionCancel(): void {
-    resolutionVisible = false;
+    ui.resolutionVisible = false;
     resolutionPairs = [];
     fetchedNotionPlayers = [];
-    isSyncing = false;
+    ui.isSyncing = false;
   }
 
   $effect(() => {
@@ -280,28 +286,38 @@
   });
 </script>
 
-{#if loading}
+{#if ui.loading}
   <p style="color:var(--muted);font-size:12px;padding:4px 0">Cargando…</p>
 {:else if data}
   {@const rows = data.players ?? []}
   <PanelLayout scrollable={false}>
     {#snippet header()}
-      <div class="section" style="margin-bottom: 16px;">
-        <div class="section-title">
-          Snapshot #{id} · {sourceLabel(data?.source)}
-        </div>
-        <div class="node-meta" style="margin-bottom:8px">
-          {esc(data?.created_at)}
-        </div>
-        <Button
-          size="sm"
-          variant={csvCopied ? "success" : "secondary"}
-          icon={csvCopied ? "✅" : "📋"}
-          fill={true}
-          onclick={copyCsv}>{csvCopied ? "Copiado" : "Copiar tabla CSV"}</Button
+      <div class="section" style="margin-bottom: 12px;">
+        <div
+          style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;"
         >
+          <div>
+            <div class="section-title" style="margin-bottom: 2px;">
+              Snapshot #{id} · {sourceLabel(data?.source)}
+            </div>
+            <div
+              class="node-meta"
+              style="color: var(--muted); font-size: 11px; font-weight: 400;"
+            >
+              {data?.created_at}
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant={ui.csvCopied ? "success" : "secondary"}
+            icon={ui.csvCopied ? "✅" : "📋"}
+            onclick={copyCsv}
+            style="min-width: 120px;"
+            >{ui.csvCopied ? "Copiado" : "Copiar CSV"}</Button
+          >
+        </div>
       </div>
-      <div class="section-title" style="margin-bottom:6px">
+      <div class="section-title" style="margin-bottom: 4px;">
         Jugadores <span
           style="color:var(--muted);font-weight:400;text-transform:none;font-size:11px"
           >— desactiva para excluir de la siguiente jornada</span
@@ -325,12 +341,11 @@
           </thead>
           <tbody>
             {#each rows as r (r.nombre)}
-              {@const nombre = esc(r.nombre)}
               {@const expColor =
                 r.experiencia === "Nuevo" ? "#713f12" : "#166534"}
               {@const expBg = r.experiencia === "Nuevo" ? "#fef9c3" : "#f0fdf4"}
               <tr>
-                <td><span class="player-name">{nombre}</span></td>
+                <td><span class="player-name">{r.nombre}</span></td>
                 <td style="padding-left: 0; width: 32px;">
                   <Button
                     variant="ghost"
@@ -344,7 +359,7 @@
                 <td
                   ><span
                     style="font-size:10px;font-weight:700;color:{expColor};background:{expBg};padding:1px 6px;border-radius:4px"
-                    >{esc(r.experiencia ?? "Nuevo")}</span
+                    >{r.experiencia ?? "Nuevo"}</span
                   ></td
                 >
                 <td>{r.juegos_este_ano ?? 0}</td>
@@ -357,20 +372,53 @@
         </table>
       </div>
       {#if data?.history && data.history.length > 0}
-        <div class="section-title" style="margin-top: 24px; margin-left: 18px;">
-          Historial de Cambios ({data.history.length})
-        </div>
-        <ul class="history-list">
-          {#each data.history as log (log.id)}
-            <li class="history-item">
-              <span class="history-date">
-                {new Date(log.created_at).toLocaleString()}
-              </span>
-              <span class="history-type">{log.action_type}</span>
-              <span class="history-summary">{log.summary}</span>
-            </li>
-          {/each}
-        </ul>
+        <details style="margin: 0 18px;">
+          <summary
+            class="section-title"
+            style="
+              cursor: pointer; 
+              padding: 8px 0; 
+              border-top: 1px solid var(--border);
+              margin: 0;
+              list-style: none;
+              transition: background-color 0.15s ease;
+              user-select: none;
+            "
+            onmouseenter={(e) => {
+              const target = e.target as HTMLElement;
+              if (target) {
+                target.style.backgroundColor = "var(--surface2)";
+                target.style.paddingLeft = "4px";
+                target.style.paddingRight = "4px";
+                target.style.marginLeft = "-4px";
+                target.style.marginRight = "-4px";
+              }
+            }}
+            onmouseleave={(e) => {
+              const target = e.target as HTMLElement;
+              if (target) {
+                target.style.backgroundColor = "transparent";
+                target.style.paddingLeft = "0";
+                target.style.paddingRight = "0";
+                target.style.marginLeft = "0";
+                target.style.marginRight = "0";
+              }
+            }}
+          >
+            Historial de Cambios ({data.history.length})
+          </summary>
+          <ul class="history-list">
+            {#each data.history as log (log.id)}
+              <li class="history-item">
+                <span class="history-date">
+                  {new Date(log.created_at).toLocaleString()}
+                </span>
+                <span class="history-type">{log.action_type}</span>
+                <span class="history-summary">{log.summary}</span>
+              </li>
+            {/each}
+          </ul>
+        </details>
       {/if}
     {/snippet}
 
@@ -380,15 +428,7 @@
         fill={true}
         icon="📝"
         onclick={() => {
-          const playersToEdit = (data?.players || []).map((p) => ({
-            nombre: p.nombre,
-            experiencia: p.experiencia ?? "Nuevo",
-            juegos_este_ano: p.juegos_este_ano ?? 0,
-            prioridad: p.prioridad ?? 0,
-            partidas_deseadas: p.partidas_deseadas ?? 1,
-            partidas_gm: p.partidas_gm ?? 0,
-          }));
-          onEditDraft(id, "manual", null, playersToEdit);
+          onEditDraft(id, "manual", null, playersForDraft());
         }}>Editar</Button
       >
       <Button
@@ -396,8 +436,8 @@
         fill={true}
         icon="🔄"
         onclick={handleDirectSync}
-        disabled={isSyncing}
-        >{isSyncing ? "Sincronizando..." : "Sincronizar Notion"}</Button
+        disabled={ui.isSyncing}
+        >{ui.isSyncing ? "Sincronizando..." : "Sincronizar Notion"}</Button
       >
       <Button variant="primary" fill={true} icon="▶️" onclick={handleOrganizar}
         >Organizar Partidas</Button
@@ -407,30 +447,22 @@
 {/if}
 
 <SyncResolutionModal
-  visible={resolutionVisible}
+  visible={ui.resolutionVisible}
   pairs={resolutionPairs}
   onComplete={handleResolutionComplete}
   onCancel={handleResolutionCancel}
 />
 
 <OrganizarConfirmModal
-  visible={showConfirm}
+  visible={ui.showConfirm}
   {validation}
   onConfirm={executeOrganizar}
   onEdit={() => {
-    showConfirm = false;
-    const playersToEdit = (data?.players || []).map((p) => ({
-      nombre: p.nombre,
-      experiencia: p.experiencia ?? "Nuevo",
-      juegos_este_ano: p.juegos_este_ano ?? 0,
-      prioridad: p.prioridad ?? 0,
-      partidas_deseadas: p.partidas_deseadas ?? 1,
-      partidas_gm: p.partidas_gm ?? 0,
-    }));
-    onEditDraft(id, "manual", null, playersToEdit);
+    ui.showConfirm = false;
+    onEditDraft(id, "manual", null, playersForDraft());
   }}
   onCancel={() => {
-    showConfirm = false;
+    ui.showConfirm = false;
   }}
 />
 
