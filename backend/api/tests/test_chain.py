@@ -83,8 +83,8 @@ class TestApiChain:
         snap3 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
 
-        await create_game_edge(db_session, snap1, snap2, 1, "copypaste1")
-        await create_game_edge(db_session, snap1, snap3, 1, "copypaste2")
+        await create_game_edge(db_session, snap1, snap2, 1)
+        await create_game_edge(db_session, snap1, snap3, 1)
         await db_session.commit()
 
         resp = await client.get("/api/chain")

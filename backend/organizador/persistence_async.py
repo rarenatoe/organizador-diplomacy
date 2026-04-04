@@ -21,7 +21,6 @@ from backend.db.crud import (
     get_snapshot_players,
 )
 from backend.db.models import GameDetail, GameTable
-from backend.organizador.formatter import format_copypaste_from_dict
 
 
 async def save_game_draft_async(
@@ -34,14 +33,11 @@ async def save_game_draft_async(
     # 1. Create the output snapshot
     out_id = await _create_output_snapshot_from_draft_async(session, input_snapshot_id, draft_data)
 
-    # 2. Format copypaste text
-    copypaste = format_copypaste_from_dict(draft_data)
-
-    # 3. Create the game event with details
+    # 2. Create game event with details
     attempts = draft_data.get("intentos_usados", 0)
-    event_id = await create_game_edge(session, input_snapshot_id, out_id, attempts, copypaste)
+    event_id = await create_game_edge(session, input_snapshot_id, out_id, attempts)
 
-    # 4. Create tables and table_players
+    # 3. Create tables and table_players
     for table in draft_data.get("mesas", []):
         gm_pid: int | None = None
         gm_nombre = table.get("gm", {}).get("nombre") if table.get("gm") else None
@@ -125,7 +121,6 @@ async def update_game_draft_async(
     """
 
     # 1. Update game_details in place
-    copypaste = format_copypaste_from_dict(draft_data)
     attempts = draft_data.get("intentos_usados", 0)
 
     # Update GameDetail
@@ -133,7 +128,6 @@ async def update_game_draft_async(
     gd = result.scalar_one_or_none()
     if gd:
         gd.attempts = attempts
-        gd.share_text = copypaste
 
     # 2. Delete existing game_tables and waiting_list for this game
     # Use raw SQL for delete operations

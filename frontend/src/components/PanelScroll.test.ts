@@ -25,7 +25,6 @@ vi.mock("../api", () => ({
     intentos: 1,
     input_snapshot_id: 1,
     output_snapshot_id: 2,
-    copypaste: "Test copypaste",
     mesas: [],
     waiting_list: [],
   }),

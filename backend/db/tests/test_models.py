@@ -255,7 +255,6 @@ class TestModelInstantiation:
         gd = GameDetail(
             timeline_edge_id=edge.id,
             attempts=5,
-            share_text="test data",
         )
         db_session.add(gd)
         await db_session.flush()

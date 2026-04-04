@@ -91,7 +91,7 @@ class TestGetGameEventDetailPaisRegression:
         snap2 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
 
-        edge_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
+        edge_id = await create_game_edge(db_session, snap1, snap2, 1)
         await db_session.commit()
 
         table_id = await create_game_table(db_session, edge_id, 1)
@@ -148,7 +148,7 @@ class TestGetGameEventDetailPaisRegression:
         snap2 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
 
-        edge_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
+        edge_id = await create_game_edge(db_session, snap1, snap2, 1)
         await db_session.commit()
 
         table_id = await create_game_table(db_session, edge_id, 1)
@@ -199,7 +199,7 @@ class TestGetGameEventDetailPaisRegression:
         snap2 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
 
-        edge_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
+        edge_id = await create_game_edge(db_session, snap1, snap2, 1)
         await db_session.commit()
 
         table_id = await create_game_table(db_session, edge_id, 1)
@@ -254,7 +254,7 @@ class TestPaisReasonPersistence:
         snap2 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
 
-        edge_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
+        edge_id = await create_game_edge(db_session, snap1, snap2, 1)
         await db_session.commit()
 
         table_id = await create_game_table(db_session, edge_id, 1)
@@ -310,7 +310,7 @@ class TestPaisReasonPersistence:
         """
         snap1 = await create_snapshot(db_session, "manual")
         snap2 = await create_snapshot(db_session, "organizar")
-        edge_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
+        edge_id = await create_game_edge(db_session, snap1, snap2, 1)
         table_id = await create_game_table(db_session, edge_id, 1)
 
         # Create 3 players with the same reason
@@ -374,7 +374,7 @@ class TestPaisReasonPersistence:
         snap2 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
 
-        edge_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
+        edge_id = await create_game_edge(db_session, snap1, snap2, 1)
         await db_session.commit()
 
         table_id = await create_game_table(db_session, edge_id, 1)
@@ -636,7 +636,7 @@ class TestGetGameEventDetailNotionCacheDeduplication:
         snap2 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
 
-        edge_id = await create_game_edge(db_session, snap1, snap2, 1, "test copypaste")
+        edge_id = await create_game_edge(db_session, snap1, snap2, 1)
         await db_session.commit()
 
         table_id = await create_game_table(db_session, edge_id, 1)

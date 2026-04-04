@@ -104,7 +104,6 @@ export interface GameDetail {
   id: number;
   created_at: string;
   intentos: number;
-  copypaste: string;
   mesas?: MesaData[];
   waiting_list?: WaitingItem[];
   input_snapshot_id: number;

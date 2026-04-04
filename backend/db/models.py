@@ -132,7 +132,6 @@ class GameDetail(Base, kw_only=True):
 
     timeline_edge_id: Mapped[int] = mapped_column(ForeignKey("timeline_edges.id"), primary_key=True)
     attempts: Mapped[int] = mapped_column(default=0)
-    share_text: Mapped[str] = mapped_column()
 
 
 class GameTable(Base, kw_only=True):

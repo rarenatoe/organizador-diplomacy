@@ -2,6 +2,7 @@
   import type { GameDetail, DraftResponse, DraftPlayer } from "../types";
   import { fetchGame } from "../api";
   import { esc } from "../utils";
+  import { translateCountry, getCountryEmoji } from "../i18n";
   import Button from "./Button.svelte";
   import PanelLayout from "./PanelLayout.svelte";
 
@@ -37,28 +38,6 @@
     }, 1500);
   }
 
-  function getCountryEmoji(pais: string | undefined): string {
-    // Handle both English (backend) and Spanish (display) country names
-    const countryEmojis: Record<string, string> = {
-      // English names (from backend)
-      England: "🇬🇧",
-      France: "🇫🇷",
-      Germany: "🇩🇪",
-      Italy: "🇮🇹",
-      Austria: "🇦🇹",
-      Russia: "🇷🇺",
-      Turkey: "🇹🇷",
-      // Spanish names (for display)
-      Inglaterra: "🇬🇧",
-      Francia: "🇫🇷",
-      Alemania: "🇩🇪",
-      Italia: "🇮🇹",
-      Rusia: "🇷🇺",
-      Turquía: "🇹🇷",
-    };
-    return pais ? countryEmojis[pais] || "" : "";
-  }
-
   function mapToDraftPlayer(player: any): DraftPlayer {
     return {
       nombre: player.nombre,
@@ -79,39 +58,24 @@
     };
   }
 
-  // Country name translations from English to Spanish
-  const countryTranslations: Record<string, string> = {
-    England: "Inglaterra",
-    France: "Francia",
-    Germany: "Alemania",
-    Italy: "Italia",
-    Austria: "Austria",
-    Russia: "Rusia",
-    Turkey: "Turquía",
-  };
-
-  function translateCountry(pais: string): string {
-    return countryTranslations[pais] || pais;
-  }
-
-  function getMesaCopyText(mesa: any): string {
+  function getTableCopyText(table: any): string {
     const footnotes: Record<string, string> = {};
     let footnoteCounter = 0;
 
     // Build player lines and collect footnotes
     const playerLines: string[] = [];
     let index = 1;
-    for (const jugador of mesa.jugadores) {
-      let line = `${index}. ${jugador.nombre}`;
-      if (jugador.pais) {
-        const translated = translateCountry(jugador.pais);
-        if (jugador.pais_reason) {
+    for (const player of table.jugadores) {
+      let line = `${index}. ${player.nombre}`;
+      if (player.pais) {
+        const translated = translateCountry(player.pais);
+        if (player.pais_reason) {
           // Get or create footnote marker
-          if (!footnotes[jugador.pais_reason]) {
+          if (!footnotes[player.pais_reason]) {
             footnoteCounter++;
-            footnotes[jugador.pais_reason] = "*".repeat(footnoteCounter);
+            footnotes[player.pais_reason] = "*".repeat(footnoteCounter);
           }
-          const marker = footnotes[jugador.pais_reason];
+          const marker = footnotes[player.pais_reason];
           line += ` (${translated}${marker})`;
         } else {
           line += ` (${translated})`;
@@ -135,6 +99,44 @@
     }
 
     return allLines.join("\n");
+  }
+
+  function getFullShareText(gameData: GameDetail | null): string {
+    if (!gameData) return "";
+
+    const lines: string[] = [];
+
+    // Add tables
+    if (gameData.mesas && gameData.mesas.length > 0) {
+      for (const table of gameData.mesas) {
+        lines.push(`Partida ${table.numero}`);
+        if (table.gm) {
+          lines.push(`GM: ${table.gm}`);
+        }
+
+        // Add players
+        for (const player of table.jugadores) {
+          let playerLine = `- ${player.nombre}`;
+          if (player.pais) {
+            const translated = translateCountry(player.pais);
+            playerLine += ` (${translated})`;
+          }
+          lines.push(playerLine);
+        }
+
+        lines.push(""); // Empty line between tables
+      }
+    }
+
+    // Add waiting list
+    if (gameData.waiting_list && gameData.waiting_list.length > 0) {
+      lines.push("Lista de espera:");
+      for (const waiter of gameData.waiting_list) {
+        lines.push(`- ${waiter.nombre} (${waiter.cupos})`);
+      }
+    }
+
+    return lines.join("\n").trim();
   }
 
   $effect(() => {
@@ -193,50 +195,51 @@
           variant={copiedId === "share" ? "success" : "secondary"}
           icon={copiedId === "share" ? "✅" : "📋"}
           fill={true}
-          onclick={() => copyText(data?.copypaste ?? "", "share")}
+          onclick={() => copyText(getFullShareText(data), "share")}
           >{copiedId === "share"
             ? "Copiado"
             : "Copiar lista para compartir"}</Button
         >
-        <div class="share-pre" style="margin-top:8px">
-          {esc(data?.copypaste)}
-        </div>
       </div>
       {#if mesas.length > 0}
         <div class="section">
           <div class="section-title">Partidas ({mesas.length})</div>
-          {#each mesas as mesa (mesa.numero)}
-            {@const playersTxt = getMesaCopyText(mesa)}
+          {#each mesas as table (table.numero)}
+            {@const playersTxt = getTableCopyText(table)}
             <div class="mesa-card">
               <div class="mesa-header">
-                <span class="mesa-title">Partida {mesa.numero}</span>
-                {#if mesa.gm}
-                  <span class="gm-tag gm-tag-ok">GM: {esc(mesa.gm)}</span>
+                <span class="mesa-title">Partida {table.numero}</span>
+                {#if table.gm}
+                  <span class="gm-tag gm-tag-ok">GM: {esc(table.gm)}</span>
                 {:else}
                   <span class="gm-tag gm-tag-bad">⚠️ Sin GM</span>
                 {/if}
               </div>
               <ul class="player-list">
-                {#each mesa.jugadores as j, i (j.nombre)}
+                {#each table.jugadores as player, i (player.nombre)}
                   <li>
                     <span class="p-num">{i + 1}.</span>
                     <span class="p-name"
-                      >{esc(j.nombre)}
-                      {j.pais ? getCountryEmoji(j.pais) : ""}
-                      {#if j.pais_reason}
+                      >{esc(player.nombre)}
+                      {player.pais ? getCountryEmoji(player.pais) : ""}
+                      {#if player.pais_reason}
                         <span class="reason-tooltip">
                           <span class="info-icon">ℹ️</span>
-                          <span class="tooltip-popover">{j.pais_reason}</span>
+                          <span class="tooltip-popover"
+                            >{player.pais_reason}</span
+                          >
                         </span>
                       {/if}</span
                     >
-                    {#if j.etiqueta === "Nuevo"}
+                    {#if player.etiqueta === "Nuevo"}
                       <div class="tag-wrapper">
                         <span class="tag tag-nuevo">Nuevo</span>
                       </div>
                     {:else}
                       <div class="tag-wrapper">
-                        <span class="tag tag-antiguo">{esc(j.etiqueta)}</span>
+                        <span class="tag tag-antiguo"
+                          >{esc(player.etiqueta)}</span
+                        >
                       </div>
                     {/if}
                   </li>
@@ -244,14 +247,14 @@
               </ul>
               <Button
                 size="sm"
-                variant={copiedId === "players-" + mesa.numero
+                variant={copiedId === "players-" + table.numero
                   ? "success"
                   : "secondary"}
-                icon={copiedId === "players-" + mesa.numero ? "✅" : "📋"}
-                class={copiedId === "players-" + mesa.numero ? "ok" : ""}
+                icon={copiedId === "players-" + table.numero ? "✅" : "📋"}
+                class={copiedId === "players-" + table.numero ? "ok" : ""}
                 fill={true}
-                onclick={() => copyText(playersTxt, "players-" + mesa.numero)}
-                >{copiedId === "players-" + mesa.numero
+                onclick={() => copyText(playersTxt, "players-" + table.numero)}
+                >{copiedId === "players-" + table.numero
                   ? "Copiado"
                   : "Copiar jugadores"}</Button
               >
@@ -313,19 +316,6 @@
 
   .meta-val {
     font-weight: 600;
-  }
-
-  .share-pre {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px;
-    font-size: 12px;
-    font-family: "SF Mono", Menlo, monospace;
-    white-space: pre-wrap;
-    max-height: 200px;
-    overflow-y: auto;
-    color: var(--text);
   }
 
   .mesa-card {

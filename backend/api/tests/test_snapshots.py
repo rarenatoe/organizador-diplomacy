@@ -134,7 +134,7 @@ class TestApiSnapshotDelete:
         snap2 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
         # Create a game event linking snap1 -> snap2
-        edge_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
+        edge_id = await create_game_edge(db_session, snap1, snap2, 1)
         await db_session.commit()
         # Delete the source snapshot
         resp = await client.delete(f"/api/snapshot/{snap1}")
@@ -172,7 +172,7 @@ class TestApiSnapshotDelete:
         await add_player_to_snapshot(db_session, snap_c, pid_c2, "Nuevo", 2, 1, 1, 0)
 
         # Create edges: A -> game -> B and A -> branch -> C
-        _game_edge_id = await create_game_edge(db_session, snap_a, snap_b, 1, "test game")
+        _game_edge_id = await create_game_edge(db_session, snap_a, snap_b, 1)
         branch_edge_id = await create_branch_edge(db_session, snap_a, snap_c)
         await db_session.commit()
 
@@ -374,7 +374,7 @@ class TestApiSnapshotSave:
         parent_id = await make_snapshot_with_players(db_session, n=3)
         # Create a game event to make parent non-leaf (has a child)
         child_id = await create_snapshot(db_session, "organizar")
-        await create_game_edge(db_session, parent_id, child_id, 1, "test game")
+        await create_game_edge(db_session, parent_id, child_id, 1)
         await db_session.commit()
 
         # Action: Save with modified player list (parent is now internal node, so new snapshot created)

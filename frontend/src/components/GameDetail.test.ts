@@ -8,7 +8,6 @@ vi.mock("../api", () => ({
     id: 1,
     created_at: "2024-01-01T00:00:00Z",
     intentos: 3,
-    copypaste: "Player1\nPlayer2\nPlayer3",
     input_snapshot_id: 10,
     output_snapshot_id: 20,
     mesas: [
@@ -115,9 +114,16 @@ describe("GameDetail", () => {
 
     // Verify clipboard.writeText was called
     expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
-    expect(mockClipboard.writeText).toHaveBeenCalledWith(
-      "Player1\nPlayer2\nPlayer3",
-    );
+
+    // Verify the generated text contains expected content
+    const clipboardText = mockClipboard.writeText.mock.calls[0]?.[0] as string;
+    expect(clipboardText).toContain("Partida 1");
+    expect(clipboardText).toContain("GM: GameMaster1");
+    expect(clipboardText).toContain("- Alice (Inglaterra)");
+    expect(clipboardText).toContain("- Bob (Francia)");
+    expect(clipboardText).toContain("Lista de espera:");
+    expect(clipboardText).toContain("- Charlie (2 cupos)");
+    expect(clipboardText).toContain("- Diana (1 cupo)");
 
     // Verify button text changes to "Copiado"
     expect(screen.getByText("Copiado")).toBeTruthy();
@@ -368,7 +374,6 @@ describe("GameDetail", () => {
         id: 2,
         created_at: "2024-01-01T00:00:00Z",
         intentos: 3,
-        copypaste: "Player1\nPlayer2",
         input_snapshot_id: 10,
         output_snapshot_id: 20,
         mesas: [

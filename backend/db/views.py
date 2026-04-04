@@ -322,7 +322,6 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[st
         "id": timeline_edge.id,
         "created_at": timeline_edge.created_at,
         "intentos": game_detail.attempts,
-        "copypaste": game_detail.share_text,
         "mesas": mesas_data,
         "waiting_list": waiting,
         "input_snapshot_id": input_sid,

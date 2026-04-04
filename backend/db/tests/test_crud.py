@@ -129,7 +129,7 @@ class TestTimelineEdgeOperations:
         snap1 = await create_snapshot(db_session, "manual")
         snap2 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
-        event_id = await create_game_edge(db_session, snap1, snap2, 5, "draft_data")
+        event_id = await create_game_edge(db_session, snap1, snap2, 5)
         await db_session.commit()
         assert event_id is not None
         result = await db_session.execute(select(TimelineEdge).where(TimelineEdge.id == event_id))
@@ -149,7 +149,7 @@ class TestGameTableOperations:
         snap1 = await create_snapshot(db_session, "manual")
         snap2 = await create_snapshot(db_session, "organizar")
         await db_session.commit()
-        event_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
+        event_id = await create_game_edge(db_session, snap1, snap2, 1)
         await db_session.commit()
         mesa_id = await create_game_table(db_session, event_id, 1)
         await db_session.commit()
@@ -162,7 +162,7 @@ class TestGameTableOperations:
         snap2 = await create_snapshot(db_session, "organizar")
         pid = await get_or_create_player(db_session, "David")
         await db_session.commit()
-        event_id = await create_game_edge(db_session, snap1, snap2, 1, "copypaste")
+        event_id = await create_game_edge(db_session, snap1, snap2, 1)
         mesa_id = await create_game_table(db_session, event_id, 1)
         await db_session.commit()
         # Add player to mesa
@@ -336,7 +336,7 @@ class TestLinearBranchSquashing:
         await add_player_to_snapshot(db_session, snap_b, pid, "Antiguo", 1, 0, 2, 0)
 
         # Create game edge A -> B
-        await create_game_edge(db_session, snap_a, snap_b, 1, "copypaste")
+        await create_game_edge(db_session, snap_a, snap_b, 1)
         await db_session.commit()
 
         # Action: Try to squash A (should do nothing because edge is a game)

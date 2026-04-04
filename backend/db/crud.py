@@ -6,7 +6,6 @@ migrating from raw SQLite to SQLAlchemy 2.0 with async sessions.
 
 from __future__ import annotations
 
-from collections import Counter
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -32,10 +31,6 @@ from backend.db.models import (
     TimelineEdge,
     WaitingList,
 )
-
-if TYPE_CHECKING:
-    from backend.organizador.models import DraftResult
-
 
 # ── Diffing Logic ────────────────────────────────────────────────────────────
 
@@ -456,7 +451,6 @@ async def create_game_edge(
     source_snapshot_id: int,
     output_snapshot_id: int,
     attempts: int,
-    share_text: str,
 ) -> int:
     """Create a game edge with details."""
     edge_id = await create_timeline_edge(session, "game", source_snapshot_id, output_snapshot_id)
@@ -464,7 +458,6 @@ async def create_game_edge(
     detail = GameDetail(
         timeline_edge_id=edge_id,
         attempts=attempts,
-        share_text=share_text,
     )
     session.add(detail)
     return edge_id
@@ -615,90 +608,6 @@ async def create_root_manual_snapshot(
     return snap_id
 
 
-async def save_game(
-    session: AsyncSession,
-    input_snapshot_id: int,
-    resultado: DraftResult,
-    intentos: int,
-    copypaste_text: str,
-) -> int:
-    """Save a game result to the database."""
-    # Create output snapshot
-    snap_id = await create_snapshot(session, "organizar")
-
-    # Count cupos jugados per player
-    cupos_jugados: Counter[str] = Counter()
-    for table in resultado.tables:
-        for player in table.players:  # type: ignore
-            cupos_jugados[player.name] += 1  # type: ignore
-
-    nombres_en_espera: set[str] = {j.name for j in resultado.waitlist_players}
-
-    for p in await get_snapshot_players(session, input_snapshot_id):
-        nombre = p["nombre"]
-        jugadas = cupos_jugados[nombre]
-        fue_promovido = p["experiencia"] == "Nuevo" and jugadas > 0
-
-        result = await session.execute(select(Player).where(Player.name == nombre))
-        player: Player | None = result.scalar_one_or_none()
-        if not player:
-            continue
-
-        await add_player_to_snapshot(
-            session,
-            snap_id,
-            player.id,
-            "Antiguo" if fue_promovido else p["experiencia"],
-            p["juegos_este_ano"] + jugadas,
-            1 if nombre in nombres_en_espera else 0,
-            p["partidas_deseadas"],
-            0,  # partidas_gm reset
-        )
-
-    # Create event and details
-    edge_id = await create_game_edge(session, input_snapshot_id, snap_id, intentos, copypaste_text)
-
-    # Save mesas
-    for table in resultado.tables:
-        table_obj = GameTable(timeline_edge_id=edge_id, table_number=table.table_number)
-        session.add(table_obj)
-        await session.flush()
-        table_id = table_obj.id
-
-        # Save GM if present
-        if table.gm:
-            result = await session.execute(select(Player).where(Player.name == table.gm.name))
-            gm_player = result.scalar_one_or_none()
-            if gm_player:
-                table_obj.gm_player_id = gm_player.id
-
-        # Save players
-        for orden, player in enumerate(table.players, 1):  # type: ignore
-            result = await session.execute(select(Player).where(Player.name == player.name))  # type: ignore
-            db_player = result.scalar_one_or_none()
-            if db_player:
-                table_player = TablePlayer(
-                    table_id=table_id,
-                    player_id=db_player.id,
-                    seat_order=orden,
-                    country=player.country,  # type: ignore
-                )
-                session.add(table_player)
-
-    # Save waiting list
-    for orden, player in enumerate(resultado.waitlist_players, 1):  # type: ignore
-        result = await session.execute(select(Player).where(Player.name == player.name))  # type: ignore
-        db_player = result.scalar_one_or_none()
-        if db_player:
-            waiting = WaitingList(
-                timeline_edge_id=edge_id,
-                player_id=db_player.id,
-                list_order=orden,
-                missing_spots=int(player.desired_games),  # type: ignore
-            )
-            session.add(waiting)
-
-    return snap_id
 
 
 # ── Notion Cache ─────────────────────────────────────────────────────────────
