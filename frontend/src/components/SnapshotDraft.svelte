@@ -41,6 +41,7 @@
     untrack(() =>
       initialPlayers.map((p) => ({
         nombre: p.nombre,
+        original_nombre: p.nombre, // Track original name for rename detection
         experiencia: p.experiencia ?? "Nuevo",
         juegos_este_ano: p.juegos_este_ano ?? 0,
         prioridad: p.prioridad,
@@ -84,6 +85,7 @@
       ...draftPlayers,
       {
         nombre,
+        original_nombre: nombre,
         experiencia: "Nuevo",
         juegos_este_ano: 0,
         prioridad: 0,
@@ -106,7 +108,10 @@
       );
       return;
     }
-    draftPlayers = [...draftPlayers, ...parsed];
+    draftPlayers = [
+      ...draftPlayers,
+      ...parsed.map((p) => ({ ...p, original_nombre: p.nombre })),
+    ];
     csvText = "";
     showCsvModal = false;
   }
@@ -182,6 +187,7 @@
         .filter((p) => !existingNames.has(normalizeName(p.nombre)))
         .map((p) => ({
           nombre: p.nombre,
+          original_nombre: p.nombre,
           experiencia: p.experiencia,
           juegos_este_ano: p.juegos_este_ano,
           prioridad: 0,
@@ -222,6 +228,11 @@
 
     saving = true;
     try {
+      // Calculate manual renames by comparing current name to original
+      const manualRenames = draftPlayers
+        .filter((p) => p.original_nombre && p.original_nombre !== p.nombre)
+        .map((p) => ({ from: p.original_nombre, to: p.nombre }));
+
       const players: EditPlayerRow[] = draftPlayers.map((p) => ({
         nombre: p.nombre,
         experiencia: p.experiencia,
@@ -235,6 +246,7 @@
         parent_id: parentId,
         event_type: eventType,
         players,
+        renames: manualRenames,
       });
 
       if (result.error) {

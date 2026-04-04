@@ -26,6 +26,8 @@ from backend.db.connection import async_engine
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from backend.db.models import RenameDict
+
 logger = logging.getLogger(__name__)
 
 # ── Player field defaults for first-time Notion players ──────────────────────
@@ -425,9 +427,7 @@ async def _fetch_notion_data() -> tuple[list[dict[str, Any]], dict[str, int], Cl
     loop = asyncio.get_event_loop()
     with concurrent.futures.ThreadPoolExecutor() as executor:
         future_pages = executor.submit(descargar_todos, client, db_id)
-        future_conteo = executor.submit(
-            conteo_partidas_este_ano, client, part_db_id, año_actual
-        )
+        future_conteo = executor.submit(conteo_partidas_este_ano, client, part_db_id, año_actual)
 
         pages = await loop.run_in_executor(None, future_pages.result)
         conteo_por_jugador = await loop.run_in_executor(None, future_conteo.result)
@@ -507,6 +507,7 @@ async def _update_snapshot_in_place(
     session: AsyncSession,
     snapshot_id: int,
     filas: list[dict[str, Any]],
+    renames: list[RenameDict],
 ) -> None:
     """Update an existing snapshot in-place with new player data."""
     from sqlalchemy import delete, update
@@ -516,15 +517,24 @@ async def _update_snapshot_in_place(
     # Fetch old roster before clearing
     previous_players = await crud.get_snapshot_players(session, snapshot_id)
 
+    # Execute renames safely to maintain player continuity without UNIQUE constraint crashes
+    from sqlalchemy import select
+
+    from backend.db.models import Player
+    for r in (renames or []):
+        target_exists = await session.execute(select(Player).where(Player.name == r["to"]))
+        if not target_exists.scalar_one_or_none():
+            await session.execute(
+                update(Player).where(Player.name == r["from"]).values(name=r["to"])
+            )
+
     # Update the existing snapshot source
     await session.execute(
         update(Snapshot).where(Snapshot.id == snapshot_id).values(source="notion_sync")
     )
 
     # Clear old roster
-    await session.execute(
-        delete(SnapshotPlayer).where(SnapshotPlayer.snapshot_id == snapshot_id)
-    )
+    await session.execute(delete(SnapshotPlayer).where(SnapshotPlayer.snapshot_id == snapshot_id))
 
     # Insert new players
     for fila in filas:
@@ -540,13 +550,30 @@ async def _update_snapshot_in_place(
             fila["partidas_gm"],
         )
 
-    # Log the history
+    # Calculate dynamic diff for history logging
+    from backend.db.crud import generate_deep_diff
+    roster_fields = {"nombre", "experiencia", "juegos_este_ano", "prioridad", "partidas_deseadas", "partidas_gm"}
+    prev_roster = [{k: v for k, v in p.items() if k in roster_fields} for p in previous_players]
+    new_roster = [
+        {
+            "nombre": f["nombre"],
+            "experiencia": f["experiencia"],
+            "juegos_este_ano": f["juegos_este_ano"],
+            "prioridad": f.get("prioridad", 0),
+            "partidas_deseadas": f.get("partidas_deseadas", 1),
+            "partidas_gm": f.get("partidas_gm", 0),
+        }
+        for f in filas
+    ]
+    diff = generate_deep_diff(prev_roster, new_roster, renames)
+
+    # Log the history (outside the loop)
     await crud.log_snapshot_history(
         session,
         snapshot_id=snapshot_id,
         action_type="notion_sync",
-        summary=f"Sincronización con Notion ({len(filas)} jugadores)",
-        previous_state={"players": previous_players}
+        changes=diff,
+        previous_state={"players": previous_players},
     )
 
     logger.info(f"Snapshot #{snapshot_id} updated in-place with {len(filas)} jugador(es).")
@@ -636,9 +663,7 @@ async def _build_snapshot_rows(
                     notion_data = notion_players[notion_norm]
                     filas.append(
                         {
-                            "nombre": notion_data["nombre"]
-                            if action == "merge_notion"
-                            else nombre,
+                            "nombre": notion_data["nombre"] if action == "merge_notion" else nombre,
                             "experiencia": notion_data["experiencia"],
                             "juegos_este_ano": notion_data["juegos_este_ano"],
                             "prioridad": int(
@@ -697,13 +722,9 @@ async def _build_snapshot_rows(
                         "nombre": nombre,  # Keep local name
                         "experiencia": notion_data["experiencia"],
                         "juegos_este_ano": notion_data["juegos_este_ano"],
-                        "prioridad": int(
-                            existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
-                        ),
+                        "prioridad": int(existente.get("prioridad", FIELD_DEFAULTS["prioridad"])),
                         "partidas_deseadas": int(
-                            existente.get(
-                                "partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"]
-                            )
+                            existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])
                         ),
                         "partidas_gm": int(
                             existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
@@ -718,13 +739,9 @@ async def _build_snapshot_rows(
                         "nombre": nombre,
                         "experiencia": existente.get("experiencia", "Nuevo"),
                         "juegos_este_ano": int(existente.get("juegos_este_ano", 0)),
-                        "prioridad": int(
-                            existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
-                        ),
+                        "prioridad": int(existente.get("prioridad", FIELD_DEFAULTS["prioridad"])),
                         "partidas_deseadas": int(
-                            existente.get(
-                                "partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"]
-                            )
+                            existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])
                         ),
                         "partidas_gm": int(
                             existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
@@ -732,6 +749,7 @@ async def _build_snapshot_rows(
                         **{c: existente.get(c, 0) for c in COUNTRY_PROPS},
                     }
                 )
+
     else:
         # No existing snapshot - use all Notion players directly from our lookup
         for _, notion_data in notion_players.items():
@@ -795,15 +813,11 @@ async def run_notion_sync_background(
                 has_snapshots = latest_id is not None
 
                 if snapshot_id is None and has_snapshots:
-                    logger.error(
-                        "Snapshot ID is required because the database is not empty."
-                    )
+                    logger.error("Snapshot ID is required because the database is not empty.")
                     return None
 
                 # Build snapshot rows combining existing and Notion data
-                filas = await _build_snapshot_rows(
-                    session, snapshot_id, notion_players, merges
-                )
+                filas = await _build_snapshot_rows(session, snapshot_id, notion_players, merges)
 
                 existing_names: set[str] = (
                     {p["nombre"] for p in await crud.get_snapshot_players(session, snapshot_id)}
@@ -812,9 +826,7 @@ async def run_notion_sync_background(
                 )
                 nuevos = [f["nombre"] for f in filas if f["nombre"] not in existing_names]
 
-                logger.info(
-                    f"{len(filas)} jugador(es) procesados ({len(nuevos)} nuevo(s))."
-                )
+                logger.info(f"{len(filas)} jugador(es) procesados ({len(nuevos)} nuevo(s)).")
                 if nuevos:
                     logger.info(f"Nuevos: {', '.join(nuevos)}")
 
@@ -832,9 +844,12 @@ async def run_notion_sync_background(
                 if snapshot_id is not None:
                     has_children = await _check_snapshot_has_children(session, snapshot_id)
 
+                    # Extract renames for merge_notion actions
+                    renames_list: list[RenameDict] = [{"from": k, "to": v["to"]} for k, v in (merges or {}).items() if v.get("action") == "merge_notion"]
+
                     if not has_children:
-                        # Update in-place for leaf nodes
-                        await _update_snapshot_in_place(session, snapshot_id, filas)
+                        # Leaf node: update in place
+                        await _update_snapshot_in_place(session, snapshot_id, filas, renames_list)
                         await session.commit()
                         return snapshot_id
 

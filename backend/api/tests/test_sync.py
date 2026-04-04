@@ -503,8 +503,15 @@ class TestNotionSyncBackground:
 
             # Verify history metadata
             assert history.action_type == "notion_sync"
-            assert "Sincronización con Notion" in history.summary
-            assert "jugadores" in history.summary
+            # With STRICT ROSTER RULE: sync only updates existing players, never adds/removes
+            # - Alice: modified (juegos_este_ano 0 -> 7, experiencia Nuevo -> Antiguo)
+            # - Bob: remains (no changes)
+            # - Charlie: ignored (new players not added to existing snapshots)
+            assert history.changes["added"] == []
+            assert history.changes["removed"] == []
+            assert history.changes["renamed"] == []
+            assert len(history.changes["modified"]) == 1
+            assert history.changes["modified"][0]["nombre"] == "Alice"
             assert "players" in history.previous_state
 
             # Verify the previous roster is stored (Alice, Bob)

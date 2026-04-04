@@ -120,6 +120,7 @@ describe("SnapshotDetail", () => {
         onOpenGameDraft: () => {},
         onEditDraft: () => {},
         onShowError: () => {},
+        onShowToast: vi.fn(),
       },
     });
 
@@ -150,6 +151,7 @@ describe("SnapshotDetail", () => {
         onOpenGameDraft: () => {},
         onEditDraft,
         onShowError: () => {},
+        onShowToast: vi.fn(),
       },
     });
 
@@ -245,6 +247,7 @@ describe("SnapshotDetail", () => {
         onOpenGameDraft: () => {},
         onEditDraft,
         onShowError: () => {},
+        onShowToast: vi.fn(),
       },
     });
 
@@ -288,6 +291,7 @@ describe("SnapshotDetail", () => {
         onOpenGameDraft: () => {},
         onEditDraft,
         onShowError: () => {},
+        onShowToast: vi.fn(),
       },
     });
 
@@ -325,6 +329,7 @@ describe("SnapshotDetail", () => {
         onOpenGameDraft: () => {},
         onEditDraft: () => {},
         onShowError: () => {},
+        onShowToast: vi.fn(),
       },
     });
 
@@ -359,6 +364,7 @@ describe("SnapshotDetail", () => {
         onOpenGameDraft: () => {},
         onEditDraft: () => {},
         onShowError: () => {},
+        onShowToast: vi.fn(),
       },
     });
 
@@ -404,6 +410,7 @@ describe("SnapshotDetail", () => {
         onOpenGameDraft,
         onEditDraft: () => {},
         onShowError: () => {},
+        onShowToast: vi.fn(),
       },
     });
 
@@ -451,6 +458,7 @@ describe("SnapshotDetail", () => {
         onOpenGameDraft: () => {},
         onEditDraft: () => {},
         onShowError,
+        onShowToast: vi.fn(),
       },
     });
 
@@ -495,6 +503,7 @@ describe("SnapshotDetail", () => {
         onOpenGameDraft: () => {},
         onEditDraft: () => {},
         onShowError: () => {},
+        onShowToast: vi.fn(),
       },
     });
 
@@ -535,6 +544,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft,
           onEditDraft: () => {},
           onShowError,
+          onShowToast: vi.fn(),
         },
       });
 
@@ -582,6 +592,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft,
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -627,6 +638,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft,
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -680,6 +692,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft,
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -791,6 +804,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -818,19 +832,142 @@ describe("SnapshotDetail", () => {
 
       // Wait for the async operations to complete
       await waitFor(() => {
-        // Verify renamePlayer was called with correct names
-        expect(renamePlayer).toHaveBeenCalledWith("Renato", "Renato Alegre");
-      });
-
-      // Verify saveSnapshot was called
-      await waitFor(() => {
+        // Verify saveSnapshot was called
         expect(saveSnapshot).toHaveBeenCalled();
       });
+
+      // Verify saveSnapshot was called with the correct renames payload
+      expect(saveSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({
+          renames: [{ from: "Renato", to: "Renato Alegre" }],
+        }),
+      );
 
       // Verify fetchSnapshot was called again (loadSnapshot after save)
       await waitFor(() => {
         expect(fetchSnapshot).toHaveBeenCalledTimes(2);
       });
+
+      // Restore fake timers
+      vi.useFakeTimers();
+    });
+
+    it("passes renames payload to saveSnapshot on sync merge", async () => {
+      // Use real timers for this test to avoid async issues
+      vi.useRealTimers();
+
+      const { fetchSnapshot, fetchNotionPlayers, saveSnapshot, renamePlayer } =
+        await import("../api");
+
+      // Mock initial snapshot with a player that has similar name in Notion
+      (fetchSnapshot as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce({
+          id: 1,
+          created_at: "2024-01-01T00:00:00Z",
+          source: "manual",
+          players: [
+            {
+              nombre: "Juan",
+              experiencia: "Nuevo",
+              juegos_este_ano: 0,
+              prioridad: 0,
+              partidas_deseadas: 1,
+              partidas_gm: 0,
+            },
+          ],
+        })
+        // Second call after successful sync (reload)
+        .mockResolvedValueOnce({
+          id: 1,
+          created_at: "2024-01-01T00:00:00Z",
+          source: "manual",
+          players: [
+            {
+              nombre: "Juan Perez",
+              experiencia: "Antiguo",
+              juegos_este_ano: 5,
+              prioridad: 0,
+              partidas_deseadas: 1,
+              partidas_gm: 0,
+            },
+          ],
+        });
+
+      // Mock fetchNotionPlayers to return a similar_names conflict
+      (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        players: [
+          {
+            nombre: "Juan Perez",
+            experiencia: "Antiguo",
+            juegos_este_ano: 5,
+            alias: [],
+          },
+        ],
+        similar_names: [
+          {
+            notion: "Juan Perez",
+            snapshot: "Juan",
+            similarity: 0.85,
+          },
+        ],
+        error: undefined,
+      });
+
+      // Mock renamePlayer to succeed
+      (renamePlayer as ReturnType<typeof vi.fn>).mockResolvedValueOnce({});
+
+      // Mock saveSnapshot to succeed
+      (saveSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        snapshot_id: 2,
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+          onShowToast: vi.fn(),
+        },
+      });
+
+      // Wait for loading to complete
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Click sync button to trigger the sync
+      const syncBtn = screen.getByRole("button", {
+        name: /Sincronizar Notion/i,
+      });
+      await fireEvent.click(syncBtn);
+
+      // Wait for the resolution modal to appear
+      await waitFor(() => {
+        expect(screen.getByText(/Nombres similares/i)).toBeTruthy();
+      });
+
+      // Click "Usar nombre Notion" button (triggers merge_notion action)
+      const notionBtn = screen.getByRole("button", {
+        name: /Usar nombre Notion/i,
+      });
+      await fireEvent.click(notionBtn);
+
+      // Wait for saveSnapshot to be called
+      await waitFor(() => {
+        expect(saveSnapshot).toHaveBeenCalled();
+      });
+
+      // Verify saveSnapshot was called with the correct renames payload
+      expect(saveSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({
+          renames: [{ from: "Juan", to: "Juan Perez" }],
+        }),
+      );
 
       // Restore fake timers
       vi.useFakeTimers();
@@ -874,6 +1011,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError,
+          onShowToast: vi.fn(),
         },
       });
 
@@ -945,6 +1083,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError,
+          onShowToast: vi.fn(),
         },
       });
 
@@ -1011,6 +1150,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError,
+          onShowToast: vi.fn(),
         },
       });
 
@@ -1064,6 +1204,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -1095,6 +1236,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -1118,13 +1260,23 @@ describe("SnapshotDetail", () => {
             id: 1,
             created_at: "2024-01-02T10:30:00Z",
             action_type: "manual_edit",
-            summary: "Edición manual del roster",
+            changes: {
+              added: ["Alice", "Bob"],
+              removed: [],
+              renamed: [],
+              modified: [],
+            },
           },
           {
             id: 2,
             created_at: "2024-01-01T15:20:00Z",
             action_type: "notion_sync",
-            summary: "Sincronización con Notion",
+            changes: {
+              added: [],
+              removed: ["Charlie"],
+              renamed: [],
+              modified: [],
+            },
           },
         ],
       });
@@ -1139,6 +1291,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -1150,12 +1303,16 @@ describe("SnapshotDetail", () => {
       expect(screen.getByText(/Historial de Cambios/)).toBeTruthy();
 
       // Both history entries should be displayed
-      expect(screen.getByText("Edición manual del roster")).toBeTruthy();
-      expect(screen.getByText("Sincronización con Notion")).toBeTruthy();
+      expect(screen.getByText("Edición Manual")).toBeTruthy();
+      expect(screen.getByText("Sincronización Notion")).toBeTruthy();
 
-      // Timestamps should be formatted and displayed
-      expect(screen.getByText(/1\/2\/2024/)).toBeTruthy();
-      expect(screen.getByText(/1\/1\/2024/)).toBeTruthy();
+      // Changes should be formatted correctly
+      expect(screen.getByText("+ Añadidos: Alice, Bob")).toBeTruthy();
+      expect(screen.getByText("- Removidos: Charlie")).toBeTruthy();
+
+      // Timestamps should be formatted and displayed in Spanish locale
+      expect(screen.getByText(/2 ene\./)).toBeTruthy();
+      expect(screen.getByText(/1 ene\./)).toBeTruthy();
     });
 
     it("renders multiple history entries in correct order", async () => {
@@ -1170,19 +1327,34 @@ describe("SnapshotDetail", () => {
             id: 3,
             created_at: "2024-01-03T12:00:00Z",
             action_type: "notion_sync",
-            summary: "Tercera edición",
+            changes: {
+              added: [],
+              removed: [],
+              renamed: [{ from: "Juan", to: "Juan Perez" }],
+              modified: [],
+            },
           },
           {
             id: 2,
             created_at: "2024-01-02T12:00:00Z",
             action_type: "manual_edit",
-            summary: "Segunda edición",
+            changes: {
+              added: ["Alice", "Bob"],
+              removed: [],
+              renamed: [],
+              modified: [],
+            },
           },
           {
             id: 1,
             created_at: "2024-01-01T12:00:00Z",
             action_type: "manual_edit",
-            summary: "Primera edición",
+            changes: {
+              added: [],
+              removed: ["Charlie"],
+              renamed: [],
+              modified: [],
+            },
           },
         ],
       });
@@ -1197,6 +1369,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -1206,15 +1379,24 @@ describe("SnapshotDetail", () => {
 
       // History section should be rendered with all entries
       expect(screen.getByText(/Historial de Cambios/)).toBeTruthy();
-      expect(screen.getByText("Tercera edición")).toBeTruthy();
-      expect(screen.getByText("Segunda edición")).toBeTruthy();
-      expect(screen.getByText("Primera edición")).toBeTruthy();
+
+      // Verify the changes are displayed correctly
+      expect(
+        screen.getByText("✏️ Renombrados: Juan ➔ Juan Perez"),
+      ).toBeTruthy();
+      expect(screen.getByText("+ Añadidos: Alice, Bob")).toBeTruthy();
+      expect(screen.getByText("- Removidos: Charlie")).toBeTruthy();
 
       // Verify the order in the DOM (most recent first)
-      const historyItems = screen.getAllByText(/edición/i);
-      expect(historyItems[0]!.textContent).toContain("Tercera");
-      expect(historyItems[1]!.textContent).toContain("Segunda");
-      expect(historyItems[2]!.textContent).toContain("Primera");
+      const historyItems = document.querySelectorAll(".history-item");
+      expect(historyItems[0]!.textContent).toContain("Sincronización Notion");
+      expect(historyItems[0]!.textContent).toContain(
+        "✏️ Renombrados: Juan ➔ Juan Perez",
+      );
+      expect(historyItems[1]!.textContent).toContain("+ Añadidos: Alice, Bob");
+      expect(historyItems[2]!.textContent).toContain("- Removidos: Charlie");
+      expect(historyItems[2]!.textContent).toContain("Edición Manual");
+      expect(historyItems[2]!.textContent).toContain("- Removidos: Charlie");
     });
 
     it("displays action type icons correctly", async () => {
@@ -1229,13 +1411,23 @@ describe("SnapshotDetail", () => {
             id: 1,
             created_at: "2024-01-01T10:00:00Z",
             action_type: "manual_edit",
-            summary: "Manual edit",
+            changes: {
+              added: ["Alice"],
+              removed: [],
+              renamed: [],
+              modified: [],
+            },
           },
           {
             id: 2,
             created_at: "2024-01-01T11:00:00Z",
             action_type: "notion_sync",
-            summary: "Notion sync",
+            changes: {
+              added: [],
+              removed: [],
+              renamed: [{ from: "Juan", to: "Juan Perez" }],
+              modified: [],
+            },
           },
         ],
       });
@@ -1250,6 +1442,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -1257,10 +1450,64 @@ describe("SnapshotDetail", () => {
         expect(screen.queryByText("Cargando…")).toBeNull();
       });
 
-      // Check that history entries are displayed
-      // The component should render appropriate visual indicators for each action type
-      expect(screen.getByText("Manual edit")).toBeTruthy();
-      expect(screen.getByText("Notion sync")).toBeTruthy();
+      // Check that history entries are displayed with proper changes
+      expect(screen.getByText("+ Añadidos: Alice")).toBeTruthy();
+      expect(
+        screen.getByText("✏️ Renombrados: Juan ➔ Juan Perez"),
+      ).toBeTruthy();
+    });
+
+    it("renders modified player changes with field details", async () => {
+      const { fetchSnapshot } = await import("../api");
+      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        id: 1,
+        created_at: "2024-01-01T00:00:00Z",
+        source: "manual",
+        players: [],
+        history: [
+          {
+            id: 1,
+            created_at: "2024-01-01T12:00:00Z",
+            action_type: "manual_edit",
+            changes: {
+              added: [],
+              removed: [],
+              renamed: [],
+              modified: [
+                {
+                  nombre: "Pablo",
+                  changes: {
+                    juegos_este_ano: { old: 2, new: 3 },
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      render(SnapshotDetail, {
+        props: {
+          id: 1,
+          onClose: () => {},
+          onChainUpdate: () => {},
+          onOpenSnapshot: () => {},
+          onOpenGame: () => {},
+          onOpenGameDraft: () => {},
+          onEditDraft: () => {},
+          onShowError: () => {},
+          onShowToast: vi.fn(),
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Verify modified section is rendered correctly
+      expect(screen.getByText("✏️ Editados:")).toBeTruthy();
+      expect(screen.getByText("Pablo:")).toBeTruthy();
+      expect(screen.getByText("[juegos_este_ano: 2 ➔ 3]")).toBeTruthy();
     });
   });
 
@@ -1277,7 +1524,12 @@ describe("SnapshotDetail", () => {
             id: 1,
             created_at: "2024-01-01T12:00:00Z",
             action_type: "manual_edit",
-            summary: "Test history entry",
+            changes: {
+              added: ["Alice"],
+              removed: [],
+              renamed: [],
+              modified: [],
+            },
           },
         ],
       });
@@ -1292,6 +1544,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -1323,7 +1576,12 @@ describe("SnapshotDetail", () => {
             id: 1,
             created_at: "2024-01-01T12:00:00Z",
             action_type: "manual_edit",
-            summary: "Test history entry",
+            changes: {
+              added: ["Alice"],
+              removed: [],
+              renamed: [],
+              modified: [],
+            },
           },
         ],
       });
@@ -1338,6 +1596,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -1350,8 +1609,8 @@ describe("SnapshotDetail", () => {
       await fireEvent.click(historySummary);
 
       // History details should now be visible
-      expect(screen.getByText("Test history entry")).toBeTruthy();
-      expect(screen.getByText("manual_edit")).toBeTruthy();
+      expect(screen.getByText("+ Añadidos: Alice")).toBeTruthy();
+      expect(screen.getByText("Edición Manual")).toBeTruthy();
 
       // The details element should be open
       const details = historySummary.closest("details");
@@ -1386,6 +1645,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -1437,6 +1697,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -1495,6 +1756,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -1533,6 +1795,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft,
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -1593,6 +1856,7 @@ describe("SnapshotDetail", () => {
           onOpenGameDraft: () => {},
           onEditDraft,
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 

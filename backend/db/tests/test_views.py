@@ -438,7 +438,7 @@ class TestSnapshotHistoryInDetail:
             db_session,
             snapshot_id=snap_id,
             action_type="manual_edit",
-            summary="Edición manual del roster",
+            changes={"added": [], "removed": [], "renamed": [], "modified": []},
             previous_state={"players": [{"nombre": "OldPlayer", "experiencia": "Nuevo"}]},
         )
         await db_session.commit()
@@ -455,7 +455,7 @@ class TestSnapshotHistoryInDetail:
         assert "id" in log
         assert "created_at" in log
         assert log["action_type"] == "manual_edit"
-        assert log["summary"] == "Edición manual del roster"
+        assert log["changes"] == {"added": [], "removed": [], "renamed": [], "modified": []}
 
     async def test_snapshot_detail_history_ordered_by_date_desc(self, db_session: Any) -> None:
         """
@@ -475,7 +475,7 @@ class TestSnapshotHistoryInDetail:
                 db_session,
                 snapshot_id=snap_id,
                 action_type=f"action_{i}",
-                summary=f"Action {i}",
+                changes={"added": [], "removed": [], "renamed": [], "modified": []},
                 previous_state={"players": []},
             )
             await db_session.commit()
@@ -493,3 +493,111 @@ class TestSnapshotHistoryInDetail:
         for entry in detail["history"]:
             assert "created_at" in entry
             assert isinstance(entry["created_at"], str)
+
+
+class TestGetSnapshotDetailFanOutRegression:
+    """
+    Regression tests for the JOIN fan-out bug causing duplicate players.
+
+    When a player has multiple entries in related tables (e.g., multiple
+    NotionCache entries from historical syncs), the JOIN in get_snapshot_players
+    was multiplying rows, causing the same player to appear multiple times.
+    """
+
+    async def test_no_duplicate_players_with_multiple_notion_cache_entries(
+        self, db_session: Any
+    ) -> None:
+        """
+        Verify that players with multiple NotionCache entries don't appear duplicated.
+
+        This is a regression test for the SQL JOIN fan-out bug where veteran
+        players with historical records were being returned multiple times.
+        """
+        from backend.db.crud import get_snapshot_players
+
+        # Setup: Create a snapshot with one player
+        snap_id = await create_snapshot(db_session, "manual")
+        player_id = await get_or_create_player(db_session, "VeteranPlayer")
+
+        # Add player to snapshot
+        await add_player_to_snapshot(
+            db_session, snap_id, player_id, "Antiguo", 5, 10, 3, 1
+        )
+        await db_session.commit()
+
+        # Create multiple NotionCache entries for the same player (historical data)
+        # This simulates the scenario where a veteran player has been synced multiple times
+        for i in range(3):
+            cache_entry = NotionCache(
+                name="VeteranPlayer",
+                notion_id=f"notion-id-{i}",
+                experience="Antiguo",
+                last_updated=datetime.now(),
+                c_england=i,
+                c_france=i + 1,
+                c_germany=i + 2,
+                c_italy=i + 3,
+                c_austria=i + 4,
+                c_russia=i + 5,
+                c_turkey=i + 6,
+            )
+            db_session.add(cache_entry)
+        await db_session.commit()
+
+        # Retrieve players - should return exactly 1 player, not 3
+        players = await get_snapshot_players(db_session, snap_id)
+
+        # The bug would cause 3 rows (one per NotionCache entry) before .distinct()
+        assert len(players) == 1, (
+            f"Expected 1 player, got {len(players)} - JOIN fan-out bug! "
+            f"Players returned: {[p['nombre'] for p in players]}"
+        )
+
+        # Verify the single player has the correct data
+        assert players[0]["nombre"] == "VeteranPlayer"
+        assert players[0]["experiencia"] == "Antiguo"
+
+    async def test_get_snapshot_detail_no_duplicates_with_history(
+        self, db_session: Any
+    ) -> None:
+        """
+        Verify get_snapshot_detail returns unique players even with history records.
+
+        Tests the full integration path from get_snapshot_detail through
+        get_snapshot_players to ensure no fan-out occurs.
+        """
+        # Setup: Create a snapshot with a player
+        snap_id = await create_snapshot(db_session, "manual")
+        player_id = await get_or_create_player(db_session, "MultiCachePlayer")
+
+        await add_player_to_snapshot(
+            db_session, snap_id, player_id, "Nuevo", 0, 0, 1, 0
+        )
+        await db_session.commit()
+
+        # Add multiple NotionCache entries to create fan-out potential
+        for i in range(5):
+            cache_entry = NotionCache(
+                name="MultiCachePlayer",
+                notion_id=f"id-{i}",
+                experience="Nuevo",
+                last_updated=datetime.now(),
+                c_england=1,
+                c_france=2,
+                c_germany=3,
+                c_italy=4,
+                c_austria=5,
+                c_russia=6,
+                c_turkey=7,
+            )
+            db_session.add(cache_entry)
+        await db_session.commit()
+
+        # Get full snapshot detail
+        detail = await get_snapshot_detail(db_session, snap_id)
+
+        assert detail is not None
+        assert len(detail["players"]) == 1, (
+            f"Expected 1 player in snapshot detail, got {len(detail['players'])}"
+        )
+        assert detail["players"][0]["nombre"] == "MultiCachePlayer"

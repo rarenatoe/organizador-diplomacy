@@ -3,9 +3,44 @@
 from __future__ import annotations
 
 from datetime import datetime  # noqa: TCH003
+from enum import StrEnum
+from typing import Any, TypedDict
 
 from sqlalchemy import JSON, ForeignKey, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, mapped_column, relationship
+
+# ── TypedDict types for diffing logic ─────────────────────────────────────────
+
+# Using alternative TypedDict syntax to handle reserved keyword 'from'
+RenameDict = TypedDict("RenameDict", {"from": str, "to": str})
+
+
+class FieldChange(TypedDict):
+    """A change to a single field with old and new values."""
+    old: Any
+    new: Any
+
+
+class ModifiedPlayer(TypedDict):
+    """A player with modified fields."""
+    nombre: str
+    changes: dict[str, FieldChange]
+
+
+class DeepDiffResult(TypedDict):
+    """Result of a deep diff operation on player lists."""
+    added: list[str]
+    removed: list[str]
+    renamed: list[RenameDict]
+    modified: list[ModifiedPlayer]
+
+
+class HistoryActionType(StrEnum):
+    """Types of history actions for snapshot mutations."""
+
+    MANUAL_EDIT = "manual_edit"
+    NOTION_SYNC = "notion_sync"
+    CREATION = "creation"
 
 
 class Base(MappedAsDataclass, DeclarativeBase):
@@ -144,9 +179,7 @@ class WaitingList(Base, kw_only=True):
 
     # Relationships
     timeline_edge: Mapped[TimelineEdge] = relationship(back_populates="waiting_list", init=False)
-    player: Mapped[Player] = relationship(
-        back_populates="waiting_list_entries", init=False
-    )
+    player: Mapped[Player] = relationship(back_populates="waiting_list_entries", init=False)
 
 
 class NotionCache(Base, kw_only=True):
@@ -177,5 +210,7 @@ class SnapshotHistory(Base, kw_only=True):
     snapshot_id: Mapped[int] = mapped_column(ForeignKey("snapshots.id"))
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     action_type: Mapped[str] = mapped_column()  # e.g., 'notion_sync', 'manual_edit'
-    summary: Mapped[str] = mapped_column()  # Human readable text for the UI
-    previous_state: Mapped[dict[str, object]] = mapped_column(JSON)  # Raw dict of the roster before the change
+    changes: Mapped[DeepDiffResult] = mapped_column(JSON)  # Structured changes object
+    previous_state: Mapped[dict[str, object]] = mapped_column(
+        JSON
+    )  # Raw dict of the roster before the change

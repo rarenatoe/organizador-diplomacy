@@ -269,11 +269,11 @@ class TestApiSnapshotCreate:
         assert edge.source_snapshot_id == parent_id
 
     async def test_create_preserves_roster_in_place(self, client: Any, db_session: Any) -> None:
-        """Creating a snapshot with same roster as parent should update in place and log history."""
+        """Creating a snapshot with same roster as parent should detect no changes and skip history."""
         parent_id = await make_snapshot_with_players(db_session, n=5)
         # Get current player list
         players_before = await get_snapshot_players(db_session, parent_id)
-        # Create child with same roster (this should trigger in-place update via /api/snapshot/save)
+        # Create child with same roster (this should trigger no_changes via /api/snapshot/save)
         resp = await client.post(
             "/api/snapshot/save",
             json={
@@ -282,22 +282,18 @@ class TestApiSnapshotCreate:
                 "players": players_before,
             },
         )
-        # Should update in place, not create new snapshot
+        # Should detect no changes and return early
         assert resp.status_code == 200
         data = resp.json()
         assert data["snapshot_id"] == parent_id
+        assert data["status"] == "no_changes"
 
-        # Verify SnapshotHistory entry was created
+        # No SnapshotHistory entry should be created when there are no changes
         result = await db_session.execute(
             select(SnapshotHistory).where(SnapshotHistory.snapshot_id == parent_id)
         )
         history_records = result.scalars().all()
-        assert len(history_records) == 1
-        history = history_records[0]
-        assert history.action_type == "manual_edit"
-        assert history.summary == "Edición manual del roster"
-        assert "players" in history.previous_state
-        assert len(history.previous_state["players"]) == len(players_before)
+        assert len(history_records) == 0
 
     async def test_create_snapshot_adds_players(self, client: Any, db_session: Any) -> None:
         """Creating a snapshot should add provided players."""
@@ -413,3 +409,65 @@ class TestApiSnapshotSave:
         assert len(edges) == 1, f"Expected exactly 1 edge, got {len(edges)}"
         edge = edges[0]
         assert edge.edge_type == "branch", f"Expected edge_type='branch', got '{edge.edge_type}'"
+
+    async def test_snapshot_save_ignores_algorithm_weights(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """
+        Regression test: Algorithm weight fields (c_england, c_france, etc.)
+        should be ignored during snapshot save to prevent phantom modifications.
+        
+        When saving a sync with the same roster but extra algorithm fields,
+        the backend should detect no actual changes and return "no_changes".
+        """
+        # Setup: Create a root snapshot with only Juan using the dedicated helper
+        from backend.db.crud import create_root_manual_snapshot
+        
+        parent_id = await create_root_manual_snapshot(
+            db_session,
+            players=[
+                {
+                    "nombre": "Juan",
+                    "experiencia": "Nuevo",
+                    "juegos_este_ano": 0,
+                    "prioridad": 0,
+                    "partidas_deseadas": 1,
+                    "partidas_gm": 0,
+                }
+            ],
+        )
+        await db_session.commit()
+        
+        # Verify setup: snapshot should have exactly 1 player
+        players_before = await get_snapshot_players(db_session, parent_id)
+        assert len(players_before) == 1
+        assert players_before[0]["nombre"] == "Juan"
+        
+        # The Action: Save with same player data BUT include algorithm weights
+        # These should be ignored and not trigger a phantom modification
+        resp = await client.post(
+            "/api/snapshot/save",
+            json={
+                "parent_id": parent_id,
+                "event_type": "sync",
+                "players": [
+                    {
+                        "nombre": "Juan",
+                        "experiencia": "Nuevo",
+                        "juegos_este_ano": 0,
+                        "prioridad": 0,
+                        "partidas_deseadas": 1,
+                        "partidas_gm": 0,
+                        # These algorithm fields should be ignored
+                        "c_england": 5,
+                        "c_france": 3,
+                    }
+                ],
+            },
+        )
+        
+        # The Assertion: Backend should ignore extra fields and detect no changes
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "no_changes"
+        assert data["snapshot_id"] == parent_id

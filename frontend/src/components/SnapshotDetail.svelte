@@ -35,6 +35,7 @@
       players?: EditPlayerRow[],
     ) => void;
     onShowError: (title: string, output: string) => void;
+    onShowToast: (message: string) => void;
   }
 
   let {
@@ -44,6 +45,7 @@
     onOpenGameDraft,
     onEditDraft,
     onShowError,
+    onShowToast,
   }: Props = $props();
 
   let data = $state<SnapshotDetail | null>(null);
@@ -71,6 +73,28 @@
     if (source === "notion_sync") return "☁️ Notion Sync";
     if (source === "organizar") return "▶ Organizar";
     return "📥 Manual";
+  }
+
+  function formatAction(action: string): string {
+    switch (action) {
+      case "manual_edit":
+        return "Edición Manual";
+      case "notion_sync":
+        return "Sincronización Notion";
+      case "creation":
+        return "Creación";
+      default:
+        return action;
+    }
+  }
+
+  function formatDate(dateString: string): string {
+    return new Date(dateString).toLocaleString("es-PE", {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   }
 
   const csvText = $derived(() => {
@@ -188,20 +212,13 @@
   }
 
   async function executeSyncMerge(merges: MergePair[]): Promise<void> {
-    // Step 1: Explicitly rename players in DB before merging (preserves continuity)
-    for (const merge of merges) {
-      if (merge.action === "merge_notion") {
-        const renameRes = await renamePlayer(merge.from, merge.to);
-        if (renameRes.error) {
-          onShowError("Error al renombrar", renameRes.error);
-          ui.isSyncing = false;
-          return;
-        }
-      }
-    }
-
     const mergeMap = new Map(merges.map((m) => [m.from, m]));
     const currentRows = data?.players ?? [];
+
+    // Extract renames payload for the backend diff algorithm
+    const renamesPayload = merges
+      .filter((m) => m.action === "merge_notion")
+      .map((m) => ({ from: m.from, to: m.to }));
 
     // Update existing players with Notion data (Strict Roster Rule: only update existing)
     const mergedPlayers = currentRows.map((row) => {
@@ -244,11 +261,18 @@
         parent_id: id,
         event_type: "sync",
         players: mergedPlayers,
+        renames: renamesPayload,
       });
 
       if (result.error) {
         // Handle backend errors properly, including the Strict Guard message
         onShowError("Error de Sincronización", result.error);
+        return;
+      }
+
+      // Handle no_changes response
+      if (result.status === "no_changes") {
+        onShowToast("Notion ya está actualizado (sin cambios detectados)");
         return;
       }
 
@@ -410,11 +434,53 @@
           <ul class="history-list">
             {#each data.history as log (log.id)}
               <li class="history-item">
-                <span class="history-date">
-                  {new Date(log.created_at).toLocaleString()}
-                </span>
-                <span class="history-type">{log.action_type}</span>
-                <span class="history-summary">{log.summary}</span>
+                <div class="history-header">
+                  <span class="history-type"
+                    >{formatAction(log.action_type)}</span
+                  >
+                  <span class="history-date">
+                    {formatDate(log.created_at)}
+                  </span>
+                </div>
+                <div class="history-summary">
+                  {#if log.changes.added.length > 0}
+                    <div class="change-added">
+                      + Añadidos: {log.changes.added.join(", ")}
+                    </div>
+                  {/if}
+                  {#if log.changes.removed.length > 0}
+                    <div class="change-removed">
+                      - Removidos: {log.changes.removed.join(", ")}
+                    </div>
+                  {/if}
+                  {#if log.changes.renamed.length > 0}
+                    <div class="change-renamed">
+                      ✏️ Renombrados: {log.changes.renamed
+                        .map((r) => `${r.from} ➔ ${r.to}`)
+                        .join(", ")}
+                    </div>
+                  {/if}
+                  {#if log.changes.modified.length > 0}
+                    <div class="change-modified">
+                      <div style="margin-bottom: 2px;">✏️ Editados:</div>
+                      <ul class="mod-list">
+                        {#each log.changes.modified as mod (mod.nombre)}
+                          <li>
+                            <span class="mod-name">{mod.nombre}:</span>
+                            {#each Object.entries(mod.changes) as [field, vals] (field)}
+                              <span class="mod-detail"
+                                >[{field}: {vals.old} ➔ {vals.new}]</span
+                              >
+                            {/each}
+                          </li>
+                        {/each}
+                      </ul>
+                    </div>
+                  {/if}
+                  {#if log.changes.added.length === 0 && log.changes.removed.length === 0 && log.changes.renamed.length === 0 && log.changes.modified.length === 0}
+                    <div class="change-none">Sin cambios locales</div>
+                  {/if}
+                </div>
               </li>
             {/each}
           </ul>
@@ -584,7 +650,7 @@
     list-style: none;
     padding: 0;
     margin: 0 18px 16px;
-    max-height: 200px;
+    max-height: 25vh;
     overflow-y: auto;
     border: 1px solid var(--border);
     border-radius: 8px;
@@ -595,12 +661,18 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 10px 12px;
+    padding: 8px 12px;
     border-bottom: 1px solid var(--border);
   }
 
   .history-item:last-child {
     border-bottom: none;
+  }
+
+  .history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .history-date {
@@ -618,8 +690,44 @@
   }
 
   .history-summary {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text);
-    line-height: 1.4;
+    line-height: 1.3;
+  }
+
+  .change-added {
+    color: #166534;
+    font-weight: 500;
+  }
+  .change-removed {
+    color: #991b1b;
+    font-weight: 500;
+  }
+  .change-renamed {
+    color: #1d4ed8;
+  }
+  .change-modified {
+    color: var(--text);
+  }
+  .change-none {
+    color: var(--muted);
+    font-style: italic;
+  }
+  .mod-list {
+    list-style: none;
+    padding: 0 0 0 8px;
+    margin: 0;
+    border-left: 2px solid var(--border);
+  }
+  .mod-list li {
+    margin-bottom: 2px;
+  }
+  .mod-name {
+    font-weight: 600;
+  }
+  .mod-detail {
+    color: var(--muted);
+    font-size: 10px;
+    margin-left: 4px;
   }
 </style>

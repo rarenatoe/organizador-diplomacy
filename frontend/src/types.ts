@@ -116,15 +116,32 @@ export interface DeleteResult {
   error?: string;
 }
 
+export interface HistoryChanges {
+  added: string[];
+  removed: string[];
+  renamed: { from: string; to: string }[];
+  modified: {
+    nombre: string;
+    changes: Record<
+      string,
+      {
+        old: string | number | boolean | null;
+        new: string | number | boolean | null;
+      }
+    >;
+  }[];
+}
+
 export interface HistoryLog {
   id: number;
   created_at: string;
   action_type: string;
-  summary: string;
+  changes: HistoryChanges;
 }
 
 export interface EditPlayerRow {
   nombre: string;
+  original_nombre?: string;
   experiencia?: string;
   juegos_este_ano?: number;
   prioridad: number;
@@ -259,4 +276,11 @@ export interface SaveDraftRequest {
   snapshot_id: number;
   draft: DraftResponse;
   editing_game_id?: number | null;
+}
+
+export interface SnapshotSaveRequest {
+  parent_id?: number | null;
+  event_type?: string;
+  players: PlayerData[];
+  renames?: { from: string; to: string }[];
 }

@@ -158,7 +158,7 @@ async def get_snapshot_detail(session: AsyncSession, snapshot_id: int) -> dict[s
             if hasattr(entry.created_at, "isoformat")
             else str(entry.created_at),
             "action_type": entry.action_type,
-            "summary": entry.summary,
+            "changes": entry.changes,
         }
         for entry in history_entries
     ]

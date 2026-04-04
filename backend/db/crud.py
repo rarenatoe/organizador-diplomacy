@@ -16,11 +16,15 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.models import (
+    DeepDiffResult,
+    FieldChange,
     GameDetail,
     GameTable,
     GraphNode,
+    ModifiedPlayer,
     NotionCache,
     Player,
+    RenameDict,
     Snapshot,
     SnapshotHistory,
     SnapshotPlayer,
@@ -32,6 +36,64 @@ from backend.db.models import (
 if TYPE_CHECKING:
     from backend.organizador.models import DraftResult
 
+
+# ── Diffing Logic ────────────────────────────────────────────────────────────
+
+def generate_deep_diff(
+    old_players: list[dict[str, Any]],
+    new_players: list[dict[str, Any]],
+    renames: list[RenameDict],
+) -> DeepDiffResult:
+    """Generate a structured changes object comparing old and new player lists with rename handling."""
+    # Create lookup dictionaries by player name
+    old_dict = {p["nombre"]: p for p in old_players}
+    new_dict = {p["nombre"]: p for p in new_players}
+
+    # Apply renames to old_dict: update keys from old names to new names
+    for rename in renames:
+        old_name = rename["from"]
+        new_name = rename["to"]
+        if old_name in old_dict:
+            old_dict[new_name] = old_dict.pop(old_name)
+
+    # Find added, removed, and common players
+    added_names = set(new_dict.keys()) - set(old_dict.keys())
+    removed_names = set(old_dict.keys()) - set(new_dict.keys())
+    common_names = set(old_dict.keys()) & set(new_dict.keys())
+
+    added: list[str] = sorted(added_names)
+    removed: list[str] = sorted(removed_names)
+    modified: list[ModifiedPlayer] = []
+
+    # Check for modified players - compare ALL keys
+    for name in sorted(common_names):
+        old = old_dict[name]
+        new = new_dict[name]
+
+        field_changes: dict[str, FieldChange] = {}
+
+        # Get all unique keys from both dictionaries
+        all_keys = set(old.keys()) | set(new.keys())
+
+        for key in all_keys:
+            if key == "nombre":
+                continue  # Skip the name field itself
+
+            old_value = old.get(key)
+            new_value = new.get(key)
+
+            if old_value != new_value:
+                field_changes[key] = {"old": old_value, "new": new_value}
+
+        if field_changes:
+            modified.append({"nombre": name, "changes": field_changes})
+
+    return {
+        "added": added,
+        "removed": removed,
+        "renamed": renames,
+        "modified": modified,
+    }
 
 # ── Players ────────────────────────────────────────────────────────────────────
 
@@ -241,11 +303,26 @@ async def snapshots_have_same_roster(
 
 async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[dict[str, Any]]:
     """Return all players in a snapshot as dictionaries."""
+    from sqlalchemy import func
+
+    # Use aggregate functions to handle multiple NotionCache entries
+    # This prevents fan-out when a player has multiple cache rows
     result = await session.execute(
-        select(SnapshotPlayer, Player, NotionCache)
+        select(
+            SnapshotPlayer,
+            Player,
+            func.max(NotionCache.c_england).label("c_england"),
+            func.max(NotionCache.c_france).label("c_france"),
+            func.max(NotionCache.c_germany).label("c_germany"),
+            func.max(NotionCache.c_italy).label("c_italy"),
+            func.max(NotionCache.c_austria).label("c_austria"),
+            func.max(NotionCache.c_russia).label("c_russia"),
+            func.max(NotionCache.c_turkey).label("c_turkey"),
+        )
         .join(Player)
         .outerjoin(NotionCache, Player.name == NotionCache.name)
         .where(SnapshotPlayer.snapshot_id == snapshot_id)
+        .group_by(SnapshotPlayer.player_id, Player.id)
         .order_by(SnapshotPlayer.priority.desc(), Player.name)
     )
     rows = result.all()
@@ -258,15 +335,15 @@ async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[
             "prioridad": sp.priority,
             "partidas_deseadas": sp.desired_games,
             "partidas_gm": sp.gm_games,
-            "c_england": cache.c_england if cache else 0,
-            "c_france": cache.c_france if cache else 0,
-            "c_germany": cache.c_germany if cache else 0,
-            "c_italy": cache.c_italy if cache else 0,
-            "c_austria": cache.c_austria if cache else 0,
-            "c_russia": cache.c_russia if cache else 0,
-            "c_turkey": cache.c_turkey if cache else 0,
+            "c_england": c_england or 0,
+            "c_france": c_france or 0,
+            "c_germany": c_germany or 0,
+            "c_italy": c_italy or 0,
+            "c_austria": c_austria or 0,
+            "c_russia": c_russia or 0,
+            "c_turkey": c_turkey or 0,
         }
-        for sp, player, cache in rows
+        for sp, player, c_england, c_france, c_germany, c_italy, c_austria, c_russia, c_turkey in rows
     ]
 
 
@@ -738,14 +815,14 @@ async def log_snapshot_history(
     session: AsyncSession,
     snapshot_id: int,
     action_type: str,
-    summary: str,
+    changes: DeepDiffResult,
     previous_state: dict[str, object],
 ) -> None:
     """Log a snapshot history entry."""
     history_entry = SnapshotHistory(
         snapshot_id=snapshot_id,
         action_type=action_type,
-        summary=summary,
+        changes=changes,
         previous_state=previous_state,
     )
     session.add(history_entry)

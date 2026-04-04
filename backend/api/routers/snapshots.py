@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
 from notion_client import Client
 from pydantic import BaseModel
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,17 +19,49 @@ from backend.db.crud import (
     add_player_to_snapshot,
     create_root_manual_snapshot,
     delete_snapshot_cascade,
+    generate_deep_diff,
     get_or_create_player,
     get_snapshot_players,
     log_snapshot_history,
 )
-from backend.db.models import Snapshot, SnapshotPlayer
+from backend.db.models import (
+    HistoryActionType,
+    NotionCache,
+    Player,
+    RenameDict,
+    Snapshot,
+    SnapshotPlayer,
+)
 from backend.db.views import get_snapshot_detail
 from backend.sync.cache_daemon import update_notion_cache
 from backend.sync.notion_sync import (
     detect_similar_names,
     normalize_name,
 )
+
+
+async def _insert_snapshot_players(
+    session: AsyncSession,
+    snapshot_id: int,
+    players: list[PlayerCreate],
+) -> None:
+    """Insert a list of PlayerCreate into a snapshot (DRY helper)."""
+    for player in players:
+        if not player.nombre:
+            continue
+        player_id = await get_or_create_player(session, player.nombre)
+        await add_player_to_snapshot(
+            session,
+            snapshot_id,
+            player_id,
+            player.experiencia,
+            player.juegos_este_ano,
+            player.prioridad,
+            player.partidas_deseadas,
+            player.partidas_gm,
+        )
+
+
 
 router = APIRouter(prefix="/api/snapshot")
 
@@ -53,6 +85,7 @@ class SnapshotSaveRequest(BaseModel):
     parent_id: int | None = None
     event_type: str = "manual"
     players: list[PlayerCreate]
+    renames: list[RenameDict] = []
 
 
 class NotionFetchRequest(BaseModel):
@@ -285,7 +318,7 @@ async def api_snapshot_save_by_id(
 async def api_snapshot_save(
     request: SnapshotSaveRequest,
     session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, int]:
+) -> dict[str, int | str]:
     """
     Unified endpoint to save a new snapshot from a player list.
     Returns: {"snapshot_id": <new_id>}
@@ -304,6 +337,11 @@ async def api_snapshot_save(
         if event_type not in ("manual", "sync"):
             raise HTTPException(status_code=400, detail="event_type must be 'manual' or 'sync'")
 
+        # Determine action type early using enum
+        action_type = (
+            HistoryActionType.NOTION_SYNC if event_type == "sync" else HistoryActionType.MANUAL_EDIT
+        )
+
         # Validate parent exists if provided
         if parent_id is not None:
             result = await session.execute(select(Snapshot).where(Snapshot.id == parent_id))
@@ -321,12 +359,49 @@ async def api_snapshot_save(
 
             # If parent is a leaf node, update in-place
             if not has_children:
-                source = "notion_sync" if event_type == "sync" else "manual"
-                # Update snapshot source
-                parent_row.source = source
+                # Update snapshot source using enum
+                parent_row.source = action_type.value
 
                 # Fetch old roster before clearing
                 previous_players = await get_snapshot_players(session, parent_id)
+
+                # Strip algorithm weight fields from previous_players to prevent phantom diffs
+                # These fields come from NotionCache but aren't part of the roster
+                roster_fields = {"nombre", "experiencia", "juegos_este_ano", "prioridad", "partidas_deseadas", "partidas_gm"}
+                previous_players_roster_only = [
+                    {k: v for k, v in p.items() if k in roster_fields}
+                    for p in previous_players
+                ]
+
+                # Calculate diff before making changes
+                new_players_dicts = [
+                    {
+                        "nombre": p.nombre,
+                        "experiencia": p.experiencia,
+                        "juegos_este_ano": p.juegos_este_ano,
+                        "prioridad": p.prioridad,
+                        "partidas_deseadas": p.partidas_deseadas,
+                        "partidas_gm": p.partidas_gm,
+                    }
+                    for p in request.players
+                ]
+                diff = generate_deep_diff(previous_players_roster_only, new_players_dicts, request.renames)
+
+                for r in request.renames:
+                    target_exists = await session.execute(select(Player).where(Player.name == r["to"]))
+                    if not target_exists.scalar_one_or_none():
+                        await session.execute(
+                            update(Player).where(Player.name == r["from"]).values(name=r["to"])
+                        )
+
+                # No changes check - skip database writes entirely
+                if (
+                    not diff["added"]
+                    and not diff["removed"]
+                    and not diff["renamed"]
+                    and not diff["modified"]
+                ):
+                    return {"snapshot_id": parent_id, "status": "no_changes"}
 
                 # Clear old roster
                 from backend.db.models import SnapshotPlayer
@@ -335,29 +410,16 @@ async def api_snapshot_save(
                     delete(SnapshotPlayer).where(SnapshotPlayer.snapshot_id == parent_id)
                 )
 
-                # Insert new players
-                for player in request.players:
-                    if not player.nombre:
-                        continue
-                    player_id = await get_or_create_player(session, player.nombre)
-                    await add_player_to_snapshot(
-                        session,
-                        parent_id,
-                        player_id,
-                        player.experiencia,
-                        player.juegos_este_ano,
-                        player.prioridad,
-                        player.partidas_deseadas,
-                        player.partidas_gm,
-                    )
+                # Insert new players using DRY helper
+                await _insert_snapshot_players(session, parent_id, request.players)
 
-                # Log the history
+                # Log the history using enum value
                 await log_snapshot_history(
                     session,
                     snapshot_id=parent_id,
-                    action_type="manual_edit",
-                    summary="Edición manual del roster",
-                    previous_state={"players": previous_players}
+                    action_type=action_type.value,
+                    changes=diff,
+                    previous_state={"players": previous_players},
                 )
 
                 await session.commit()
@@ -463,7 +525,6 @@ async def api_notion_fetch(
     Fetches raw player data from the local notion_cache table.
     Returns: {"players": [...], "similar_names": [...], "last_updated": "..."}
     """
-    from backend.db.models import NotionCache
 
     try:
         result = await session.execute(select(NotionCache).order_by(NotionCache.name))

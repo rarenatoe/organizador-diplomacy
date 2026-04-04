@@ -347,6 +347,7 @@ describe("SnapshotDraft", () => {
           partidas_gm: 0,
         },
       ],
+      renames: [],
     });
   });
 
@@ -504,5 +505,69 @@ describe("SnapshotDraft", () => {
       "title",
       "Agrega al menos un jugador para guardar",
     );
+  });
+
+  it("sends renames payload when player name is edited", async () => {
+    const { saveSnapshot } = await import("../api");
+    const onClose = vi.fn();
+    const onChainUpdate = vi.fn();
+
+    const { container } = render(SnapshotDraft, {
+      props: {
+        parentId: 1,
+        initialPlayers: [
+          {
+            nombre: "Daniel V.",
+            experiencia: "Antiguo",
+            juegos_este_ano: 5,
+            prioridad: 1,
+            partidas_deseadas: 2,
+            partidas_gm: 1,
+          },
+        ],
+        defaultEventType: "manual",
+        onClose,
+        onCancel: () => {},
+        onChainUpdate,
+        onOpenSnapshot: () => {},
+        onShowError: () => {},
+      },
+    });
+
+    // Find and edit the player name input
+    const nameInput = container.querySelector(
+      ".player-name-input",
+    ) as HTMLInputElement;
+    expect(nameInput).toBeTruthy();
+    expect(nameInput.value).toBe("Daniel V.");
+
+    // Change the name
+    await fireEvent.input(nameInput, {
+      target: { value: "Daniel Villafranca" },
+    });
+    expect(nameInput.value).toBe("Daniel Villafranca");
+
+    // Save
+    const saveButton = screen.getByRole("button", {
+      name: /Guardar Edición/i,
+    });
+    await fireEvent.click(saveButton);
+
+    // Verify saveSnapshot was called with renames payload
+    expect(saveSnapshot).toHaveBeenCalledWith({
+      parent_id: 1,
+      event_type: "manual",
+      players: [
+        {
+          nombre: "Daniel Villafranca",
+          experiencia: "Antiguo",
+          juegos_este_ano: 5,
+          prioridad: 1,
+          partidas_deseadas: 2,
+          partidas_gm: 1,
+        },
+      ],
+      renames: [{ from: "Daniel V.", to: "Daniel Villafranca" }],
+    });
   });
 });

@@ -172,6 +172,9 @@
           modalLoading = false;
           modalVisible = true;
         }}
+        onShowToast={(message) => {
+          toaster?.showSuccessToast(message);
+        }}
       />
     {:else if panelType === "draft"}
       <SnapshotDraft

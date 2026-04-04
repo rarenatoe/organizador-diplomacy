@@ -71,6 +71,7 @@ describe("Panel Scroll Pattern", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -98,6 +99,7 @@ describe("Panel Scroll Pattern", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 
@@ -129,6 +131,7 @@ describe("Panel Scroll Pattern", () => {
           onOpenGameDraft: () => {},
           onEditDraft: () => {},
           onShowError: () => {},
+          onShowToast: vi.fn(),
         },
       });
 

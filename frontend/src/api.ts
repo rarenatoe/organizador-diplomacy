@@ -105,13 +105,17 @@ export async function saveSnapshot(payload: {
   parent_id: number | null;
   event_type: string;
   players: EditPlayerRow[];
-}): Promise<SnapshotSaveResponse> {
-  return safeFetch<SnapshotSaveResponse>("/api/snapshot/save", {
-    method: "POST",
-    // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  renames?: { from: string; to: string }[];
+}): Promise<{ snapshot_id: number; status?: string; error?: string }> {
+  return safeFetch<{ snapshot_id: number; status?: string; error?: string }>(
+    "/api/snapshot/save",
+    {
+      method: "POST",
+      // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    },
+  );
 }
 
 export async function fetchNotionPlayers(
