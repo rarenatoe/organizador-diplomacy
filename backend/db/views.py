@@ -13,11 +13,17 @@ from sqlalchemy import select, text
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.db.crud import get_snapshot_players
+from backend.db.crud import get_deduped_notion_cache_subquery, get_snapshot_players
 from backend.db.models import (
+    GameDetail,
+    GameTable,
     Player,
     Snapshot,
     SnapshotHistory,
+    SnapshotPlayer,
+    TablePlayer,
+    TimelineEdge,
+    WaitingList,
 )
 
 
@@ -176,151 +182,149 @@ async def get_snapshot_detail(session: AsyncSession, snapshot_id: int) -> dict[s
 
 async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[str, Any] | None:
     """Returns full game event detail for the detail panel. None if not found."""
-    # Get game event basic info
-    ge_query = text("""
-        SELECT e.id, e.created_at, e.source_snapshot_id, e.output_snapshot_id,
-               gd.attempts, gd.share_text
-        FROM   timeline_edges e
-        JOIN   game_details gd ON gd.timeline_edge_id = e.id
-        WHERE  e.id = :event_id AND e.edge_type = 'game'
-    """)
-    result = await session.execute(ge_query, {"event_id": event_id})
-    ge = result.first()
-    if not ge:
+    # Get game event basic info using ORM
+    result = await session.execute(
+        select(TimelineEdge, GameDetail)
+        .join(GameDetail)
+        .where(TimelineEdge.id == event_id, TimelineEdge.edge_type == 'game')
+    )
+    row = result.first()
+    if not row:
         return None
+    
+    timeline_edge, game_detail = row
+    input_sid = timeline_edge.source_snapshot_id
 
-    input_sid = int(ge[2])
+    # Get the deduplicated Notion cache subquery
+    deduped_cache = get_deduped_notion_cache_subquery(_session=session)
 
-    # Get mesas data
-    mesas_query = text("""
-        SELECT id, table_number, gm_player_id FROM game_tables WHERE timeline_edge_id = :event_id ORDER BY table_number
-    """)
-    result = await session.execute(mesas_query, {"event_id": event_id})
-    mesa_rows = result.all()
+    # Get mesas data using ORM
+    mesas_result = await session.execute(
+        select(GameTable)
+        .where(GameTable.timeline_edge_id == event_id)
+        .order_by(GameTable.table_number)
+    )
+    mesa_rows = mesas_result.scalars().all()
 
     mesas_data: list[dict[str, Any]] = []
-    for mesa_row in mesa_rows:
-        mesa_id = int(mesa_row[0])
-        gm_player_id = mesa_row[2]
-
+    for mesa in mesa_rows:
         # Get GM name
         gm_name: str | None = None
-        if gm_player_id is not None:
-            result = await session.execute(select(Player.name).where(Player.id == gm_player_id))
-            gm_row = result.scalar_one_or_none()
-            gm_name = gm_row if gm_row else None
+        if mesa.gm_player_id is not None:
+            gm_result = await session.execute(
+                select(Player.name).where(Player.id == mesa.gm_player_id)
+            )
+            gm_name = gm_result.scalar_one_or_none()
 
-        # Get players for this mesa
-        players_query = text("""
-            SELECT p.name, sp.experience, sp.games_this_year, sp.priority,
-                   sp.desired_games, sp.gm_games,
-                   COALESCE(nc.c_england, 0) AS c_england,
-                   COALESCE(nc.c_france, 0) AS c_france,
-                   COALESCE(nc.c_germany, 0) AS c_germany,
-                   COALESCE(nc.c_italy, 0) AS c_italy,
-                   COALESCE(nc.c_austria, 0) AS c_austria,
-                   COALESCE(nc.c_russia, 0) AS c_russia,
-                   COALESCE(nc.c_turkey, 0) AS c_turkey,
-                   mp.country,
-                   mp.country_reason
-            FROM   table_players mp
-            JOIN   players      p  ON p.id  = mp.player_id
-            JOIN   snapshot_players sp
-                   ON sp.player_id   = mp.player_id
-                   AND sp.snapshot_id = :input_sid
-            LEFT  JOIN notion_cache nc ON nc.name = p.name
-            WHERE  mp.table_id = :mesa_id
-            ORDER  BY mp.seat_order
-        """)
-        result = await session.execute(players_query, {"input_sid": input_sid, "mesa_id": mesa_id})
+        # Get players for this mesa using deduplicated cache
+        players_result = await session.execute(
+            select(
+                Player,
+                SnapshotPlayer,
+                deduped_cache.c.c_england,
+                deduped_cache.c.c_france,
+                deduped_cache.c.c_germany,
+                deduped_cache.c.c_italy,
+                deduped_cache.c.c_austria,
+                deduped_cache.c.c_russia,
+                deduped_cache.c.c_turkey,
+                TablePlayer.country,
+                TablePlayer.country_reason,
+            )
+            .join(TablePlayer, Player.id == TablePlayer.player_id)
+            .join(SnapshotPlayer, (SnapshotPlayer.player_id == Player.id) & (SnapshotPlayer.snapshot_id == input_sid))
+            .outerjoin(deduped_cache, Player.name == deduped_cache.c.name)
+            .where(TablePlayer.table_id == mesa.id)
+            .order_by(TablePlayer.seat_order)
+        )
 
         jugadores: list[dict[str, Any]] = []
-        for p in result.all():
-            etiqueta = "Nuevo" if p[1] == "Nuevo" else f"Antiguo ({p[2]} juegos)"
+        for p in players_result.all():
+            player, sp, c_england, c_france, c_germany, c_italy, c_austria, c_russia, c_turkey, country, country_reason = p
+            etiqueta = "Nuevo" if sp.experience == "Nuevo" else f"Antiguo ({sp.games_this_year} juegos)"
             jugadores.append(
                 {
-                    "nombre": p[0],
+                    "nombre": player.name,
                     "etiqueta": etiqueta,
-                    "pais": p[13] or "",  # Convert None to empty string
-                    "pais_reason": p[14] if len(p) > 14 else None,
-                    "es_nuevo": p[1] == "Nuevo",
-                    "experiencia": p[1],
-                    "juegos_este_ano": p[2],
-                    "prioridad": p[3],
-                    "partidas_deseadas": p[4],
-                    "partidas_gm": p[5],
-                    "c_england": p[6],
-                    "c_france": p[7],
-                    "c_germany": p[8],
-                    "c_italy": p[9],
-                    "c_austria": p[10],
-                    "c_russia": p[11],
-                    "c_turkey": p[12] if len(p) > 12 else 0,
-                    "cupos": p[4],  # For backward compatibility
+                    "pais": country or "",  # Convert None to empty string
+                    "pais_reason": country_reason,
+                    "es_nuevo": sp.experience == "Nuevo",
+                    "experiencia": sp.experience,
+                    "juegos_este_ano": sp.games_this_year,
+                    "prioridad": sp.priority,
+                    "partidas_deseadas": sp.desired_games,
+                    "partidas_gm": sp.gm_games,
+                    "c_england": c_england or 0,
+                    "c_france": c_france or 0,
+                    "c_germany": c_germany or 0,
+                    "c_italy": c_italy or 0,
+                    "c_austria": c_austria or 0,
+                    "c_russia": c_russia or 0,
+                    "c_turkey": c_turkey or 0,
+                    "cupos": sp.desired_games,  # For backward compatibility
                 }
             )
 
         mesas_data.append(
             {
-                "numero": int(mesa_row[1]),
+                "numero": mesa.table_number,
                 "gm": gm_name,
                 "jugadores": jugadores,
             }
         )
 
-    # Get waiting list
-    waiting_query = text("""
-        SELECT p.name, wl.missing_spots,
-               sp.experience, sp.games_this_year, sp.priority,
-               sp.desired_games, sp.gm_games,
-               COALESCE(nc.c_england, 0) AS c_england,
-               COALESCE(nc.c_france, 0) AS c_france,
-               COALESCE(nc.c_germany, 0) AS c_germany,
-               COALESCE(nc.c_italy, 0) AS c_italy,
-               COALESCE(nc.c_austria, 0) AS c_austria,
-               COALESCE(nc.c_russia, 0) AS c_russia,
-               COALESCE(nc.c_turkey, 0) AS c_turkey
-        FROM   waiting_list wl
-        JOIN   players      p ON p.id = wl.player_id
-        JOIN   snapshot_players sp
-               ON sp.player_id   = wl.player_id
-               AND sp.snapshot_id = :input_sid
-        LEFT  JOIN notion_cache nc ON nc.name = p.name
-        WHERE  wl.timeline_edge_id = :event_id
-        ORDER  BY wl.list_order
-    """)
-    result = await session.execute(waiting_query, {"input_sid": input_sid, "event_id": event_id})
+    # Get waiting list using deduplicated cache
+    waiting_result = await session.execute(
+        select(
+            Player,
+            WaitingList,
+            SnapshotPlayer,
+            deduped_cache.c.c_england,
+            deduped_cache.c.c_france,
+            deduped_cache.c.c_germany,
+            deduped_cache.c.c_italy,
+            deduped_cache.c.c_austria,
+            deduped_cache.c.c_russia,
+            deduped_cache.c.c_turkey,
+        )
+        .join(WaitingList, Player.id == WaitingList.player_id)
+        .join(SnapshotPlayer, (SnapshotPlayer.player_id == Player.id) & (SnapshotPlayer.snapshot_id == input_sid))
+        .outerjoin(deduped_cache, Player.name == deduped_cache.c.name)
+        .where(WaitingList.timeline_edge_id == event_id)
+        .order_by(WaitingList.list_order)
+    )
 
     waiting: list[dict[str, Any]] = []
-    for row in result.all():
+    for row in waiting_result.all():
+        player, wl, sp, c_england, c_france, c_germany, c_italy, c_austria, c_russia, c_turkey = row
         waiting.append(
             {
-                "nombre": row[0],
-                "cupos": f"{row[1]} cupo(s) sin asignar",
-                "es_nuevo": row[2] == "Nuevo",
-                "experiencia": row[2],
-                "juegos_este_ano": row[3],
-                "prioridad": row[4],
-                "partidas_deseadas": row[5],
-                "partidas_gm": row[6],
-                "c_england": row[7],
-                "c_france": row[8],
-                "c_germany": row[9],
-                "c_italy": row[10],
-                "c_austria": row[11],
-                "c_russia": row[12],
-                "c_turkey": row[13] if len(row) > 13 else 0,
-                "cupos_faltantes": row[5],  # For backward compatibility
+                "nombre": player.name,
+                "cupos": f"{wl.missing_spots} cupo(s) sin asignar",
+                "es_nuevo": sp.experience == "Nuevo",
+                "experiencia": sp.experience,
+                "juegos_este_ano": sp.games_this_year,
+                "prioridad": sp.priority,
+                "partidas_deseadas": sp.desired_games,
+                "partidas_gm": sp.gm_games,
+                "c_england": c_england or 0,
+                "c_france": c_france or 0,
+                "c_germany": c_germany or 0,
+                "c_italy": c_italy or 0,
+                "c_austria": c_austria or 0,
+                "c_russia": c_russia or 0,
+                "c_turkey": c_turkey or 0,
+                "cupos_faltantes": sp.desired_games,  # For backward compatibility
             }
         )
 
     return {
-        "id": int(ge[0]),
-        "created_at": ge[1],
-        "intentos": int(ge[4] or 0),
-        "copypaste": ge[5] or "",
+        "id": timeline_edge.id,
+        "created_at": timeline_edge.created_at,
+        "intentos": game_detail.attempts,
+        "copypaste": game_detail.share_text,
         "mesas": mesas_data,
         "waiting_list": waiting,
         "input_snapshot_id": input_sid,
-        "output_snapshot_id": int(ge[3]),
+        "output_snapshot_id": timeline_edge.output_snapshot_id,
     }

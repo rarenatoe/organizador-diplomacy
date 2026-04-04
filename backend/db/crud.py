@@ -303,26 +303,24 @@ async def snapshots_have_same_roster(
 
 async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[dict[str, Any]]:
     """Return all players in a snapshot as dictionaries."""
-    from sqlalchemy import func
+    # Get the deduplicated Notion cache subquery
+    deduped_cache = get_deduped_notion_cache_subquery(_session=session)
 
-    # Use aggregate functions to handle multiple NotionCache entries
-    # This prevents fan-out when a player has multiple cache rows
     result = await session.execute(
         select(
             SnapshotPlayer,
             Player,
-            func.max(NotionCache.c_england).label("c_england"),
-            func.max(NotionCache.c_france).label("c_france"),
-            func.max(NotionCache.c_germany).label("c_germany"),
-            func.max(NotionCache.c_italy).label("c_italy"),
-            func.max(NotionCache.c_austria).label("c_austria"),
-            func.max(NotionCache.c_russia).label("c_russia"),
-            func.max(NotionCache.c_turkey).label("c_turkey"),
+            deduped_cache.c.c_england,
+            deduped_cache.c.c_france,
+            deduped_cache.c.c_germany,
+            deduped_cache.c.c_italy,
+            deduped_cache.c.c_austria,
+            deduped_cache.c.c_russia,
+            deduped_cache.c.c_turkey,
         )
         .join(Player)
-        .outerjoin(NotionCache, Player.name == NotionCache.name)
+        .outerjoin(deduped_cache, Player.name == deduped_cache.c.name)
         .where(SnapshotPlayer.snapshot_id == snapshot_id)
-        .group_by(SnapshotPlayer.player_id, Player.id)
         .order_by(SnapshotPlayer.priority.desc(), Player.name)
     )
     rows = result.all()
@@ -704,6 +702,30 @@ async def save_game(
 
 
 # ── Notion Cache ─────────────────────────────────────────────────────────────
+
+
+def get_deduped_notion_cache_subquery(_session: AsyncSession):
+    """Create a reusable SQLAlchemy subquery to deduplicate Notion cache entries.
+    
+    Returns a subquery that groups by NotionCache.name and selects the maximum
+    values for country assignments and other fields to prevent fan-out bugs.
+    """
+    return (
+        select(
+            NotionCache.name,
+            func.max(NotionCache.c_austria).label("c_austria"),
+            func.max(NotionCache.c_england).label("c_england"),
+            func.max(NotionCache.c_france).label("c_france"),
+            func.max(NotionCache.c_germany).label("c_germany"),
+            func.max(NotionCache.c_italy).label("c_italy"),
+            func.max(NotionCache.c_russia).label("c_russia"),
+            func.max(NotionCache.c_turkey).label("c_turkey"),
+            func.max(NotionCache.experience).label("experience"),
+            func.max(NotionCache.games_this_year).label("games_this_year"),
+        )
+        .group_by(NotionCache.name)
+        .subquery()
+    )
 
 
 async def update_notion_cache(session: AsyncSession, rows: list[dict[str, Any]]) -> None:
