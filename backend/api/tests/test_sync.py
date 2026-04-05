@@ -22,6 +22,7 @@ pytestmark = pytest.mark.asyncio
 async def background_test_engine():
     """Create a shared async engine for all background sync tests."""
     from sqlalchemy.ext.asyncio import create_async_engine
+
     from backend.db.models import Base
     
     test_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
