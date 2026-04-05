@@ -52,3 +52,35 @@ export function translateCountry(country: string): string {
 export function getCountryEmoji(country: string | null | undefined): string {
   return country ? countryEmojis[country] || "" : "";
 }
+
+/**
+ * Translates an action type to Spanish display name
+ * @param action - The action type to translate
+ * @returns The translated action name in Spanish, or the original action if no translation exists
+ */
+export function formatAction(action: string): string {
+  switch (action) {
+    case "manual_edit":
+      return "Edición Manual";
+    case "notion_sync":
+      return "Sincronización Notion";
+    case "creation":
+      return "Creación";
+    default:
+      return action;
+  }
+}
+
+/**
+ * Formats a date string to Spanish locale format
+ * @param dateString - The date string to format
+ * @returns The formatted date string in Spanish locale
+ */
+export function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleString("es-PE", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
