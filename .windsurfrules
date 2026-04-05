@@ -1,262 +1,71 @@
-<!-- GENERATED FILE: DO NOT EDIT DIRECTLY -->
-<!-- Source of truth: docs/ai-rules/*.md -->
 
-# Copilot Instructions — Organizador Diplomacy
 
-## Stack
+## Core Architecture
+- **Backend:** Pure Data & Algorithms. Python 3.13, uv, FastAPI, and SQLAlchemy. (No Flask).
+- **Frontend:** Presentation & Translation. Svelte 5, TypeScript, Vite.
+- **File Size:** 400-line soft limit per file. Extract sub-domains into new files unless they are highly cohesive indivisible units.
 
-Python 3.13 · uv · Flask 3 · pytest · notion-client · python-dotenv · SQLite (stdlib)
-TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecked`) · Vitest 4 · @testing-library/dom
-Lefthook for smart pre-commit execution on changed files.
-
-> Scoped instructions: `python.md` (applyTo `backend/**/*.py`) and
-> `typescript.md` (applyTo `frontend/src/**`) contain language-specific detail.
-
-## Directory layout
-
-```
-.
-├── backend/            Python source, tests, DB, Flask server
-│   ├── db/              Modular database operations
-│   │   ├── connection.py      # Database connection and schema
-│   │   ├── players.py         # Player CRUD operations
-│   │   ├── snapshots.py       # Snapshot management
-│   │   └── events.py         # Event operations
-│   ├── organizador/      Core algorithm and models
-│   │   ├── core.py           # Country assignment algorithm
-│   │   └── models.py         # Domain types
-│   ├── sync/              Notion integration
-│   │   ├── api.py            # Notion API utilities
-│   │   ├── similarity.py     # Name similarity detection
-│   │   └── notion_sync.py   # Main orchestrator
-│   └── viewer.py           # Flask REST API
-├── frontend/           TypeScript source, UI bundles, templates
-│   ├── src/
-│   │   ├── types.ts          # Shared TypeScript interfaces
-│   │   ├── stores.svelte.ts   # Global state ($state runes)
-│   │   ├── api.ts            # API utility module
-│   │   ├── App.svelte         # Main layout shell
-│   │   └── components/*.svelte # UI components
-│   └── [config files]      pyproject.toml, package.json, tsconfig.json, etc.
-```
-
-## File map
-
-### Backend (`backend/`)
-
-| File                  | Role                                                                                                                                                                |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `connection.py`       | Database connection and schema management                                                                                                                           |
-| `players.py`          | Player CRUD operations (get_or_create_player, rename_player, add_player_to_snapshot, get_snapshot_players)                                                          |
-| `snapshots.py`        | Snapshot management (create_snapshot, add_snapshot_player, get_latest_snapshot_id, snapshots_have_same_roster, create_manual_snapshot, create_root_manual_snapshot) |
-| `events.py`           | Event operations (create_event, create_sync_event, create_game_event, delete_snapshot_cascade)                                                                      |
-| `core.py`             | Algorithm: `_calcular_partidas()`, `organizar_partidas()`, `assign_countries_to_mesa()`                                                                             |
-| `models.py`           | Domain types: `Jugador`, `Mesa`, `ResultadoPartidas`                                                                                                                |
-| `formatter.py`        | Text generation: `_formatear_*`, `_construir_proyeccion`                                                                                                            |
-| `db_game.py`          | Game-event persistence (legacy, now in events.py)                                                                                                                   |
-| `db_views.py`         | Read-only queries for viewer                                                                                                                                        |
-| `viewer.py`           | Flask REST API                                                                                                                                                      |
-| `sync/api.py`         | Notion API utilities (download data, count games, extract numbers, get names, experience)                                                                           |
-| `sync/similarity.py`  | Name similarity detection (\_normalize_name, \_words_match, \_similarity, \_detect_similar_names)                                                                   |
-| `sync/notion_sync.py` | Main orchestrator (main function)                                                                                                                                   |
-| `test_*.py`           | Tests (co-located with source files)                                                                                                                                |
-
-### Frontend (`frontend/`)
-
-| Path                      | Role                         |
-| ------------------------- | ---------------------------- |
-| `src/types.ts`            | Shared TypeScript interfaces |
-| `src/stores.svelte.ts`    | Global state ($state runes)  |
-| `src/api.ts`              | API utility module           |
-| `src/App.svelte`          | Main layout shell            |
-| `src/components/*.svelte` | UI components                |
-| `static/style.css`        | All CSS                      |
-| `static/app.js`           | Build artifact (gitignored)  |
-
-**One file, one format. No CSVs, no .txt reports.**
-
-## Workflow
-
-1. Run `uv run python -m pytest -q`.
-2. Run `bun run build && bun run lint && bun run typecheck`. Check Svelte Problems in VS Code.
-3. Refactor files >400 LOC.
-4. Update/add tests for changes.
-5. Update instructions if architecture/data model changed.
-6. Commit: `feat:` · `fix:` · `refactor:` · `test:`.
-
-## Principles
-
-- **Governance**: Rules in `docs/ai-rules/`, generated via `scripts/generate-ai-instructions.ts`. No direct edits to generated files.
-- **Database**: Centralized `graph_nodes` table for global IDs and cascading deletes.
-- **Testing**: Tests required for new behavior and modifications.
-- **Integrity**: Snapshots require explicit source snapshot ID. UI uses store getters directly in templates.
-- **Reactivity**: Svelte 5 `$state`, `$derived`, `$effect`. No local copies of store state.
-- **Loading**: Use `-1` for unknown state; `0` when loaded.
-- **Errors**: Check for null/undefined backend responses. UI toast for errors.
-- **UI**: `title` attributes on disabled buttons for feedback.
-
-## File Size
-
-400-line soft limit. Extract sub-domains into new files. Exception: highly cohesive indivisible units.
-
-## Python Backend Instructions (backend/**/*.py)
-
-# Python Instructions — Organizador Diplomacy
-
-## Stack
-
-Python 3.13 · uv · Flask 3 · pytest · notion-client · python-dotenv · SQLite (stdlib)
-
-> Scoped instructions: `python.md` (applyTo `backend/**/*.py`) contain language-specific detail.
+## The Spanglish Boundary
+- **INTERNAL CODE:** Python/TS variables, types, function names, database schemas, and endpoints MUST be in English.
+- **UI:** HTML text, labels, user-facing error messages, and test queries MUST be in Spanish.
+- **Translation Layer:** Translations between internal code and UI must go through `frontend/src/i18n.ts`.
 
 ## Directory Layout
+- `backend/api/routers/`: FastAPI endpoints.
+- `backend/db/`: Modular database operations (connection, crud, models, views).
+- `backend/organizador/`: Core algorithms and pure data modeling.
+- `backend/sync/`: Notion integration and caching daemon.
+- `frontend/src/`: Svelte components, `$state` runes, API utilities, and types.
 
-```
-backend/
-├── db/              Modular database operations
-│   ├── connection.py      # Database connection and schema
-│   ├── players.py         # Player CRUD operations
-│   ├── snapshots.py       # Snapshot management
-│   └── events.py         # Event operations
-├── organizador/      Core algorithm and models
-│   ├── core.py           # Country assignment algorithm
-│   └── models.py         # Domain types
-├── sync/              Notion integration
-│   ├── api.py            # Notion API utilities
-│   ├── similarity.py     # Name similarity detection
-│   └── notion_sync.py   # Main orchestrator
-└── viewer.py           # Flask REST API
-```
+## Database Philosophy
+- **Disposable Local SQLite:** The database is local and disposable (`sqlite (stdlib)` via `aiosqlite`). 
+- **No Migrations:** DO NOT use Alembic migrations. The DB schema is defined in code and re-created as needed.
+- **Strict Typing:** Use explicit type annotations for all function signatures. Use Pydantic models for request/response validation and TypedDicts where appropriate.
 
-## File Map
+## Schema & Data Integrity
+- **Global IDs:** Use a centralized `graph_nodes` table for universal IDs and cascading deletes across all entities.
+- **Snapshots & Events:** Data flows through immutable snapshots connected by events (`timeline_edges`). Snapshots require an explicit source ID.
 
-### Backend (`backend/`)
+## Business Logic Patterns
+- **Shielding Strategy:** The country assignment algorithm (`organizador/core.py`) prevents player repetition by conditionally assigning countries to act as "shields" for other players.
+- **Draft Mode:** A two-step API is strictly enforced. The `/api/game/draft` endpoint computes game tables in memory *without* writing to the database, allowing manual review. Only `/api/game/save` persists the draft.
+- **Notion Sync:** Notion data is cached locally. Background caching is orchestrated via `backend/sync/cache_daemon.py`.
 
-| File                  | Role                                                                                                                                                                |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `connection.py`       | Database connection and schema management                                                                                                                           |
-| `players.py`          | Player CRUD operations (get_or_create_player, rename_player, add_player_to_snapshot, get_snapshot_players)                                                          |
-| `snapshots.py`        | Snapshot management (create_snapshot, add_snapshot_player, get_latest_snapshot_id, snapshots_have_same_roster, create_manual_snapshot, create_root_manual_snapshot) |
-| `events.py`           | Event operations (create_event, create_sync_event, create_game_event, delete_snapshot_cascade)                                                                      |
-| `core.py`             | Algorithm: `_calcular_partidas()`, `organizar_partidas()`, `assign_countries_to_mesa()`                                                                             |
-| `models.py`           | Domain types: `Jugador`, `Mesa`, `ResultadoPartidas`                                                                                                                |
-| `formatter.py`        | Text generation: `_formatear_*`, `_construir_proyeccion`                                                                                                            |
-| `db_game.py`          | Game-event persistence (legacy, now in events.py)                                                                                                                   |
-| `db_views.py`         | Read-only queries for viewer                                                                                                                                        |
-| `viewer.py`           | Flask REST API                                                                                                                                                      |
-| `sync/api.py`         | Notion API utilities (download data, count games, extract numbers, get names, experience)                                                                           |
-| `sync/similarity.py`  | Name similarity detection (\_normalize_name, \_words_match, \_similarity, \_detect_similar_names)                                                                   |
-| `sync/notion_sync.py` | Main orchestrator (main function)                                                                                                                                   |
-| `test_*.py`           | Tests (co-located with source files)                                                                                                                                |
+## Svelte 5 Runes & State
+- **Reactivity:** Exclusively use `$state`, `$derived`, and `$effect`. Do not use `let` for variables that require reactivity but are not in `$state`.
+- **Global Stores:** Found in `stores.svelte.ts`. UI components must use store getters directly in templates. No local copies of store state.
+- **Loading States:** Use `-1` for unknown state; `0` when loaded.
+- **Handlers & Bindings:** Use `onclick={() => ...}` syntax for events and `bind:value={var}` for bindings.
 
-## Principles
+## UI Components & Styling
+- **Buttons:** NEVER use native HTML `<button>` tags for actions. Always import and use the universal `<Button>` component (`import Button from './Button.svelte'`). Use orthogonal props to control appearance: `variant` ('primary', 'secondary', 'success', 'warning', 'ghost'), `size` ('md', 'sm'), `fill`, and `iconOnly`. Give disabled buttons a `title` attribute for user feedback.
+- **Layouts:** Use the `<PanelLayout>` component with `{#snippet body()}`, `{#snippet header()}`, and `{#snippet footer()}` for side panel content.
+- **CSS:** Use flex layout for panels. Strictly prefer **CSS Grid** (`display: grid`) over Flexbox when aligning lists with complex horizontal alignment (e.g., player tables, waiting lists). Use scoped `<style>` in components.
 
-- **Modular Database**: Use separate files in `backend/db/` for different concerns (connection, players, snapshots, events).
-- **Import Structure**: Import from `backend.db.connection` for database operations, not directly from `backend.db`.
-- **Type Safety**: Use explicit type annotations for all function signatures and return types.
-- **Error Handling**: Raise specific exceptions for invalid states, use try/except blocks for database operations.
-- **Testing**: Tests co-located with source files, use pytest fixtures for consistent test data.
-- **API Design**: Flask routes should return JSON responses, use proper HTTP status codes.
-- **Background Processing**: Use separate modules for background tasks (like Notion caching).
+## Domain Patterns
+- **Constraint-Preserving UI (The Swap Pattern):** When manipulating strict arrays (like exactly 7 players per table), use the `SwapTarget` pattern. Users must click two entities to swap their positions to preserve mathematical constraints.
+- **Handling Nulls:** Dropdowns interacting with optional backend data (e.g., `pais: null`) must explicitly handle nulls (e.g., `<option value={null}>🎲 Aleatorio</option>`).
+- **Tooltips:** Avoid native `title="..."` attributes for complex information due to slow delay. Use custom CSS hover popovers (`.reason-tooltip` containing a `.tooltip-popover`).
 
-## Business Logic
+## Execution Rules
+- **CRITICAL:** NEVER use `bun test`. Always run tests using `bun run test`.
+- **Backend:** Run using `uv run python -m pytest -q`.
 
-- **Shielding Strategy**: Country assignment algorithm in `assign_countries_to_mesa()` prevents player repetition by only assigning countries when necessary.
-- **Draft Mode**: Game drafts are created in memory without database writes, allowing manual review before persistence.
-- **Background Caching**: `notion_cache.py` provides SQLite table and `cache_daemon.py` for periodic data synchronization.
-- **Two-step Draft API**: `/api/game/draft` calculates results without writing to DB, `/api/game/save` persists the draft.
+## Backend Testing
+- Use `pytest` for all backend tests. Test files should be `test_*.py` and co-located with their respective implementation files.
+- Mock external dependencies (like Notion API) using `unittest.mock`.
+- Test database operations exclusively using an in-memory SQLite database (`:memory:`).
 
-## Database Schema
+## Frontend Testing
+- **Framework:** Vitest + `@testing-library/svelte`.
+- **State Mocking (CRITICAL OVERWRITE):** Do NOT use `vi.mock()` on `.svelte.ts` files that contain `$state` runes. State files must be tested using integration-style testing methodologies. 
+- **DOM Accessibility:** Testing for buttons MUST use accessible queries (e.g., `screen.getByRole('button', { name: /Text/i })`). Do NOT use `getByText()` for buttons because emojis and text are structurally separated. For `iconOnly` buttons, rely on their `title` attribute, which `getByRole` uses as the accessible name.
 
-- **Global IDs**: All entities use `graph_nodes` table for universal IDs with cascading deletes.
-- **Player Management**: `players` table with unique `nombre` constraint, linked to `graph_nodes`.
-- **Snapshots**: `snapshots` table with `source` field for tracking data provenance.
-- **Game Events**: `events` table with type field for different operations (sync, game, edit).
-- **Country Assignment**: `mesa_players` table includes `pais` column for country assignments.
+## Rule Governance
+- AI rules live in `docs/ai-rules/`. 
+- NEVER directly edit `.clinerules`, `.windsurfrules`, or `.github/copilot-instructions.md`. They are generated artifacts.
 
-## Testing
-
-- Use pytest for all backend tests.
-- Test files should be `test_*.py` and co-located with implementation files.
-- Mock external dependencies (Notion API) using `unittest.mock`.
-- Test database operations using in-memory SQLite (`:memory:`).
-
-## TypeScript + Svelte Scoped Instructions (frontend/src/**)
-
-# TypeScript + Svelte Instructions — Organizador Diplomacy
-
-## Stack
-
-TypeScript 5 (strict) · bun · ESLint 9 (typescript-eslint v8 `strictTypeChecked`) · Vitest 4 · @testing-library/dom
-
-> Scoped instructions: `typescript.md` (applyTo `frontend/src/**`) contain language-specific detail.
-
-## Svelte 5 conventions
-
-- Use `$state` runes for reactive state, not `let` variables that get reassigned.
-- Use `$derived` for computed values.
-- Use `$effect` for side effects.
-- Props defined with `$props()` runes.
-- Event handlers use `onclick={() => ...}` syntax.
-- Bindings use `bind:value={variable}` syntax.
-
-## Component conventions
-
-- Export component name via `<script lang="ts">` and file name.
-- Use PascalCase for component names.
-- Props typed with TypeScript interfaces.
-- Slots used for composition.
-- Never use native HTML `<button>` tags for actions. Always import and use universal `<Button>` component (`import Button from './Button.svelte'`).
-- Use orthogonal props to control button appearance: `variant` ('primary', 'secondary', 'success', 'warning', 'ghost'), `size` ('md', 'sm'), `fill` (boolean, to take full width of container), and `iconOnly` (boolean).
-
-## Constraint-Preserving UI (The Swap Pattern)
-
-- When manipulating strict arrays (like 7 players per table), use `SwapTarget` pattern instead of generic "Move to table" dropdowns.
-- Users click two entities to swap their positions, preserving mathematical constraints.
-- Maintain table integrity while allowing flexible player movement.
-
-## Handling Nulls
-
-- When dealing with optional backend data (like `pais: null`), `<select>` dropdowns must explicitly handle `null` state.
-- Use `<option value={null}>🎲 Aleatorio</option>` for optional selections.
-- Ensure `bind:value={j.pais}` correctly selects "🎲 Aleatorio" when `j.pais` is empty/null.
-
-## Custom Tooltips
-
-- Avoid native HTML `title="..."` attributes for complex information due to slow delays.
-- Use custom CSS hover popovers (e.g., `.tooltip-popover`) for instant feedback.
-- Structure: `<div class="reason-tooltip"><span class="info-icon">ℹ️</span><div class="tooltip-popover">{content}</div></div>`.
-- CSS: `z-index: 9999` for proper layering.
-
-## Build & Tooling
-
-- Vite entry: `src/index.html` → `static/`.
-- Commands: `bun run build`, `bun run dev`, `bun run typecheck`, `bun run lint`.
-- **Formatting**: Use `bun run format` (Prettier) to fix indentation and formatting issues across all Svelte, TypeScript, and CSS files.
-- Rules: `bun run ai-rules:generate`.
-
-## Testing
-
-- Vitest + `@testing-library/svelte`.
-- Co-located tests: `ComponentName.test.ts`.
-- Mock API: `vi.mock('../api')`.
-- Test files: `frontend/src/*.test.ts`.
-- DOM testing for buttons MUST use accessible queries: `screen.getByRole('button', { name: /Text/i })`. Do NOT use `getByText()` for buttons, as emojis and text are structurally separated in DOM.
-- For `iconOnly` buttons, rely on their `title` attribute, which `getByRole` automatically uses as accessible name.
-
-## Naming
-
-- Variables/Functions: `camelCase`.
-- Svelte 5 Props: `camelCase` (starting with "on" for handlers).
-- Domain Types: `PascalCase`.
-- Backend Mapping: `snake_case` allowed for API properties.
-
-## CSS
-
-- Flex layout for panels, rows, containers.
-- **List Alignment**: When displaying lists of items with complex horizontal alignment (like player tables, waiting lists, or rows with varying-width badges), strictly prefer **CSS Grid** (`display: grid` with `grid-template-columns`) over Flexbox to ensure perfect column alignment.
-- `overflow: hidden; text-overflow: ellipsis; white-space: nowrap;` for truncation.
-- Component-specific UI classes (like button variants or layouts) must live in scoped `<style>` blocks within component. Keep `static/style.css` strictly for CSS variables, CSS resets, and high-level layout utilities.
-- Scoped `<style>` in `.svelte` files.
-- `static/style.css` for variables, resets, utility classes.
-- Layout pattern: Always use the <PanelLayout> component with {#snippet body()}, {#snippet header()}, and {#snippet footer()} for side panel content. Use scrollable={false} for table views relying on .flex-table-wrap. Do not manually write .panel-scroll, .panel-body-fixed, or .panel-footer classes.
+## Verification & Commits
+- Validate all tests and typing before committing: `bun run build && bun run lint && bun run typecheck`.
+- Check for Svelte syntax problems locally.
+- Git Commits must follow conventional prefixes: `feat:`, `fix:`, `refactor:`, `test:`.
