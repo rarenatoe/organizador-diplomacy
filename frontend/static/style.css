@@ -21,6 +21,28 @@
   --accent: #3b82f6;
   --danger: #ef4444;
   --success: #22c55e;
+
+  /* Semantic UI Badges */
+  --info-bg: #eff6ff;
+  --info-border: #60a5fa;
+  --info-dark: #1e40af;
+
+  --success-bg: #f0fdf4;
+  --success-border: #4ade80;
+  --success-dark: #166534;
+
+  --warning-bg: #fef9c3;
+  --warning-border: #facc15;
+  --warning-dark: #713f12;
+
+  --error-bg: #fef2f2;
+  --error-border: #f87171;
+  --error-dark: #991b1b;
+
+  /* Floating / Inverted Elements */
+  --tooltip-bg: #1f2937;
+  --tooltip-text: #f9fafb;
+
   --panel-w: max(460px, 45vw);
   --hdr: 56px;
   --radius: 10px;

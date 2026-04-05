@@ -98,12 +98,14 @@ describe("GameDraft.svelte", () => {
     expect(screen.getByText("Bob")).toBeInTheDocument();
     expect(screen.getByText("David")).toBeInTheDocument();
 
-    // Verify that experience tags are wrapped in tag-wrapper divs
+    // Verify that experience badges are rendered correctly
     const nuevoTag = screen.getByText("Nuevo");
     const antiguoTag = screen.getByText("Antiguo");
 
-    expect(nuevoTag.closest(".tag-wrapper")).toBeInTheDocument();
-    expect(antiguoTag.closest(".tag-wrapper")).toBeInTheDocument();
+    expect(nuevoTag.closest(".badge")).toBeInTheDocument();
+    expect(nuevoTag.closest(".badge")).toHaveClass("warning");
+    expect(antiguoTag.closest(".badge")).toBeInTheDocument();
+    expect(antiguoTag.closest(".badge")).toHaveClass("success");
   });
 
   it("shows loading state initially", async () => {
@@ -128,11 +130,13 @@ describe("GameDraft.svelte", () => {
     const antiguoTags = screen.getAllByText("Antiguo");
 
     nuevoTags.forEach((tag) => {
-      expect(tag.closest(".tag-wrapper")).toBeInTheDocument();
+      expect(tag.closest(".badge")).toBeInTheDocument();
+      expect(tag.closest(".badge")).toHaveClass("warning");
     });
 
     antiguoTags.forEach((tag) => {
-      expect(tag.closest(".tag-wrapper")).toBeInTheDocument();
+      expect(tag.closest(".badge")).toBeInTheDocument();
+      expect(tag.closest(".badge")).toHaveClass("success");
     });
   });
 
@@ -643,20 +647,31 @@ describe("GameDraft.svelte", () => {
     expect(aliceSelect.value).toBe("");
   });
 
-  it("verifies tag-wrapper structure for all players", async () => {
+  it("verifies badge structure for all players", async () => {
     render(GameDraft, { props: mockProps });
 
     await vi.waitFor(() => {
       expect(screen.getByText("Partida 1")).toBeInTheDocument();
     });
 
-    // Check that all experience tags are wrapped in tag-wrapper divs
-    const allTags = screen.getAllByText(/Nuevo|Antiguo/);
+    // Check that all experience tags are rendered as Badge components
+    const nuevoTags = screen.getAllByText("Nuevo");
+    const antiguoTags = screen.getAllByText("Antiguo");
 
-    allTags.forEach((tag) => {
-      const wrapper = tag.closest(".tag-wrapper");
-      expect(wrapper).toBeInTheDocument();
-      expect(wrapper?.tagName).toBe("DIV");
+    // Test Nuevo badges
+    nuevoTags.forEach((tag) => {
+      const badge = tag.closest(".badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveClass("fixed-width");
+      expect(badge).toHaveClass("warning");
+    });
+
+    // Test Antiguo badges
+    antiguoTags.forEach((tag) => {
+      const badge = tag.closest(".badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveClass("fixed-width");
+      expect(badge).toHaveClass("success");
     });
   });
 });

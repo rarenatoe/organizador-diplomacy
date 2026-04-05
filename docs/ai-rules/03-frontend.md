@@ -11,6 +11,11 @@ priority: 30
 - **Loading States:** Use `-1` for unknown state; `0` when loaded.
 - **Handlers & Bindings:** Use `onclick={() => ...}` syntax for events and `bind:value={var}` for bindings.
 
+### Svelte 5 Snippets and CSS Scoping (CRITICAL)
+
+- When a parent component passes HTML elements (like `<tr>` or `<td>`) into a child component via a `{#snippet}`, the child component's standard scoped CSS **will not affect those elements**.
+- To style elements injected via snippets, the child component MUST use the `:global()` modifier (e.g., `:global(.table-wrap td) { ... }`). Failure to do this will result in stripped styles.
+
 ## Frontend Coding Standards
 
 - **Logging Only:** NEVER use `console.log()` for any purpose. All debugging and error logging must use the custom logger from `src/utils/logger.ts` with appropriate methods (`logger.info()`, `logger.warn()`, `logger.error()`).
@@ -20,6 +25,16 @@ priority: 30
 - **Buttons:** NEVER use native HTML `<button>` tags for actions. Always import and use the universal `<Button>` component (`import Button from './Button.svelte'`). Use orthogonal props to control appearance: `variant` ('primary', 'secondary', 'success', 'warning', 'ghost'), `size` ('md', 'sm'), `fill`, and `iconOnly`. Give disabled buttons a `title` attribute for user feedback.
 - **Layouts:** Use the `<PanelLayout>` component with `{#snippet body()}`, `{#snippet header()}`, and `{#snippet footer()}` for side panel content.
 - **CSS:** Use flex layout for panels. Strictly prefer **CSS Grid** (`display: grid`) over Flexbox when aligning lists with complex horizontal alignment (e.g., player tables, waiting lists). Use scoped `<style>` in components.
+- **Domain-Agnostic UI:** Pure UI components (like Badges, Tooltips, Cards) MUST NOT contain domain-specific logic or nomenclature. Use semantic intent APIs (e.g., `variant="info" | "success" | "warning" | "error"`) instead of domain names (e.g., `variant="gm" | "veteran"`). The parent component is responsible for mapping domain data to semantic UI variants.
+
+## CSS and Theming
+
+- **No Hardcoded Hex Colors:** NEVER use hardcoded hex colors in `<style>` blocks for UI components. All colors must utilize global CSS variables defined in `frontend/static/style.css` (e.g., `var(--info-bg)`, `var(--tooltip-bg)`).
+- **Inverted Floating Elements:** Tooltips, popovers, and toasts should use inverted color schemes (e.g., dark background with light text) for maximum Z-axis contrast.
+
+## Component API
+
+- **Explicit Layout Props:** Do not bundle layout behavior (like explicit widths for table column alignment) into visual shape props (like `pill`). Use explicit layout props (e.g., `fixedWidth: boolean`) so the consuming parent can decide if the component needs to hug its content or align to a grid.
 
 ## Domain Patterns
 

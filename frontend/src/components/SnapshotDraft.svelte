@@ -12,6 +12,7 @@
   import SyncResolutionModal from "./SyncResolutionModal.svelte";
   import Button from "./Button.svelte";
   import PanelLayout from "./PanelLayout.svelte";
+  import Badge from "./Badge.svelte";
 
   interface Props {
     parentId: number | null;
@@ -335,10 +336,6 @@
           </thead>
           <tbody>
             {#each draftPlayers as player, i (i)}
-              {@const expColor =
-                player.experiencia === "Nuevo" ? "#713f12" : "#166534"}
-              {@const expBg =
-                player.experiencia === "Nuevo" ? "#fef9c3" : "#f0fdf4"}
               <tr>
                 <td
                   ><input
@@ -349,11 +346,15 @@
                   /></td
                 >
                 <td>
-                  <span
-                    style="font-size:10px;font-weight:700;color:{expColor};background:{expBg};padding:1px 6px;border-radius:4px"
-                  >
-                    {player.experiencia}
-                  </span>
+                  {#if player.experiencia}
+                    <Badge
+                      variant={player.experiencia === "Nuevo"
+                        ? "warning"
+                        : "success"}
+                      text={player.experiencia}
+                      fixedWidth={true}
+                    />
+                  {/if}
                 </td>
                 <td>
                   <input

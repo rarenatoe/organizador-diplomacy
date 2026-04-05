@@ -20,6 +20,7 @@
   import OrganizarConfirmModal from "./OrganizarConfirmModal.svelte";
   import Button from "./Button.svelte";
   import PanelLayout from "./PanelLayout.svelte";
+  import Badge from "./Badge.svelte";
   import { logger } from "../utils/logger";
 
   interface Props {
@@ -361,9 +362,6 @@
           </thead>
           <tbody>
             {#each rows as r (r.nombre)}
-              {@const expColor =
-                r.experiencia === "Nuevo" ? "#713f12" : "#166534"}
-              {@const expBg = r.experiencia === "Nuevo" ? "#fef9c3" : "#f0fdf4"}
               <tr>
                 <td><span class="player-name">{r.nombre}</span></td>
                 <td style="padding-left: 0; width: 32px;">
@@ -376,12 +374,17 @@
                     icon="✏️"
                   />
                 </td>
-                <td
-                  ><span
-                    style="font-size:10px;font-weight:700;color:{expColor};background:{expBg};padding:1px 6px;border-radius:4px"
-                    >{r.experiencia ?? "Nuevo"}</span
-                  ></td
-                >
+                <td>
+                  {#if r.experiencia}
+                    <Badge
+                      variant={r.experiencia === "Nuevo"
+                        ? "warning"
+                        : "success"}
+                      text={r.experiencia}
+                      fixedWidth={true}
+                    />
+                  {/if}
+                </td>
                 <td>{r.juegos_este_ano ?? 0}</td>
                 <td>{r.prioridad === 1 ? "✓" : ""}</td>
                 <td>{r.partidas_deseadas}</td>

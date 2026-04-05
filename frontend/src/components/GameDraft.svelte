@@ -5,6 +5,8 @@
   import { findLatestGameId } from "../snapshotUtils";
   import Button from "./Button.svelte";
   import PanelLayout from "./PanelLayout.svelte";
+  import Badge from "./Badge.svelte";
+  import Tooltip from "./Tooltip.svelte";
 
   interface Props {
     snapshotId: number;
@@ -414,9 +416,13 @@
               <div class="mesa-header">
                 <span class="mesa-title">Partida {mesa.numero}</span>
                 {#if mesa.gm}
-                  <span class="gm-tag gm-tag-ok">GM: {mesa.gm.nombre}</span>
+                  <Badge
+                    variant="info"
+                    text={`GM: ${mesa.gm.nombre}`}
+                    pill={true}
+                  />
                 {:else}
-                  <span class="gm-tag gm-tag-bad">⚠️ Sin GM</span>
+                  <Badge variant="error" text="⚠️ Sin GM" pill={true} />
                 {/if}
               </div>
               <ul class="player-list">
@@ -449,21 +455,24 @@
                         <option value="Turkey">🇹🇷 Turquía</option>
                       </select>
                       {#if j.pais_reason}
-                        <div class="reason-tooltip">
-                          <span class="info-icon">ℹ️</span>
-                          <div class="tooltip-popover">{j.pais_reason}</div>
-                        </div>
+                        <Tooltip text={j.pais_reason} />
                       {/if}
                     </div>
-                    {#if j.es_nuevo}
-                      <div class="tag-wrapper">
-                        <span class="tag tag-nuevo">Nuevo</span>
-                      </div>
-                    {:else}
-                      <div class="tag-wrapper">
-                        <span class="tag tag-antiguo">Antiguo</span>
-                      </div>
-                    {/if}
+                    <div class="tag-wrapper">
+                      {#if j.es_nuevo}
+                        <Badge
+                          variant="warning"
+                          text="Nuevo"
+                          fixedWidth={true}
+                        />
+                      {:else}
+                        <Badge
+                          variant="success"
+                          text="Antiguo"
+                          fixedWidth={true}
+                        />
+                      {/if}
+                    </div>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -577,25 +586,6 @@
     font-size: 13px;
   }
 
-  .gm-tag {
-    font-size: 11px;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 99px;
-  }
-
-  .gm-tag-ok {
-    color: var(--report-dark);
-    background: var(--report-bg);
-    border: 1px solid var(--report-border);
-  }
-
-  .gm-tag-bad {
-    color: #92400e;
-    background: #fffbeb;
-    border: 1px solid var(--pending-border);
-  }
-
   .player-list {
     list-style: none;
   }
@@ -632,24 +622,6 @@
     justify-content: center;
   }
 
-  .tag {
-    font-size: 10px;
-    padding: 1px 6px;
-    border-radius: 4px;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  .tag-nuevo {
-    background: #fef9c3;
-    color: #713f12;
-  }
-
-  .tag-antiguo {
-    background: #f0fdf4;
-    color: #166534;
-  }
-
   .country-container {
     display: flex;
     align-items: center;
@@ -666,62 +638,6 @@
     cursor: pointer;
     width: 100%;
     min-width: 0;
-  }
-
-  .reason-tooltip {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    cursor: help;
-    margin-left: 4px;
-  }
-
-  .info-icon {
-    font-size: 11px;
-    opacity: 0.7;
-    transition: opacity 0.15s;
-  }
-
-  .reason-tooltip:hover .info-icon {
-    opacity: 1;
-  }
-
-  .tooltip-popover {
-    display: none;
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #1f2937;
-    color: #f9fafb;
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 500;
-    white-space: normal;
-    width: max-content;
-    max-width: 220px;
-    z-index: 9999;
-    margin-bottom: 6px;
-    box-shadow: var(--shadow-md);
-    text-align: center;
-    line-height: 1.4;
-  }
-
-  /* Little triangle pointer for the tooltip */
-  .tooltip-popover::after {
-    content: "";
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    margin-left: -4px;
-    border-width: 4px;
-    border-style: solid;
-    border-color: #1f2937 transparent transparent transparent;
-  }
-
-  .reason-tooltip:hover .tooltip-popover {
-    display: block;
   }
 
   .swapping-active {

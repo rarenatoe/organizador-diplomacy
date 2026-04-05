@@ -85,12 +85,14 @@ describe("GameDetail", () => {
     expect(screen.getByText("Charlie")).toBeTruthy();
     expect(screen.getByText("Diana")).toBeTruthy();
 
-    // Verify that experience tags are wrapped in tag-wrapper divs
+    // Verify that experience badges are rendered correctly
     const nuevoTag = screen.getByText("Nuevo");
     const antiguoTag = screen.getByText("Antiguo");
 
-    expect(nuevoTag.closest(".tag-wrapper")).toBeInTheDocument();
-    expect(antiguoTag.closest(".tag-wrapper")).toBeInTheDocument();
+    expect(nuevoTag.closest(".badge")).toBeInTheDocument();
+    expect(nuevoTag.closest(".badge")).toHaveClass("warning");
+    expect(antiguoTag.closest(".badge")).toBeInTheDocument();
+    expect(antiguoTag.closest(".badge")).toHaveClass("success");
   });
 
   it("copies share list and shows feedback when share button is clicked", async () => {
@@ -239,12 +241,14 @@ describe("GameDetail", () => {
       expect(screen.queryByText("Cargando…")).toBeNull();
     });
 
-    // Verify tag-wrapper structure before editing
+    // Verify badge structure before editing
     const nuevoTag = screen.getByText("Nuevo");
     const antiguoTag = screen.getByText("Antiguo");
 
-    expect(nuevoTag.closest(".tag-wrapper")).toBeInTheDocument();
-    expect(antiguoTag.closest(".tag-wrapper")).toBeInTheDocument();
+    expect(nuevoTag.closest(".badge")).toBeInTheDocument();
+    expect(nuevoTag.closest(".badge")).toHaveClass("warning");
+    expect(antiguoTag.closest(".badge")).toBeInTheDocument();
+    expect(antiguoTag.closest(".badge")).toHaveClass("success");
 
     // Find and click Edit button
     const editButton = screen.getByRole("button", { name: /Editar Jornada/i });
@@ -280,7 +284,7 @@ describe("GameDetail", () => {
     );
   });
 
-  it("verifies tag-wrapper structure for all experience tags", async () => {
+  it("verifies badge structure for all experience tags", async () => {
     render(GameDetail, {
       props: {
         id: 1,
@@ -293,13 +297,24 @@ describe("GameDetail", () => {
       expect(screen.queryByText("Cargando…")).toBeNull();
     });
 
-    // Check that all experience tags are wrapped in tag-wrapper divs
-    const allTags = screen.getAllByText(/Nuevo|Antiguo/);
+    // Check that all experience tags are rendered as Badge components
+    const nuevoTags = screen.getAllByText("Nuevo");
+    const antiguoTags = screen.getAllByText("Antiguo");
 
-    allTags.forEach((tag) => {
-      const wrapper = tag.closest(".tag-wrapper");
-      expect(wrapper).toBeInTheDocument();
-      expect(wrapper?.tagName).toBe("DIV");
+    // Verify Nuevo badges have warning variant
+    nuevoTags.forEach((tag) => {
+      const badge = tag.closest(".badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveClass("warning");
+      expect(badge).toHaveClass("fixed-width");
+    });
+
+    // Verify Antiguo badges have success variant
+    antiguoTags.forEach((tag) => {
+      const badge = tag.closest(".badge");
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveClass("success");
+      expect(badge).toHaveClass("fixed-width");
     });
   });
 
@@ -357,13 +372,13 @@ describe("GameDetail", () => {
       const infoIcons = document.querySelectorAll(".info-icon");
       expect(infoIcons.length).toBe(1);
 
-      // Find all reason tooltips (should only be for Alice)
-      const reasonTooltips = document.querySelectorAll(".reason-tooltip");
-      expect(reasonTooltips.length).toBe(1);
+      // Find all tooltips (should only be for Alice)
+      const tooltips = document.querySelectorAll(".tooltip");
+      expect(tooltips.length).toBe(1);
 
       // Verify the tooltip contains the reason text
-      const tooltipText = reasonTooltips[0]?.textContent;
-      expect(tooltipText).toContain(
+      const tooltipPopover = tooltips[0]?.querySelector(".tooltip-popover");
+      expect(tooltipPopover).toHaveTextContent(
         "Cualquier jugador disponible podía recibir este país",
       );
     });
