@@ -1,28 +1,13 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    // Output
-    "target": "ES2022",
-    "lib": ["ES2022", "DOM"],
-    "module": "ES2022",
-    "moduleDetection": "auto",
-    "outDir": "frontend/static",
-    "rootDir": "frontend/src",
-
-    // Strict type checking — all of these are intentional
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "noImplicitReturns": true,
-    "exactOptionalPropertyTypes": true,
-    "noFallthroughCasesInSwitch": true,
-    "noPropertyAccessFromIndexSignature": true,
-
-    // Module resolution
-    "moduleResolution": "bundler",
-    "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "moduleDetection": "force",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "types": ["bun-types"]
   },
-  "include": ["frontend/src/**/*", "frontend/vitest.d.ts"]
+  "include": ["scripts/**/*"]
 }

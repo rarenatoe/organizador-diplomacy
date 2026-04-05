@@ -115,8 +115,6 @@ class TestApiGameSave:
         save_resp = await client.post(
             "/api/game/save", json={"snapshot_id": snap_id, "draft": draft}
         )
-        print(f"Save response status: {save_resp.status_code}")
-        print(f"Save response body: {save_resp.text}")
         assert save_resp.status_code == 200
         data = save_resp.json()
         assert "game_id" in data
@@ -129,8 +127,6 @@ class TestApiGameSave:
         save_resp = await client.post(
             "/api/game/save", json={"snapshot_id": snap_id, "draft": draft}
         )
-        print(f"\n>>> Save response status: {save_resp.status_code}")
-        print(f">>> Save response body: {save_resp.text}\n")
         game_id = save_resp.json()["game_id"]
         result = await db_session.execute(select(TimelineEdge).where(TimelineEdge.id == game_id))
         event = result.scalar_one_or_none()

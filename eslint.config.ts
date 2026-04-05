@@ -23,6 +23,7 @@ export default defineConfig([
     rules: {
       "@typescript-eslint/dot-notation": "error",
       "@typescript-eslint/no-explicit-any": "error",
+      "no-console": ["error", { allow: ["warn", "error"] }],
       "@typescript-eslint/naming-convention": [
         "error",
         {

@@ -20,6 +20,7 @@
   import OrganizarConfirmModal from "./OrganizarConfirmModal.svelte";
   import Button from "./Button.svelte";
   import PanelLayout from "./PanelLayout.svelte";
+  import { logger } from "../utils/logger";
 
   interface Props {
     id: number;
@@ -121,7 +122,7 @@
     ui.loading = true;
     try {
       data = await fetchSnapshot(id);
-      console.log("Loaded snapshot data:", data);
+      logger.info("Loaded snapshot data:", data);
     } finally {
       ui.loading = false;
     }

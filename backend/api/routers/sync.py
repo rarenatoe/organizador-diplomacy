@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
+from backend.core.logger import logger
 from backend.db.connection import async_engine
 from backend.sync.cache_daemon import update_notion_cache
 from backend.sync.notion_sync import run_notion_sync_background
@@ -76,7 +77,7 @@ async def _run_cache_refresh() -> None:
     part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
 
     if not token or not db_id or not part_db_id or token.startswith("secret_XXX"):
-        print("[Cache Refresh] Skipping: Missing Notion credentials")
+        logger.info("[Cache Refresh] Skipping: Missing Notion credentials")
         return
 
     client = Client(auth=token)
@@ -87,9 +88,9 @@ async def _run_cache_refresh() -> None:
         try:
             await update_notion_cache(session, client, db_id, part_db_id)
             await session.commit()
-            print("[Cache Refresh] Completed successfully")
+            logger.info("[Cache Refresh] Completed successfully")
         except Exception as e:
             await session.rollback()
-            print(f"[Cache Refresh] Error: {e}")
+            logger.error("[Cache Refresh] Error: %s", e, exc_info=True)
         finally:
             await session.close()

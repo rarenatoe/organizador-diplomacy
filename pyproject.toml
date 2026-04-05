@@ -48,6 +48,7 @@ select = [
     "TCH", # flake8-type-checking
     "ARG", # flake8-unused-arguments
     "FBT", # flake8-boolean-trap
+    "T20", # flake8-print
 ]
 ignore = [
     "E501",   # Line too long (handled by formatter or ignored)

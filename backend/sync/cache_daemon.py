@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from notion_client import Client
 from sqlalchemy import select
 
+from backend.core.logger import logger
 from backend.db.connection import async_engine
 from backend.db.models import NotionCache
 from backend.sync.notion_sync import (
@@ -127,7 +128,7 @@ async def daemon_loop() -> None:
     part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
 
     if not all([token, db_id, part_db_id]) or not token or token.startswith("secret_XXX"):
-        print(" [Cache Daemon] Skipping background sync: Missing Notion credentials.")
+        logger.info(" [Cache Daemon] Skipping background sync: Missing Notion credentials.")
         return
 
     # Type assertions for mypy/pyright
@@ -138,15 +139,15 @@ async def daemon_loop() -> None:
     from sqlalchemy.ext.asyncio.session import AsyncSession
 
     while True:
-        print(f" [Cache Daemon] Starting sync at {datetime.now()}")
+        logger.info(" [Cache Daemon] Starting sync at %s", datetime.now())
         async with AsyncSession(async_engine) as session:
             try:
                 await update_notion_cache(session, client, db_id, part_db_id)
                 await session.commit()
-                print(" [Cache Daemon] Sync complete. Sleeping for 15 minutes.")
+                logger.info(" [Cache Daemon] Sync complete. Sleeping for 15 minutes.")
             except Exception as e:
                 await session.rollback()
-                print(f" [Cache Daemon] Error during sync: {e}")
+                logger.error(" [Cache Daemon] Error during sync: %s", e, exc_info=True)
             finally:
                 await session.close()
 
