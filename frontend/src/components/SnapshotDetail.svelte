@@ -341,12 +341,7 @@
           >
         </div>
       </div>
-      <div class="section-title" style="margin-bottom: 4px;">
-        Jugadores <span
-          style="color:var(--muted);font-weight:400;text-transform:none;font-size:11px"
-          >— desactiva para excluir de la siguiente jornada</span
-        >
-      </div>
+      <div class="section-title" style="margin-bottom: 4px;">Jugadores</div>
     {/snippet}
 
     {#snippet body()}
