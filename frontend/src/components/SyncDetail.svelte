@@ -1,7 +1,6 @@
 <script lang="ts">
   import { fetchChain } from "../api";
   import type { SnapshotNode } from "../types";
-  import { esc } from "../utils";
   import PanelLayout from "./PanelLayout.svelte";
 
   interface Props {
@@ -55,7 +54,7 @@
         <div class="section-title">Detalles del Sync</div>
         <div class="meta-grid">
           <span class="meta-key">Generado</span>
-          <span class="meta-val">{esc(info?.created_at)}</span>
+          <span class="meta-val">{info?.created_at}</span>
           <span class="meta-key">De snapshot</span>
           <span class="meta-val">#{info?.from_id}</span>
           <span class="meta-key">A snapshot</span>

@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { GameDetail, DraftResponse, DraftPlayer } from "../types";
   import { fetchGame } from "../api";
-  import { esc } from "../utils";
   import { translateCountry, getCountryEmoji } from "../i18n";
   import Button from "./Button.svelte";
   import PanelLayout from "./PanelLayout.svelte";
@@ -180,7 +179,7 @@
         <div class="section-title">Resumen</div>
         <div class="meta-grid">
           <span class="meta-key">Generado</span>
-          <span class="meta-val">{esc(data?.created_at)}</span>
+          <span class="meta-val">{data?.created_at}</span>
           <span class="meta-key">Intentos</span>
           <span class="meta-val">{data?.intentos}</span>
           <span class="meta-key">Snapshot entrada</span>
@@ -210,7 +209,7 @@
               <div class="mesa-header">
                 <span class="mesa-title">Partida {table.numero}</span>
                 {#if table.gm}
-                  <span class="gm-tag gm-tag-ok">GM: {esc(table.gm)}</span>
+                  <span class="gm-tag gm-tag-ok">GM: {table.gm}</span>
                 {:else}
                   <span class="gm-tag gm-tag-bad">⚠️ Sin GM</span>
                 {/if}
@@ -220,7 +219,7 @@
                   <li>
                     <span class="p-num">{i + 1}.</span>
                     <span class="p-name"
-                      >{esc(player.nombre)}
+                      >{player.nombre}
                       {player.pais ? getCountryEmoji(player.pais) : ""}
                       {#if player.pais_reason}
                         <span class="reason-tooltip">
@@ -237,9 +236,7 @@
                       </div>
                     {:else}
                       <div class="tag-wrapper">
-                        <span class="tag tag-antiguo"
-                          >{esc(player.etiqueta)}</span
-                        >
+                        <span class="tag tag-antiguo">{player.etiqueta}</span>
                       </div>
                     {/if}
                   </li>
@@ -268,8 +265,8 @@
           <div class="section-title">Lista de espera</div>
           {#each waiting as w (w.nombre)}
             <div class="waiting-item">
-              <span class="waiting-name">{esc(w.nombre)}</span>
-              <span class="waiting-cupos">{esc(w.cupos)}</span>
+              <span class="waiting-name">{w.nombre}</span>
+              <span class="waiting-cupos">{w.cupos}</span>
             </div>
           {/each}
           <Button

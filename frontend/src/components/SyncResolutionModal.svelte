@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { SimilarName, ResolutionAction, MergePair } from "../types";
-  import { esc } from "../utils";
   import Button from "./Button.svelte";
 
   interface Props {
@@ -67,14 +66,14 @@
           <div class="resolution-side">
             <span class="resolution-label">Notion</span>
             <span class="resolution-name resolution-name-notion"
-              >{esc(currentPair.notion)}</span
+              >{currentPair.notion}</span
             >
           </div>
           <div class="resolution-vs">vs</div>
           <div class="resolution-side">
             <span class="resolution-label">Snapshot</span>
             <span class="resolution-name resolution-name-snapshot"
-              >{esc(currentPair.snapshot)}</span
+              >{currentPair.snapshot}</span
             >
           </div>
         </div>

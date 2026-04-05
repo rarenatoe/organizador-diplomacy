@@ -72,12 +72,6 @@
     }
   });
 
-  function esc(s: string | null | undefined): string {
-    const el = document.createElement("span");
-    el.textContent = s ?? "";
-    return el.innerHTML;
-  }
-
   function handleAddPlayer(): void {
     const nombre = prompt("Nombre del nuevo jugador:");
     if (!nombre) return;
@@ -358,7 +352,7 @@
                   <span
                     style="font-size:10px;font-weight:700;color:{expColor};background:{expBg};padding:1px 6px;border-radius:4px"
                   >
-                    {esc(player.experiencia)}
+                    {player.experiencia}
                   </span>
                 </td>
                 <td>

@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { OrganizarValidation } from "../types";
-  import { esc } from "../utils";
   import Button from "./Button.svelte";
 
   interface Props {
@@ -53,7 +52,7 @@
             <div class="excluded-title">Jugadores excluidos (0 partidas):</div>
             <div class="excluded-list">
               {#each displayedExcluded as name (name)}
-                <div class="excluded-item">{esc(name)}</div>
+                <div class="excluded-item">{name}</div>
               {/each}
               {#if extraCount > 0}
                 <div class="excluded-more">+ {extraCount} más</div>
