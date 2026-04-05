@@ -1,11 +1,11 @@
 <script lang="ts">
-  import type { GameDetail, DraftResponse, DraftPlayer } from "../types";
-  import { fetchGame } from "../api";
-  import { translateCountry, getCountryEmoji } from "../i18n";
-  import Button from "./Button.svelte";
-  import PanelLayout from "./PanelLayout.svelte";
-  import Badge from "./Badge.svelte";
-  import Tooltip from "./Tooltip.svelte";
+  import type { GameDetail, DraftResponse, DraftPlayer } from "../../types";
+  import { fetchGame } from "../../api";
+  import { translateCountry, getCountryEmoji } from "../../i18n";
+  import Button from "../ui/Button.svelte";
+  import PanelLayout from "../layout/PanelLayout.svelte";
+  import Badge from "../ui/Badge.svelte";
+  import Tooltip from "../ui/Tooltip.svelte";
   import GameTableCard from "./GameTableCard.svelte";
 
   interface Props {

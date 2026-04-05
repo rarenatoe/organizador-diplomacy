@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { DraftResponse, DraftPlayer } from "../types";
-  import { fetchGameDraft, saveGameDraft } from "../api";
-  import { setActiveNodeId } from "../stores.svelte";
-  import { findLatestGameId } from "../snapshotUtils";
-  import Button from "./Button.svelte";
-  import PanelLayout from "./PanelLayout.svelte";
-  import Badge from "./Badge.svelte";
-  import Tooltip from "./Tooltip.svelte";
+  import type { DraftResponse, DraftPlayer } from "../../types";
+  import { fetchGameDraft, saveGameDraft } from "../../api";
+  import { setActiveNodeId } from "../../stores.svelte";
+  import { findLatestGameId } from "../../snapshotUtils";
+  import Button from "../ui/Button.svelte";
+  import PanelLayout from "../layout/PanelLayout.svelte";
+  import Badge from "../ui/Badge.svelte";
+  import Tooltip from "../ui/Tooltip.svelte";
   import GameTableCard from "./GameTableCard.svelte";
 
   interface Props {
@@ -148,7 +148,7 @@
       onChainUpdate();
 
       // Find and open the latest game
-      const { fetchChain } = await import("../api");
+      const { fetchChain } = await import("../../api");
       const chainData = await fetchChain();
       const gameId = findLatestGameId(chainData.roots);
       if (gameId !== null) {

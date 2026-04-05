@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import SnapshotDetail from "./SnapshotDetail.svelte";
 
 // Mock the API module
-vi.mock("../api", () => ({
+vi.mock("../../api", () => ({
   fetchSnapshot: vi.fn().mockResolvedValue({
     id: 1,
     created_at: "2024-01-01T00:00:00Z",
@@ -76,12 +76,12 @@ vi.mock("../api", () => ({
 }));
 
 // Mock the stores
-vi.mock("../stores.svelte", () => ({
+vi.mock("../../stores.svelte", () => ({
   setActiveNodeId: vi.fn(),
 }));
 
 // Mock the syncUtils
-vi.mock("../syncUtils", () => ({
+vi.mock("../../syncUtils", () => ({
   validateOrganizar: vi.fn().mockReturnValue(null),
 }));
 
@@ -227,7 +227,7 @@ describe("SnapshotDetail", () => {
   });
 
   it("passes empty array when snapshot has no players", async () => {
-    const { fetchSnapshot } = await import("../api");
+    const { fetchSnapshot } = await import("../../api");
     (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       id: 2,
       created_at: "2024-01-01T00:00:00Z",
@@ -266,7 +266,7 @@ describe("SnapshotDetail", () => {
   });
 
   it("handles players with missing fields gracefully", async () => {
-    const { fetchSnapshot } = await import("../api");
+    const { fetchSnapshot } = await import("../../api");
     (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       id: 3,
       created_at: "2024-01-01T00:00:00Z",
@@ -429,7 +429,7 @@ describe("SnapshotDetail", () => {
   });
 
   it("should prevent Sincronizar Notion if snapshot source is already notion_sync", async () => {
-    const { fetchSnapshot, fetchNotionPlayers } = await import("../api");
+    const { fetchSnapshot, fetchNotionPlayers } = await import("../../api");
     (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       id: 4,
       source: "notion_sync",
@@ -480,7 +480,7 @@ describe("SnapshotDetail", () => {
   });
 
   it("should allow Sincronizar Notion if snapshot source is manual", async () => {
-    const { fetchSnapshot, fetchNotionPlayers } = await import("../api");
+    const { fetchSnapshot, fetchNotionPlayers } = await import("../../api");
     (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       id: 5,
       source: "manual",
@@ -523,7 +523,7 @@ describe("SnapshotDetail", () => {
 
   describe("Organizar Validation", () => {
     it("should hard block if less than 7 players", async () => {
-      const { fetchSnapshot } = await import("../api");
+      const { fetchSnapshot } = await import("../../api");
       const onOpenGameDraft = vi.fn();
       const onShowError = vi.fn();
 
@@ -561,8 +561,8 @@ describe("SnapshotDetail", () => {
     });
 
     it("should show modal if all players have 1 ticket", async () => {
-      const { fetchSnapshot } = await import("../api");
-      const { validateOrganizar } = await import("../syncUtils");
+      const { fetchSnapshot } = await import("../../api");
+      const { validateOrganizar } = await import("../../syncUtils");
       const onOpenGameDraft = vi.fn();
 
       const players = new Array(7).fill(null).map((_, i) => ({
@@ -607,8 +607,8 @@ describe("SnapshotDetail", () => {
 
     it("should call executeOrganizar when confirmed in modal", async () => {
       vi.useRealTimers();
-      const { fetchSnapshot } = await import("../api");
-      const { validateOrganizar } = await import("../syncUtils");
+      const { fetchSnapshot } = await import("../../api");
+      const { validateOrganizar } = await import("../../syncUtils");
       const onOpenGameDraft = vi.fn();
 
       const players = new Array(7).fill(null).map((_, i) => ({
@@ -659,8 +659,8 @@ describe("SnapshotDetail", () => {
     });
 
     it("should call onEditDraft when edit is clicked in modal", async () => {
-      const { fetchSnapshot } = await import("../api");
-      const { validateOrganizar } = await import("../syncUtils");
+      const { fetchSnapshot } = await import("../../api");
+      const { validateOrganizar } = await import("../../syncUtils");
 
       const players = new Array(7).fill(null).map((_, i) => ({
         nombre: `P${i}`,
@@ -729,7 +729,7 @@ describe("SnapshotDetail", () => {
       vi.useRealTimers();
 
       const { fetchSnapshot, fetchNotionPlayers, saveSnapshot, renamePlayer } =
-        await import("../api");
+        await import("../../api");
       const onOpenSnapshot = vi.fn();
 
       // Mock initial snapshot with a player that has similar name in Notion
@@ -857,7 +857,7 @@ describe("SnapshotDetail", () => {
       vi.useRealTimers();
 
       const { fetchSnapshot, fetchNotionPlayers, saveSnapshot, renamePlayer } =
-        await import("../api");
+        await import("../../api");
 
       // Mock initial snapshot with a player that has similar name in Notion
       (fetchSnapshot as ReturnType<typeof vi.fn>)
@@ -974,7 +974,7 @@ describe("SnapshotDetail", () => {
     });
 
     it("should reset isSyncing state when fetchNotionPlayers returns an error", async () => {
-      const { fetchSnapshot, fetchNotionPlayers } = await import("../api");
+      const { fetchSnapshot, fetchNotionPlayers } = await import("../../api");
       const onShowError = vi.fn();
 
       // Mock a valid manual snapshot so sync button is enabled
@@ -1041,7 +1041,7 @@ describe("SnapshotDetail", () => {
 
     it("should reset isSyncing state when saveSnapshot returns an error", async () => {
       const { fetchSnapshot, fetchNotionPlayers, saveSnapshot } =
-        await import("../api");
+        await import("../../api");
       const onShowError = vi.fn();
 
       // Mock a valid manual snapshot so sync button is enabled
@@ -1115,7 +1115,7 @@ describe("SnapshotDetail", () => {
       // Use real timers for this test to avoid async issues with promise rejection
       vi.useRealTimers();
 
-      const { fetchSnapshot, fetchNotionPlayers } = await import("../api");
+      const { fetchSnapshot, fetchNotionPlayers } = await import("../../api");
       const onShowError = vi.fn();
 
       // Mock a valid manual snapshot so sync button is enabled
@@ -1185,7 +1185,7 @@ describe("SnapshotDetail", () => {
 
   describe("New Svelte 5 Behaviors", () => {
     it("CSV button calls clipboard.writeText with correctly formatted derived CSV data", async () => {
-      const { fetchSnapshot } = await import("../api");
+      const { fetchSnapshot } = await import("../../api");
       (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         id: 1,
         created_at: "2024-01-01T00:00:00Z",
@@ -1235,7 +1235,7 @@ describe("SnapshotDetail", () => {
     });
 
     it("CSV derived state updates automatically when player data changes", async () => {
-      const { fetchSnapshot } = await import("../api");
+      const { fetchSnapshot } = await import("../../api");
 
       // Initial mock with one player
       (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
@@ -1289,7 +1289,7 @@ describe("SnapshotDetail", () => {
 
     it("Sincronizar button shows disabled state and 'Sincronizando...' when ui.isSyncing is true", async () => {
       // We need to test the UI state behavior by triggering sync
-      const { fetchSnapshot, fetchNotionPlayers } = await import("../api");
+      const { fetchSnapshot, fetchNotionPlayers } = await import("../../api");
 
       (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         id: 1,
@@ -1333,7 +1333,7 @@ describe("SnapshotDetail", () => {
     });
 
     it("Editar button triggers onEditDraft with mapped playersForDraft data", async () => {
-      const { fetchSnapshot } = await import("../api");
+      const { fetchSnapshot } = await import("../../api");
       const onEditDraft = vi.fn();
 
       (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
@@ -1389,8 +1389,8 @@ describe("SnapshotDetail", () => {
     });
 
     it("OrganizarConfirmModal onEdit uses playersForDraft derived data", async () => {
-      const { fetchSnapshot } = await import("../api");
-      const { validateOrganizar } = await import("../syncUtils");
+      const { fetchSnapshot } = await import("../../api");
+      const { validateOrganizar } = await import("../../syncUtils");
       const onEditDraft = vi.fn();
 
       const players = new Array(7).fill(null).map((_, i) => ({

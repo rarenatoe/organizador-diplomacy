@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { GameEdge } from "../types";
-  import { getActiveNodeId } from "../stores.svelte";
+  import type { GameEdge } from "../../types";
+  import { getActiveNodeId } from "../../stores.svelte";
 
   interface Props {
     node: GameEdge;

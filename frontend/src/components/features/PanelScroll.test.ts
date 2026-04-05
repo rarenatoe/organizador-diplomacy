@@ -5,7 +5,7 @@ import GameDetail from "./GameDetail.svelte";
 import SyncDetail from "./SyncDetail.svelte";
 
 // Mock the API module
-vi.mock("../api", () => ({
+vi.mock("../../api", () => ({
   fetchSnapshot: vi.fn().mockResolvedValue({
     source: "manual",
     created_at: "2024-01-01",
@@ -53,7 +53,7 @@ vi.mock("../api", () => ({
 }));
 
 // Mock the stores
-vi.mock("../stores.svelte", () => ({
+vi.mock("../../stores.svelte", () => ({
   setSelectedSnapshot: vi.fn(),
 }));
 

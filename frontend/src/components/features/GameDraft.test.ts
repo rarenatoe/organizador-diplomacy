@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/svelte";
 import GameDraft from "./GameDraft.svelte";
 
 // Mock the API module
-vi.mock("../api", () => ({
+vi.mock("../../api", () => ({
   fetchGameDraft: vi.fn(),
   saveGameDraft: vi.fn(),
 }));
@@ -83,7 +83,7 @@ describe("GameDraft.svelte", () => {
 
   beforeEach(async () => {
     // Reset any necessary state before each test
-    const { fetchGameDraft } = vi.mocked(await import("../api"));
+    const { fetchGameDraft } = vi.mocked(await import("../../api"));
     fetchGameDraft.mockResolvedValue(mockDraftData);
   });
 
@@ -109,7 +109,7 @@ describe("GameDraft.svelte", () => {
   });
 
   it("shows loading state initially", async () => {
-    const { fetchGameDraft } = vi.mocked(await import("../api"));
+    const { fetchGameDraft } = vi.mocked(await import("../../api"));
     fetchGameDraft.mockImplementation(() => new Promise(() => {}));
 
     render(GameDraft, { props: mockProps });
@@ -141,7 +141,7 @@ describe("GameDraft.svelte", () => {
   });
 
   it("saves draft when save button is clicked", async () => {
-    const { saveGameDraft } = vi.mocked(await import("../api"));
+    const { saveGameDraft } = vi.mocked(await import("../../api"));
     saveGameDraft.mockResolvedValue({ game_id: 456 });
 
     render(GameDraft, { props: mockProps });
@@ -163,7 +163,7 @@ describe("GameDraft.svelte", () => {
   });
 
   it("shows error when save fails", async () => {
-    const { saveGameDraft } = vi.mocked(await import("../api"));
+    const { saveGameDraft } = vi.mocked(await import("../../api"));
     saveGameDraft.mockResolvedValue({ game_id: 0, error: "Save failed" });
 
     render(GameDraft, { props: mockProps });
@@ -212,7 +212,7 @@ describe("GameDraft.svelte", () => {
   });
 
   it("shows error when draft generation fails", async () => {
-    const { fetchGameDraft } = vi.mocked(await import("../api"));
+    const { fetchGameDraft } = vi.mocked(await import("../../api"));
     fetchGameDraft.mockResolvedValue({
       mesas: [],
       tickets_sobrantes: [],
@@ -234,7 +234,7 @@ describe("GameDraft.svelte", () => {
   describe("handlePlayerClick swap functionality", () => {
     beforeEach(async () => {
       vi.clearAllMocks();
-      const { fetchGameDraft } = vi.mocked(await import("../api"));
+      const { fetchGameDraft } = vi.mocked(await import("../../api"));
       fetchGameDraft.mockResolvedValue({
         mesas: [
           {
@@ -396,7 +396,7 @@ describe("GameDraft.svelte", () => {
     it("constraint validation prevents duplicate players in same mesa", async () => {
       // Use a special draft where Mesa 2 already contains a player named "Alice"
       // so swapping Alice from Mesa 1 into Mesa 2 triggers the duplicate check.
-      const { fetchGameDraft } = vi.mocked(await import("../api"));
+      const { fetchGameDraft } = vi.mocked(await import("../../api"));
       fetchGameDraft.mockResolvedValue({
         mesas: [
           {
@@ -496,12 +496,12 @@ describe("GameDraft.svelte", () => {
   describe("Editing functionality", () => {
     beforeEach(async () => {
       vi.clearAllMocks();
-      const { fetchGameDraft } = vi.mocked(await import("../api"));
+      const { fetchGameDraft } = vi.mocked(await import("../../api"));
       fetchGameDraft.mockResolvedValue(mockDraftData);
     });
 
     it("uses initialDraft prop and skips fetchGameDraft if provided", async () => {
-      const { fetchGameDraft } = vi.mocked(await import("../api"));
+      const { fetchGameDraft } = vi.mocked(await import("../../api"));
 
       render(GameDraft, {
         props: {
@@ -523,7 +523,7 @@ describe("GameDraft.svelte", () => {
     });
 
     it("passes editing_game_id to saveGameDraft when editing", async () => {
-      const { saveGameDraft } = vi.mocked(await import("../api"));
+      const { saveGameDraft } = vi.mocked(await import("../../api"));
       saveGameDraft.mockResolvedValue({ game_id: 456 });
 
       render(GameDraft, {
@@ -548,7 +548,7 @@ describe("GameDraft.svelte", () => {
     });
 
     it("calls onCancel instead of onClose when editingGameId exists", async () => {
-      const { saveGameDraft } = vi.mocked(await import("../api"));
+      const { saveGameDraft } = vi.mocked(await import("../../api"));
       saveGameDraft.mockResolvedValue({ game_id: 456 });
 
       render(GameDraft, {
@@ -569,7 +569,7 @@ describe("GameDraft.svelte", () => {
     });
 
     it("calls onCancel when editingGameId is null", async () => {
-      const { saveGameDraft } = vi.mocked(await import("../api"));
+      const { saveGameDraft } = vi.mocked(await import("../../api"));
       saveGameDraft.mockResolvedValue({ game_id: 456 });
 
       render(GameDraft, {
@@ -590,7 +590,7 @@ describe("GameDraft.svelte", () => {
     });
 
     it("handles GM assignment correctly", async () => {
-      const { fetchGameDraft } = vi.mocked(await import("../api"));
+      const { fetchGameDraft } = vi.mocked(await import("../../api"));
       const draftWithGM = {
         ...mockDraftData,
         mesas: [

@@ -6,24 +6,24 @@
     MergePair,
     NotionPlayer,
     OrganizarValidation,
-  } from "../types";
+  } from "../../types";
   import {
     fetchSnapshot,
     renamePlayer,
     fetchNotionPlayers,
     saveSnapshot,
-  } from "../api";
-  import { setActiveNodeId } from "../stores.svelte";
-  import { validateOrganizar } from "../syncUtils";
-  import { normalizeName } from "../utils";
-  import SyncResolutionModal from "./SyncResolutionModal.svelte";
-  import OrganizarConfirmModal from "./OrganizarConfirmModal.svelte";
-  import Button from "./Button.svelte";
-  import PanelLayout from "./PanelLayout.svelte";
-  import Badge from "./Badge.svelte";
-  import DataTable, { type ColumnDef } from "./DataTable.svelte";
+  } from "../../api";
+  import { setActiveNodeId } from "../../stores.svelte";
+  import { validateOrganizar } from "../../syncUtils";
+  import { normalizeName } from "../../utils";
+  import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
+  import OrganizarConfirmModal from "../modals/OrganizarConfirmModal.svelte";
+  import Button from "../ui/Button.svelte";
+  import PanelLayout from "../layout/PanelLayout.svelte";
+  import Badge from "../ui/Badge.svelte";
+  import DataTable, { type ColumnDef } from "../layout/DataTable.svelte";
   import SnapshotHistory from "./SnapshotHistory.svelte";
-  import { logger } from "../utils/logger";
+  import { logger } from "../../utils/logger";
 
   interface Props {
     id: number;

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { clickOutside } from "../clickOutside";
-  import Button from "./Button.svelte";
+  import { clickOutside } from "../../clickOutside";
+  import Button from "../ui/Button.svelte";
 
   interface Props {
     title: string;

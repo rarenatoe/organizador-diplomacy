@@ -2,16 +2,16 @@
   import type { EditPlayerRow, DraftResponse } from "./types";
   import { deleteSnapshot as apiDeleteSnapshot } from "./api";
   import { setActiveNodeId } from "./stores.svelte";
-  import Header from "./components/Header.svelte";
-  import ChainViewer from "./components/ChainViewer.svelte";
-  import SidePanel from "./components/SidePanel.svelte";
-  import SnapshotDetail from "./components/SnapshotDetail.svelte";
-  import SnapshotDraft from "./components/SnapshotDraft.svelte";
-  import GameDraft from "./components/GameDraft.svelte";
-  import GameDetail from "./components/GameDetail.svelte";
-  import SyncDetail from "./components/SyncDetail.svelte";
-  import Toaster from "./components/Toaster.svelte";
-  import TerminalModal from "./components/TerminalModal.svelte";
+  import Header from "./components/layout/Header.svelte";
+  import ChainViewer from "./components/features/ChainViewer.svelte";
+  import SidePanel from "./components/layout/SidePanel.svelte";
+  import SnapshotDetail from "./components/features/SnapshotDetail.svelte";
+  import SnapshotDraft from "./components/features/SnapshotDraft.svelte";
+  import GameDraft from "./components/features/GameDraft.svelte";
+  import GameDetail from "./components/features/GameDetail.svelte";
+  import SyncDetail from "./components/features/SyncDetail.svelte";
+  import Toaster from "./components/features/Toaster.svelte";
+  import TerminalModal from "./components/modals/TerminalModal.svelte";
   import "../static/style.css";
 
   // Component refs

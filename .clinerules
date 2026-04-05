@@ -59,7 +59,15 @@
 **FILE LIMIT**: 400 lines per file (extract sub-domains when exceeded)
 **TRANSLATION**: All UI translations go through `frontend/src/i18n.ts`
 
-## Component Design Principles
+## Component Architecture & Organization (CRITICAL)
+
+**FOLDER HIERARCHY:**
+Categorize all components in `frontend/src/components/` by responsibility:
+
+- `ui/`: Atomic/domain-agnostic (e.g., `Button`, `Badge`).
+- `modals/`: Overlays using the `.modal-overlay` pattern.
+- `layout/`: Structural containers (e.g., `SidePanel`, `DataTable`).
+- `features/`: Domain-specific logic (e.g., `SnapshotDraft`, `GameNode`).
 
 **LEAF COMPONENTS** (Domain-Agnostic):
 
@@ -174,6 +182,7 @@
 - CSS class changes → IMMEDIATELY update test queries
 - Search for: `querySelector`, `closest`, `getBy` calls
 
+<<<<<<< Updated upstream
 ## Modals & Overlays
 
 **PATTERN:** All modals must use the global `.modal-overlay` utility class and `--modal-backdrop` variable defined in `style.css` for consistent visual behavior across the application.
@@ -188,6 +197,21 @@
 - **Autofocus:** Apply `autofocus` action to textarea for immediate user interaction
 
 **EXAMPLES:**
+=======
+## Modal & Overlay Patterns (CRITICAL)
+
+**VISUAL CONTRACT:**
+
+- **Overlay:** MUST use `.modal-overlay` utility and `--modal-backdrop` variable.
+- **Z-Index:** Set to `1000` to escape `SidePanel` (z-index 50) stacking contexts.
+- **Effect:** Apply `backdrop-filter: blur(2px)` for depth.
+
+**BEHAVIORAL CONTRACT:**
+
+- **Events:** Implement `onclick={onCancel}` on overlay and `e.stopPropagation()` on content.
+- **Focus:** Use `use:autofocus` on the primary input/textarea.
+- **Props:** Use standard callbacks: `onImport` or `onConfirm`.
+>>>>>>> Stashed changes
 
 ```svelte
 <!-- Modal with global overlay utility -->
@@ -216,12 +240,19 @@
 }
 ```
 
-## Testing Execution (CRITICAL)
+## Testing Execution (STRICT ENFORCEMENT)
 
-**COMMANDS**:
+**FORBIDDEN COMMANDS:**
 
-- NEVER: `bun test`
-- ALWAYS: `bun run test`
+- **NEVER use `bun test`**: This uses Bun's native runner which is incompatible with our Vitest configuration and Svelte 5 runes.
+
+**MANDATORY COMMANDS:**
+
+- **ALWAYS use `bun run test`**: This triggers the Vitest suite specifically configured for this project.
+- **Typing:** Run `bun run typecheck` after any directory restructuring or prop changes.
+
+**BACKEND TESTING:**
+
 - Backend: `uv run python -m pytest -q`
 
 ## Backend Testing Strategy
@@ -264,6 +295,14 @@
 - NEVER: `vi.mock()` on `.svelte.ts` files with `$state` runes
 - USE: Integration-style testing methodology
 - REASON: State files require real reactivity for accurate testing
+
+**TESTING STATE RUNES:**
+
+- **REGLA:** Exigir tests unitarios para verificar cambios de visibilidad o comportamiento en componentes que dependen de props de estado.
+- **PROHIBITION:** NEVER use `vi.mock()` on `.svelte.ts` files or components using `$state`. You MUST use integration-style tests to verify actual reactive behavior.
+- **VALIDATION STATES:** Test visibility changes based on props like `editing`, `viewMode`, `hasPermission`
+- **EXAMPLE:** Test that `Button` shows/hides based on `visible={condition}` prop
+- **EXAMPLE:** Test that `DataTable` switches between view/edit modes based on `editable` prop
 
 ## Test Maintenance (CRITICAL)
 

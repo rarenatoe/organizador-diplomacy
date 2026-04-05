@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/svelte";
 import GameNode from "./GameNode.svelte";
-import { setActiveNodeId } from "../stores.svelte";
+import { setActiveNodeId } from "../../stores.svelte";
 
 describe("Node Interaction Seatbelts", () => {
   beforeEach(() => {

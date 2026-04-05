@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import GameDetail from "./GameDetail.svelte";
 
 // Mock the API module
-vi.mock("../api", () => ({
+vi.mock("../../api", () => ({
   fetchGame: vi.fn().mockResolvedValue({
     id: 1,
     created_at: "2024-01-01T00:00:00Z",
@@ -34,7 +34,7 @@ vi.mock("../api", () => ({
 }));
 
 // Mock the utils module
-vi.mock("../utils", () => ({
+vi.mock("../../utils", () => ({
   esc: vi.fn((s: string | null | undefined) => s ?? ""),
 }));
 
@@ -405,8 +405,8 @@ describe("GameDetail", () => {
       });
 
       // Temporarily replace the mock
-      const originalMock = vi.mocked(await import("../api")).fetchGame;
-      vi.mocked(await import("../api")).fetchGame = mockFetchGame;
+      const originalMock = vi.mocked(await import("../../api")).fetchGame;
+      vi.mocked(await import("../../api")).fetchGame = mockFetchGame;
 
       render(GameDetail, {
         props: {
@@ -427,7 +427,7 @@ describe("GameDetail", () => {
       expect(reasonTooltips.length).toBe(0);
 
       // Restore original mock
-      vi.mocked(await import("../api")).fetchGame = originalMock;
+      vi.mocked(await import("../../api")).fetchGame = originalMock;
     });
   });
 });

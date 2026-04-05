@@ -10,7 +10,15 @@ priority: 30
 **FILE LIMIT**: 400 lines per file (extract sub-domains when exceeded)
 **TRANSLATION**: All UI translations go through `frontend/src/i18n.ts`
 
-## Component Design Principles
+## Component Architecture & Organization (CRITICAL)
+
+**FOLDER HIERARCHY:**
+Categorize all components in `frontend/src/components/` by responsibility:
+
+- `ui/`: Atomic/domain-agnostic (e.g., `Button`, `Badge`).
+- `modals/`: Overlays using the `.modal-overlay` pattern.
+- `layout/`: Structural containers (e.g., `SidePanel`, `DataTable`).
+- `features/`: Domain-specific logic (e.g., `SnapshotDraft`, `GameNode`).
 
 **LEAF COMPONENTS** (Domain-Agnostic):
 
@@ -125,6 +133,7 @@ priority: 30
 - CSS class changes → IMMEDIATELY update test queries
 - Search for: `querySelector`, `closest`, `getBy` calls
 
+<<<<<<< Updated upstream
 ## Modals & Overlays
 
 **PATTERN:** All modals must use the global `.modal-overlay` utility class and `--modal-backdrop` variable defined in `style.css` for consistent visual behavior across the application.
@@ -139,6 +148,21 @@ priority: 30
 - **Autofocus:** Apply `autofocus` action to textarea for immediate user interaction
 
 **EXAMPLES:**
+=======
+## Modal & Overlay Patterns (CRITICAL)
+
+**VISUAL CONTRACT:**
+
+- **Overlay:** MUST use `.modal-overlay` utility and `--modal-backdrop` variable.
+- **Z-Index:** Set to `1000` to escape `SidePanel` (z-index 50) stacking contexts.
+- **Effect:** Apply `backdrop-filter: blur(2px)` for depth.
+
+**BEHAVIORAL CONTRACT:**
+
+- **Events:** Implement `onclick={onCancel}` on overlay and `e.stopPropagation()` on content.
+- **Focus:** Use `use:autofocus` on the primary input/textarea.
+- **Props:** Use standard callbacks: `onImport` or `onConfirm`.
+>>>>>>> Stashed changes
 
 ```svelte
 <!-- Modal with global overlay utility -->

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
 
 // Mock the API module
-vi.mock("../api", () => ({
+vi.mock("../../api", () => ({
   fetchChain: vi.fn(),
 }));
 
@@ -15,7 +15,7 @@ vi.mock("./GameNode.svelte", () => ({
 
 // Import ChainViewer and API
 import ChainViewer from "./ChainViewer.svelte";
-import { fetchChain } from "../api";
+import { fetchChain } from "../../api";
 
 describe("ChainViewer.svelte - Empty State Integration", () => {
   const mockProps = {

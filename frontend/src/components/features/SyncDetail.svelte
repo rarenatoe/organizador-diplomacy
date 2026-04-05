@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { fetchChain } from "../api";
-  import type { SnapshotNode } from "../types";
-  import PanelLayout from "./PanelLayout.svelte";
+  import { fetchChain } from "../../api";
+  import type { SnapshotNode } from "../../types";
+  import PanelLayout from "../layout/PanelLayout.svelte";
 
   interface Props {
     id: number;

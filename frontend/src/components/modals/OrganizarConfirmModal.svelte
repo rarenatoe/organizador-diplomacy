@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { OrganizarValidation } from "../types";
-  import Button from "./Button.svelte";
+  import type { OrganizarValidation } from "../../types";
+  import Button from "../ui/Button.svelte";
 
   interface Props {
     visible: boolean;

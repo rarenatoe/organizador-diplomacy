@@ -1,13 +1,13 @@
 <script lang="ts">
-  import type { SnapshotNode } from "../types";
-  import { fetchChain } from "../api";
+  import type { SnapshotNode } from "../../types";
+  import { fetchChain } from "../../api";
   import {
     setSnapshotCount,
     setChainData,
     getActiveNodeId,
-  } from "../stores.svelte";
+  } from "../../stores.svelte";
   import GameNode from "./GameNode.svelte";
-  import Button from "./Button.svelte";
+  import Button from "../ui/Button.svelte";
 
   interface Props {
     onOpenSnapshot: (id: number) => void;

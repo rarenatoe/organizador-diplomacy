@@ -5,16 +5,16 @@
     SimilarName,
     MergePair,
     NotionPlayer,
-  } from "../types";
-  import { saveSnapshot, fetchNotionPlayers } from "../api";
-  import { parsePlayersCsv, normalizeName } from "../utils";
-  import { setActiveNodeId } from "../stores.svelte";
-  import SyncResolutionModal from "./SyncResolutionModal.svelte";
-  import CsvImportModal from "./CsvImportModal.svelte";
-  import Button from "./Button.svelte";
-  import PanelLayout from "./PanelLayout.svelte";
-  import Badge from "./Badge.svelte";
-  import DataTable, { type ColumnDef } from "./DataTable.svelte";
+  } from "../../types";
+  import { saveSnapshot, fetchNotionPlayers } from "../../api";
+  import { parsePlayersCsv, normalizeName } from "../../utils";
+  import { setActiveNodeId } from "../../stores.svelte";
+  import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
+  import CsvImportModal from "../modals/CsvImportModal.svelte";
+  import Button from "../ui/Button.svelte";
+  import PanelLayout from "../layout/PanelLayout.svelte";
+  import Badge from "../ui/Badge.svelte";
+  import DataTable, { type ColumnDef } from "../layout/DataTable.svelte";
 
   interface Props {
     parentId: number | null;

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Button from "./Button.svelte";
+  import Button from "../ui/Button.svelte";
 
   interface Props {
     onNewDraft: () => void;

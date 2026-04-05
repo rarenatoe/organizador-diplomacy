@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { SimilarName, ResolutionAction, MergePair } from "../types";
-  import Button from "./Button.svelte";
+  import type { SimilarName, ResolutionAction, MergePair } from "../../types";
+  import Button from "../ui/Button.svelte";
 
   interface Props {
     visible: boolean;

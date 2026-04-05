@@ -4,12 +4,19 @@ title: Pillar 4 - Testing & Validation
 priority: 40
 ---
 
-## Testing Execution (CRITICAL)
+## Testing Execution (STRICT ENFORCEMENT)
 
-**COMMANDS**:
+**FORBIDDEN COMMANDS:**
 
-- NEVER: `bun test`
-- ALWAYS: `bun run test`
+- **NEVER use `bun test`**: This uses Bun's native runner which is incompatible with our Vitest configuration and Svelte 5 runes.
+
+**MANDATORY COMMANDS:**
+
+- **ALWAYS use `bun run test`**: This triggers the Vitest suite specifically configured for this project.
+- **Typing:** Run `bun run typecheck` after any directory restructuring or prop changes.
+
+**BACKEND TESTING:**
+
 - Backend: `uv run python -m pytest -q`
 
 ## Backend Testing Strategy
@@ -52,6 +59,14 @@ priority: 40
 - NEVER: `vi.mock()` on `.svelte.ts` files with `$state` runes
 - USE: Integration-style testing methodology
 - REASON: State files require real reactivity for accurate testing
+
+**TESTING STATE RUNES:**
+
+- **REGLA:** Exigir tests unitarios para verificar cambios de visibilidad o comportamiento en componentes que dependen de props de estado.
+- **PROHIBITION:** NEVER use `vi.mock()` on `.svelte.ts` files or components using `$state`. You MUST use integration-style tests to verify actual reactive behavior.
+- **VALIDATION STATES:** Test visibility changes based on props like `editing`, `viewMode`, `hasPermission`
+- **EXAMPLE:** Test that `Button` shows/hides based on `visible={condition}` prop
+- **EXAMPLE:** Test that `DataTable` switches between view/edit modes based on `editable` prop
 
 ## Test Maintenance (CRITICAL)
 

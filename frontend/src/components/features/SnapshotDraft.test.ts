@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/svelte";
 import SnapshotDraft from "./SnapshotDraft.svelte";
 
 // Mock the API module
-vi.mock("../api", () => ({
+vi.mock("../../api", () => ({
   createSnapshot: vi.fn().mockResolvedValue({
     snapshot_id: 123,
   }),
@@ -16,7 +16,7 @@ vi.mock("../api", () => ({
 }));
 
 // Mock the utils module
-vi.mock("../utils", () => ({
+vi.mock("../../utils", () => ({
   parsePlayersCsv: vi.fn().mockReturnValue([
     {
       nombre: "Alice",
@@ -38,7 +38,7 @@ vi.mock("../utils", () => ({
 }));
 
 // Mock the stores
-vi.mock("../stores.svelte", () => ({
+vi.mock("../../stores.svelte", () => ({
   setActiveNodeId: vi.fn(),
 }));
 
@@ -304,7 +304,7 @@ describe("SnapshotDraft", () => {
   });
 
   it("calls saveSnapshot when save button is clicked", async () => {
-    const { saveSnapshot } = await import("../api");
+    const { saveSnapshot } = await import("../../api");
     const onClose = vi.fn();
     const onChainUpdate = vi.fn();
     const onOpenSnapshot = vi.fn();
@@ -451,7 +451,7 @@ describe("SnapshotDraft", () => {
   });
 
   it("calls onShowError when importing CSV yields no valid players", async () => {
-    const { parsePlayersCsv } = await import("../utils");
+    const { parsePlayersCsv } = await import("../../utils");
     (parsePlayersCsv as ReturnType<typeof vi.fn>).mockReturnValueOnce([]);
 
     const onShowError = vi.fn();
@@ -508,7 +508,7 @@ describe("SnapshotDraft", () => {
   });
 
   it("sends renames payload when player name is edited", async () => {
-    const { saveSnapshot } = await import("../api");
+    const { saveSnapshot } = await import("../../api");
     const onClose = vi.fn();
     const onChainUpdate = vi.fn();
 
