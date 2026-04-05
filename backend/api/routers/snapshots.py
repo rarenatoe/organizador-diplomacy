@@ -549,6 +549,7 @@ async def api_notion_fetch(
                     "c_austria": r.c_austria,
                     "c_russia": r.c_russia,
                     "c_turkey": r.c_turkey,
+                    "alias": r.alias,
                 }
             )
 

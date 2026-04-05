@@ -14,7 +14,7 @@ import logging
 import os
 from collections import defaultdict
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from dotenv import load_dotenv
 from notion_client import Client
@@ -37,6 +37,24 @@ FIELD_DEFAULTS: dict[str, int] = {
     "partidas_deseadas": 1,
     "partidas_gm": 0,
 }
+
+# ── TypedDict for Notion player data ───────────────────────────────────────────
+
+class NotionPlayerDict(TypedDict):
+    """TypedDict for Notion player data with strict type safety."""
+    notion_id: str
+    nombre: str
+    experiencia: str
+    juegos_este_ano: int
+    alias: list[str]
+    c_england: int
+    c_france: int
+    c_germany: int
+    c_italy: int
+    c_austria: int
+    c_russia: int
+    c_turkey: int
+
 
 # ── Country property mapping ──────────────────────────────────────────────────
 
@@ -160,7 +178,7 @@ def similarity(a: str, b: str) -> float:
 
 
 def detect_similar_names(
-    notion_players: dict[str, dict[str, Any]] | list[dict[str, Any]],
+    notion_players: dict[str, NotionPlayerDict] | list[NotionPlayerDict],
     snapshot_names: list[str],
     threshold: float = 0.75,
 ) -> list[dict[str, Any]]:
@@ -386,8 +404,8 @@ def conteo_partidas_este_ano(
 
 
 def find_notion_player(
-    name: str, notion_players: dict[str, dict[str, Any]]
-) -> dict[str, Any] | None:
+    name: str, notion_players: dict[str, NotionPlayerDict]
+) -> NotionPlayerDict | None:
     """Finds a Notion player by name or alias."""
     norm_name = normalize_name(name)
     # Exact name match
@@ -443,9 +461,9 @@ async def _fetch_notion_data() -> tuple[list[dict[str, Any]], dict[str, int], Cl
 def _build_notion_players_lookup(
     pages: list[dict[str, Any]],
     conteo_por_jugador: dict[str, int],
-) -> dict[str, dict[str, Any]]:
+) -> dict[str, NotionPlayerDict]:
     """Build a lookup dict of Notion players by normalized name."""
-    notion_players: dict[str, dict[str, Any]] = {}
+    notion_players: dict[str, NotionPlayerDict] = {}
 
     for page in pages:
         props = page.get("properties", {})
@@ -479,14 +497,20 @@ def _build_notion_players_lookup(
             for key, notion_name in COUNTRY_PROPS.items()
         }
 
-        notion_players[normalize_name(nombre)] = {
+        notion_players[normalize_name(nombre)] = NotionPlayerDict({
             "notion_id": page["id"],
             "nombre": nombre,
             "experiencia": experiencia_val,
             "juegos_este_ano": juegos,
             "alias": alias_list,
-            **countries_data,
-        }
+            "c_england": countries_data["c_england"],
+            "c_france": countries_data["c_france"],
+            "c_germany": countries_data["c_germany"],
+            "c_italy": countries_data["c_italy"],
+            "c_austria": countries_data["c_austria"],
+            "c_russia": countries_data["c_russia"],
+            "c_turkey": countries_data["c_turkey"],
+        })
 
     return notion_players
 
@@ -614,6 +638,7 @@ async def _create_new_snapshot(
             "c_austria": fila.get("c_austria", 0),
             "c_russia": fila.get("c_russia", 0),
             "c_turkey": fila.get("c_turkey", 0),
+            "alias": fila.get("alias", []),
         }
         for fila in filas
     ]
@@ -630,7 +655,7 @@ async def _create_new_snapshot(
 async def _build_snapshot_rows(
     session: AsyncSession,
     source_snapshot_id: int | None,
-    notion_players: dict[str, dict[str, Any]],
+    notion_players: dict[str, NotionPlayerDict],
     merges: dict[str, dict[str, str]] | None = None,
 ) -> list[dict[str, Any]]:
     """
@@ -677,6 +702,7 @@ async def _build_snapshot_rows(
                             "partidas_gm": int(
                                 existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
                             ),
+                            "alias": notion_data.get("alias", []),
                             **{c: notion_data[c] for c in COUNTRY_PROPS},
                         }
                     )
@@ -706,6 +732,7 @@ async def _build_snapshot_rows(
                             "partidas_gm": int(
                                 existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
                             ),
+                            "alias": notion_data.get("alias", []),
                             **{c: notion_data[c] for c in COUNTRY_PROPS},
                         }
                     )
@@ -729,6 +756,7 @@ async def _build_snapshot_rows(
                         "partidas_gm": int(
                             existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
                         ),
+                        "alias": notion_data.get("alias", []),
                         **{c: notion_data[c] for c in COUNTRY_PROPS},
                     }
                 )
@@ -761,6 +789,7 @@ async def _build_snapshot_rows(
                     "prioridad": FIELD_DEFAULTS["prioridad"],
                     "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
                     "partidas_gm": FIELD_DEFAULTS["partidas_gm"],
+                    "alias": notion_data.get("alias", []),
                     **{c: notion_data[c] for c in COUNTRY_PROPS},
                 }
             )

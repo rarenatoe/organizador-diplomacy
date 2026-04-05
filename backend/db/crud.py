@@ -656,6 +656,7 @@ async def update_notion_cache(session: AsyncSession, rows: list[dict[str, Any]])
             c_austria=int(r.get("c_austria", 0)),
             c_russia=int(r.get("c_russia", 0)),
             c_turkey=int(r.get("c_turkey", 0)),
+            alias=r.get("alias", []),
             last_updated=datetime.now(),
         )
         session.add(cache)
@@ -679,6 +680,7 @@ async def get_notion_cache(session: AsyncSession) -> list[dict[str, Any]]:
             "c_austria": r.c_austria,
             "c_russia": r.c_russia,
             "c_turkey": r.c_turkey,
+            "alias": r.alias,
             "last_updated": r.last_updated,
         }
         for r in rows

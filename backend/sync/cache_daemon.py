@@ -64,6 +64,14 @@ async def update_notion_cache(
         player_id = page["id"].replace("-", "")
         juegos = conteo_por_jugador.get(player_id, 0)
 
+        alias_prop = props.get("Alias")
+        alias_text = (
+            "".join(p.get("plain_text", "") for p in alias_prop.get("rich_text", []))
+            if alias_prop
+            else ""
+        )
+        alias_list = [a.strip().lower() for a in alias_text.split(",") if a.strip()]
+
         countries_data = {
             key: extraer_numero(props.get(notion_name, {}))
             for key, notion_name in COUNTRY_PROPS.items()
@@ -87,6 +95,7 @@ async def update_notion_cache(
             existing.c_austria = countries_data["c_austria"]
             existing.c_russia = countries_data["c_russia"]
             existing.c_turkey = countries_data["c_turkey"]
+            existing.alias = alias_list
             existing.last_updated = last_updated
         else:
             # Create new
@@ -102,6 +111,7 @@ async def update_notion_cache(
                 c_austria=countries_data["c_austria"],
                 c_russia=countries_data["c_russia"],
                 c_turkey=countries_data["c_turkey"],
+                alias=alias_list,
                 last_updated=last_updated,
             )
             session.add(cache_entry)

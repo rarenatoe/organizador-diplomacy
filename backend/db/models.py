@@ -197,6 +197,7 @@ class NotionCache(Base, kw_only=True):
     c_austria: Mapped[int] = mapped_column(default=0)
     c_russia: Mapped[int] = mapped_column(default=0)
     c_turkey: Mapped[int] = mapped_column(default=0)
+    alias: Mapped[list[str]] = mapped_column(JSON, default_factory=list)
     last_updated: Mapped[datetime] = mapped_column()
 
 
