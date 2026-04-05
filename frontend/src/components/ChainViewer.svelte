@@ -7,6 +7,7 @@
     getActiveNodeId,
   } from "../stores.svelte";
   import GameNode from "./GameNode.svelte";
+  import Button from "./Button.svelte";
 
   interface Props {
     onOpenSnapshot: (id: number) => void;
@@ -130,21 +131,23 @@
         <div
           style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;"
         >
-          <button
-            class="btn btn-primary"
+          <Button
+            variant="primary"
+            icon="☁️"
             onclick={() => onNewDraft({ autoAction: "notion" })}
           >
-            ☁️ Importar de Notion
-          </button>
-          <button
-            class="btn btn-secondary"
+            Importar de Notion
+          </Button>
+          <Button
+            variant="secondary"
+            icon="📥"
             onclick={() => onNewDraft({ autoAction: "csv" })}
           >
-            📥 Pegar CSV
-          </button>
-          <button class="btn btn-secondary" onclick={() => onNewDraft()}>
-            📝 Crear desde cero
-          </button>
+            Pegar CSV
+          </Button>
+          <Button variant="secondary" icon="📝" onclick={() => onNewDraft()}>
+            Crear desde cero
+          </Button>
         </div>
       </div>
     {:else}
