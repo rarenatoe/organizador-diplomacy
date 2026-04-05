@@ -4,40 +4,111 @@ title: Pillar 3 - Frontend & Svelte 5 Conventions
 priority: 30
 ---
 
-## Svelte 5 Runes & State
+## Frontend Architecture (CRITICAL)
 
-- **Reactivity:** Exclusively use `$state`, `$derived`, and `$effect`. Do not use `let` for variables that require reactivity but are not in `$state`.
-- **Global Stores:** Found in `stores.svelte.ts`. UI components must use store getters directly in templates. No local copies of store state.
-- **Loading States:** Use `-1` for unknown state; `0` when loaded.
-- **Handlers & Bindings:** Use `onclick={() => ...}` syntax for events and `bind:value={var}` for bindings.
+**TECH STACK**: Svelte 5, TypeScript, Vite
+**FILE LIMIT**: 400 lines per file (extract sub-domains when exceeded)
+**TRANSLATION**: All UI translations go through `frontend/src/i18n.ts`
 
-### Svelte 5 Snippets and CSS Scoping (CRITICAL)
+## Component Design Principles
 
-- When a parent component passes HTML elements (like `<tr>` or `<td>`) into a child component via a `{#snippet}`, the child component's standard scoped CSS **will not affect those elements**.
-- To style elements injected via snippets, the child component MUST use the `:global()` modifier (e.g., `:global(.table-wrap td) { ... }`). Failure to do this will result in stripped styles.
+**LEAF COMPONENTS** (Domain-Agnostic):
+
+- `Badge`, `Button`, `Tooltip`, `Input` - NO domain logic
+- Use semantic APIs: `variant="info|success|warning|error"`
+- NEVER use domain names: `variant="gm|veteran"`
+
+**DOMAIN LAYOUT COMPONENTS** (Domain-Specific):
+
+- `GameTableCard`, `PlayerList` - Accept domain data explicitly
+- Use clear props: `gmName`, `tableNumber`, `players`
+- AVOID over-abstracting with generic snippet APIs
+
+## Svelte 5 Patterns (CRITICAL)
+
+**REACTIVITY**:
+
+- USE: `$state`, `$derived`, `$effect`
+- AVOID: `let` for reactive variables
+
+**SNIPPETS & CSS SCOPING** (CRITICAL):
+
+- Parent → Child snippet injection: Child's scoped CSS **WILL NOT** affect snippet elements
+- SOLUTION: Use `:global()` modifier: `:global(.table-wrap td) { ... }`
+- FAILURE: Results in stripped styles and broken layouts
+
+**STORES & STATE**:
+
+- Global stores: `stores.svelte.ts`
+- Loading states: `-1` (unknown), `0` (loaded)
+- Event handlers: `onclick={() => ...}`
+- Bindings: `bind:value={variable}`
+
+## Styling & Theming
+
+**COLOR SYSTEM**:
+
+- NEVER use hardcoded hex colors
+- USE global CSS variables: `var(--info-bg)`, `var(--tooltip-bg)`
+- DEFINED in: `frontend/static/style.css`
+
+**LAYOUT SYSTEM**:
+
+- Panels: Use flexbox
+- Lists: Prefer CSS Grid over Flexbox for complex alignment
+- Components: Use scoped `<style>` blocks
+
+**FLOATING ELEMENTS**:
+
+- Tooltips, popovers, toasts: Use inverted schemes
+- Dark background + light text = maximum Z-axis contrast
+
+## Component API Design
+
+**VISUAL PROPS**: Control appearance only
+
+- `variant`, `size`, `fill`, `iconOnly`
+
+**LAYOUT PROPS**: Control behavior only
+
+- `fixedWidth`, `align`, `spacing`
+
+**SEPARATION**: Never bundle layout behavior into visual props
+
+- WRONG: `pill` prop that controls width
+- RIGHT: `fixedWidth={true}` + `pill={true}`
 
 ## Frontend Coding Standards
 
-- **Logging Only:** NEVER use `console.log()` for any purpose. All debugging and error logging must use the custom logger from `src/utils/logger.ts` with appropriate methods (`logger.info()`, `logger.warn()`, `logger.error()`).
+**LOGGING**:
 
-## UI Components & Styling
+- NEVER use `console.log()`
+- USE: `logger.info()`, `logger.warn()`, `logger.error()`
+- IMPORT: `src/utils/logger.ts`
 
-- **Buttons:** NEVER use native HTML `<button>` tags for actions. Always import and use the universal `<Button>` component (`import Button from './Button.svelte'`). Use orthogonal props to control appearance: `variant` ('primary', 'secondary', 'success', 'warning', 'ghost'), `size` ('md', 'sm'), `fill`, and `iconOnly`. Give disabled buttons a `title` attribute for user feedback.
-- **Layouts:** Use the `<PanelLayout>` component with `{#snippet body()}`, `{#snippet header()}`, and `{#snippet footer()}` for side panel content.
-- **CSS:** Use flex layout for panels. Strictly prefer **CSS Grid** (`display: grid`) over Flexbox when aligning lists with complex horizontal alignment (e.g., player tables, waiting lists). Use scoped `<style>` in components.
-- **Domain-Agnostic UI:** Pure UI components (like Badges, Tooltips, Cards) MUST NOT contain domain-specific logic or nomenclature. Use semantic intent APIs (e.g., `variant="info" | "success" | "warning" | "error"`) instead of domain names (e.g., `variant="gm" | "veteran"`). The parent component is responsible for mapping domain data to semantic UI variants.
+**BUTTONS**:
 
-## CSS and Theming
+- NEVER use native `<button>` tags
+- ALWAYS import: `import Button from './Button.svelte'`
+- REQUIRED: `title` attribute for disabled buttons
 
-- **No Hardcoded Hex Colors:** NEVER use hardcoded hex colors in `<style>` blocks for UI components. All colors must utilize global CSS variables defined in `frontend/static/style.css` (e.g., `var(--info-bg)`, `var(--tooltip-bg)`).
-- **Inverted Floating Elements:** Tooltips, popovers, and toasts should use inverted color schemes (e.g., dark background with light text) for maximum Z-axis contrast.
+## Testing Strategy
 
-## Component API
+**FRAMEWORK**: Vitest + `@testing-library/svelte`
 
-- **Explicit Layout Props:** Do not bundle layout behavior (like explicit widths for table column alignment) into visual shape props (like `pill`). Use explicit layout props (e.g., `fixedWidth: boolean`) so the consuming parent can decide if the component needs to hug its content or align to a grid.
+**DOM QUERIES**:
 
-## Domain Patterns
+- Buttons: `screen.getByRole('button', { name: /Text/i })`
+- NEVER: `getByText()` for buttons (emojis separated from text)
+- Icon-only buttons: Use `title` attribute for accessible name
 
-- **Constraint-Preserving UI (The Swap Pattern):** When manipulating strict arrays (like exactly 7 players per table), use the `SwapTarget` pattern. Users must click two entities to swap their positions to preserve mathematical constraints.
-- **Handling Nulls:** Dropdowns interacting with optional backend data (e.g., `pais: null`) must explicitly handle nulls (e.g., `<option value={null}>🎲 Aleatorio</option>`).
-- **Tooltips:** Avoid native `title="..."` attributes for complex information due to slow delay. Use custom CSS hover popovers (`.reason-tooltip` containing a `.tooltip-popover`).
+**STATE MOCKING**:
+
+- NEVER: `vi.mock()` on `.svelte.ts` files with `$state` runes
+- USE: Integration-style testing for state files
+
+**TEST MAINTENANCE**:
+
+- CSS class changes → IMMEDIATELY update test queries
+- Search for: `querySelector`, `closest`, `getBy` calls
+- Update: `.mesa-card` → `.card` in all `.test.ts` files

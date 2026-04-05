@@ -1,16 +1,31 @@
 
 
 ## Core Architecture
+
 - **Backend:** Pure Data & Algorithms. Python 3.13, uv, FastAPI, and SQLAlchemy. (No Flask).
 - **Frontend:** Presentation & Translation. Svelte 5, TypeScript, Vite.
 - **File Size:** 400-line soft limit per file. Extract sub-domains into new files unless they are highly cohesive indivisible units.
 
-## The Spanglish Boundary
-- **INTERNAL CODE:** Python/TS variables, types, function names, database schemas, and endpoints MUST be in English.
-- **UI:** HTML text, labels, user-facing error messages, and test queries MUST be in Spanish.
-- **Translation Layer:** Translations between internal code and UI must go through `frontend/src/i18n.ts`.
+## The Spanglish Boundary (CRITICAL)
+
+**INTERNAL CODE** (English ONLY):
+
+- Python/TS variables, types, function names, database schemas, endpoints
+- Component names, CSS classes, DOM variables
+- Example: `.mesa-card` → `.card`, `mesaIndex` → `tableIndex`
+
+**UI TEXT** (Spanish ONLY):
+
+- HTML labels, user messages, button text, error messages
+- Example: "Partida 1", "⚠️ Sin GM", "Copiar jugadores"
+
+**CRITICAL EXCEPTION**: NEVER translate API-coupled data properties:
+
+- `mesa.jugadores`, `juegos_este_ano`, `pais_reason`
+- These map to frontend UI and database schema - translating causes massive ripple effects
 
 ## Directory Layout
+
 - `backend/api/routers/`: FastAPI endpoints.
 - `backend/db/`: Modular database operations (connection, crud, models, views).
 - `backend/organizador/`: Core algorithms and pure data modeling.
@@ -38,57 +53,203 @@
 - **Draft Mode:** A two-step API is strictly enforced. The `/api/game/draft` endpoint computes game tables in memory _without_ writing to the database, allowing manual review. Only `/api/game/save` persists the draft.
 - **Notion Sync:** Notion data is cached locally. Background caching is orchestrated via `backend/sync/cache_daemon.py`.
 
-## Svelte 5 Runes & State
+## Frontend Architecture (CRITICAL)
 
-- **Reactivity:** Exclusively use `$state`, `$derived`, and `$effect`. Do not use `let` for variables that require reactivity but are not in `$state`.
-- **Global Stores:** Found in `stores.svelte.ts`. UI components must use store getters directly in templates. No local copies of store state.
-- **Loading States:** Use `-1` for unknown state; `0` when loaded.
-- **Handlers & Bindings:** Use `onclick={() => ...}` syntax for events and `bind:value={var}` for bindings.
+**TECH STACK**: Svelte 5, TypeScript, Vite
+**FILE LIMIT**: 400 lines per file (extract sub-domains when exceeded)
+**TRANSLATION**: All UI translations go through `frontend/src/i18n.ts`
 
-### Svelte 5 Snippets and CSS Scoping (CRITICAL)
+## Component Design Principles
 
-- When a parent component passes HTML elements (like `<tr>` or `<td>`) into a child component via a `{#snippet}`, the child component's standard scoped CSS **will not affect those elements**.
-- To style elements injected via snippets, the child component MUST use the `:global()` modifier (e.g., `:global(.table-wrap td) { ... }`). Failure to do this will result in stripped styles.
+**LEAF COMPONENTS** (Domain-Agnostic):
+
+- `Badge`, `Button`, `Tooltip`, `Input` - NO domain logic
+- Use semantic APIs: `variant="info|success|warning|error"`
+- NEVER use domain names: `variant="gm|veteran"`
+
+**DOMAIN LAYOUT COMPONENTS** (Domain-Specific):
+
+- `GameTableCard`, `PlayerList` - Accept domain data explicitly
+- Use clear props: `gmName`, `tableNumber`, `players`
+- AVOID over-abstracting with generic snippet APIs
+
+## Svelte 5 Patterns (CRITICAL)
+
+**REACTIVITY**:
+
+- USE: `$state`, `$derived`, `$effect`
+- AVOID: `let` for reactive variables
+
+**SNIPPETS & CSS SCOPING** (CRITICAL):
+
+- Parent → Child snippet injection: Child's scoped CSS **WILL NOT** affect snippet elements
+- SOLUTION: Use `:global()` modifier: `:global(.table-wrap td) { ... }`
+- FAILURE: Results in stripped styles and broken layouts
+
+**STORES & STATE**:
+
+- Global stores: `stores.svelte.ts`
+- Loading states: `-1` (unknown), `0` (loaded)
+- Event handlers: `onclick={() => ...}`
+- Bindings: `bind:value={variable}`
+
+## Styling & Theming
+
+**COLOR SYSTEM**:
+
+- NEVER use hardcoded hex colors
+- USE global CSS variables: `var(--info-bg)`, `var(--tooltip-bg)`
+- DEFINED in: `frontend/static/style.css`
+
+**LAYOUT SYSTEM**:
+
+- Panels: Use flexbox
+- Lists: Prefer CSS Grid over Flexbox for complex alignment
+- Components: Use scoped `<style>` blocks
+
+**FLOATING ELEMENTS**:
+
+- Tooltips, popovers, toasts: Use inverted schemes
+- Dark background + light text = maximum Z-axis contrast
+
+## Component API Design
+
+**VISUAL PROPS**: Control appearance only
+
+- `variant`, `size`, `fill`, `iconOnly`
+
+**LAYOUT PROPS**: Control behavior only
+
+- `fixedWidth`, `align`, `spacing`
+
+**SEPARATION**: Never bundle layout behavior into visual props
+
+- WRONG: `pill` prop that controls width
+- RIGHT: `fixedWidth={true}` + `pill={true}`
 
 ## Frontend Coding Standards
 
-- **Logging Only:** NEVER use `console.log()` for any purpose. All debugging and error logging must use the custom logger from `src/utils/logger.ts` with appropriate methods (`logger.info()`, `logger.warn()`, `logger.error()`).
+**LOGGING**:
 
-## UI Components & Styling
+- NEVER use `console.log()`
+- USE: `logger.info()`, `logger.warn()`, `logger.error()`
+- IMPORT: `src/utils/logger.ts`
 
-- **Buttons:** NEVER use native HTML `<button>` tags for actions. Always import and use the universal `<Button>` component (`import Button from './Button.svelte'`). Use orthogonal props to control appearance: `variant` ('primary', 'secondary', 'success', 'warning', 'ghost'), `size` ('md', 'sm'), `fill`, and `iconOnly`. Give disabled buttons a `title` attribute for user feedback.
-- **Layouts:** Use the `<PanelLayout>` component with `{#snippet body()}`, `{#snippet header()}`, and `{#snippet footer()}` for side panel content.
-- **CSS:** Use flex layout for panels. Strictly prefer **CSS Grid** (`display: grid`) over Flexbox when aligning lists with complex horizontal alignment (e.g., player tables, waiting lists). Use scoped `<style>` in components.
-- **Domain-Agnostic UI:** Pure UI components (like Badges, Tooltips, Cards) MUST NOT contain domain-specific logic or nomenclature. Use semantic intent APIs (e.g., `variant="info" | "success" | "warning" | "error"`) instead of domain names (e.g., `variant="gm" | "veteran"`). The parent component is responsible for mapping domain data to semantic UI variants.
+**BUTTONS**:
 
-## CSS and Theming
+- NEVER use native `<button>` tags
+- ALWAYS import: `import Button from './Button.svelte'`
+- REQUIRED: `title` attribute for disabled buttons
 
-- **No Hardcoded Hex Colors:** NEVER use hardcoded hex colors in `<style>` blocks for UI components. All colors must utilize global CSS variables defined in `frontend/static/style.css` (e.g., `var(--info-bg)`, `var(--tooltip-bg)`).
-- **Inverted Floating Elements:** Tooltips, popovers, and toasts should use inverted color schemes (e.g., dark background with light text) for maximum Z-axis contrast.
+## Testing Strategy
 
-## Component API
+**FRAMEWORK**: Vitest + `@testing-library/svelte`
 
-- **Explicit Layout Props:** Do not bundle layout behavior (like explicit widths for table column alignment) into visual shape props (like `pill`). Use explicit layout props (e.g., `fixedWidth: boolean`) so the consuming parent can decide if the component needs to hug its content or align to a grid.
+**DOM QUERIES**:
 
-## Domain Patterns
+- Buttons: `screen.getByRole('button', { name: /Text/i })`
+- NEVER: `getByText()` for buttons (emojis separated from text)
+- Icon-only buttons: Use `title` attribute for accessible name
 
-- **Constraint-Preserving UI (The Swap Pattern):** When manipulating strict arrays (like exactly 7 players per table), use the `SwapTarget` pattern. Users must click two entities to swap their positions to preserve mathematical constraints.
-- **Handling Nulls:** Dropdowns interacting with optional backend data (e.g., `pais: null`) must explicitly handle nulls (e.g., `<option value={null}>🎲 Aleatorio</option>`).
-- **Tooltips:** Avoid native `title="..."` attributes for complex information due to slow delay. Use custom CSS hover popovers (`.reason-tooltip` containing a `.tooltip-popover`).
+**STATE MOCKING**:
 
-## Execution Rules
-- **CRITICAL:** NEVER use `bun test`. Always run tests using `bun run test`.
-- **Backend:** Run using `uv run python -m pytest -q`.
+- NEVER: `vi.mock()` on `.svelte.ts` files with `$state` runes
+- USE: Integration-style testing for state files
 
-## Backend Testing
-- Use `pytest` for all backend tests. Test files should be `test_*.py` and co-located with their respective implementation files.
-- Mock external dependencies (like Notion API) using `unittest.mock`.
-- Test database operations exclusively using an in-memory SQLite database (`:memory:`).
+**TEST MAINTENANCE**:
 
-## Frontend Testing
-- **Framework:** Vitest + `@testing-library/svelte`.
-- **State Mocking (CRITICAL OVERWRITE):** Do NOT use `vi.mock()` on `.svelte.ts` files that contain `$state` runes. State files must be tested using integration-style testing methodologies. 
-- **DOM Accessibility:** Testing for buttons MUST use accessible queries (e.g., `screen.getByRole('button', { name: /Text/i })`). Do NOT use `getByText()` for buttons because emojis and text are structurally separated. For `iconOnly` buttons, rely on their `title` attribute, which `getByRole` uses as the accessible name.
+- CSS class changes → IMMEDIATELY update test queries
+- Search for: `querySelector`, `closest`, `getBy` calls
+- Update: `.mesa-card` → `.card` in all `.test.ts` files
+
+## Testing Execution (CRITICAL)
+
+**COMMANDS**:
+
+- NEVER: `bun test`
+- ALWAYS: `bun run test`
+- Backend: `uv run python -m pytest -q`
+
+## Backend Testing Strategy
+
+**FRAMEWORK**: pytest
+**TEST FILES**: `test_*.py` (co-located with implementation)
+**DATABASE**: In-memory SQLite (`:memory:`) only
+
+**MOCKING**:
+
+- External dependencies: Use `unittest.mock`
+- Notion API: Always mock, never hit real API
+- Database operations: Test with in-memory SQLite
+
+**TEST STRUCTURE**:
+
+- Unit tests for pure functions
+- Integration tests for database operations
+- End-to-end tests for API endpoints
+
+## Frontend Testing Strategy
+
+**FRAMEWORK**: Vitest + `@testing-library/svelte`
+
+**COMPONENT TESTING**:
+
+- Unit tests for pure UI components
+- Integration tests for stateful components
+- Accessibility tests for interactive elements
+
+**DOM QUERY PATTERNS**:
+
+- Buttons: `screen.getByRole('button', { name: /Text/i })`
+- NEVER: `getByText()` for buttons (emojis separated from text)
+- Icon-only: Use `title` attribute for accessible name
+- Forms: `screen.getByLabelText()`, `screen.getByPlaceholderText()`
+
+**STATE TESTING** (CRITICAL):
+
+- NEVER: `vi.mock()` on `.svelte.ts` files with `$state` runes
+- USE: Integration-style testing methodology
+- REASON: State files require real reactivity for accurate testing
+
+## Test Maintenance (CRITICAL)
+
+**DOM QUERY UPDATES**:
+
+- CSS class changes → IMMEDIATELY update test queries
+- Component extraction → Update all affected selectors
+- Search patterns: `querySelector`, `closest`, `getBy` calls
+
+**COMMON UPDATES**:
+
+- `.mesa-card` → `.card`
+- `.mesa-header` → `.card-header`
+- `.mesa-title` → `.card-title`
+
+**FAILURE PREVENTION**:
+
+- Legacy integration tests fail without query updates
+- Run `bun run typecheck` after CSS changes
+- Verify visual regression after component extraction
+
+## Test Quality Standards
+
+**ASSERTION PATTERNS**:
+
+- Use semantic HTML queries first
+- Test user behavior, not implementation details
+- Assert accessible names, not visual appearance
+
+**MOCKING PRINCIPLES**:
+
+- Mock external dependencies only
+- Test real component interactions
+- Avoid over-mocking that hides real bugs
+
+**COVERAGE REQUIREMENTS**:
+
+- Critical user paths: 100% coverage
+- Error handling: Always test error states
+- Edge cases: Test null/undefined inputs
 
 ## Rule Governance
 - AI rules live in `docs/ai-rules/`. 

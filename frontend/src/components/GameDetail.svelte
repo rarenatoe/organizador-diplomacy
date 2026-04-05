@@ -6,6 +6,7 @@
   import PanelLayout from "./PanelLayout.svelte";
   import Badge from "./Badge.svelte";
   import Tooltip from "./Tooltip.svelte";
+  import GameTableCard from "./GameTableCard.svelte";
 
   interface Props {
     id: number;
@@ -207,15 +208,7 @@
           <div class="section-title">Partidas ({mesas.length})</div>
           {#each mesas as table (table.numero)}
             {@const playersTxt = getTableCopyText(table)}
-            <div class="mesa-card">
-              <div class="mesa-header">
-                <span class="mesa-title">Partida {table.numero}</span>
-                {#if table.gm}
-                  <Badge variant="info" text={`GM: ${table.gm}`} pill={true} />
-                {:else}
-                  <Badge variant="error" text="⚠️ Sin GM" pill={true} />
-                {/if}
-              </div>
+            <GameTableCard tableNumber={table.numero} gmName={table.gm}>
               <ul class="player-list">
                 {#each table.jugadores as player, i (player.nombre)}
                   <li>
@@ -252,7 +245,7 @@
                   ? "Copiado"
                   : "Copiar jugadores"}</Button
               >
-            </div>
+            </GameTableCard>
           {/each}
         </div>
       {/if}
@@ -310,26 +303,6 @@
 
   .meta-val {
     font-weight: 600;
-  }
-
-  .mesa-card {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    padding: 11px 13px;
-    margin-bottom: 10px;
-  }
-
-  .mesa-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 8px;
-  }
-
-  .mesa-title {
-    font-weight: 700;
-    font-size: 13px;
   }
 
   .player-list {

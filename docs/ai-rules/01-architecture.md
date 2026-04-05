@@ -3,17 +3,33 @@ id: architecture
 title: Pillar 1 - Stack & Architecture
 priority: 10
 ---
+
 ## Core Architecture
+
 - **Backend:** Pure Data & Algorithms. Python 3.13, uv, FastAPI, and SQLAlchemy. (No Flask).
 - **Frontend:** Presentation & Translation. Svelte 5, TypeScript, Vite.
 - **File Size:** 400-line soft limit per file. Extract sub-domains into new files unless they are highly cohesive indivisible units.
 
-## The Spanglish Boundary
-- **INTERNAL CODE:** Python/TS variables, types, function names, database schemas, and endpoints MUST be in English.
-- **UI:** HTML text, labels, user-facing error messages, and test queries MUST be in Spanish.
-- **Translation Layer:** Translations between internal code and UI must go through `frontend/src/i18n.ts`.
+## The Spanglish Boundary (CRITICAL)
+
+**INTERNAL CODE** (English ONLY):
+
+- Python/TS variables, types, function names, database schemas, endpoints
+- Component names, CSS classes, DOM variables
+- Example: `.mesa-card` → `.card`, `mesaIndex` → `tableIndex`
+
+**UI TEXT** (Spanish ONLY):
+
+- HTML labels, user messages, button text, error messages
+- Example: "Partida 1", "⚠️ Sin GM", "Copiar jugadores"
+
+**CRITICAL EXCEPTION**: NEVER translate API-coupled data properties:
+
+- `mesa.jugadores`, `juegos_este_ano`, `pais_reason`
+- These map to frontend UI and database schema - translating causes massive ripple effects
 
 ## Directory Layout
+
 - `backend/api/routers/`: FastAPI endpoints.
 - `backend/db/`: Modular database operations (connection, crud, models, views).
 - `backend/organizador/`: Core algorithms and pure data modeling.

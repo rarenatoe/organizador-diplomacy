@@ -349,8 +349,8 @@ describe("GameDraft.svelte", () => {
 
       // Verify swap occurred - Alice and Charlie should be swapped
       await vi.waitFor(() => {
-        const mesa1 = screen.getByText("Partida 1").closest(".mesa-card")!;
-        const mesa2 = screen.getByText("Partida 2").closest(".mesa-card")!;
+        const mesa1 = screen.getByText("Partida 1").closest(".card")!;
+        const mesa2 = screen.getByText("Partida 2").closest(".card")!;
 
         // Alice should now be in Mesa 2, Charlie in Mesa 1
         expect(mesa1.textContent).toContain("Charlie");
@@ -382,7 +382,7 @@ describe("GameDraft.svelte", () => {
 
       // Verify swap occurred
       await vi.waitFor(() => {
-        const mesa1 = screen.getByText("Partida 1").closest(".mesa-card")!;
+        const mesa1 = screen.getByText("Partida 1").closest(".card")!;
         const waitingSection = screen
           .getByText("Lista de espera")
           .closest(".section")!;
