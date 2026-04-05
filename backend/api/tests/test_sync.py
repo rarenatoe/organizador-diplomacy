@@ -10,8 +10,30 @@ from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import pytest_asyncio
 
 pytestmark = pytest.mark.asyncio
+
+
+# ── Shared Test Fixtures ─────────────────────────────────────────────────────
+
+
+@pytest_asyncio.fixture(scope="module")
+async def background_test_engine():
+    """Create a shared async engine for all background sync tests."""
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from backend.db.models import Base
+    
+    test_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
+    
+    # Initialize database schema once for the entire module
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    
+    yield test_engine
+    
+    # Clean up after all tests in the module
+    await test_engine.dispose()
 
 
 # ── POST /api/run/notion_sync ─────────────────────────────────────────────────
@@ -183,7 +205,10 @@ class TestNotionSyncBackground:
     Prevents silent crashes from outdated imports and JSON key mismatches.
     """
 
-    async def test_run_sync_creates_snapshot_successfully(self) -> None:
+    async def test_run_sync_creates_snapshot_successfully(
+        self,
+        background_test_engine: Any,
+    ) -> None:
         """
         Regression test: run_notion_sync_background must create snapshots successfully.
         Previously crashed due to:
@@ -192,18 +217,10 @@ class TestNotionSyncBackground:
         """
         from unittest.mock import MagicMock
 
-        from sqlalchemy.ext.asyncio import create_async_engine
-
         from backend.sync.notion_sync import run_notion_sync_background
 
-        # Create a test async engine that shares the same in-memory database
-        test_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-
-        # Initialize database schema
-        from backend.db.models import Base
-
-        async with test_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        # Use the shared test engine from the fixture
+        test_engine = background_test_engine
 
         # Mock Notion data with correct structure (matching real Notion API format)
         mock_pages: list[dict[str, Any]] = [
@@ -290,10 +307,10 @@ class TestNotionSyncBackground:
             assert bob["juegos_este_ano"] == 2
             assert bob["c_england"] == 1  # Has England preference
 
-        # Clean up
-        await test_engine.dispose()
-
-    async def test_run_sync_applies_merges_and_renames(self) -> None:
+    async def test_run_sync_applies_merges_and_renames(
+        self,
+        background_test_engine: Any,
+    ) -> None:
         """
         Regression test: merges with action='merge_notion' must formally rename
         the player in the database, preserving continuity.
@@ -301,19 +318,13 @@ class TestNotionSyncBackground:
         """
         from unittest.mock import MagicMock
 
-        from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+        from sqlalchemy.ext.asyncio import AsyncSession
 
         from backend.db.crud import get_snapshot_players
         from backend.sync.notion_sync import run_notion_sync_background
 
-        # Create a test async engine
-        test_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-
-        # Initialize database schema
-        from backend.db.models import Base
-
-        async with test_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        # Use the shared test engine from the fixture
+        test_engine = background_test_engine
 
         # Step 1: Create initial snapshot with "AliceOld" (games_this_year=0)
         from backend.db import crud
@@ -388,10 +399,10 @@ class TestNotionSyncBackground:
             assert "AliceOld" not in player_names
             assert "AliceNew" in player_names
 
-        # Clean up
-        await test_engine.dispose()
-
-    async def test_sync_in_place_update_logs_history(self) -> None:
+    async def test_sync_in_place_update_logs_history(
+        self,
+        background_test_engine: Any,
+    ) -> None:
         """
         Regression test: When syncing with Notion updates a snapshot in-place,
         the previous roster should be logged to SnapshotHistory.
@@ -399,20 +410,14 @@ class TestNotionSyncBackground:
         from unittest.mock import MagicMock
 
         from sqlalchemy import select
-        from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+        from sqlalchemy.ext.asyncio import AsyncSession
 
         from backend.db import crud
         from backend.db.models import SnapshotHistory
         from backend.sync.notion_sync import run_notion_sync_background
 
-        # Create a test async engine
-        test_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-
-        # Initialize database schema
-        from backend.db.models import Base
-
-        async with test_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        # Use the shared test engine from the fixture
+        test_engine = background_test_engine
 
         # Step 1: Create initial snapshot with 2 players
         async with AsyncSession(test_engine) as session:
@@ -519,6 +524,3 @@ class TestNotionSyncBackground:
             assert len(previous_players) == 2
             previous_names = {p["nombre"] for p in previous_players}
             assert previous_names == {"Alice", "Bob"}
-
-        # Clean up
-        await test_engine.dispose()
