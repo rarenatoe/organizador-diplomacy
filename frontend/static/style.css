@@ -48,6 +48,10 @@
   --radius: 10px;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-sticky: 2px 0 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-elevation-1: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-elevation-2: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-elevation-3: 0 10px 20px rgba(0, 0, 0, 0.15);
 }
 
 /* ── Reset ── */
@@ -86,11 +90,49 @@ body {
   overflow: hidden;
 }
 
-.panel-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid var(--border);
+/* ── Table Typography & Form Controls ── */
+.text-strong {
+  font-weight: 600;
+  font-family: inherit;
+  white-space: nowrap;
+  /* Align physical dimensions with .table-input */
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  display: inline-block;
+}
+
+.table-input {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.table-input:focus {
+  outline: 2px solid var(--accent);
+  border-color: transparent;
+}
+
+/* Ghost inputs look like text until focused */
+.table-input-ghost {
+  border: 1px solid transparent;
+  background: transparent;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+
+.table-input-ghost:focus {
+  border: 1px solid var(--accent);
+  background: var(--surface);
+  outline: none;
+}
+
+.table-checkbox {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: var(--accent);
 }

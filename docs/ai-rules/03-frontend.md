@@ -24,6 +24,14 @@ priority: 30
 - Use clear props: `gmName`, `tableNumber`, `players`
 - AVOID over-abstracting with generic snippet APIs
 
+- **CSS-Only Abstractions vs. Components:** If a planned "component" has zero JavaScript logic and exists purely to apply structural CSS to injected HTML children (like a generic Table wrapper), DO NOT create a Svelte Component for it. This forces the use of `:global()` CSS which breaks encapsulation and snippet rendering. Instead, extract the layout into a global CSS utility class in `style.css` (e.g., `.data-table`) and use native HTML elements in the consumer.
+
+- **Data-Driven Components over CSS Wrappers:** To style complex children (like tables with sticky columns), build **Data-Driven Components** (e.g., `<DataTable data={rows} columns={config} />`) that own the HTML structure (`<table>`, `<tr>`, `<td>`). DO NOT build generic wrapper components that expect raw HTML elements passed via snippets, as this breaks Svelte's scoped CSS and forces `:global()` code smells.
+
+- **Strict View vs. Edit Separation:** Do not blur boundaries between View (read-only) and Edit screens. A View screen MUST NOT contain inline editing hacks like `window.prompt()`. Provide an explicit "Edit" button that transitions the user to a dedicated Draft/Edit screen with proper form inputs.
+
+- **Input Typography Inheritance:** HTML `<input>` and `<textarea>` elements do not inherit `font-family` or `font-weight` automatically. Use global utility classes in `style.css` (e.g., `.text-strong`, `.table-input`) to ensure typography perfectly aligns between plain text in View modes and inputs in Edit modes.
+
 ## Svelte 5 Patterns (CRITICAL)
 
 **REACTIVITY**:
@@ -36,6 +44,11 @@ priority: 30
 - Parent → Child snippet injection: Child's scoped CSS **WILL NOT** affect snippet elements
 - SOLUTION: Use `:global()` modifier: `:global(.table-wrap td) { ... }`
 - FAILURE: Results in stripped styles and broken layouts
+
+**TYPING SNIPPETS IN GENERICS** (CRITICAL):
+
+- When passing Svelte 5 snippets to a generic component (like a table cell renderer), you MUST import and use the official Svelte type: `import type { Snippet } from "svelte";` and type it as `cell?: Snippet<[T, number]>`.
+- DO NOT downgrade snippets to string-returning functions (e.g., `(row: T) => string`), as this makes it impossible to render internal Svelte components (like Badges) inside the snippet.
 
 **STORES & STATE**:
 
@@ -111,4 +124,3 @@ priority: 30
 
 - CSS class changes → IMMEDIATELY update test queries
 - Search for: `querySelector`, `closest`, `getBy` calls
-- Update: `.mesa-card` → `.card` in all `.test.ts` files

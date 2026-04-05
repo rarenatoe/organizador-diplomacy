@@ -108,7 +108,7 @@ describe("SnapshotDraft", () => {
 
     expect(mockPrompt).toHaveBeenCalledWith("Nombre del nuevo jugador:");
     const nameInput = container.querySelector(
-      ".player-name-input",
+      ".table-input-ghost",
     ) as HTMLInputElement;
     expect(nameInput).toBeTruthy();
     expect(nameInput.value).toBe("Test Player");
@@ -185,7 +185,7 @@ describe("SnapshotDraft", () => {
     await fireEvent.click(importButton);
 
     // Verify players were added by checking input values
-    const nameInputs = container.querySelectorAll(".player-name-input");
+    const nameInputs = container.querySelectorAll(".table-input-ghost");
     expect(nameInputs.length).toBe(2);
     expect((nameInputs[0] as HTMLInputElement).value).toBe("Alice");
     expect((nameInputs[1] as HTMLInputElement).value).toBe("Bob");
@@ -242,7 +242,7 @@ describe("SnapshotDraft", () => {
     await fireEvent.click(addButton);
 
     const nameInput = container.querySelector(
-      ".player-name-input",
+      ".table-input-ghost",
     ) as HTMLInputElement;
     expect(nameInput).toBeTruthy();
     expect(nameInput.value).toBe("Test Player");
@@ -253,7 +253,7 @@ describe("SnapshotDraft", () => {
     await fireEvent.click(deleteButton);
 
     // Player should be removed - no name input should exist
-    const nameInputs = container.querySelectorAll(".player-name-input");
+    const nameInputs = container.querySelectorAll(".table-input-ghost");
     expect(nameInputs.length).toBe(0);
   });
 
@@ -413,7 +413,7 @@ describe("SnapshotDraft", () => {
       },
     });
 
-    const nameInputs = container.querySelectorAll(".player-name-input");
+    const nameInputs = container.querySelectorAll(".table-input-ghost");
     expect(nameInputs.length).toBe(2);
     expect((nameInputs[0] as HTMLInputElement).value).toBe("Alice");
     expect((nameInputs[1] as HTMLInputElement).value).toBe("Bob");
@@ -536,7 +536,7 @@ describe("SnapshotDraft", () => {
 
     // Find and edit the player name input
     const nameInput = container.querySelector(
-      ".player-name-input",
+      ".table-input-ghost",
     ) as HTMLInputElement;
     expect(nameInput).toBeTruthy();
     expect(nameInput.value).toBe("Daniel V.");

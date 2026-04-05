@@ -21,6 +21,7 @@
   import Button from "./Button.svelte";
   import PanelLayout from "./PanelLayout.svelte";
   import Badge from "./Badge.svelte";
+  import DataTable, { type ColumnDef } from "./DataTable.svelte";
   import { logger } from "../utils/logger";
 
   interface Props {
@@ -160,18 +161,6 @@
     ui.showConfirm = false;
     // Open the game draft panel instead of running the script directly
     onOpenGameDraft(id);
-  }
-
-  async function handleRename(oldName: string): Promise<void> {
-    const newName = prompt(`Renombrar jugador "${oldName}" a:`, oldName);
-    if (!newName || newName === oldName) return;
-    const result = await renamePlayer(oldName, newName);
-    if (result.error) {
-      alert(`Error: ${result.error}`);
-      return;
-    }
-    await loadSnapshot();
-    onChainUpdate();
   }
 
   async function handleDirectSync(): Promise<void> {
@@ -347,53 +336,38 @@
     {/snippet}
 
     {#snippet body()}
-      <div class="table-wrap flex-table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th></th>
-              <th>Exp.</th>
-              <th>Juegos</th>
-              <th>Prior.</th>
-              <th>Desea</th>
-              <th>GM</th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each rows as r (r.nombre)}
-              <tr>
-                <td><span class="player-name">{r.nombre}</span></td>
-                <td style="padding-left: 0; width: 32px;">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconOnly={true}
-                    title="Renombrar"
-                    onclick={() => handleRename(r.nombre)}
-                    icon="✏️"
-                  />
-                </td>
-                <td>
-                  {#if r.experiencia}
-                    <Badge
-                      variant={r.experiencia === "Nuevo"
-                        ? "warning"
-                        : "success"}
-                      text={r.experiencia}
-                      fixedWidth={true}
-                    />
-                  {/if}
-                </td>
-                <td>{r.juegos_este_ano ?? 0}</td>
-                <td>{r.prioridad === 1 ? "✓" : ""}</td>
-                <td>{r.partidas_deseadas}</td>
-                <td>{r.partidas_gm > 0 ? "✓" : ""}</td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
+      {#snippet nameCell(row: EditPlayerRow, index: number)}
+        <span class="text-strong">{row.nombre}</span>
+      {/snippet}
+
+      {#snippet expCell(row: EditPlayerRow, index: number)}
+        {#if row.experiencia}
+          <Badge
+            variant={row.experiencia === "Nuevo" ? "warning" : "success"}
+            text={row.experiencia}
+            fixedWidth={true}
+          />
+        {/if}
+      {/snippet}
+
+      {#snippet priorCell(row: EditPlayerRow, index: number)}
+        {row.prioridad === 1 ? "✓" : ""}
+      {/snippet}
+
+      {#snippet gmCell(row: EditPlayerRow, index: number)}
+        {row.partidas_gm > 0 ? "✓" : ""}
+      {/snippet}
+
+      {@const tableColumns: ColumnDef<EditPlayerRow>[] = [
+    { header: "Nombre", cell: nameCell, sticky: true },
+    { header: "Exp.", cell: expCell },
+    { header: "Juegos", key: "juegos_este_ano" },
+    { header: "Prior.", cell: priorCell },
+    { header: "Desea", key: "partidas_deseadas" },
+    { header: "GM", cell: gmCell }
+  ]}
+
+      <DataTable data={rows} columns={tableColumns} />
       {#if data?.history && data.history.length > 0}
         <details style="margin: 0 18px;">
           <summary
@@ -486,7 +460,6 @@
         </details>
       {/if}
     {/snippet}
-
     {#snippet footer()}
       <Button
         variant="secondary"
@@ -543,106 +516,6 @@
     letter-spacing: 0.6px;
     color: var(--muted);
     margin-bottom: 10px;
-  }
-
-  .table-wrap {
-    overflow-x: auto;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-    min-width: max-content;
-  }
-
-  th {
-    background: var(--surface2);
-    padding: 7px 9px;
-    text-align: left;
-    font-weight: 600;
-    font-size: 10px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-  }
-
-  td {
-    padding: 6px 9px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  tr:last-child td {
-    border-bottom: none;
-  }
-
-  tr:hover td {
-    background: var(--surface2);
-  }
-
-  .flex-table-wrap {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-    margin: 0 18px 16px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overscroll-behavior-y: none;
-  }
-
-  .flex-table-wrap th {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: var(--surface2);
-    transform: translateZ(0);
-    background-clip: padding-box;
-    border-bottom: 1px solid var(--border);
-    box-shadow: none;
-  }
-
-  .flex-table-wrap th:nth-child(1),
-  .flex-table-wrap td:nth-child(1) {
-    width: 32px;
-    min-width: 32px;
-    padding: 6px 9px;
-    position: sticky;
-    left: 0;
-    background: var(--surface);
-    z-index: 5;
-  }
-
-  .flex-table-wrap th:nth-child(2),
-  .flex-table-wrap td:nth-child(2) {
-    position: sticky;
-    left: 32px;
-    background: var(--surface);
-    z-index: 5;
-    box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.1);
-  }
-
-  .flex-table-wrap tbody tr:hover td:nth-child(1),
-  .flex-table-wrap tbody tr:hover td:nth-child(2) {
-    background: var(--surface2);
-  }
-
-  .flex-table-wrap th:nth-child(1) {
-    z-index: 12;
-    background: var(--surface2);
-  }
-
-  .flex-table-wrap th:nth-child(2) {
-    z-index: 12;
-    background: var(--surface2);
-    box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.1);
-  }
-
-  .player-name {
-    white-space: nowrap;
   }
 
   .history-list {

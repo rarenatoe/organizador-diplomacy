@@ -61,11 +61,9 @@ priority: 40
 - Component extraction → Update all affected selectors
 - Search patterns: `querySelector`, `closest`, `getBy` calls
 
-**COMMON UPDATES**:
+**SYNCHRONIZE DOM QUERIES**:
 
-- `.mesa-card` → `.card`
-- `.mesa-header` → `.card-header`
-- `.mesa-title` → `.card-title`
+- Whenever you abstract HTML into components, rename CSS classes, or translate Spanglish classes to English, you MUST immediately update `querySelector`, `closest`, and `getBy` calls in the corresponding `.test.ts` files. Legacy integration tests are the first thing to break during CSS/DOM refactors.
 
 **FAILURE PREVENTION**:
 

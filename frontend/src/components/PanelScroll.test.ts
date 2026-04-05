@@ -80,7 +80,7 @@ describe("Panel Scroll Pattern", () => {
       });
 
       const fixedHeader = container.querySelector(".panel-body-fixed");
-      const tableWrap = container.querySelector(".flex-table-wrap");
+      const tableWrap = container.querySelector(".data-table-wrapper");
 
       expect(fixedHeader).toBeTruthy();
       expect(tableWrap).toBeTruthy();

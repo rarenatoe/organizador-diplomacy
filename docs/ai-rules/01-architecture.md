@@ -16,7 +16,7 @@ priority: 10
 
 - Python/TS variables, types, function names, database schemas, endpoints
 - Component names, CSS classes, DOM variables
-- Example: `.mesa-card` → `.card`, `mesaIndex` → `tableIndex`
+- Example: `let listaEspera = []` → `let waitingList = []`, `class="jugadores-excluidos"` → `class="excluded-players"`
 
 **UI TEXT** (Spanish ONLY):
 

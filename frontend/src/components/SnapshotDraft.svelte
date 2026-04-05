@@ -13,6 +13,7 @@
   import Button from "./Button.svelte";
   import PanelLayout from "./PanelLayout.svelte";
   import Badge from "./Badge.svelte";
+  import DataTable, { type ColumnDef } from "./DataTable.svelte";
 
   interface Props {
     parentId: number | null;
@@ -321,91 +322,88 @@
 
   {#snippet body()}
     {#if draftPlayers.length > 0}
-      <div class="table-wrap flex-table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Nombre</th>
-              <th>Exp.</th>
-              <th>Juegos</th>
-              <th>Prior.</th>
-              <th>Desea</th>
-              <th>GM</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each draftPlayers as player, i (i)}
-              <tr>
-                <td
-                  ><input
-                    type="text"
-                    class="player-name-input"
-                    bind:value={player.nombre}
-                    placeholder="Nombre del jugador"
-                  /></td
-                >
-                <td>
-                  {#if player.experiencia}
-                    <Badge
-                      variant={player.experiencia === "Nuevo"
-                        ? "warning"
-                        : "success"}
-                      text={player.experiencia}
-                      fixedWidth={true}
-                    />
-                  {/if}
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    value={player.juegos_este_ano}
-                    min="0"
-                    style="width: 38px;"
-                    onchange={(e) =>
-                      handleNumberChange(e, i, "juegos_este_ano")}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={player.prioridad === 1}
-                    onchange={(e) => handleCheckboxChange(e, i, "prioridad")}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    value={player.partidas_deseadas}
-                    min="1"
-                    max="9"
-                    style="width: 38px;"
-                    onchange={(e) =>
-                      handleNumberChange(e, i, "partidas_deseadas")}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={player.partidas_gm > 0}
-                    onchange={(e) => handleCheckboxChange(e, i, "partidas_gm")}
-                  />
-                </td>
-                <td>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    iconOnly={true}
-                    title="Eliminar"
-                    onclick={() => handleDeletePlayer(i)}
-                    icon="🗑"
-                  />
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
+      {#snippet nameInput(row: EditPlayerRow, i: number)}
+        <input
+          type="text"
+          class="table-input table-input-ghost text-strong"
+          bind:value={row.nombre}
+          placeholder="Nombre del jugador"
+        />
+      {/snippet}
+
+      {#snippet expCell(row: EditPlayerRow)}
+        {#if row.experiencia}
+          <Badge
+            variant={row.experiencia === "Nuevo" ? "warning" : "success"}
+            text={row.experiencia}
+            fixedWidth={true}
+          />
+        {/if}
+      {/snippet}
+
+      {#snippet gamesInput(row: EditPlayerRow, i: number)}
+        <input
+          type="number"
+          class="table-input"
+          value={row.juegos_este_ano}
+          min="0"
+          style="width: 48px;"
+          onchange={(e) => handleNumberChange(e, i, "juegos_este_ano")}
+        />
+      {/snippet}
+
+      {#snippet priorInput(row: EditPlayerRow, i: number)}
+        <input
+          type="checkbox"
+          class="table-checkbox"
+          checked={row.prioridad === 1}
+          onchange={(e) => handleCheckboxChange(e, i, "prioridad")}
+        />
+      {/snippet}
+
+      {#snippet deseaInput(row: EditPlayerRow, i: number)}
+        <input
+          type="number"
+          class="table-input"
+          value={row.partidas_deseadas}
+          min="1"
+          max="9"
+          style="width: 48px;"
+          onchange={(e) => handleNumberChange(e, i, "partidas_deseadas")}
+        />
+      {/snippet}
+
+      {#snippet gmInput(row: EditPlayerRow, i: number)}
+        <input
+          type="checkbox"
+          class="table-checkbox"
+          checked={row.partidas_gm > 0}
+          onchange={(e) => handleCheckboxChange(e, i, "partidas_gm")}
+        />
+      {/snippet}
+
+      {#snippet actionsCell(row: EditPlayerRow, i: number)}
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly={true}
+          title="Eliminar"
+          onclick={() => handleDeletePlayer(i)}
+          icon="🗑"
+        />
+      {/snippet}
+
+      {@const tableColumns: ColumnDef<EditPlayerRow>[] = [
+        { header: "Nombre", cell: nameInput, sticky: true },
+        { header: "Exp.", cell: expCell },
+        { header: "Juegos", cell: gamesInput },
+        { header: "Prior.", cell: priorInput },
+        { header: "Desea", cell: deseaInput },
+        { header: "GM", cell: gmInput },
+        { header: "", cell: actionsCell }
+      ]}
+
+      <DataTable data={draftPlayers} columns={tableColumns} />
     {:else}
       <div class="empty-draft">
         <p>No hay jugadores en el borrador.</p>
@@ -483,105 +481,6 @@
     margin-bottom: 10px;
   }
 
-  .table-wrap {
-    overflow-x: auto;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 12px;
-    min-width: max-content;
-  }
-
-  th {
-    background: var(--surface2);
-    padding: 7px 9px;
-    text-align: left;
-    font-weight: 600;
-    font-size: 10px;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-  }
-
-  td {
-    padding: 6px 9px;
-    border-bottom: 1px solid var(--border);
-  }
-
-  tr:last-child td {
-    border-bottom: none;
-  }
-
-  tr:hover td {
-    background: var(--surface2);
-  }
-
-  .flex-table-wrap {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-    margin: 0 18px 16px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overscroll-behavior-y: none;
-  }
-
-  .flex-table-wrap th {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background: var(--surface2);
-    transform: translateZ(0);
-    background-clip: padding-box;
-    border-bottom: 1px solid var(--border);
-    box-shadow: none;
-  }
-
-  .flex-table-wrap input[type="checkbox"] {
-    width: 14px;
-    height: 14px;
-    cursor: pointer;
-    accent-color: var(--accent);
-  }
-
-  .flex-table-wrap input[type="number"] {
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 2px 4px;
-    font-size: 12px;
-    background: var(--surface);
-    color: var(--text);
-  }
-
-  .flex-table-wrap input[type="number"]:focus {
-    outline: 2px solid var(--accent);
-    border-color: transparent;
-  }
-
-  .player-name-input {
-    border: none;
-    background: transparent;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text);
-    width: 100%;
-    padding: 2px 4px;
-    border-radius: 4px;
-    transition: border-color 0.15s;
-  }
-
-  .player-name-input:focus {
-    outline: none;
-    border: 1px solid var(--accent);
-    background: var(--surface);
-  }
-
   .empty-draft {
     display: flex;
     flex-direction: column;
@@ -589,7 +488,7 @@
     gap: 8px;
     padding: 40px;
     color: var(--muted);
-    text-align: center;
+    margin-bottom: 10px;
   }
 
   .empty-draft p {
