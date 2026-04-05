@@ -570,4 +570,36 @@ describe("SnapshotDraft", () => {
       renames: [{ from: "Daniel V.", to: "Daniel Villafranca" }],
     });
   });
+
+  it("oculta los botones de CSV y Notion al editar (parentId no es nulo)", () => {
+    render(SnapshotDraft, {
+      props: {
+        parentId: 123, // Editando una lista existente
+        initialPlayers: [
+          {
+            nombre: "Jugador Existente",
+            experiencia: "Antiguo",
+            juegos_este_ano: 5,
+            prioridad: 1,
+            partidas_deseadas: 2,
+            partidas_gm: 1,
+            original_nombre: "Jugador Existente",
+          },
+        ],
+        defaultEventType: "edit",
+        onClose: vi.fn(),
+        onCancel: vi.fn(),
+        onChainUpdate: vi.fn(),
+        onOpenSnapshot: vi.fn(),
+        onShowError: vi.fn(),
+      },
+    });
+
+    // Los botones de CSV y Notion NO deben estar presentes
+    expect(screen.queryByText("📥 Pegar CSV")).toBeNull();
+    expect(screen.queryByText(/Importar Notion/)).toBeNull();
+
+    // El botón de agregar jugador SÍ debe estar presente
+    expect(screen.getByText("➕ Agregar jugador")).toBeTruthy();
+  });
 });

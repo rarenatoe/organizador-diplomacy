@@ -43,6 +43,9 @@
   --tooltip-bg: #1f2937;
   --tooltip-text: #f9fafb;
 
+  /* Modal & Overlay Elements */
+  --modal-backdrop: rgba(0, 0, 0, 0.4);
+
   --panel-w: max(460px, 45vw);
   --hdr: 56px;
   --radius: 10px;
@@ -135,4 +138,16 @@ body {
   height: 14px;
   cursor: pointer;
   accent-color: var(--accent);
+}
+
+/* ── Modal Utilities ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--modal-backdrop); /* Consistently dimmed */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000; /* Higher than SidePanel and Header */
+  backdrop-filter: blur(2px); /* Modern touch */
 }

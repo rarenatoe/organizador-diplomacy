@@ -124,3 +124,45 @@ priority: 30
 
 - CSS class changes → IMMEDIATELY update test queries
 - Search for: `querySelector`, `closest`, `getBy` calls
+
+## Modals & Overlays
+
+**PATTERN:** All modals must use the global `.modal-overlay` utility class and `--modal-backdrop` variable defined in `style.css` for consistent visual behavior across the application.
+
+**IMPLEMENTATION REQUIREMENTS:**
+
+- **Backdrop:** Use `.modal-overlay` with `position: fixed`, `inset: 0`, `background: var(--modal-backdrop)`, `display: flex`, `align-items: center`, `justify-content: center`
+- **Z-Index:** Use high `z-index` (1000+) to escape stacking contexts from parent panels like `SidePanel` (z-index: 50)
+- **Backdrop Filter:** Apply `backdrop-filter: blur(2px)` for modern visual effects
+- **Click Handling:** Implement click on overlay to close modal (`onclick={onCancel}`) and `e.stopPropagation()` on modal content to prevent event bubbling
+- **Component Props:** Use clear props: `onImport: (text: string) => void`, `onCancel: () => void`
+- **Autofocus:** Apply `autofocus` action to textarea for immediate user interaction
+
+**EXAMPLES:**
+
+```svelte
+<!-- Modal with global overlay utility -->
+<div class="modal-overlay" onclick={handleCancel}>
+  <div class="modal-content" onclick={(e) => e.stopPropagation()}>
+    <!-- Modal content here -->
+  </div>
+</div>
+```
+
+```css
+/* frontend/static/style.css */
+:root {
+  --modal-backdrop: rgba(0, 0, 0, 0.4);
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--modal-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+```

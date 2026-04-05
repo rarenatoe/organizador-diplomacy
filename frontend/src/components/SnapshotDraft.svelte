@@ -10,6 +10,7 @@
   import { parsePlayersCsv, normalizeName } from "../utils";
   import { setActiveNodeId } from "../stores.svelte";
   import SyncResolutionModal from "./SyncResolutionModal.svelte";
+  import CsvImportModal from "./CsvImportModal.svelte";
   import Button from "./Button.svelte";
   import PanelLayout from "./PanelLayout.svelte";
   import Badge from "./Badge.svelte";
@@ -54,7 +55,6 @@
   );
   let eventType = $state(untrack(() => defaultEventType));
   let showCsvModal = $state(false);
-  let csvText = $state("");
   let saving = $state(false);
   let isImporting = $state(false);
   let resolutionVisible = $state(false);
@@ -95,8 +95,8 @@
     draftPlayers = draftPlayers.filter((_, i) => i !== index);
   }
 
-  function handleImportCsv(): void {
-    const parsed = parsePlayersCsv(csvText);
+  function handleImportCsv(text: string): void {
+    const parsed = parsePlayersCsv(text);
     if (parsed.length === 0) {
       onShowError(
         "Aviso / Error",
@@ -108,12 +108,10 @@
       ...draftPlayers,
       ...parsed.map((p) => ({ ...p, original_nombre: p.nombre })),
     ];
-    csvText = "";
     showCsvModal = false;
   }
 
   function handleCancelCsv(): void {
-    csvText = "";
     showCsvModal = false;
   }
 
@@ -284,10 +282,6 @@
     updated[index]![field] = parseInt(input.value, 10) || 0;
     draftPlayers = updated;
   }
-
-  function autofocus(node: HTMLTextAreaElement) {
-    node.focus();
-  }
 </script>
 
 <PanelLayout scrollable={false}>
@@ -437,27 +431,7 @@
 </PanelLayout>
 
 {#if showCsvModal}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="modal-overlay" onclick={handleCancelCsv}>
-    <div class="modal-content" onclick={(e) => e.stopPropagation()}>
-      <div class="modal-title">Pegar CSV</div>
-      <p class="modal-description">
-        Pega el contenido CSV con las columnas: nombre, experiencia,
-        juegos_este_ano, prioridad, partidas_deseadas, partidas_gm
-      </p>
-      <textarea
-        use:autofocus
-        bind:value={csvText}
-        placeholder="nombre,experiencia,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm&#10;Alice,Nuevo,0,0,1,0&#10;Bob,Antiguo,3,1,2,1"
-        rows="10"
-      ></textarea>
-      <div class="modal-actions">
-        <Button variant="secondary" onclick={handleCancelCsv}>Cancelar</Button>
-        <Button variant="primary" onclick={handleImportCsv}>Importar</Button>
-      </div>
-    </div>
-  </div>
+  <CsvImportModal onImport={handleImportCsv} onCancel={handleCancelCsv} />
 {/if}
 
 <SyncResolutionModal
@@ -494,62 +468,5 @@
   .empty-draft p {
     font-size: 13px;
     margin: 0;
-  }
-
-  .modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 100;
-  }
-
-  .modal-content {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 24px;
-    width: 90%;
-    max-width: 600px;
-    max-height: 80vh;
-    overflow-y: auto;
-  }
-
-  .modal-title {
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 8px;
-  }
-
-  .modal-description {
-    font-size: 12px;
-    color: var(--muted);
-    margin-bottom: 16px;
-  }
-
-  .modal-content textarea {
-    width: 100%;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px;
-    font-family: monospace;
-    font-size: 12px;
-    background: var(--surface2);
-    color: var(--text);
-    resize: vertical;
-    margin-bottom: 16px;
-  }
-
-  .modal-content textarea:focus {
-    outline: 2px solid var(--accent);
-    border-color: transparent;
-  }
-
-  .modal-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
   }
 </style>
