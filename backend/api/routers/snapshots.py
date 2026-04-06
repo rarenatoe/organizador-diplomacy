@@ -62,7 +62,6 @@ async def _insert_snapshot_players(
         )
 
 
-
 router = APIRouter(prefix="/api/snapshot")
 
 
@@ -348,6 +347,56 @@ async def api_snapshot_save(
             if not parent_row:
                 raise HTTPException(status_code=404, detail="parent snapshot not found")
 
+            # Fetch old roster and calculate diff before checking children
+            previous_players = await get_snapshot_players(session, parent_id)
+
+            # Strip algorithm weight fields from previous_players to prevent phantom diffs
+            # These fields come from NotionCache but aren't part of the roster
+            roster_fields = {
+                "nombre",
+                "experiencia",
+                "juegos_este_ano",
+                "prioridad",
+                "partidas_deseadas",
+                "partidas_gm",
+            }
+            previous_players_roster_only = [
+                {k: v for k, v in p.items() if k in roster_fields} for p in previous_players
+            ]
+
+            # Calculate diff before making changes
+            new_players_dicts = [
+                {
+                    "nombre": p.nombre,
+                    "experiencia": p.experiencia,
+                    "juegos_este_ano": p.juegos_este_ano,
+                    "prioridad": p.prioridad,
+                    "partidas_deseadas": p.partidas_deseadas,
+                    "partidas_gm": p.partidas_gm,
+                }
+                for p in request.players
+            ]
+            diff = generate_deep_diff(
+                previous_players_roster_only, new_players_dicts, request.renames
+            )
+
+            # Apply renames before checking for no changes
+            for r in request.renames:
+                target_exists = await session.execute(select(Player).where(Player.name == r["to"]))
+                if not target_exists.scalar_one_or_none():
+                    await session.execute(
+                        update(Player).where(Player.name == r["from"]).values(name=r["to"])
+                    )
+
+            # No changes check - skip database writes entirely
+            if (
+                not diff["added"]
+                and not diff["removed"]
+                and not diff["renamed"]
+                and not diff["modified"]
+            ):
+                return {"snapshot_id": parent_id, "status": "no_changes"}
+
             # Check if parent is a leaf node (has no children)
             from backend.db.models import TimelineEdge
 
@@ -360,47 +409,6 @@ async def api_snapshot_save(
             if not has_children:
                 # Update snapshot source using enum
                 parent_row.source = action_type.value
-
-                # Fetch old roster before clearing
-                previous_players = await get_snapshot_players(session, parent_id)
-
-                # Strip algorithm weight fields from previous_players to prevent phantom diffs
-                # These fields come from NotionCache but aren't part of the roster
-                roster_fields = {"nombre", "experiencia", "juegos_este_ano", "prioridad", "partidas_deseadas", "partidas_gm"}
-                previous_players_roster_only = [
-                    {k: v for k, v in p.items() if k in roster_fields}
-                    for p in previous_players
-                ]
-
-                # Calculate diff before making changes
-                new_players_dicts = [
-                    {
-                        "nombre": p.nombre,
-                        "experiencia": p.experiencia,
-                        "juegos_este_ano": p.juegos_este_ano,
-                        "prioridad": p.prioridad,
-                        "partidas_deseadas": p.partidas_deseadas,
-                        "partidas_gm": p.partidas_gm,
-                    }
-                    for p in request.players
-                ]
-                diff = generate_deep_diff(previous_players_roster_only, new_players_dicts, request.renames)
-
-                for r in request.renames:
-                    target_exists = await session.execute(select(Player).where(Player.name == r["to"]))
-                    if not target_exists.scalar_one_or_none():
-                        await session.execute(
-                            update(Player).where(Player.name == r["from"]).values(name=r["to"])
-                        )
-
-                # No changes check - skip database writes entirely
-                if (
-                    not diff["added"]
-                    and not diff["removed"]
-                    and not diff["renamed"]
-                    and not diff["modified"]
-                ):
-                    return {"snapshot_id": parent_id, "status": "no_changes"}
 
                 # Clear old roster
                 from backend.db.models import SnapshotPlayer

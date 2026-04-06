@@ -143,14 +143,6 @@
   }
 
   async function handleDirectSync(): Promise<void> {
-    if (data?.source === "notion_sync") {
-      onShowError(
-        "Acción no permitida",
-        "El snapshot base ya fue generado por notion_sync y aún no se ha jugado una partida.",
-      );
-      return;
-    }
-
     ui.isSyncing = true;
     try {
       const currentNames = (data?.players ?? []).map((p) => p.nombre);
@@ -235,8 +227,11 @@
       });
 
       if (result.error) {
-        // Handle backend errors properly, including the Strict Guard message
-        onShowError("Error de Sincronización", result.error);
+        if (result.error.includes("ya fue generado por notion_sync")) {
+          onShowToast("⚠️ " + result.error);
+        } else {
+          onShowError("Error de Sincronización", result.error);
+        }
         return;
       }
 

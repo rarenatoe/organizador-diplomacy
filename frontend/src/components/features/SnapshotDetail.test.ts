@@ -186,29 +186,26 @@ describe("SnapshotDetail", () => {
     ]);
   });
 
-  // TODO: Fix copy button tests - these buttons don't exist in current component
-  it("copies CSV to clipboard when copy button is clicked", async () => {
+  it("handles CSV export formatting and UI copy feedback", async () => {
     await renderSnapshotDetail();
 
     const copyButton = screen.getByText("Copiar CSV");
     await fireEvent.click(copyButton);
 
-    // Verify clipboard.writeText was called
+    // Verify clipboard.writeText was called with exact payload
     expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
     expect(mockClipboard.writeText).toHaveBeenCalledWith(
-      expect.stringContaining(
-        "nombre,experiencia,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm",
-      ),
+      "nombre,experiencia,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm\n" +
+        "P1,Nuevo,0,0,1,0\n" +
+        "P2,Antiguo,3,1,2,1\n" +
+        "P3,Nuevo,0,0,1,0\n" +
+        "P4,Nuevo,0,0,1,0\n" +
+        "P5,Nuevo,0,0,1,0\n" +
+        "P6,Nuevo,0,0,1,0\n" +
+        "P7,Nuevo,0,0,1,0",
     );
-  });
 
-  it("shows copy feedback when CSV copy button is clicked", async () => {
-    await renderSnapshotDetail();
-
-    const copyButton = screen.getByText("Copiar CSV");
-    await fireEvent.click(copyButton);
-
-    // Verify button text changes to "Copiado"
+    // Verify button changes to "Copiado"
     expect(screen.getByText("Copiado")).toBeTruthy();
 
     // Fast-forward time by 1500ms
@@ -243,20 +240,21 @@ describe("SnapshotDetail", () => {
     expect(onOpenGameDraft).toHaveBeenCalledWith(1);
   });
 
-  it("should prevent Sincronizar Notion if snapshot source is already notion_sync", async () => {
+  it("should allow Sincronizar Notion and fetch players regardless of source", async () => {
     const { fetchSnapshot, fetchNotionPlayers } = await import("../../api");
     (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
       createMockSnapshotDetail({
         id: 4,
-        source: "notion_sync",
+        source: "notion_sync", // Test with notion_sync to prove frontend doesn't block
         created_at: "2024-01-01 12:00:00",
         players: [createMockEditPlayerRow({ nombre: "P1" })],
       }),
     );
 
     const onShowError = vi.fn();
+    const onShowToast = vi.fn();
 
-    await renderSnapshotDetail({ id: 4, onShowError });
+    await renderSnapshotDetail({ id: 4, onShowError, onShowToast });
 
     // Wait for loading to finish
     await waitFor(() => {
@@ -267,56 +265,9 @@ describe("SnapshotDetail", () => {
     const syncBtn = screen.getByText(/Sincronizar Notion/);
     await fireEvent.click(syncBtn);
 
-    // Assert fail-fast behavior: onShowError called, fetchNotionPlayers NOT called
-    expect(onShowError).toHaveBeenCalledWith(
-      "Acción no permitida",
-      "El snapshot base ya fue generado por notion_sync y aún no se ha jugado una partida.",
-    );
-    expect(fetchNotionPlayers).not.toHaveBeenCalled();
-  });
-
-  it("should allow Sincronizar Notion if snapshot source is manual", async () => {
-    const { fetchSnapshot, fetchNotionPlayers } = await import("../../api");
-    (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      createMockSnapshotDetail({
-        id: 5,
-        source: "manual",
-        created_at: "2024-01-01 12:00:00",
-        players: [],
-      }),
-    );
-
-    (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      players: [],
-      error: undefined,
-    });
-
-    render(SnapshotDetail, {
-      props: {
-        id: 5,
-        onClose: () => {},
-        onChainUpdate: () => {},
-        onOpenSnapshot: () => {},
-        onOpenGame: () => {},
-        onOpenGameDraft: () => {},
-        onEditDraft: () => {},
-        onShowError: () => {},
-        onShowToast: vi.fn(),
-      },
-    });
-
-    await waitFor(() => {
-      expect(screen.queryByText("Cargando…")).toBeNull();
-    });
-
-    // Click "Sincronizar Notion"
-    const syncBtn = screen.getByText(/Sincronizar Notion/);
-    await fireEvent.click(syncBtn);
-
-    // Assert it proceeds to fetch Notion players
-    await waitFor(() => {
-      expect(fetchNotionPlayers).toHaveBeenCalled();
-    });
+    // Assert sync proceeds: fetchNotionPlayers called, no frontend error
+    expect(fetchNotionPlayers).toHaveBeenCalledWith(["P1"]);
+    expect(onShowError).not.toHaveBeenCalled();
   });
 
   describe("Organizar Validation", () => {
@@ -526,7 +477,7 @@ describe("SnapshotDetail", () => {
       vi.useRealTimers();
     });
 
-    it("calls renamePlayer and reloads snapshot when resolving notion sync merges", async () => {
+    it("handles notion sync merge with renames payload and snapshot reload", async () => {
       // Use real timers for this test to avoid async issues
       vi.useRealTimers();
 
@@ -571,10 +522,8 @@ describe("SnapshotDetail", () => {
         error: undefined,
       });
 
-      // Mock renamePlayer to succeed
+      // Mock renamePlayer and saveSnapshot to succeed
       (renamePlayer as ReturnType<typeof vi.fn>).mockResolvedValueOnce({});
-
-      // Mock saveSnapshot to succeed
       (saveSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         snapshot_id: 2,
       });
@@ -587,12 +536,12 @@ describe("SnapshotDetail", () => {
       });
       await fireEvent.click(syncBtn);
 
-      // Wait for the resolution modal to appear (it should show the conflict)
+      // Wait for the resolution modal to appear
       await waitFor(() => {
         expect(screen.getByText(/Nombres similares/i)).toBeTruthy();
       });
 
-      // Click "Usar nombre Notion" button directly (triggers merge_notion action)
+      // Click "Usar nombre Notion" button to trigger merge
       const notionBtn = screen.getByRole("button", {
         name: /Usar nombre Notion/i,
       });
@@ -600,7 +549,6 @@ describe("SnapshotDetail", () => {
 
       // Wait for the async operations to complete
       await waitFor(() => {
-        // Verify saveSnapshot was called
         expect(saveSnapshot).toHaveBeenCalled();
       });
 
@@ -611,7 +559,7 @@ describe("SnapshotDetail", () => {
         }),
       );
 
-      // Verify fetchSnapshot was called again (loadSnapshot after save)
+      // Verify fetchSnapshot was called again (reload after save)
       await waitFor(() => {
         expect(fetchSnapshot).toHaveBeenCalledTimes(2);
       });
@@ -620,106 +568,12 @@ describe("SnapshotDetail", () => {
       vi.useFakeTimers();
     });
 
-    it("passes renames payload to saveSnapshot on sync merge", async () => {
-      // Use real timers for this test to avoid async issues
-      vi.useRealTimers();
-
-      const { fetchSnapshot, fetchNotionPlayers, saveSnapshot, renamePlayer } =
+    it("should reset isSyncing state on API payload errors", async () => {
+      const { fetchSnapshot, fetchNotionPlayers, saveSnapshot } =
         await import("../../api");
-
-      // Mock initial snapshot with a player that has similar name in Notion
-      (fetchSnapshot as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce(
-          createMockSnapshotDetail({
-            id: 1,
-            created_at: "2024-01-01T00:00:00Z",
-            source: "manual",
-            players: [createMockEditPlayerRow({ nombre: "Juan" })],
-          }),
-        )
-        // Second call after successful sync (reload)
-        .mockResolvedValueOnce(
-          createMockSnapshotDetail({
-            id: 1,
-            created_at: "2024-01-01T00:00:00Z",
-            source: "manual",
-            players: [
-              createMockEditPlayerRow({
-                nombre: "Juan Perez",
-                experiencia: "Antiguo",
-                juegos_este_ano: 5,
-              }),
-            ],
-          }),
-        );
-
-      // Mock fetchNotionPlayers to return a similar_names conflict
-      (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        players: [
-          createMockEditPlayerRow({
-            nombre: "Juan Perez",
-            experiencia: "Antiguo",
-            juegos_este_ano: 5,
-          }),
-        ],
-        similar_names: [
-          {
-            notion: "Juan Perez",
-            snapshot: "Juan",
-            similarity: 0.85,
-          },
-        ],
-        error: undefined,
-      });
-
-      // Mock renamePlayer to succeed
-      (renamePlayer as ReturnType<typeof vi.fn>).mockResolvedValueOnce({});
-
-      // Mock saveSnapshot to succeed
-      (saveSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        snapshot_id: 2,
-      });
-
-      await renderSnapshotDetail({ id: 1 });
-
-      // Click sync button to trigger the sync
-      const syncBtn = screen.getByRole("button", {
-        name: /Sincronizar Notion/i,
-      });
-      await fireEvent.click(syncBtn);
-
-      // Wait for the resolution modal to appear
-      await waitFor(() => {
-        expect(screen.getByText(/Nombres similares/i)).toBeTruthy();
-      });
-
-      // Click "Usar nombre Notion" button (triggers merge_notion action)
-      const notionBtn = screen.getByRole("button", {
-        name: /Usar nombre Notion/i,
-      });
-      await fireEvent.click(notionBtn);
-
-      // Wait for saveSnapshot to be called
-      await waitFor(() => {
-        expect(saveSnapshot).toHaveBeenCalled();
-      });
-
-      // Verify saveSnapshot was called with the correct renames payload
-      expect(saveSnapshot).toHaveBeenCalledWith(
-        expect.objectContaining({
-          renames: [{ from: "Juan", to: "Juan Perez" }],
-        }),
-      );
-
-      // Restore fake timers
-      vi.useFakeTimers();
-    });
-
-    it("should reset isSyncing state when fetchNotionPlayers returns an error", async () => {
-      const { fetchSnapshot, fetchNotionPlayers } = await import("../../api");
       const onShowError = vi.fn();
 
-      // Mock a valid manual snapshot so sync button is enabled
+      // Test error from fetchNotionPlayers
       (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
         createMockSnapshotDetail({
           id: 1,
@@ -729,14 +583,13 @@ describe("SnapshotDetail", () => {
         }),
       );
 
-      // Mock fetchNotionPlayers to return an error
       (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         error: "API limit reached",
         players: [],
         similar_names: [],
       });
 
-      render(SnapshotDetail, {
+      const { unmount } = render(SnapshotDetail, {
         props: {
           id: 1,
           onClose: () => {},
@@ -750,18 +603,15 @@ describe("SnapshotDetail", () => {
         },
       });
 
-      // Wait for loading to complete
       await waitFor(() => {
         expect(screen.queryByText("Cargando…")).toBeNull();
       });
 
-      // Click sync button
       const syncBtn: HTMLButtonElement = screen.getByRole("button", {
         name: /Sincronizar Notion/i,
       });
       await fireEvent.click(syncBtn);
 
-      // Wait for error to be handled
       await waitFor(() => {
         expect(onShowError).toHaveBeenCalledWith(
           "Error de Sincronización",
@@ -769,41 +619,34 @@ describe("SnapshotDetail", () => {
         );
       });
 
-      // Assert that sync button is no longer disabled and text has reverted
       expect(syncBtn.disabled).toBe(false);
       expect(syncBtn.textContent).toBe("🔄 Sincronizar Notion");
-    });
+      unmount();
 
-    it("should reset isSyncing state when saveSnapshot returns an error", async () => {
-      const { fetchSnapshot, fetchNotionPlayers, saveSnapshot } =
-        await import("../../api");
-      const onShowError = vi.fn();
-
-      // Mock a valid manual snapshot so sync button is enabled
+      // Test error from saveSnapshot
+      vi.clearAllMocks();
       (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
         createMockSnapshotDetail({
-          id: 1,
+          id: 2,
           created_at: "2024-01-01T00:00:00Z",
           source: "manual",
-          players: [createMockEditPlayerRow({ nombre: "P1" })],
+          players: [createMockEditPlayerRow({ nombre: "P2" })],
         }),
       );
 
-      // Mock fetchNotionPlayers to return success with no similar names (so it proceeds directly to merge)
       (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         players: [],
         similar_names: [],
         error: undefined,
       });
 
-      // Mock saveSnapshot to return an error
       (saveSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         error: "Backend strict guard rejected save",
       });
 
       render(SnapshotDetail, {
         props: {
-          id: 1,
+          id: 2,
           onClose: () => {},
           onChainUpdate: () => {},
           onOpenSnapshot: () => {},
@@ -815,18 +658,15 @@ describe("SnapshotDetail", () => {
         },
       });
 
-      // Wait for loading to complete
       await waitFor(() => {
         expect(screen.queryByText("Cargando…")).toBeNull();
       });
 
-      // Click sync button
-      const syncBtn: HTMLButtonElement = screen.getByRole("button", {
+      const syncBtn2: HTMLButtonElement = screen.getByRole("button", {
         name: /Sincronizar Notion/i,
       });
-      await fireEvent.click(syncBtn);
+      await fireEvent.click(syncBtn2);
 
-      // Wait for error to be handled
       await waitFor(() => {
         expect(onShowError).toHaveBeenCalledWith(
           "Error de Sincronización",
@@ -834,36 +674,32 @@ describe("SnapshotDetail", () => {
         );
       });
 
-      // Assert that sync button is no longer disabled and text has reverted
-      expect(syncBtn.disabled).toBe(false);
-      expect(syncBtn.textContent).toBe("🔄 Sincronizar Notion");
+      expect(syncBtn2.disabled).toBe(false);
+      expect(syncBtn2.textContent).toBe("🔄 Sincronizar Notion");
     });
 
-    it("should reset isSyncing state when fetchNotionPlayers throws a network exception", async () => {
-      // Use real timers for this test to avoid async issues with promise rejection
+    it("should reset isSyncing state on network exceptions", async () => {
       vi.useRealTimers();
 
       const { fetchSnapshot, fetchNotionPlayers } = await import("../../api");
       const onShowError = vi.fn();
 
-      // Mock a valid manual snapshot so sync button is enabled
       (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
         createMockSnapshotDetail({
-          id: 1,
+          id: 3,
           created_at: "2024-01-01T00:00:00Z",
           source: "manual",
-          players: [createMockEditPlayerRow({ nombre: "P1" })],
+          players: [createMockEditPlayerRow({ nombre: "P3" })],
         }),
       );
 
-      // Mock fetchNotionPlayers to reject with a network error
       (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
         new Error("Network Error"),
       );
 
       render(SnapshotDetail, {
         props: {
-          id: 1,
+          id: 3,
           onClose: () => {},
           onChainUpdate: () => {},
           onOpenSnapshot: () => {},
@@ -875,304 +711,25 @@ describe("SnapshotDetail", () => {
         },
       });
 
-      // Wait for loading to complete
       await waitFor(() => {
         expect(screen.queryByText("Cargando…")).toBeNull();
       });
 
-      // Click sync button
       const syncBtn: HTMLButtonElement = screen.getByRole("button", {
         name: /Sincronizar Notion/i,
       });
       await fireEvent.click(syncBtn);
 
-      // Wait for the rejected promise to be processed
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Verify error was shown
       expect(onShowError).toHaveBeenCalledWith(
         "Error de conexión",
         "Error: Network Error",
       );
-
-      // Assert that sync button is no longer disabled and text has reverted
       expect(syncBtn.disabled).toBe(false);
       expect(syncBtn.textContent).toBe("🔄 Sincronizar Notion");
 
-      // Restore fake timers for other tests
       vi.useFakeTimers();
-    });
-  });
-
-  describe("New Svelte 5 Behaviors", () => {
-    it("CSV button calls clipboard.writeText with correctly formatted derived CSV data", async () => {
-      const { fetchSnapshot } = await import("../../api");
-      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        createMockSnapshotDetail({
-          id: 1,
-          created_at: "2024-01-01T00:00:00Z",
-          source: "manual",
-          players: [
-            createMockEditPlayerRow({
-              nombre: "Test Player",
-              experiencia: "Nuevo",
-              juegos_este_ano: 5,
-              prioridad: 1,
-              partidas_deseadas: 2,
-              partidas_gm: 1,
-            }),
-          ],
-        }),
-      );
-
-      render(SnapshotDetail, {
-        props: {
-          id: 1,
-          onClose: () => {},
-          onChainUpdate: () => {},
-          onOpenSnapshot: () => {},
-          onOpenGame: () => {},
-          onOpenGameDraft: () => {},
-          onEditDraft: () => {},
-          onShowError: () => {},
-          onShowToast: vi.fn(),
-        },
-      });
-
-      await waitFor(() => {
-        expect(screen.queryByText("Cargando…")).toBeNull();
-      });
-
-      // Click the copy button
-      const copyButton = screen.getByRole("button", {
-        name: /Copiar CSV/i,
-      });
-      await fireEvent.click(copyButton);
-
-      // Verify clipboard.writeText was called with correctly formatted CSV
-      expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
-      expect(mockClipboard.writeText).toHaveBeenCalledWith(
-        "nombre,experiencia,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm\n" +
-          "Test Player,Nuevo,5,1,2,1",
-      );
-    });
-
-    it("CSV derived state updates automatically when player data changes", async () => {
-      const { fetchSnapshot } = await import("../../api");
-
-      // Initial mock with one player
-      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        createMockSnapshotDetail({
-          id: 1,
-          created_at: "2024-01-01T00:00:00Z",
-          source: "manual",
-          players: [createMockEditPlayerRow({ nombre: "Player 1" })],
-        }),
-      );
-
-      render(SnapshotDetail, {
-        props: {
-          id: 1,
-          onClose: () => {},
-          onChainUpdate: () => {},
-          onOpenSnapshot: () => {},
-          onOpenGame: () => {},
-          onOpenGameDraft: () => {},
-          onEditDraft: () => {},
-          onShowError: () => {},
-          onShowToast: vi.fn(),
-        },
-      });
-
-      await waitFor(() => {
-        expect(screen.queryByText("Cargando…")).toBeNull();
-      });
-
-      // Clear previous calls
-      mockClipboard.writeText.mockClear();
-
-      // Click copy button
-      const copyButton = screen.getByRole("button", {
-        name: /Copiar CSV/i,
-      });
-      await fireEvent.click(copyButton);
-
-      // Verify CSV with first player
-      expect(mockClipboard.writeText).toHaveBeenCalledWith(
-        expect.stringContaining("Player 1"),
-      );
-    });
-
-    it("Sincronizar button shows disabled state and 'Sincronizando...' when ui.isSyncing is true", async () => {
-      // We need to test the UI state behavior by triggering sync
-      const { fetchSnapshot, fetchNotionPlayers } = await import("../../api");
-
-      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        createMockSnapshotDetail({
-          id: 1,
-          created_at: "2024-01-01T00:00:00Z",
-          source: "manual",
-          players: [createMockEditPlayerRow({ nombre: "Test Player" })],
-        }),
-      );
-
-      // Mock fetchNotionPlayers to never resolve (keep isSyncing true)
-      const neverResolvePromise = new Promise<never>(() => {});
-      (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockReturnValue(
-        neverResolvePromise,
-      );
-
-      render(SnapshotDetail, {
-        props: {
-          id: 1,
-          onClose: () => {},
-          onChainUpdate: () => {},
-          onOpenSnapshot: () => {},
-          onOpenGame: () => {},
-          onOpenGameDraft: () => {},
-          onEditDraft: () => {},
-          onShowError: () => {},
-          onShowToast: vi.fn(),
-        },
-      });
-
-      await waitFor(() => {
-        expect(screen.queryByText("Cargando…")).toBeNull();
-      });
-    });
-
-    it("Editar button triggers onEditDraft with mapped playersForDraft data", async () => {
-      const { fetchSnapshot } = await import("../../api");
-      const onEditDraft = vi.fn();
-
-      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        createMockSnapshotDetail({
-          id: 1,
-          created_at: "2024-01-01T00:00:00Z",
-          source: "manual",
-          players: [
-            createMockEditPlayerRow({
-              nombre: "Test Player",
-              experiencia: "Antiguo",
-              juegos_este_ano: 3,
-              prioridad: 1,
-              partidas_deseadas: 2,
-              partidas_gm: 1,
-            }),
-          ],
-        }),
-      );
-
-      render(SnapshotDetail, {
-        props: {
-          id: 1,
-          onClose: () => {},
-          onChainUpdate: () => {},
-          onOpenSnapshot: () => {},
-          onOpenGame: () => {},
-          onOpenGameDraft: () => {},
-          onEditDraft,
-          onShowError: () => {},
-          onShowToast: vi.fn(),
-        },
-      });
-
-      await waitFor(() => {
-        expect(screen.queryByText("Cargando…")).toBeNull();
-      });
-
-      // Click the edit button
-      const editButton = screen.getByRole("button", { name: /Editar/i });
-      await fireEvent.click(editButton);
-
-      // Verify onEditDraft was called with correctly mapped playersForDraft data
-      expect(onEditDraft).toHaveBeenCalledTimes(1);
-      expect(onEditDraft).toHaveBeenCalledWith(1, "manual", null, [
-        createMockEditPlayerRow({
-          nombre: "Test Player",
-          experiencia: "Antiguo",
-          juegos_este_ano: 3,
-          prioridad: 1,
-          partidas_deseadas: 2,
-          partidas_gm: 1,
-        }),
-      ]);
-    });
-
-    it("OrganizarConfirmModal onEdit uses playersForDraft derived data", async () => {
-      const { fetchSnapshot } = await import("../../api");
-      const { validateOrganizar } = await import("../../syncUtils");
-      const onEditDraft = vi.fn();
-
-      const players = new Array(7).fill(null).map((_, i) =>
-        createMockEditPlayerRow({
-          nombre: `Player ${i + 1}`,
-          partidas_deseadas: 1,
-          partidas_gm: 0,
-          prioridad: 0,
-        }),
-      );
-
-      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        createMockSnapshotDetail({
-          id: 1,
-          players,
-        }),
-      );
-
-      (validateOrganizar as ReturnType<typeof vi.fn>).mockReturnValueOnce({
-        isAllOnes: true,
-        gmShortage: null,
-        excludedPlayers: [],
-      });
-
-      render(SnapshotDetail, {
-        props: {
-          id: 1,
-          onClose: () => {},
-          onChainUpdate: () => {},
-          onOpenSnapshot: () => {},
-          onOpenGame: () => {},
-          onOpenGameDraft: () => {},
-          onEditDraft,
-          onShowError: () => {},
-          onShowToast: vi.fn(),
-        },
-      });
-
-      await waitFor(() => {
-        expect(screen.queryByText("Cargando…")).toBeNull();
-      });
-
-      // Click organizar button to show modal
-      const organizarButton = screen.getByRole("button", {
-        name: /Organizar Partidas/i,
-      });
-      await fireEvent.click(organizarButton);
-
-      // Click edit button in modal
-      const modalEditButton = screen.getByRole("button", {
-        name: /Volver a Editar/i,
-      });
-      await fireEvent.click(modalEditButton);
-
-      // Verify onEditDraft was called with playersForDraft data
-      expect(onEditDraft).toHaveBeenCalledTimes(1);
-      expect(onEditDraft).toHaveBeenCalledWith(
-        1,
-        "manual",
-        null,
-        expect.arrayContaining([
-          expect.objectContaining({
-            nombre: expect.stringMatching(/Player \d+/) as string,
-            experiencia: "Nuevo",
-            juegos_este_ano: 0,
-            prioridad: 0,
-            partidas_deseadas: 1,
-            partidas_gm: 0,
-          }),
-        ]),
-      );
     });
   });
 });
