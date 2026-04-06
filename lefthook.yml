@@ -1,14 +1,20 @@
 pre-commit:
   commands:
-    python-lint:
+    backend-format:
       glob: "backend/**/*.py"
-      run: uv run ruff check backend --fix && (uv run vulture backend/ || true)
-    python-test:
+      run: uv run ruff format {staged_files}
+      stage_fixed: true
+    backend-lint:
+      glob: "backend/**/*.py"
+      run: uv run ruff check --fix {staged_files}
+      stage_fixed: true
+    backend-test:
       glob: "backend/**/*.py"
       run: uv run python -m pytest -q
     frontend-format:
       glob: "frontend/src/**/*.{ts,svelte,css,html}"
-      run: bunx prettier --write --plugin=prettier-plugin-svelte {staged_files}
+      run: bun prettier --write --plugin=prettier-plugin-svelte {staged_files}
+      stage_fixed: true
     frontend-typecheck:
       glob: "frontend/src/**/*.{ts,svelte}"
       run: bun run typecheck
@@ -21,3 +27,9 @@ pre-commit:
     ai-rules:
       glob: "docs/ai-rules/*.md"
       run: bun run ai-rules:generate && git add .github/ .clinerules .windsurfrules
+
+pre-push:
+  commands:
+    backend-dead-code:
+      glob: "backend/**/*.py"
+      run: uv run vulture backend/
