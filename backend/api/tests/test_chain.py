@@ -10,7 +10,8 @@ from typing import Any
 
 import pytest
 
-from backend.db.crud import create_game_edge, create_snapshot
+from backend.crud.chain import create_game_edge
+from backend.crud.snapshots import create_snapshot
 
 pytestmark = pytest.mark.asyncio
 
@@ -40,7 +41,7 @@ class TestApiChain:
     async def test_sync_branch_not_a_root(self, client: Any, db_session: Any) -> None:
         """Snapshot produced by a sync_event must be a branch, not a root."""
         from backend.conftest import add_snapshot
-        from backend.db.crud import create_branch_edge
+        from backend.crud.chain import create_branch_edge
 
         snap1 = await add_snapshot(db_session)
         snap2 = await add_snapshot(db_session)
@@ -59,7 +60,7 @@ class TestApiChain:
     async def test_latest_flag_on_highest_id(self, client: Any, db_session: Any) -> None:
         """is_latest is True only on the snapshot with the highest id."""
         from backend.conftest import add_snapshot
-        from backend.db.crud import create_branch_edge
+        from backend.crud.chain import create_branch_edge
 
         snap1 = await add_snapshot(db_session)
         snap2 = await add_snapshot(db_session)

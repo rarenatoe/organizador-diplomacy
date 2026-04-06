@@ -23,11 +23,8 @@ pytestmark = pytest.mark.asyncio
 
 async def make_snapshot_with_players(db_session: Any, count: int = 14) -> int:
     """Creates a snapshot with `count` players, enough for the algorithm."""
-    from backend.db.crud import (
-        add_player_to_snapshot,
-        create_snapshot,
-        get_or_create_player,
-    )
+    from backend.crud.players import get_or_create_player
+    from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
 
     snap_id = await create_snapshot(db_session, "manual")
     for i in range(count):
@@ -66,7 +63,8 @@ class TestApiGameDraft:
         assert event_count == 0
 
     async def test_too_few_players_returns_400(self, client: Any, db_session: Any) -> None:
-        from backend.db.crud import add_player_to_snapshot, create_snapshot, get_or_create_player
+        from backend.crud.players import get_or_create_player
+        from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
 
         snap_id = await create_snapshot(db_session, "manual")
         for i in range(3):
@@ -235,7 +233,8 @@ class TestApiGameSave:
         self, client: Any, db_session: Any
     ) -> None:
         """Test fallback behavior when the game is an internal node (has children)."""
-        from backend.db.crud import create_branch_edge, create_snapshot
+        from backend.crud.chain import create_branch_edge
+        from backend.crud.snapshots import create_snapshot
         from backend.db.models import GameDetail
 
         # 1. Setup a game

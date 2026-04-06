@@ -11,19 +11,25 @@ from typing import Any
 import pytest
 from sqlalchemy import select
 
-from backend.db.crud import (
-    add_player_to_snapshot,
-    add_table_player,
+from backend.crud.chain import (
     create_branch_edge,
     create_game_edge,
+    squash_linear_branch,
+)
+from backend.crud.games import (
+    add_table_player,
     create_game_table,
+)
+from backend.crud.players import (
+    get_or_create_player,
+    rename_player,
+)
+from backend.crud.snapshots import (
+    add_player_to_snapshot,
     create_snapshot,
     delete_snapshot_cascade,
-    get_or_create_player,
     get_snapshot_players,
-    rename_player,
     snapshots_have_same_roster,
-    squash_linear_branch,
 )
 from backend.db.models import Player, Snapshot, SnapshotPlayer, TablePlayer, TimelineEdge
 

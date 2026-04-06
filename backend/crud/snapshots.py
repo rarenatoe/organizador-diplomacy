@@ -1,7 +1,8 @@
-"""Async CRUD operations using SQLAlchemy.
+"""Snapshot-related CRUD operations.
 
-This module provides async database operations for the Diplomacy organizer,
-migrating from raw SQLite to SQLAlchemy 2.0 with async sessions.
+This module contains database operations for snapshot management,
+Notion cache, and history logging, extracted from the monolithic crud.py file
+for better organization.
 """
 
 from __future__ import annotations
@@ -9,11 +10,13 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, select
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.crud.chain import create_timeline_edge
+from backend.crud.players import get_or_create_player
 from backend.db.models import (
     DeepDiffResult,
     FieldChange,
@@ -33,6 +36,7 @@ from backend.db.models import (
 )
 
 # ── Diffing Logic ────────────────────────────────────────────────────────────
+
 
 def generate_deep_diff(
     old_players: list[dict[str, Any]],
@@ -92,118 +96,7 @@ def generate_deep_diff(
 
 # ── Players ────────────────────────────────────────────────────────────────────
 
-
-async def get_or_create_player(session: AsyncSession, name: str) -> int:
-    """Returns the player id, inserting a new row if the name is unknown."""
-    result = await session.execute(select(Player).where(Player.name == name))
-    player = result.scalar_one_or_none()
-    if player:
-        return player.id
-
-    new_player: Player = Player(name=name)
-    session.add(new_player)
-    await session.flush()
-    return new_player.id
-
-
-async def rename_player(session: AsyncSession, old_name: str, new_name: str) -> bool:
-    """
-    Renames a player. If new_name already exists, links snapshot_players
-    to the existing player and deletes the old player if orphaned.
-    Returns True if successful.
-    """
-    # Check if old name exists
-    result = await session.execute(select(Player).where(Player.name == old_name))
-    old_player = result.scalar_one_or_none()
-    if not old_player:
-        return False
-
-    old_id = old_player.id
-
-    # Check if new name already exists
-    result = await session.execute(select(Player).where(Player.name == new_name))
-    new_player = result.scalar_one_or_none()
-
-    if new_player:
-        new_id = new_player.id
-
-        # Check if both players are in the same snapshot
-        result = await session.execute(
-            select(SnapshotPlayer.snapshot_id).where(SnapshotPlayer.player_id == old_id).distinct()
-        )
-        old_snapshots = result.scalars().all()
-
-        for snapshot_id in old_snapshots:
-            result = await session.execute(
-                select(SnapshotPlayer)
-                .where(SnapshotPlayer.snapshot_id == snapshot_id)
-                .where(SnapshotPlayer.player_id == new_id)
-            )
-            if result.scalar_one_or_none():
-                # New name is already in the same snapshot - block the rename
-                return False
-
-        # Update snapshot_players to point to the existing player
-        await session.execute(
-            update(SnapshotPlayer)
-            .where(SnapshotPlayer.player_id == old_id)
-            .values(player_id=new_id)
-        )
-
-        # Handle table_players conflicts
-        result = await session.execute(
-            select(TablePlayer.table_id).where(TablePlayer.player_id == new_id)
-        )
-        new_player_tables = {row for row in result.scalars().all()}
-
-        if new_player_tables:
-            await session.execute(
-                delete(TablePlayer)
-                .where(TablePlayer.player_id == old_id)
-                .where(TablePlayer.table_id.in_(new_player_tables))
-            )
-
-        await session.execute(
-            update(TablePlayer).where(TablePlayer.player_id == old_id).values(player_id=new_id)
-        )
-
-        # Update other references
-        await session.execute(
-            update(GameTable).where(GameTable.gm_player_id == old_id).values(gm_player_id=new_id)
-        )
-        await session.execute(
-            update(WaitingList).where(WaitingList.player_id == old_id).values(player_id=new_id)
-        )
-
-        # Check if old player is orphaned
-        result = await session.execute(
-            select(SnapshotPlayer).where(SnapshotPlayer.player_id == old_id).limit(1)
-        )
-        has_snapshot_links = result.scalar_one_or_none() is not None
-
-        result = await session.execute(
-            select(GameTable).where(GameTable.gm_player_id == old_id).limit(1)
-        )
-        has_gm_links = result.scalar_one_or_none() is not None
-
-        result = await session.execute(
-            select(TablePlayer).where(TablePlayer.player_id == old_id).limit(1)
-        )
-        has_table_links = result.scalar_one_or_none() is not None
-
-        result = await session.execute(
-            select(WaitingList).where(WaitingList.player_id == old_id).limit(1)
-        )
-        has_waiting_links = result.scalar_one_or_none() is not None
-
-        if not any([has_snapshot_links, has_gm_links, has_table_links, has_waiting_links]):
-            await session.execute(delete(Player).where(Player.id == old_id))
-
-        return True
-    else:
-        # Simple rename
-        old_player.name = new_name
-        return True
+# Player operations moved to backend.crud.players module
 
 
 async def add_player_to_snapshot(
@@ -342,125 +235,7 @@ async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[
 
 # ── Events ───────────────────────────────────────────────────────────────────
 
-
-async def create_timeline_edge(
-    session: AsyncSession,
-    edge_type: str,
-    source_snapshot_id: int | None,
-    output_snapshot_id: int,
-) -> int:
-    """Create a new timeline edge and return its ID."""
-    # Create graph node
-    node = GraphNode(entity_type="timeline_edge")
-    session.add(node)
-    await session.flush()
-    node_id = node.id
-
-    # Create timeline edge
-    edge = TimelineEdge(
-        id=node_id,
-        edge_type=edge_type,
-        source_snapshot_id=source_snapshot_id,
-        output_snapshot_id=output_snapshot_id,
-    )
-    session.add(edge)
-    await session.flush()
-    return edge.id
-
-
-async def create_branch_edge(
-    session: AsyncSession, source_snapshot_id: int, output_snapshot_id: int
-) -> int:
-    """Create a branch edge."""
-    return await create_timeline_edge(session, "branch", source_snapshot_id, output_snapshot_id)
-
-
-async def squash_linear_branch(session: AsyncSession, snapshot_id: int) -> None:
-    """
-    Squashes linear branch chains into a single snapshot.
-    If a snapshot has EXACTLY ONE outgoing edge, and that edge is NOT a game,
-    this function absorbs the child snapshot into the parent.
-    """
-    from sqlalchemy import delete, select, update
-
-    from backend.db.models import GraphNode, Snapshot, SnapshotHistory, SnapshotPlayer, TimelineEdge
-
-    # Query outgoing edges from this snapshot
-    result = await session.execute(
-        select(TimelineEdge).where(TimelineEdge.source_snapshot_id == snapshot_id)
-    )
-    outgoing_edges = result.scalars().all()
-
-    # Only squash if exactly 1 outgoing edge and it's NOT a game
-    if len(outgoing_edges) != 1:
-        return
-
-    edge = outgoing_edges[0]
-    if edge.edge_type == "game":
-        return
-
-    child_id = edge.output_snapshot_id
-
-    # Step 0: Inherit source and timestamp from child
-    child_snap_result = await session.execute(select(Snapshot).where(Snapshot.id == child_id))
-    child_snap = child_snap_result.scalar_one()
-    await session.execute(
-        update(Snapshot)
-        .where(Snapshot.id == snapshot_id)
-        .values(source=child_snap.source, created_at=child_snap.created_at)
-    )
-
-    # Step 1: Move child's outgoing edges to parent
-    await session.execute(
-        update(TimelineEdge)
-        .where(TimelineEdge.source_snapshot_id == child_id)
-        .values(source_snapshot_id=snapshot_id)
-    )
-
-    # Step 2: Move child's history to parent
-    await session.execute(
-        update(SnapshotHistory)
-        .where(SnapshotHistory.snapshot_id == child_id)
-        .values(snapshot_id=snapshot_id)
-    )
-
-    # Step 3: Delete parent's current roster
-    await session.execute(delete(SnapshotPlayer).where(SnapshotPlayer.snapshot_id == snapshot_id))
-
-    # Step 4: Move child's roster to parent
-    await session.execute(
-        update(SnapshotPlayer)
-        .where(SnapshotPlayer.snapshot_id == child_id)
-        .values(snapshot_id=snapshot_id)
-    )
-
-    # Step 5: Delete the branch edge
-    await session.execute(delete(TimelineEdge).where(TimelineEdge.id == edge.id))
-    await session.execute(delete(GraphNode).where(GraphNode.id == edge.id))
-
-    # Step 6: Delete child snapshot and its graph node
-    await session.execute(delete(Snapshot).where(Snapshot.id == child_id))
-    await session.execute(delete(GraphNode).where(GraphNode.id == child_id))
-
-    # Step 7: Recursively check if we need to squash again
-    await squash_linear_branch(session, snapshot_id)
-
-
-async def create_game_edge(
-    session: AsyncSession,
-    source_snapshot_id: int,
-    output_snapshot_id: int,
-    attempts: int,
-) -> int:
-    """Create a game edge with details."""
-    edge_id = await create_timeline_edge(session, "game", source_snapshot_id, output_snapshot_id)
-
-    detail = GameDetail(
-        timeline_edge_id=edge_id,
-        attempts=attempts,
-    )
-    session.add(detail)
-    return edge_id
+# Timeline edge operations moved to backend.crud.chain module
 
 
 async def delete_snapshot_cascade(session: AsyncSession, snapshot_id: int) -> bool:
@@ -608,8 +383,6 @@ async def create_root_manual_snapshot(
     return snap_id
 
 
-
-
 # ── Notion Cache ─────────────────────────────────────────────────────────────
 
 
@@ -689,56 +462,7 @@ async def get_notion_cache(session: AsyncSession) -> list[dict[str, Any]]:
 
 # ── Mesa Management ─────────────────────────────────────────────────────────
 
-
-async def add_table_player(
-    session: AsyncSession,
-    table_id: int,
-    player_id: int,
-    seat_order: int,
-    country: str,
-    country_reason: str | None = None,
-) -> None:
-    """Add a player to a game table."""
-    tp = TablePlayer(
-        table_id=table_id,
-        player_id=player_id,
-        seat_order=seat_order,
-        country=country,
-        country_reason=country_reason,
-    )
-    session.add(tp)
-
-
-async def add_waiting_player(
-    session: AsyncSession,
-    timeline_edge_id: int,
-    player_id: int,
-    list_order: int,
-    missing_spots: int,
-) -> None:
-    """Add a player to the waiting list."""
-    wl = WaitingList(
-        timeline_edge_id=timeline_edge_id,
-        player_id=player_id,
-        list_order=list_order,
-        missing_spots=missing_spots,
-    )
-    session.add(wl)
-
-
-async def create_game_table(session: AsyncSession, timeline_edge_id: int, table_number: int) -> int:
-    """Create a new game table and return its ID."""
-    from sqlalchemy import insert
-
-    stmt = (
-        insert(GameTable)
-        .values(timeline_edge_id=timeline_edge_id, table_number=table_number)
-        .returning(GameTable.id)
-    )
-    result = await session.execute(stmt)
-    await session.flush()
-    row = result.scalar_one()
-    return row
+# Game table operations moved to backend.crud.games module
 
 
 # ── History Logging ─────────────────────────────────────────────────────────────

@@ -27,7 +27,8 @@
 ## Directory Layout
 
 - `backend/api/routers/`: FastAPI endpoints.
-- `backend/db/`: Modular database operations (connection, crud, models, views).
+- `backend/db/`: Database models, views, and connection management.
+- `backend/crud/`: Modular data access layer (Repository Pattern) with domain-specific modules.
 - `backend/organizador/`: Core algorithms and pure data modeling.
 - `backend/sync/`: Notion integration and caching daemon.
 - `frontend/src/`: Svelte components, `$state` runes, API utilities, and types.
@@ -37,6 +38,13 @@
 - **Disposable Local SQLite:** The database is local and disposable (`sqlite (stdlib)` via `aiosqlite`).
 - **No Migrations:** DO NOT use Alembic migrations. The DB schema is defined in code and re-created as needed.
 - **Strict Typing:** Use explicit type annotations for all function signatures. Use Pydantic models for request/response validation and TypedDicts where appropriate.
+
+## CRUD Architecture (Repository Pattern)
+
+- **Modular Data Access:** Never cram DB operations into a single file. Use a functional Repository Pattern grouped by domain inside `backend/crud/` (e.g., `games.py`, `players.py`, `snapshots.py`, `chain.py`).
+- **Domain Separation:** Each CRUD module handles a specific domain (players, games, snapshots, timeline edges) with clear separation of concerns.
+- **No God Files:** Strictly forbid the recreation of monolithic "God files" for database operations. Each module should be focused and maintainable.
+- **Consistent Patterns:** All CRUD functions follow the same async patterns with proper session handling and type annotations.
 
 ## Backend Coding Standards
 
@@ -182,22 +190,6 @@ Categorize all components in `frontend/src/components/` by responsibility:
 - CSS class changes → IMMEDIATELY update test queries
 - Search for: `querySelector`, `closest`, `getBy` calls
 
-<<<<<<< Updated upstream
-## Modals & Overlays
-
-**PATTERN:** All modals must use the global `.modal-overlay` utility class and `--modal-backdrop` variable defined in `style.css` for consistent visual behavior across the application.
-
-**IMPLEMENTATION REQUIREMENTS:**
-
-- **Backdrop:** Use `.modal-overlay` with `position: fixed`, `inset: 0`, `background: var(--modal-backdrop)`, `display: flex`, `align-items: center`, `justify-content: center`
-- **Z-Index:** Use high `z-index` (1000+) to escape stacking contexts from parent panels like `SidePanel` (z-index: 50)
-- **Backdrop Filter:** Apply `backdrop-filter: blur(2px)` for modern visual effects
-- **Click Handling:** Implement click on overlay to close modal (`onclick={onCancel}`) and `e.stopPropagation()` on modal content to prevent event bubbling
-- **Component Props:** Use clear props: `onImport: (text: string) => void`, `onCancel: () => void`
-- **Autofocus:** Apply `autofocus` action to textarea for immediate user interaction
-
-**EXAMPLES:**
-=======
 ## Modal & Overlay Patterns (CRITICAL)
 
 **VISUAL CONTRACT:**
@@ -210,8 +202,9 @@ Categorize all components in `frontend/src/components/` by responsibility:
 
 - **Events:** Implement `onclick={onCancel}` on overlay and `e.stopPropagation()` on content.
 - **Focus:** Use `use:autofocus` on the primary input/textarea.
-- **Props:** Use standard callbacks: `onImport` or `onConfirm`.
->>>>>>> Stashed changes
+- **Props:** Use standard callbacks like `onImport`, `onCancel`, or `onConfirm`.
+
+**EXAMPLES:**
 
 ```svelte
 <!-- Modal with global overlay utility -->

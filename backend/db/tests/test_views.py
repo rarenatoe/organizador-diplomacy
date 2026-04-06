@@ -11,13 +11,15 @@ from typing import Any
 
 import pytest
 
-from backend.db.crud import (
-    add_player_to_snapshot,
+from backend.crud.chain import create_game_edge
+from backend.crud.games import (
     add_table_player,
-    create_game_edge,
     create_game_table,
+)
+from backend.crud.players import get_or_create_player
+from backend.crud.snapshots import (
+    add_player_to_snapshot,
     create_snapshot,
-    get_or_create_player,
 )
 from backend.db.models import NotionCache
 from backend.db.views import get_game_event_detail, get_snapshot_detail
@@ -425,7 +427,7 @@ class TestSnapshotHistoryInDetail:
         """
         Verify get_snapshot_detail returns history entries after log_snapshot_history is called.
         """
-        from backend.db.crud import log_snapshot_history
+        from backend.crud.snapshots import log_snapshot_history
 
         # Create snapshot
         snap_id = await create_snapshot(db_session, "manual")
@@ -464,7 +466,7 @@ class TestSnapshotHistoryInDetail:
         Note: In tests, all entries may have the same timestamp due to fast insertion.
         The query uses ORDER BY created_at DESC, id DESC as a tiebreaker.
         """
-        from backend.db.crud import log_snapshot_history
+        from backend.crud.snapshots import log_snapshot_history
 
         snap_id = await create_snapshot(db_session, "manual")
         await db_session.commit()
@@ -513,7 +515,7 @@ class TestGetSnapshotDetailFanOutRegression:
         This is a regression test for the SQL JOIN fan-out bug where veteran
         players with historical records were being returned multiple times.
         """
-        from backend.db.crud import get_snapshot_players
+        from backend.crud.snapshots import get_snapshot_players
 
         # Setup: Create a snapshot with one player
         snap_id = await create_snapshot(db_session, "manual")

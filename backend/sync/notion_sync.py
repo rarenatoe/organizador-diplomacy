@@ -20,7 +20,17 @@ from dotenv import load_dotenv
 from notion_client import Client
 from notion_client.errors import APIResponseError
 
-from backend.db import crud
+from backend.crud.chain import create_branch_edge
+from backend.crud.players import get_or_create_player, rename_player
+from backend.crud.snapshots import (
+    add_player_to_snapshot,
+    create_snapshot,
+    get_latest_snapshot_id,
+    get_snapshot_players,
+    log_snapshot_history,
+    snapshots_have_same_roster,
+    update_notion_cache,
+)
 from backend.db.connection import async_engine
 
 if TYPE_CHECKING:
@@ -539,7 +549,7 @@ async def _update_snapshot_in_place(
     from backend.db.models import Snapshot, SnapshotPlayer
 
     # Fetch old roster before clearing
-    previous_players = await crud.get_snapshot_players(session, snapshot_id)
+    previous_players = await get_snapshot_players(session, snapshot_id)
 
     # Execute renames safely to maintain player continuity without UNIQUE constraint crashes
     from sqlalchemy import select
@@ -562,8 +572,8 @@ async def _update_snapshot_in_place(
 
     # Insert new players
     for fila in filas:
-        pid = await crud.get_or_create_player(session, fila["nombre"])
-        await crud.add_player_to_snapshot(
+        pid = await get_or_create_player(session, fila["nombre"])
+        await add_player_to_snapshot(
             session,
             snapshot_id,
             pid,
@@ -575,7 +585,7 @@ async def _update_snapshot_in_place(
         )
 
     # Calculate dynamic diff for history logging
-    from backend.db.crud import generate_deep_diff
+    from backend.crud.snapshots import generate_deep_diff
     roster_fields = {"nombre", "experiencia", "juegos_este_ano", "prioridad", "partidas_deseadas", "partidas_gm"}
     prev_roster = [{k: v for k, v in p.items() if k in roster_fields} for p in previous_players]
     new_roster = [
@@ -592,7 +602,7 @@ async def _update_snapshot_in_place(
     diff = generate_deep_diff(prev_roster, new_roster, renames)
 
     # Log the history (outside the loop)
-    await crud.log_snapshot_history(
+    await log_snapshot_history(
         session,
         snapshot_id=snapshot_id,
         action_type="notion_sync",
@@ -609,11 +619,11 @@ async def _create_new_snapshot(
     filas: list[dict[str, Any]],
 ) -> int:
     """Create a new snapshot with player data and sync event."""
-    snap_id = await crud.create_snapshot(session, "notion_sync")
+    snap_id = await create_snapshot(session, "notion_sync")
 
     for fila in filas:
-        pid = await crud.get_or_create_player(session, fila["nombre"])
-        await crud.add_player_to_snapshot(
+        pid = await get_or_create_player(session, fila["nombre"])
+        await add_player_to_snapshot(
             session,
             snap_id,
             pid,
@@ -642,11 +652,11 @@ async def _create_new_snapshot(
         }
         for fila in filas
     ]
-    await crud.update_notion_cache(session, cache_rows)
+    await update_notion_cache(session, cache_rows)
 
     # Create sync event only if we have a source snapshot
     if source_snapshot_id is not None:
-        await crud.create_branch_edge(session, source_snapshot_id, snap_id)
+        await create_branch_edge(session, source_snapshot_id, snap_id)
 
     logger.info(f"Snapshot #{snap_id} created with {len(filas)} jugador(es).")
     return snap_id
@@ -667,7 +677,7 @@ async def _build_snapshot_rows(
 
     if source_snapshot_id is not None:
         # Get existing players from source snapshot
-        existentes_list = await crud.get_snapshot_players(session, source_snapshot_id)
+        existentes_list = await get_snapshot_players(session, source_snapshot_id)
         existentes = {p["nombre"]: p for p in existentes_list}
 
         merged_notion_normalized = {normalize_name(v["to"]) for v in merges.values()}
@@ -835,10 +845,10 @@ async def run_notion_sync_background(
                 if merges:
                     for old_name, merge_info in merges.items():
                         if merge_info.get("action") == "merge_notion":
-                            await crud.rename_player(session, old_name, merge_info["to"])
+                            await rename_player(session, old_name, merge_info["to"])
 
                 # Check if database has existing snapshots
-                latest_id = await crud.get_latest_snapshot_id(session)
+                latest_id = await get_latest_snapshot_id(session)
                 has_snapshots = latest_id is not None
 
                 if snapshot_id is None and has_snapshots:
@@ -849,7 +859,7 @@ async def run_notion_sync_background(
                 filas = await _build_snapshot_rows(session, snapshot_id, notion_players, merges)
 
                 existing_names: set[str] = (
-                    {p["nombre"] for p in await crud.get_snapshot_players(session, snapshot_id)}
+                    {p["nombre"] for p in await get_snapshot_players(session, snapshot_id)}
                     if snapshot_id is not None
                     else set()
                 )
@@ -863,7 +873,7 @@ async def run_notion_sync_background(
                 if (
                     snapshot_id is not None
                     and not force
-                    and await crud.snapshots_have_same_roster(session, snapshot_id, filas)
+                    and await snapshots_have_same_roster(session, snapshot_id, filas)
                 ):
                     logger.info(
                         "Los datos de Notion coinciden con el último snapshot — sin cambios."

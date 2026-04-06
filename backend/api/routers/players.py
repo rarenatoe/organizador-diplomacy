@@ -11,8 +11,8 @@ from sqlalchemy import select
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.session import AsyncSession
 
+from backend.crud.players import rename_player
 from backend.db.connection import get_session
-from backend.db.crud import rename_player
 from backend.db.models import Player
 
 router = APIRouter(prefix="/api/player")

@@ -10,14 +10,16 @@ from sqlalchemy import select, text
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.session import AsyncSession
 
-from backend.db.crud import (
-    add_player_to_snapshot,
+from backend.crud.chain import create_game_edge
+from backend.crud.games import (
     add_table_player,
     add_waiting_player,
-    create_game_edge,
     create_game_table,
+)
+from backend.crud.players import get_or_create_player
+from backend.crud.snapshots import (
+    add_player_to_snapshot,
     create_snapshot,
-    get_or_create_player,
     get_snapshot_players,
 )
 from backend.db.models import GameDetail, GameTable

@@ -41,7 +41,7 @@ class DraftPlayer(BaseModel):
 
     @field_validator("games_this_year", "desired_games", "gm_games", mode="before")
     @classmethod
-    def coerce_to_int(cls, v: Any) -> int:
+    def coerce_to_int(_cls, v: Any) -> int:
         """Coerce string or int values to int."""
         return int(v)
 

@@ -284,7 +284,7 @@ class TestNotionSyncBackground:
         # Query database using test engine to verify players were saved correctly
         from sqlalchemy.ext.asyncio import AsyncSession
 
-        from backend.db.crud import get_snapshot_players
+        from backend.crud.snapshots import get_snapshot_players
 
         async with AsyncSession(test_engine) as session:
             players = await get_snapshot_players(session, snapshot_id)
@@ -321,19 +321,20 @@ class TestNotionSyncBackground:
 
         from sqlalchemy.ext.asyncio import AsyncSession
 
-        from backend.db.crud import get_snapshot_players
+        from backend.crud.snapshots import get_snapshot_players
         from backend.sync.notion_sync import run_notion_sync_background
 
         # Use the shared test engine from the fixture
         test_engine = background_test_engine
 
         # Step 1: Create initial snapshot with "AliceOld" (games_this_year=0)
-        from backend.db import crud
+        from backend.crud.players import get_or_create_player
+        from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
 
         async with AsyncSession(test_engine) as session:
-            snap_id = await crud.create_snapshot(session, "test_source")
-            player_id = await crud.get_or_create_player(session, "AliceOld")
-            await crud.add_player_to_snapshot(session, snap_id, player_id, "Nuevo", 0, 0, 1, 0)
+            snap_id = await create_snapshot(session, "test_source")
+            player_id = await get_or_create_player(session, "AliceOld")
+            await add_player_to_snapshot(session, snap_id, player_id, "Nuevo", 0, 0, 1, 0)
             await session.commit()
 
         # Step 2: Mock Notion API to return "AliceNew" with games=10
@@ -413,7 +414,7 @@ class TestNotionSyncBackground:
         from sqlalchemy import select
         from sqlalchemy.ext.asyncio import AsyncSession
 
-        from backend.db import crud
+        from backend.crud.snapshots import create_snapshot
         from backend.db.models import SnapshotHistory
         from backend.sync.notion_sync import run_notion_sync_background
 
@@ -421,12 +422,15 @@ class TestNotionSyncBackground:
         test_engine = background_test_engine
 
         # Step 1: Create initial snapshot with 2 players
+        from backend.crud.players import get_or_create_player
+        from backend.crud.snapshots import add_player_to_snapshot
+        
         async with AsyncSession(test_engine) as session:
-            snap_id = await crud.create_snapshot(session, "notion_sync")
-            player1_id = await crud.get_or_create_player(session, "Alice")
-            player2_id = await crud.get_or_create_player(session, "Bob")
-            await crud.add_player_to_snapshot(session, snap_id, player1_id, "Nuevo", 0, 0, 1, 0)
-            await crud.add_player_to_snapshot(session, snap_id, player2_id, "Nuevo", 0, 0, 1, 0)
+            snap_id = await create_snapshot(session, "notion_sync")
+            player1_id = await get_or_create_player(session, "Alice")
+            player2_id = await get_or_create_player(session, "Bob")
+            await add_player_to_snapshot(session, snap_id, player1_id, "Nuevo", 0, 0, 1, 0)
+            await add_player_to_snapshot(session, snap_id, player2_id, "Nuevo", 0, 0, 1, 0)
             await session.commit()
 
         # Step 2: Verify no history exists yet

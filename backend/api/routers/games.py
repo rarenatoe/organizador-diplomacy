@@ -14,8 +14,8 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.session import AsyncSession
 
 from backend.config import PROJECT_ROOT
+from backend.crud.snapshots import get_snapshot_players
 from backend.db.connection import get_session
-from backend.db.crud import get_snapshot_players
 from backend.db.models import TimelineEdge
 from backend.db.views import get_game_event_detail
 from backend.organizador.core import calculate_matches

@@ -10,6 +10,13 @@ priority: 20
 - **No Migrations:** DO NOT use Alembic migrations. The DB schema is defined in code and re-created as needed.
 - **Strict Typing:** Use explicit type annotations for all function signatures. Use Pydantic models for request/response validation and TypedDicts where appropriate.
 
+## CRUD Architecture (Repository Pattern)
+
+- **Modular Data Access:** Never cram DB operations into a single file. Use a functional Repository Pattern grouped by domain inside `backend/crud/` (e.g., `games.py`, `players.py`, `snapshots.py`, `chain.py`).
+- **Domain Separation:** Each CRUD module handles a specific domain (players, games, snapshots, timeline edges) with clear separation of concerns.
+- **No God Files:** Strictly forbid the recreation of monolithic "God files" for database operations. Each module should be focused and maintainable.
+- **Consistent Patterns:** All CRUD functions follow the same async patterns with proper session handling and type annotations.
+
 ## Backend Coding Standards
 
 - **Logging Only:** NEVER use `print()` or `pprint()` for any purpose. All logging must use `from backend.core.logger import logger` with appropriate levels (`logger.info()`, `logger.warning()`, `logger.error(..., exc_info=True)` for exceptions).

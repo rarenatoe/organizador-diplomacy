@@ -11,10 +11,10 @@ from typing import Any
 import pytest
 from sqlalchemy import select
 
-from backend.db.crud import (
+from backend.crud.players import get_or_create_player
+from backend.crud.snapshots import (
     add_player_to_snapshot,
     create_snapshot,
-    get_or_create_player,
 )
 from backend.db.models import SnapshotPlayer
 
@@ -129,7 +129,7 @@ class TestApiPlayerRename:
         )
         await db_session.commit()
         # The old snapshot still has the old name
-        from backend.db.crud import get_snapshot_players
+        from backend.crud.snapshots import get_snapshot_players
 
         rows = await get_snapshot_players(db_session, snap_id)
         names = [r["nombre"] for r in rows]
@@ -155,7 +155,7 @@ class TestApiPlayerRename:
         await db_session.commit()
         # Rename the player
         await client.post("/api/player/rename", json={"old_name": "Frank", "new_name": "Francis"})
-        from backend.db.crud import get_snapshot_players
+        from backend.crud.snapshots import get_snapshot_players
 
         rows1 = await get_snapshot_players(db_session, snap_id)
         rows2 = await get_snapshot_players(db_session, snap_id2)
@@ -178,7 +178,7 @@ class TestApiSnapshotAddPlayer:
 
     async def test_add_player_to_snapshot_succeeds(self, client: Any, db_session: Any) -> None:
         """Adding a player increases the snapshot's player count."""
-        from backend.db.crud import get_snapshot_players
+        from backend.crud.snapshots import get_snapshot_players
 
         snap_id = await create_snapshot(db_session, "manual")
         await db_session.commit()

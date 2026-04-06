@@ -13,7 +13,7 @@ from sqlalchemy import select, text
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.db.crud import get_deduped_notion_cache_subquery, get_snapshot_players
+from backend.crud.snapshots import get_deduped_notion_cache_subquery, get_snapshot_players
 from backend.db.models import (
     GameDetail,
     GameTable,

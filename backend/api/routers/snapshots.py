@@ -14,16 +14,16 @@ from sqlalchemy import delete, select, update
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.db.connection import get_session
-from backend.db.crud import (
+from backend.crud.players import get_or_create_player
+from backend.crud.snapshots import (
     add_player_to_snapshot,
     create_root_manual_snapshot,
     delete_snapshot_cascade,
     generate_deep_diff,
-    get_or_create_player,
     get_snapshot_players,
     log_snapshot_history,
 )
+from backend.db.connection import get_session
 from backend.db.models import (
     HistoryActionType,
     NotionCache,
@@ -136,7 +136,9 @@ async def api_create_snapshot_root(
     Creates a new snapshot. If parent_id is provided, links to parent via event.
     Returns: {"snapshot_id": <new_id>}
     """
-    from backend.db.crud import create_branch_edge, create_snapshot, get_or_create_player
+    from backend.crud.chain import create_branch_edge
+    from backend.crud.players import get_or_create_player
+    from backend.crud.snapshots import create_snapshot
 
     try:
         # If parent_id provided, check if parent exists
@@ -198,7 +200,7 @@ async def api_delete_snapshot(
     session: AsyncSession = Depends(get_session),  # noqa: B008
 ) -> dict[str, Any]:
     """Deletes a snapshot and all its dependent snapshots/events."""
-    from backend.db.crud import squash_linear_branch
+    from backend.crud.chain import squash_linear_branch
     from backend.db.models import TimelineEdge
 
     try:
@@ -323,12 +325,9 @@ async def api_snapshot_save(
     Unified endpoint to save a new snapshot from a player list.
     Returns: {"snapshot_id": <new_id>}
     """
-    from backend.db.crud import (
-        add_player_to_snapshot,
-        create_branch_edge,
-        create_snapshot,
-        get_or_create_player,
-    )
+    from backend.crud.chain import create_branch_edge
+    from backend.crud.players import get_or_create_player
+    from backend.crud.snapshots import create_snapshot
 
     try:
         parent_id = request.parent_id

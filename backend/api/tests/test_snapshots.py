@@ -11,11 +11,11 @@ from typing import Any
 import pytest
 from sqlalchemy import select
 
-from backend.db.crud import (
+from backend.crud.chain import create_game_edge
+from backend.crud.players import get_or_create_player
+from backend.crud.snapshots import (
     add_player_to_snapshot,
-    create_game_edge,
     create_snapshot,
-    get_or_create_player,
     get_snapshot_players,
 )
 from backend.db.models import Snapshot, SnapshotHistory, SnapshotPlayer, TimelineEdge
@@ -157,7 +157,8 @@ class TestApiSnapshotDelete:
         3. Any non-game edge is squashed (not just "branch")
         4. Source and created_at are inherited from the child
         """
-        from backend.db.crud import create_branch_edge, get_snapshot_players
+        from backend.crud.chain import create_branch_edge
+        from backend.crud.snapshots import get_snapshot_players
 
         # Setup: A -> Game -> B
         #        A -> Manual -> C
@@ -316,7 +317,7 @@ class TestApiSnapshotCreate:
         data = resp.json()
         snap_id = data["snapshot_id"]
         # Verify players were added
-        from backend.db.crud import get_snapshot_players
+        from backend.crud.snapshots import get_snapshot_players
 
         db_players = await get_snapshot_players(db_session, snap_id)
         assert len(db_players) == 3
@@ -349,7 +350,7 @@ class TestApiSnapshotSave:
         )
         assert resp.status_code == 200
         # Verify players were replaced
-        from backend.db.crud import get_snapshot_players
+        from backend.crud.snapshots import get_snapshot_players
 
         db_players = await get_snapshot_players(db_session, snap_id)
         assert len(db_players) == 2
@@ -421,7 +422,7 @@ class TestApiSnapshotSave:
         the backend should detect no actual changes and return "no_changes".
         """
         # Setup: Create a root snapshot with only Juan using the dedicated helper
-        from backend.db.crud import create_root_manual_snapshot
+        from backend.crud.snapshots import create_root_manual_snapshot
         
         parent_id = await create_root_manual_snapshot(
             db_session,

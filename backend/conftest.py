@@ -62,10 +62,10 @@ async def add_snapshot(
     db_session: AsyncSession, source: str = "notion_sync", players: int = 5
 ) -> int:
     """Creates a snapshot with `players` dummy players and returns the snapshot id."""
-    from backend.db.crud import (
+    from backend.crud.players import get_or_create_player
+    from backend.crud.snapshots import (
         add_player_to_snapshot,
         create_snapshot,
-        get_or_create_player,
     )
 
     snap_id = await create_snapshot(db_session, source)

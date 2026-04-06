@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.db.crud import generate_deep_diff
+from backend.crud.snapshots import generate_deep_diff
 
 if TYPE_CHECKING:
     from backend.db.models import RenameDict

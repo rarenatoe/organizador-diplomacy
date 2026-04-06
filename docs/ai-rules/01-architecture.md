@@ -31,7 +31,8 @@ priority: 10
 ## Directory Layout
 
 - `backend/api/routers/`: FastAPI endpoints.
-- `backend/db/`: Modular database operations (connection, crud, models, views).
+- `backend/db/`: Database models, views, and connection management.
+- `backend/crud/`: Modular data access layer (Repository Pattern) with domain-specific modules.
 - `backend/organizador/`: Core algorithms and pure data modeling.
 - `backend/sync/`: Notion integration and caching daemon.
 - `frontend/src/`: Svelte components, `$state` runes, API utilities, and types.
