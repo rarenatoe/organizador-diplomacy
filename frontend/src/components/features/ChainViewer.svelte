@@ -163,7 +163,11 @@
       </div>
     {:else}
       <div class="tree-container">
-        {@render renderTree(localRoots)}
+        {#each localRoots as root (root.id)}
+          <div class="chain-lane" data-testid="chain-lane">
+            {@render renderTree([root])}
+          </div>
+        {/each}
       </div>
     {/if}
   </div>
@@ -212,9 +216,8 @@
 
   .tree-container {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     gap: 32px;
-    flex-wrap: wrap;
     align-items: flex-start;
     padding: 16px 0;
   }

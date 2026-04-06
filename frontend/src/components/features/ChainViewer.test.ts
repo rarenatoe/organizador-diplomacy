@@ -198,3 +198,153 @@ describe("ChainViewer.svelte - Delete Functionality", () => {
   // Note: Game deletion testing is not possible with current mock setup
   // but the functionality is verified in GameNode component tests
 });
+
+describe("ChainViewer.svelte - Layout Regression Guards", () => {
+  const mockProps = {
+    onOpenSnapshot: vi.fn(),
+    onOpenGame: vi.fn(),
+    onDeleteSnapshot: vi.fn(),
+    onDeleteGame: vi.fn(),
+    onNewDraft: vi.fn(),
+    panelOpen: false,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders multiple root snapshots in separate chain lanes", async () => {
+    // Mock fetchChain to return multiple root snapshots
+    vi.mocked(fetchChain).mockResolvedValue({
+      roots: [
+        {
+          id: 1,
+          type: "snapshot",
+          created_at: "2024-01-01 10:00:00",
+          source: "manual",
+          player_count: 5,
+          is_latest: false,
+          branches: [],
+        },
+        {
+          id: 2,
+          type: "snapshot",
+          created_at: "2024-01-02 11:00:00",
+          source: "notion",
+          player_count: 7,
+          is_latest: true,
+          branches: [],
+        },
+        {
+          id: 3,
+          type: "snapshot",
+          created_at: "2024-01-03 12:00:00",
+          source: "csv",
+          player_count: 4,
+          is_latest: false,
+          branches: [],
+        },
+      ],
+    });
+
+    render(ChainViewer, { props: mockProps });
+
+    // Wait for data to load
+    await vi.waitFor(() => {
+      expect(screen.getByText("Snapshot #1")).toBeInTheDocument();
+      expect(screen.getByText("Snapshot #2")).toBeInTheDocument();
+      expect(screen.getByText("Snapshot #3")).toBeInTheDocument();
+    });
+
+    // Verify that each root snapshot is wrapped in its own chain-lane container
+    const chainLanes = screen.getAllByTestId("chain-lane");
+    expect(chainLanes).toHaveLength(3);
+
+    // Verify each chain lane contains the expected snapshot
+    expect(chainLanes[0]).toContainElement(screen.getByText("Snapshot #1"));
+    expect(chainLanes[1]).toContainElement(screen.getByText("Snapshot #2"));
+    expect(chainLanes[2]).toContainElement(screen.getByText("Snapshot #3"));
+  });
+
+  it("renders single root snapshot in one chain lane", async () => {
+    // Mock with single snapshot
+    vi.mocked(fetchChain).mockResolvedValue({
+      roots: [
+        {
+          id: 1,
+          type: "snapshot",
+          created_at: "2024-01-01 10:00:00",
+          source: "manual",
+          player_count: 5,
+          is_latest: true,
+          branches: [],
+        },
+      ],
+    });
+
+    render(ChainViewer, { props: mockProps });
+
+    await vi.waitFor(() => {
+      expect(screen.getByText("Snapshot #1")).toBeInTheDocument();
+    });
+
+    // Verify there's exactly one chain lane for the single root
+    const chainLanes = screen.getAllByTestId("chain-lane");
+    expect(chainLanes).toHaveLength(1);
+
+    // Verify the chain lane contains the snapshot
+    expect(chainLanes[0]).toContainElement(screen.getByText("Snapshot #1"));
+  });
+
+  it("renders root nodes and their branches within a single chain lane without recursive wrapping", async () => {
+    // Mock fetchChain to return one root snapshot that has a nested branch (child snapshot)
+    vi.mocked(fetchChain).mockResolvedValue({
+      roots: [
+        {
+          id: 1,
+          type: "snapshot",
+          created_at: "2024-01-01 10:00:00",
+          source: "manual",
+          player_count: 5,
+          is_latest: false,
+          branches: [
+            {
+              edge: {
+                id: 1,
+                type: "edit",
+                created_at: "2024-01-01 10:30:00",
+                to_id: 2,
+                from_id: 1,
+              },
+              output: {
+                id: 2,
+                type: "snapshot",
+                created_at: "2024-01-01 11:00:00",
+                source: "manual",
+                player_count: 5,
+                is_latest: true,
+                branches: [],
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    render(ChainViewer, { props: mockProps });
+
+    // Wait for data to load
+    await vi.waitFor(() => {
+      expect(screen.getByText("Snapshot #1")).toBeInTheDocument();
+      expect(screen.getByText("Snapshot #2")).toBeInTheDocument();
+    });
+
+    // Verify there is exactly ONE chain-lane, proving children aren't wrapped in their own lanes
+    const chainLanes = screen.getAllByTestId("chain-lane");
+    expect(chainLanes).toHaveLength(1);
+
+    // Verify the single chain lane contains BOTH the root and the child snapshot
+    expect(chainLanes[0]).toContainElement(screen.getByText("Snapshot #1"));
+    expect(chainLanes[0]).toContainElement(screen.getByText("Snapshot #2"));
+  });
+});
