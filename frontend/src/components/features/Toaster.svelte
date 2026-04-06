@@ -98,12 +98,14 @@
   #toast-container {
     position: fixed;
     top: 16px;
-    right: 16px;
+    left: 50%;
+    transform: translateX(-50%);
     z-index: 200;
     display: flex;
     flex-direction: column;
     gap: 8px;
     pointer-events: none;
+    align-items: center;
   }
 
   .toast {
@@ -186,22 +188,22 @@
   @keyframes toast-in {
     from {
       opacity: 0;
-      transform: translateX(20px);
+      transform: translateY(-20px);
     }
     to {
       opacity: 1;
-      transform: translateX(0);
+      transform: translateY(0);
     }
   }
 
   @keyframes toast-out {
     from {
       opacity: 1;
-      transform: translateX(0);
+      transform: translateY(0);
     }
     to {
       opacity: 0;
-      transform: translateX(20px);
+      transform: translateY(-20px);
     }
   }
 </style>
