@@ -33,6 +33,14 @@
 - `backend/sync/`: Notion integration and caching daemon.
 - `frontend/src/`: Svelte components, `$state` runes, API utilities, and types.
 
+## Business Logic Patterns
+
+**Semantic Modifiers** - Prefer semantic boolean props (e.g., `destructive={true}`) over specialized component variants (e.g., `variant="ghost-danger"`) to keep the design system clean and predictable.
+
+## Interaction Patterns
+
+**Action Bubbling** - Feature components should bubble up destructive actions (like deletions) to central orchestrators (`App.svelte`) via callback props. Avoid performing API side-effects inside deeply nested UI components to keep confirmation logic and state refreshes consistent.
+
 ## Database Philosophy
 
 - **Disposable Local SQLite:** The database is local and disposable (`sqlite (stdlib)` via `aiosqlite`).
@@ -122,6 +130,8 @@ Categorize all components in `frontend/src/components/` by responsibility:
 - Event handlers: `onclick={() => ...}`
 - Bindings: `bind:value={variable}`
 
+**Group Hover Reveal** - Use global utility classes (`.group`, `.group-hover-reveal`) to show/hide secondary actions like delete buttons. This avoids Svelte CSS isolation issues and keeps components DRY.
+
 ## Styling & Theming
 
 **COLOR SYSTEM**:
@@ -140,6 +150,8 @@ Categorize all components in `frontend/src/components/` by responsibility:
 
 - Tooltips, popovers, toasts: Use inverted schemes
 - Dark background + light text = maximum Z-axis contrast
+
+**Theme Integrity** - Never hardcode hex colors in components. Always define semantic variables in `style.css` (e.g., `--danger`, `--success`) and reference them in component styles.
 
 ## Component API Design
 

@@ -36,3 +36,11 @@ priority: 10
 - `backend/organizador/`: Core algorithms and pure data modeling.
 - `backend/sync/`: Notion integration and caching daemon.
 - `frontend/src/`: Svelte components, `$state` runes, API utilities, and types.
+
+## Business Logic Patterns
+
+**Semantic Modifiers** - Prefer semantic boolean props (e.g., `destructive={true}`) over specialized component variants (e.g., `variant="ghost-danger"`) to keep the design system clean and predictable.
+
+## Interaction Patterns
+
+**Action Bubbling** - Feature components should bubble up destructive actions (like deletions) to central orchestrators (`App.svelte`) via callback props. Avoid performing API side-effects inside deeply nested UI components to keep confirmation logic and state refreshes consistent.

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { EditPlayerRow, DraftResponse } from "./types";
-  import { deleteSnapshot as apiDeleteSnapshot } from "./api";
+  import { deleteSnapshot as apiDeleteSnapshot, deleteGame } from "./api";
   import { setActiveNodeId } from "./stores.svelte";
   import Header from "./components/layout/Header.svelte";
   import ChainViewer from "./components/features/ChainViewer.svelte";
@@ -133,6 +133,21 @@
     }
   }
 
+  // Delete game
+  async function handleDeleteGame(id: number): Promise<void> {
+    if (
+      !confirm(`¿Eliminar jornada #${id}?\nEsta acción no se puede deshacer.`)
+    )
+      return;
+    try {
+      await deleteGame(id);
+      closePanel();
+      await chainViewer?.loadChain();
+    } catch (e) {
+      alert(`Error de conexión: ${String(e)}`);
+    }
+  }
+
   function handleChainUpdate(): void {
     void chainViewer?.loadChain();
   }
@@ -146,6 +161,7 @@
     onOpenSnapshot={openSnapshot}
     onOpenGame={openGame}
     onDeleteSnapshot={handleDeleteSnapshot}
+    onDeleteGame={handleDeleteGame}
     onNewDraft={(options) =>
       openDraft(null, "manual", options?.autoAction ?? null)}
     {panelOpen}

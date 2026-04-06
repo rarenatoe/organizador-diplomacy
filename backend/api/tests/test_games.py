@@ -449,3 +449,157 @@ class TestPaisReasonPersistence:
 
         assert first_player["pais_reason"] == reason_for_first
         assert second_player["pais_reason"] is None
+
+
+# ── DELETE /api/game/{game_id} ───────────────────────────────────────────────────
+
+
+class TestApiGameDelete:
+    async def test_delete_nonexistent_returns_404(self, client: Any) -> None:
+        """Test that deleting a non-existent game returns 404."""
+        resp = await client.delete("/api/game/99999")
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Game not found"
+
+    async def test_delete_game_removes_game_and_child_snapshot(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Create a chain (Snap A -> Game 1 -> Snap B). Delete Game 1 via /api/games/{id}. 
+        Assert Game 1 and Snap B are deleted from the DB, but Snap A remains."""
+        from backend.crud.chain import create_game_edge
+        from backend.crud.snapshots import create_snapshot
+        from backend.db.models import Snapshot
+
+        # Setup: Snap A -> Game 1 -> Snap B
+        snap_a = await make_snapshot_with_players(db_session, 14)
+        snap_b = await create_snapshot(db_session, "organizar")
+        
+        # Create game edge from A to B
+        game_edge_id = await create_game_edge(db_session, snap_a, snap_b, 1)
+        await db_session.commit()
+
+        # Verify initial state: all exist
+        result = await db_session.execute(select(TimelineEdge).where(TimelineEdge.id == game_edge_id))
+        assert result.scalar_one_or_none() is not None
+        
+        result = await db_session.execute(select(Snapshot).where(Snapshot.id == snap_a))
+        assert result.scalar_one_or_none() is not None
+        
+        result = await db_session.execute(select(Snapshot).where(Snapshot.id == snap_b))
+        assert result.scalar_one_or_none() is not None
+
+        # Action: Delete game
+        resp = await client.delete(f"/api/game/{game_edge_id}")
+        assert resp.status_code == 200
+        assert resp.json() == {"deleted": True}
+
+        # Assert: Game 1 and Snap B are deleted, but Snap A remains
+        result = await db_session.execute(select(TimelineEdge).where(TimelineEdge.id == game_edge_id))
+        assert result.scalar_one_or_none() is None  # Game deleted
+        
+        result = await db_session.execute(select(Snapshot).where(Snapshot.id == snap_b))
+        assert result.scalar_one_or_none() is None  # Child snapshot deleted
+        
+        result = await db_session.execute(select(Snapshot).where(Snapshot.id == snap_a))
+        assert result.scalar_one_or_none() is not None  # Parent snapshot remains
+
+    async def test_delete_game_triggers_squash_on_parent(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Recreate the scenario from test_snapshots.py::test_delete_sibling_triggers_squash 
+        but trigger the deletion via /api/games/{game_id} instead of the snapshot endpoint. 
+        Verify the sibling branch is squashed correctly."""
+        from backend.crud.chain import create_branch_edge, create_game_edge
+        from backend.crud.players import get_or_create_player
+        from backend.crud.snapshots import (
+            add_player_to_snapshot,
+            create_snapshot,
+            get_snapshot_players,
+        )
+        from backend.db.models import Snapshot
+
+        # Helper function for this test
+        async def make_snapshot_with_players_source(db_session: Any, n: int = 5, source: str = "notion_sync") -> int:
+            """Creates a snapshot with n players and returns snapshot_id."""
+            snap_id = await create_snapshot(db_session, source)
+            for i in range(n):
+                pid = await get_or_create_player(db_session, f"P{snap_id}_{i}")
+                await add_player_to_snapshot(db_session, snap_id, pid, "Antiguo", 0, 1, 2, 0)
+            await db_session.commit()
+            return snap_id
+
+        # Setup: A -> Game -> B
+        #        A -> Manual -> C
+        snap_a = await make_snapshot_with_players_source(db_session, n=5, source="notion_sync")
+        snap_b = await create_snapshot(db_session, "organizar")
+        snap_c = await create_snapshot(db_session, "manual")
+
+        # Add different players to C to verify squashing
+        pid_c1 = await get_or_create_player(db_session, "PlayerC1")
+        pid_c2 = await get_or_create_player(db_session, "PlayerC2")
+        await add_player_to_snapshot(db_session, snap_c, pid_c1, "Antiguo", 5, 1, 2, 0)
+        await add_player_to_snapshot(db_session, snap_c, pid_c2, "Nuevo", 2, 1, 1, 0)
+
+        # Create edges: A -> game -> B and A -> branch -> C
+        game_edge_id = await create_game_edge(db_session, snap_a, snap_b, 1)
+        branch_edge_id = await create_branch_edge(db_session, snap_a, snap_c)
+        await db_session.commit()
+
+        # Get C's original source and timestamp for verification
+        result = await db_session.execute(select(Snapshot).where(Snapshot.id == snap_c))
+        snap_c_obj = result.scalar_one()
+        c_source = snap_c_obj.source
+        c_timestamp = snap_c_obj.created_at
+
+        # Verify initial state: A has 2 outgoing edges
+        result = await db_session.execute(
+            select(TimelineEdge).where(TimelineEdge.source_snapshot_id == snap_a)
+        )
+        assert len(result.scalars().all()) == 2
+
+        # Action: Delete game (which will delete snapshot B and trigger squash on A)
+        resp = await client.delete(f"/api/game/{game_edge_id}")
+        assert resp.status_code == 200
+        await db_session.commit()
+        db_session.expire_all()
+
+        # Assert 1: Snapshot B is gone
+        result = await db_session.execute(select(Snapshot).where(Snapshot.id == snap_b))
+        assert result.scalar_one_or_none() is None
+
+        # Assert 2: Snapshot C is also gone (squashed into A)
+        result = await db_session.execute(select(Snapshot).where(Snapshot.id == snap_c))
+        assert result.scalar_one_or_none() is None
+
+        # Assert 3: Snapshot A still exists
+        result = await db_session.execute(select(Snapshot).where(Snapshot.id == snap_a))
+        snap_a_obj = result.scalar_one()
+        assert snap_a_obj is not None
+
+        # Assert 4: A's roster is now C's roster
+        players_a = await get_snapshot_players(db_session, snap_a)
+        assert len(players_a) == 2
+        player_names = {p["nombre"] for p in players_a}
+        assert player_names == {"PlayerC1", "PlayerC2"}
+
+        # Assert 5: A inherited C's source and timestamp
+        assert snap_a_obj.source == c_source
+        assert snap_a_obj.created_at == c_timestamp
+
+        # Assert 6: A has no outgoing edges now (both B and C edges removed)
+        result = await db_session.execute(
+            select(TimelineEdge).where(TimelineEdge.source_snapshot_id == snap_a)
+        )
+        assert len(result.scalars().all()) == 0
+
+        # Assert 7: The branch edge from A to C is gone
+        result = await db_session.execute(
+            select(TimelineEdge).where(TimelineEdge.id == branch_edge_id)
+        )
+        assert result.scalar_one_or_none() is None
+
+        # Assert 8: The game edge is also gone
+        result = await db_session.execute(
+            select(TimelineEdge).where(TimelineEdge.id == game_edge_id)
+        )
+        assert result.scalar_one_or_none() is None

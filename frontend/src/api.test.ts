@@ -10,6 +10,7 @@ import {
   fetchGame,
   fetchGameDraft,
   saveGameDraft,
+  deleteGame,
   renamePlayer,
 } from "./api";
 
@@ -513,6 +514,13 @@ describe("api.ts - FastAPI Error Handling", () => {
           body: JSON.stringify({ old_name: "OldName", new_name: "NewName" }),
         }),
       );
+    });
+
+    it("deleteGame sends DELETE to /api/games/:id", async () => {
+      await deleteGame(123);
+      expect(mockFetch).toHaveBeenCalledWith("/api/game/123", {
+        method: "DELETE",
+      });
     });
   });
 });

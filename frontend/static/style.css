@@ -20,7 +20,23 @@
   --pending-border: #f59e0b;
   --accent: #3b82f6;
   --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --danger-bg-subtle: rgba(239, 68, 68, 0.1);
+  --warning: #eab308;
+  --warning-hover: #ca8a04;
+  --warning-text: #422006;
   --success: #22c55e;
+  --success-hover: #16a34a;
+  --primary: var(--accent);
+  --primary-hover: #2563eb;
+  --white: #ffffff;
+  --transition-fast: 0.15s ease-in-out;
+  --transition-normal: 0.2s ease-in-out;
+  --arrow-color: #9ca3af;
+  --active-glow: rgba(59, 130, 246, 0.25);
+  --badge-latest-bg: #dbeafe;
+  --badge-latest-text: #1e40af;
+  --badge-latest-border: #93c5fd;
 
   /* Semantic UI Badges */
   --info-bg: #eff6ff;
@@ -150,4 +166,27 @@ body {
   justify-content: center;
   z-index: 1000; /* Higher than SidePanel and Header */
   backdrop-filter: blur(2px); /* Modern touch */
+}
+
+/* --- Group Hover Utilities --- */
+/* The child element starts hidden */
+.group-hover-reveal {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+/* Reveal child when parent (.group) is hovered OR active */
+.group:hover .group-hover-reveal,
+.group.active .group-hover-reveal {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* --- Positioning Utilities --- */
+.absolute-top-right {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  line-height: 1;
 }

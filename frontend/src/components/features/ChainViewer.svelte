@@ -13,6 +13,7 @@
     onOpenSnapshot: (id: number) => void;
     onOpenGame: (id: number) => void;
     onDeleteSnapshot: (id: number) => void;
+    onDeleteGame: (id: number) => void;
     onNewDraft: (options?: { autoAction?: "notion" | "csv" }) => void;
     panelOpen?: boolean;
   }
@@ -21,6 +22,7 @@
     onOpenSnapshot,
     onOpenGame,
     onDeleteSnapshot,
+    onDeleteGame,
     onNewDraft,
     panelOpen = false,
   }: Props = $props();
@@ -58,7 +60,7 @@
   {#each nodes as node (node.id)}
     <div class="chain-row">
       <div
-        class="node node-snapshot"
+        class="node node-snapshot group"
         class:active={getActiveNodeId() === node.id}
         data-id={node.id}
         onclick={() => handleSelect(node.id)}
@@ -66,14 +68,19 @@
         tabindex="0"
         onkeydown={(e) => e.key === "Enter" && handleSelect(node.id)}
       >
-        <button
-          class="node-delete-btn"
+        <Button
+          variant="ghost"
+          destructive={true}
+          size="xs"
+          iconOnly={true}
+          icon="🗑"
+          class="absolute-top-right group-hover-reveal"
           title="Eliminar snapshot"
           onclick={(e) => {
             e.stopPropagation();
             handleDelete(node.id);
-          }}>🗑</button
-        >
+          }}
+        />
 
         <div class="node-icon">📋</div>
         <div class="node-label">Snapshot #{node.id}</div>
@@ -99,7 +106,11 @@
               <div class="chain-branch">
                 <span class="arrow">→</span>
                 {#if branch.edge && branch.edge.type === "game"}
-                  <GameNode node={branch.edge} onOpen={onOpenGame} />
+                  <GameNode
+                    node={branch.edge}
+                    onOpen={onOpenGame}
+                    onDelete={onDeleteGame}
+                  />
                   {#if branch.output}
                     <span class="arrow">→</span>
                   {/if}
@@ -222,7 +233,7 @@
     align-items: center;
   }
   .arrow {
-    color: #9ca3af;
+    color: var(--arrow-color);
     font-size: 18px;
     padding: 0 6px;
     flex-shrink: 0;
@@ -253,7 +264,7 @@
     box-shadow: var(--shadow-md);
   }
   :global(.node.active) {
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    box-shadow: 0 0 0 3px var(--active-glow);
     z-index: 45;
   }
 
@@ -293,31 +304,6 @@
     line-height: 1.6;
   }
 
-  /* Delete button */
-  .node-delete-btn {
-    position: absolute;
-    top: 5px;
-    right: 5px;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    font-size: 11px;
-    opacity: 0;
-    transition:
-      opacity 0.15s,
-      background 0.15s;
-    padding: 2px 4px;
-    border-radius: 4px;
-    line-height: 1;
-  }
-  .node:hover .node-delete-btn,
-  :global(.node.active) .node-delete-btn {
-    opacity: 1;
-  }
-  .node-delete-btn:hover {
-    background: rgba(239, 68, 68, 0.15);
-  }
-
   /* Badges */
   .node-badges {
     display: flex;
@@ -337,8 +323,8 @@
     margin-top: 5px;
   }
   .badge-latest {
-    background: #dbeafe;
-    color: #1e40af;
-    border: 1px solid #93c5fd;
+    background: var(--badge-latest-bg);
+    color: var(--badge-latest-text);
+    border: 1px solid var(--badge-latest-border);
   }
 </style>

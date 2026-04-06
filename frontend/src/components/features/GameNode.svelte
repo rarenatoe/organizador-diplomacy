@@ -1,20 +1,22 @@
 <script lang="ts">
   import type { GameEdge } from "../../types";
   import { getActiveNodeId } from "../../stores.svelte";
+  import Button from "../ui/Button.svelte";
 
   interface Props {
     node: GameEdge;
     onOpen: (id: number) => void;
+    onDelete?: (id: number) => void;
   }
 
-  let { node, onOpen }: Props = $props();
+  let { node, onOpen, onDelete }: Props = $props();
 
   let date = $derived((node.created_at || "").split(" ")[0] ?? "");
   let time = $derived((node.created_at || "").split(" ")[1] ?? "");
 </script>
 
 <div
-  class="node node-report"
+  class="node node-report group"
   class:active={getActiveNodeId() === node.id}
   data-id={node.id}
   data-type="game"
@@ -23,6 +25,22 @@
   onclick={() => onOpen(node.id)}
   onkeydown={(e) => e.key === "Enter" && onOpen(node.id)}
 >
+  {#if onDelete}
+    <Button
+      variant="ghost"
+      destructive={true}
+      size="xs"
+      iconOnly={true}
+      icon="🗑"
+      class="absolute-top-right group-hover-reveal"
+      title="Eliminar jornada"
+      onclick={(e) => {
+        e.stopPropagation();
+        onDelete(node.id);
+      }}
+    />
+  {/if}
+
   <div class="node-icon">📊</div>
   <div class="node-label">Jornada</div>
   <div class="node-name">{date}</div>

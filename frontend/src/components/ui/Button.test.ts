@@ -72,6 +72,53 @@ describe("Button.svelte", () => {
       expect(button).toHaveClass("btn");
       expect(button).toHaveClass("btn-warning");
     });
+
+    it("applies destructive modifier with ghost variant", () => {
+      render(ButtonTestWrapper, {
+        props: {
+          variant: "ghost",
+          destructive: true,
+          text: "Delete",
+        },
+      });
+
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("btn");
+      expect(button).toHaveClass("btn-ghost");
+      expect(button).toHaveClass("btn-destructive");
+    });
+  });
+
+  describe("Sizes", () => {
+    it("applies xs size class", () => {
+      render(ButtonTestWrapper, {
+        props: {
+          size: "xs",
+          text: "Small",
+        },
+      });
+
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("btn");
+      expect(button).toHaveClass("btn-xs");
+    });
+
+    it("combines xs size with destructive modifier", () => {
+      render(ButtonTestWrapper, {
+        props: {
+          size: "xs",
+          variant: "ghost",
+          destructive: true,
+          text: "🗑",
+        },
+      });
+
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("btn");
+      expect(button).toHaveClass("btn-xs");
+      expect(button).toHaveClass("btn-ghost");
+      expect(button).toHaveClass("btn-destructive");
+    });
   });
 
   describe("Layout", () => {
@@ -294,6 +341,34 @@ describe("Button.svelte", () => {
 
       // Check disabled state (should be enabled)
       expect(button).not.toBeDisabled();
+    });
+
+    it("combines destructive modifier with xs size and icon", () => {
+      render(ButtonTestWrapper, {
+        props: {
+          variant: "ghost",
+          destructive: true,
+          size: "xs",
+          icon: "🗑",
+          class: "custom-delete",
+          text: "Delete",
+        },
+      });
+
+      const button = screen.getByRole("button");
+
+      // Check all classes are applied
+      expect(button).toHaveClass("btn");
+      expect(button).toHaveClass("btn-ghost");
+      expect(button).toHaveClass("btn-destructive");
+      expect(button).toHaveClass("btn-xs");
+      expect(button).toHaveClass("custom-delete");
+
+      // Check icon and text
+      const spans = button.querySelectorAll("span");
+      expect(spans).toHaveLength(2);
+      expect(spans[0]).toHaveTextContent("🗑");
+      expect(spans[1]).toHaveTextContent("Delete");
     });
 
     it("works with all props including disabled", async () => {

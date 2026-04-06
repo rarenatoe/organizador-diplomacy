@@ -14,7 +14,8 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.session import AsyncSession
 
 from backend.config import PROJECT_ROOT
-from backend.crud.snapshots import get_snapshot_players
+from backend.crud.chain import squash_linear_branch
+from backend.crud.snapshots import delete_snapshot_cascade, get_snapshot_players
 from backend.db.connection import get_session
 from backend.db.models import TimelineEdge
 from backend.db.views import get_game_event_detail
@@ -50,6 +51,43 @@ async def api_game(
         raise HTTPException(status_code=404, detail="not found")
     await session.commit()
     return detail
+
+
+@router.delete("/{game_id}")
+async def api_game_delete(
+    game_id: int,
+    session: AsyncSession = Depends(get_session),  # noqa: B008
+) -> dict[str, bool]:
+    """Delete a game and its output snapshot, with optional squash on parent."""
+    # Query the TimelineEdge where id == game_id and edge_type == 'game'
+    stmt = select(TimelineEdge).where(
+        TimelineEdge.id == game_id,
+        TimelineEdge.edge_type == "game",
+    )
+    result = await session.execute(stmt)
+    edge = result.scalar_one_or_none()
+    
+    # If it doesn't exist, raise a 404 HTTPException
+    if edge is None:
+        raise HTTPException(status_code=404, detail="Game not found")
+    
+    # Extract the output_snapshot_id and source_snapshot_id from the edge
+    output_snapshot_id = edge.output_snapshot_id
+    source_snapshot_id = edge.source_snapshot_id
+    
+    # Call await delete_snapshot_cascade(session, edge.output_snapshot_id)
+    await delete_snapshot_cascade(session, output_snapshot_id)
+    
+    # Call await session.flush()
+    await session.flush()
+    
+    # If source_snapshot_id is not None, call await squash_linear_branch(session, edge.source_snapshot_id)
+    if source_snapshot_id is not None:
+        await squash_linear_branch(session, source_snapshot_id)
+    
+    # await session.commit() and return {"deleted": True}
+    await session.commit()
+    return {"deleted": True}
 
 
 @router.post("/draft")

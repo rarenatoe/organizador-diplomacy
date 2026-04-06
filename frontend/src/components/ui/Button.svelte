@@ -6,7 +6,7 @@
     fill?: boolean;
     disabled?: boolean;
     icon?: string;
-    size?: "md" | "sm";
+    size?: "md" | "sm" | "xs";
     iconOnly?: boolean;
     type?: "button" | "submit" | "reset";
     class?: string;
@@ -14,6 +14,7 @@
     title?: string;
     onclick?: (e: MouseEvent) => void;
     children?: Snippet;
+    destructive?: boolean;
   }
 
   let {
@@ -29,6 +30,7 @@
     title = "",
     onclick,
     children,
+    destructive = false,
   }: Props = $props();
 
   const variantClasses: Record<string, string> = {
@@ -43,9 +45,10 @@
     [
       "btn",
       variantClasses[variant],
-      size === "sm" ? "btn-sm" : "",
+      size === "sm" ? "btn-sm" : size === "xs" ? "btn-xs" : "",
       fill ? "flex-fill" : "",
       iconOnly ? "btn-icon-only" : "",
+      destructive ? "btn-destructive" : "",
       className,
     ]
       .filter(Boolean)
@@ -83,7 +86,7 @@
     font-weight: 600;
     cursor: pointer;
     border: 1px solid transparent;
-    transition: all 0.15s ease;
+    transition: all var(--transition-fast);
     font-family: inherit;
     box-shadow: none;
     outline: none;
@@ -105,12 +108,12 @@
 
   /* Primary */
   .btn-primary {
-    background: var(--accent);
-    color: white;
-    border-color: var(--accent);
+    background: var(--primary);
+    color: var(--white);
+    border-color: var(--primary);
   }
   .btn-primary:hover:not(:disabled) {
-    background: #2563eb;
+    background: var(--primary-hover);
   }
 
   /* Secondary */
@@ -126,21 +129,21 @@
   /* Success */
   .btn-success {
     background: var(--success);
-    color: white;
+    color: var(--white);
     border-color: var(--success);
   }
   .btn-success:hover:not(:disabled) {
-    background: #16a34a;
+    background: var(--success-hover);
   }
 
   /* Warning */
   .btn-warning {
-    background: #eab308;
-    color: #422006;
-    border-color: #eab308;
+    background: var(--warning);
+    color: var(--warning-text);
+    border-color: var(--warning);
   }
   .btn-warning:hover:not(:disabled) {
-    background: #ca8a04;
+    background: var(--warning-hover);
   }
 
   /* Ghost */
@@ -170,6 +173,13 @@
     gap: 4px;
   }
 
+  /* Extra Small Size */
+  .btn-xs {
+    padding: 2px 4px;
+    font-size: 11px;
+    gap: 4px;
+  }
+
   /* Icon Only */
   .btn-icon-only {
     padding: 0;
@@ -181,9 +191,33 @@
     align-items: center;
     justify-content: center;
   }
+
   .btn-sm.btn-icon-only {
     width: 24px;
     height: 24px;
     border-radius: 4px;
+  }
+
+  .btn-xs.btn-icon-only {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+  }
+
+  /* Destructive Modifiers */
+  .btn-destructive.btn-ghost {
+    color: var(--danger);
+  }
+  .btn-destructive.btn-ghost:hover:not(:disabled) {
+    background: var(--danger-bg-subtle);
+    color: var(--danger-hover);
+  }
+  .btn-destructive.btn-primary {
+    background: var(--danger);
+    border-color: var(--danger);
+  }
+  .btn-destructive.btn-primary:hover:not(:disabled) {
+    background: var(--danger-hover);
+    border-color: var(--danger-hover);
   }
 </style>

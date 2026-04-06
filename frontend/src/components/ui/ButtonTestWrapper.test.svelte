@@ -17,11 +17,13 @@
     fill?: boolean;
     disabled?: boolean;
     icon?: string;
+    size?: "md" | "sm" | "xs";
     class?: string;
     style?: string;
     title?: string;
     text: string;
     noHandler?: boolean;
+    destructive?: boolean;
   }
 
   let {
@@ -29,11 +31,13 @@
     fill,
     disabled,
     icon,
+    size,
     class: className,
     style,
     title,
     text,
     noHandler = false,
+    destructive,
   }: Props = $props();
 
   function handleClick() {
@@ -46,6 +50,8 @@
   {...fill !== undefined && { fill }}
   {...disabled !== undefined && { disabled }}
   {...icon !== undefined && { icon }}
+  {...size !== undefined && { size }}
+  {...destructive !== undefined && { destructive }}
   {...className !== undefined && { class: className }}
   {...style !== undefined && { style }}
   {...title !== undefined && { title }}

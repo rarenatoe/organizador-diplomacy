@@ -157,6 +157,15 @@ export async function saveGameDraft(
   });
 }
 
+export async function deleteGame(id: number): Promise<void> {
+  const res = await fetch(`/api/game/${id}`, { method: "DELETE" });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(errorText);
+  }
+}
+
 // ── Player ────────────────────────────────────────────────────────────────────
 
 export async function renamePlayer(

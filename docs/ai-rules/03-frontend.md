@@ -65,6 +65,8 @@ Categorize all components in `frontend/src/components/` by responsibility:
 - Event handlers: `onclick={() => ...}`
 - Bindings: `bind:value={variable}`
 
+**Group Hover Reveal** - Use global utility classes (`.group`, `.group-hover-reveal`) to show/hide secondary actions like delete buttons. This avoids Svelte CSS isolation issues and keeps components DRY.
+
 ## Styling & Theming
 
 **COLOR SYSTEM**:
@@ -83,6 +85,8 @@ Categorize all components in `frontend/src/components/` by responsibility:
 
 - Tooltips, popovers, toasts: Use inverted schemes
 - Dark background + light text = maximum Z-axis contrast
+
+**Theme Integrity** - Never hardcode hex colors in components. Always define semantic variables in `style.css` (e.g., `--danger`, `--success`) and reference them in component styles.
 
 ## Component API Design
 
