@@ -15,13 +15,13 @@ if TYPE_CHECKING:
 
 from backend.config import PROJECT_ROOT
 from backend.crud.chain import squash_linear_branch
+from backend.crud.games import save_game_draft, update_game_draft
 from backend.crud.snapshots import delete_snapshot_cascade, get_snapshot_players
 from backend.db.connection import get_session
 from backend.db.models import TimelineEdge
 from backend.db.views import get_game_event_detail
 from backend.organizador.core import calculate_matches
 from backend.organizador.models import DraftPlayer, DraftResult
-from backend.organizador.persistence_async import save_game_draft_async, update_game_draft_async
 
 router = APIRouter(prefix="/api/game")
 
@@ -66,25 +66,25 @@ async def api_game_delete(
     )
     result = await session.execute(stmt)
     edge = result.scalar_one_or_none()
-    
+
     # If it doesn't exist, raise a 404 HTTPException
     if edge is None:
         raise HTTPException(status_code=404, detail="Game not found")
-    
+
     # Extract the output_snapshot_id and source_snapshot_id from the edge
     output_snapshot_id = edge.output_snapshot_id
     source_snapshot_id = edge.source_snapshot_id
-    
+
     # Call await delete_snapshot_cascade(session, edge.output_snapshot_id)
     await delete_snapshot_cascade(session, output_snapshot_id)
-    
+
     # Call await session.flush()
     await session.flush()
-    
+
     # If source_snapshot_id is not None, call await squash_linear_branch(session, edge.source_snapshot_id)
     if source_snapshot_id is not None:
         await squash_linear_branch(session, source_snapshot_id)
-    
+
     # await session.commit() and return {"deleted": True}
     await session.commit()
     return {"deleted": True}
@@ -138,7 +138,7 @@ async def api_game_draft(
             )
 
         await session.commit()
-        
+
         # Convert English DraftResult back to Spanish JSON for frontend
         spanish_result = {
             "mesas": [
@@ -162,7 +162,9 @@ async def api_game_draft(
                         "pais_reason": table.gm.country_reason,
                         "es_nuevo": table.gm.is_new,
                         "tiene_prioridad": table.gm.has_priority,
-                    } if table.gm else None,
+                    }
+                    if table.gm
+                    else None,
                     "jugadores": [
                         {
                             "nombre": player.name,
@@ -213,7 +215,7 @@ async def api_game_draft(
             "minimo_teorico": resultado.theoretical_minimum,
             "intentos_usados": resultado.attempts_used,
         }
-        
+
         return spanish_result
     except HTTPException:
         raise
@@ -264,7 +266,7 @@ async def api_game_save(
 
             if is_leaf:
                 # Update existing game in place
-                game_id = await update_game_draft_async(
+                game_id = await update_game_draft(
                     session,
                     request.editing_game_id,
                     request.snapshot_id,
@@ -275,7 +277,7 @@ async def api_game_save(
                 return {"game_id": game_id}
 
         # Create new game (fallback or normal flow)
-        game_id = await save_game_draft_async(session, request.snapshot_id, request.draft)
+        game_id = await save_game_draft(session, request.snapshot_id, request.draft)
         await session.commit()
         return {"game_id": game_id}
     except HTTPException:

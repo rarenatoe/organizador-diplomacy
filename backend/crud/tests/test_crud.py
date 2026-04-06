@@ -31,7 +31,13 @@ from backend.crud.snapshots import (
     get_snapshot_players,
     snapshots_have_same_roster,
 )
-from backend.db.models import Player, Snapshot, SnapshotPlayer, TablePlayer, TimelineEdge
+from backend.db.models import (
+    Player,
+    Snapshot,
+    SnapshotPlayer,
+    TablePlayer,
+    TimelineEdge,
+)
 
 pytestmark = pytest.mark.asyncio
 
