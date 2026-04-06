@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
 import GameDraft from "./GameDraft.svelte";
+import {
+  createMockDraftResponse,
+  createMockDraftMesa,
+  createMockDraftPlayer,
+} from "../../tests/fixtures";
 
 // Mock the API module
 vi.mock("../../api", () => ({
@@ -18,68 +23,39 @@ describe("GameDraft.svelte", () => {
     onShowError: vi.fn(),
   };
 
-  const mockDraftData = {
+  const mockDraftData = createMockDraftResponse({
     mesas: [
-      {
+      createMockDraftMesa({
         numero: 1,
-        gm: null,
         jugadores: [
-          {
+          createMockDraftPlayer({
             nombre: "Alice",
             es_nuevo: false,
             juegos_ano: 5,
             tiene_prioridad: true,
             partidas_deseadas: 2,
-            partidas_gm: 0,
             c_england: 1,
-            c_france: 0,
-            c_germany: 0,
-            c_italy: 0,
-            c_austria: 0,
-            c_russia: 0,
-            c_turkey: 0,
-            pais: "",
-          },
-          {
+          }),
+          createMockDraftPlayer({
             nombre: "Bob",
             es_nuevo: true,
             juegos_ano: 0,
-            tiene_prioridad: false,
-            partidas_deseadas: 1,
-            partidas_gm: 0,
-            c_england: 0,
             c_france: 1,
-            c_germany: 0,
-            c_italy: 0,
-            c_austria: 0,
-            c_russia: 0,
-            c_turkey: 0,
-            pais: "France",
-          },
+          }),
         ],
-      },
+      }),
     ],
     tickets_sobrantes: [
-      {
+      createMockDraftPlayer({
         nombre: "David",
-        es_nuevo: false,
         juegos_ano: 2,
-        tiene_prioridad: false,
         partidas_deseadas: 2,
-        partidas_gm: 0,
-        c_england: 0,
-        c_france: 0,
         c_germany: 1,
-        c_italy: 0,
-        c_austria: 0,
-        c_russia: 0,
-        c_turkey: 0,
-        pais: "",
-      },
+      }),
     ],
     minimo_teorico: 2,
     intentos_usados: 1,
-  };
+  });
 
   beforeEach(async () => {
     // Reset any necessary state before each test
@@ -235,90 +211,51 @@ describe("GameDraft.svelte", () => {
     beforeEach(async () => {
       vi.clearAllMocks();
       const { fetchGameDraft } = vi.mocked(await import("../../api"));
-      fetchGameDraft.mockResolvedValue({
-        mesas: [
-          {
-            numero: 1,
-            gm: null,
-            jugadores: [
-              {
-                nombre: "Alice",
-                es_nuevo: false,
-                juegos_ano: 5,
-                tiene_prioridad: true,
-                partidas_deseadas: 2,
-                partidas_gm: 0,
-                c_england: 1,
-                c_france: 0,
-                c_germany: 0,
-                c_italy: 0,
-                c_austria: 0,
-                c_russia: 0,
-                c_turkey: 0,
-                pais: "",
-              },
-              {
-                nombre: "Bob",
-                es_nuevo: true,
-                juegos_ano: 0,
-                tiene_prioridad: false,
-                partidas_deseadas: 1,
-                partidas_gm: 0,
-                c_england: 0,
-                c_france: 1,
-                c_germany: 0,
-                c_italy: 0,
-                c_austria: 0,
-                c_russia: 0,
-                c_turkey: 0,
-                pais: "France",
-              },
-            ],
-          },
-          {
-            numero: 2,
-            gm: null,
-            jugadores: [
-              {
-                nombre: "Charlie",
-                es_nuevo: false,
-                juegos_ano: 3,
-                tiene_prioridad: false,
-                partidas_deseadas: 1,
-                partidas_gm: 0,
-                c_england: 0,
-                c_france: 0,
-                c_germany: 1,
-                c_italy: 0,
-                c_austria: 0,
-                c_russia: 0,
-                c_turkey: 0,
-                pais: "",
-              },
-            ],
-          },
-        ],
-        tickets_sobrantes: [
-          {
-            nombre: "David",
-            es_nuevo: false,
-            juegos_ano: 2,
-            tiene_prioridad: false,
-            partidas_deseadas: 2,
-            partidas_gm: 0,
-            c_england: 0,
-            c_france: 0,
-            c_germany: 1,
-            c_italy: 0,
-            c_austria: 0,
-            c_russia: 0,
-            c_turkey: 0,
-            pais: "",
-          },
-        ],
-        minimo_teorico: 2,
-        intentos_usados: 1,
-      });
+      fetchGameDraft.mockResolvedValue(
+        createMockDraftResponse({
+          mesas: [
+            createMockDraftMesa({
+              numero: 1,
+              jugadores: [
+                createMockDraftPlayer({
+                  nombre: "Alice",
+                  es_nuevo: false,
+                  juegos_ano: 5,
+                  tiene_prioridad: true,
+                  partidas_deseadas: 2,
+                  c_england: 1,
+                }),
+                createMockDraftPlayer({
+                  nombre: "Bob",
+                  es_nuevo: true,
+                  juegos_ano: 0,
+                  c_france: 1,
+                }),
+              ],
+            }),
+            createMockDraftMesa({
+              numero: 2,
+              jugadores: [
+                createMockDraftPlayer({
+                  nombre: "Charlie",
+                  juegos_ano: 3,
+                  c_germany: 1,
+                }),
+              ],
+            }),
+          ],
+          tickets_sobrantes: [
+            createMockDraftPlayer({
+              nombre: "David",
+              juegos_ano: 2,
+              partidas_deseadas: 2,
+              c_germany: 1,
+            }),
+          ],
+          minimo_teorico: 2,
+          intentos_usados: 1,
+        }),
+      );
     });
 
     it("valid swap between mesa players", async () => {
@@ -397,74 +334,40 @@ describe("GameDraft.svelte", () => {
       // Use a special draft where Mesa 2 already contains a player named "Alice"
       // so swapping Alice from Mesa 1 into Mesa 2 triggers the duplicate check.
       const { fetchGameDraft } = vi.mocked(await import("../../api"));
-      fetchGameDraft.mockResolvedValue({
-        mesas: [
-          {
-            numero: 1,
-            gm: null,
-            jugadores: [
-              {
-                nombre: "Alice",
-                es_nuevo: false,
-                juegos_ano: 5,
-                tiene_prioridad: false,
-                partidas_deseadas: 1,
-                partidas_gm: 0,
-                c_england: 0,
-                c_france: 0,
-                c_germany: 0,
-                c_italy: 0,
-                c_austria: 0,
-                c_russia: 0,
-                c_turkey: 0,
-                pais: "",
-              },
-            ],
-          },
-          {
-            numero: 2,
-            gm: null,
-            jugadores: [
-              {
-                // Alice already appears in Mesa 2 — swapping Alice from Mesa 1 here must be blocked.
-                nombre: "Alice",
-                es_nuevo: false,
-                juegos_ano: 5,
-                tiene_prioridad: false,
-                partidas_deseadas: 1,
-                partidas_gm: 0,
-                c_england: 0,
-                c_france: 0,
-                c_germany: 0,
-                c_italy: 0,
-                c_austria: 0,
-                c_russia: 0,
-                c_turkey: 0,
-                pais: "",
-              },
-              {
-                nombre: "Charlie",
-                es_nuevo: false,
-                juegos_ano: 3,
-                tiene_prioridad: false,
-                partidas_deseadas: 1,
-                partidas_gm: 0,
-                c_england: 0,
-                c_france: 0,
-                c_germany: 0,
-                c_italy: 0,
-                c_austria: 0,
-                c_russia: 0,
-                c_turkey: 0,
-                pais: "",
-              },
-            ],
-          },
-        ],
-        tickets_sobrantes: [],
-        minimo_teorico: 2,
-        intentos_usados: 1,
-      });
+      fetchGameDraft.mockResolvedValue(
+        createMockDraftResponse({
+          mesas: [
+            createMockDraftMesa({
+              numero: 1,
+              jugadores: [
+                createMockDraftPlayer({
+                  nombre: "Alice",
+                  juegos_ano: 5,
+                  partidas_deseadas: 1,
+                }),
+              ],
+            }),
+            createMockDraftMesa({
+              numero: 2,
+              jugadores: [
+                createMockDraftPlayer({
+                  // Alice already appears in Mesa 2 — swapping Alice from Mesa 1 here must be blocked.
+                  nombre: "Alice",
+                  juegos_ano: 5,
+                  partidas_deseadas: 1,
+                }),
+                createMockDraftPlayer({
+                  nombre: "Charlie",
+                  juegos_ano: 3,
+                  partidas_deseadas: 1,
+                }),
+              ],
+            }),
+          ],
+          minimo_teorico: 2,
+          intentos_usados: 1,
+        }),
+      );
 
       render(GameDraft, { props: mockProps });
 
@@ -591,17 +494,14 @@ describe("GameDraft.svelte", () => {
 
     it("handles GM assignment correctly", async () => {
       const { fetchGameDraft } = vi.mocked(await import("../../api"));
-      const draftWithGM = {
+      const draftWithGM = createMockDraftResponse({
         ...mockDraftData,
         mesas: [
-          {
+          createMockDraftMesa({
             numero: 1,
-            gm: {
+            gm: createMockDraftPlayer({
               nombre: "TestGM",
-              es_nuevo: false,
               juegos_ano: 10,
-              tiene_prioridad: false,
-              partidas_deseadas: 1,
               partidas_gm: 5,
               c_england: 2,
               c_france: 1,
@@ -610,12 +510,11 @@ describe("GameDraft.svelte", () => {
               c_austria: 1,
               c_russia: 1,
               c_turkey: 1,
-              pais: "",
-            },
+            }),
             jugadores: mockDraftData.mesas[0]?.jugadores || [],
-          },
+          }),
         ],
-      };
+      });
       fetchGameDraft.mockResolvedValue(draftWithGM);
 
       render(GameDraft, { props: mockProps });

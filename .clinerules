@@ -296,13 +296,20 @@ Categorize all components in `frontend/src/components/` by responsibility:
 - USE: Integration-style testing methodology
 - REASON: State files require real reactivity for accurate testing
 
-**TESTING STATE RUNES:**
+**TESTING STATE RUNES**:
 
 - **REGLA:** Exigir tests unitarios para verificar cambios de visibilidad o comportamiento en componentes que dependen de props de estado.
 - **PROHIBITION:** NEVER use `vi.mock()` on `.svelte.ts` files or components using `$state`. You MUST use integration-style tests to verify actual reactive behavior.
 - **VALIDATION STATES:** Test visibility changes based on props like `editing`, `viewMode`, `hasPermission`
 - **EXAMPLE:** Test that `Button` shows/hides based on `visible={condition}` prop
 - **EXAMPLE:** Test that `DataTable` switches between view/edit modes based on `editable` prop
+
+**MOCKING DATA & TEST STRUCTURE (CRITICAL)**:
+
+- **NEVER** use giant inline JSON objects for mock API responses, store states, or entity models.
+- **ALWAYS** use the Factory Pattern via the `frontend/src/tests/fixtures/` directory (e.g., `createMockPlayer({ ...overrides })`).
+- \*\*Only pass the exact properties relevant to the specific test as overrides to the factory. Let the factory handle the default noise/boilerplate.
+- \*\*For complex components, ALWAYS extract the `render` call and loading state `waitFor` into a shared `renderMyComponent(propsOverrides)` helper at the top of the test file to eliminate boilerplate.
 
 ## Test Maintenance (CRITICAL)
 
