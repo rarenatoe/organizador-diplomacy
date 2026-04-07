@@ -103,21 +103,27 @@ async def save_game_draft(
         for order, player in enumerate(table.get("jugadores", []), start=1):
             pid = await get_or_create_player(session, player["nombre"])
             await add_table_player(
-                session,
-                table_id,
-                pid,
-                order,
-                player.get("pais", ""),
-                player.get("pais_reason"),
+                session=session,
+                table_id=table_id,
+                player_id=pid,
+                seat_order=order,
+                country=player.get("pais", ""),
+                country_reason=player.get("pais_reason"),
             )
 
     # 5. Create waiting list
     waiting_players = draft_data.get("tickets_sobrantes", [])
-    waitlist_count: Counter[str] = Counter(j["nombre"] for j in waiting_players)
 
-    for order, (name, slots) in enumerate(waitlist_count.items(), start=1):
-        pid = await get_or_create_player(session, name)
-        await add_waiting_player(session, event_id, pid, order, slots)
+    for order, player_dict in enumerate(waiting_players, start=1):
+        pid = await get_or_create_player(session, player_dict["nombre"])
+        slots = player_dict.get("cupos_faltantes", 1)
+        await add_waiting_player(
+            session=session,
+            timeline_edge_id=event_id,
+            player_id=pid,
+            list_order=order,
+            missing_spots=slots,
+        )
 
     return event_id
 
@@ -145,14 +151,14 @@ async def _create_output_snapshot_from_draft(
         pid = await get_or_create_player(session, name)
 
         await add_player_to_snapshot(
-            session,
-            snap_id,
-            pid,
-            "Antiguo" if was_promoted else p["experiencia"],
-            p["juegos_este_ano"] + played,
-            1 if name in names_in_waitlist else 0,
-            p["partidas_deseadas"],
-            0,  # partidas_gm reset
+            session=session,
+            snapshot_id=snap_id,
+            player_id=pid,
+            experience="Antiguo" if was_promoted else p["experiencia"],
+            games_this_year=p["juegos_este_ano"] + played,
+            priority=1 if name in names_in_waitlist else 0,
+            desired_games=p["partidas_deseadas"],
+            gm_games=0,  # partidas_gm reset
         )
 
     return snap_id
@@ -218,14 +224,14 @@ async def update_game_draft(
         pid = await get_or_create_player(session, name)
 
         await add_player_to_snapshot(
-            session,
-            output_snapshot_id,
-            pid,
-            "Antiguo" if was_promoted else p["experiencia"],
-            p["juegos_este_ano"] + played,
-            1 if name in names_in_waitlist else 0,
-            p["partidas_deseadas"],
-            0,  # partidas_gm reset
+            session=session,
+            snapshot_id=output_snapshot_id,
+            player_id=pid,
+            experience="Antiguo" if was_promoted else p["experiencia"],
+            games_this_year=p["juegos_este_ano"] + played,
+            priority=1 if name in names_in_waitlist else 0,
+            desired_games=p["partidas_deseadas"],
+            gm_games=0,  # partidas_gm reset
         )
 
     # 4. Re-insert tables and waiting_list
@@ -244,20 +250,26 @@ async def update_game_draft(
         for order, player in enumerate(table.get("jugadores", []), start=1):
             pid = await get_or_create_player(session, player["nombre"])
             await add_table_player(
-                session,
-                table_id,
-                pid,
-                order,
-                player.get("pais", ""),
-                player.get("pais_reason"),
+                session=session,
+                table_id=table_id,
+                player_id=pid,
+                seat_order=order,
+                country=player.get("pais", ""),
+                country_reason=player.get("pais_reason"),
             )
 
     # 5. Create waiting list
     waiting_players = draft_data.get("tickets_sobrantes", [])
-    waitlist_count: Counter[str] = Counter(j["nombre"] for j in waiting_players)
 
-    for order, (name, slots) in enumerate(waitlist_count.items(), start=1):
-        pid = await get_or_create_player(session, name)
-        await add_waiting_player(session, game_id, pid, order, slots)
+    for order, player_dict in enumerate(waiting_players, start=1):
+        pid = await get_or_create_player(session, player_dict["nombre"])
+        slots = player_dict.get("cupos_faltantes", 1)
+        await add_waiting_player(
+            session=session,
+            timeline_edge_id=game_id,
+            player_id=pid,
+            list_order=order,
+            missing_spots=slots,
+        )
 
     return game_id

@@ -146,6 +146,7 @@ export interface EditPlayerRow {
   prioridad: number;
   partidas_deseadas: number;
   partidas_gm: number;
+  historyRestored?: boolean;
 }
 
 export interface SnapshotSaveResponse {

@@ -13,9 +13,10 @@
   interface Props {
     data: T[];
     columns: ColumnDef<T>[];
+    footerRow?: import("svelte").Snippet;
   }
 
-  let { data, columns }: Props = $props();
+  let { data, columns, footerRow }: Props = $props();
 </script>
 
 <div class="data-table-wrapper">
@@ -41,6 +42,9 @@
           {/each}
         </tr>
       {/each}
+      {#if footerRow}
+        {@render footerRow()}
+      {/if}
     </tbody>
   </table>
 </div>

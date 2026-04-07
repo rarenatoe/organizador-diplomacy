@@ -1,19 +1,27 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { onMount, tick, untrack } from "svelte";
   import type {
     EditPlayerRow,
     SimilarName,
     MergePair,
     NotionPlayer,
   } from "../../types";
-  import { saveSnapshot, fetchNotionPlayers } from "../../api";
+  import {
+    saveSnapshot,
+    fetchNotionPlayers,
+    lookupPlayerHistory,
+    getAllPlayers,
+    checkPlayerSimilarity,
+  } from "../../api";
   import { parsePlayersCsv, normalizeName } from "../../utils";
   import { setActiveNodeId } from "../../stores.svelte";
+  import { clickOutside } from "../../clickOutside";
   import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
   import CsvImportModal from "../modals/CsvImportModal.svelte";
   import Button from "../ui/Button.svelte";
   import PanelLayout from "../layout/PanelLayout.svelte";
   import Badge from "../ui/Badge.svelte";
+  import Tooltip from "../ui/Tooltip.svelte";
   import DataTable, { type ColumnDef } from "../layout/DataTable.svelte";
 
   interface Props {
@@ -50,10 +58,15 @@
         prioridad: p.prioridad,
         partidas_deseadas: p.partidas_deseadas,
         partidas_gm: p.partidas_gm,
+        historyRestored: false, // Default for existing players
       })),
     ),
   );
   let eventType = $state(untrack(() => defaultEventType));
+  let knownPlayers: string[] = $state([]);
+  let isAddingPlayer = $state(false);
+  let newPlayerSearchQuery = $state("");
+  let pendingCsvPlayers: any[] = $state([]);
   let showCsvModal = $state(false);
   let saving = $state(false);
   let isImporting = $state(false);
@@ -74,41 +87,146 @@
     }
   });
 
-  function handleAddPlayer(): void {
-    const nombre = prompt("Nombre del nuevo jugador:");
-    if (!nombre) return;
+  onMount(() => {
+    getAllPlayers()
+      .then((res) => {
+        knownPlayers = res.names;
+      })
+      .catch(console.error);
+  });
+
+  async function handleAddPlayer(): Promise<void> {
+    isAddingPlayer = true;
+    newPlayerSearchQuery = "";
+    await tick();
+    const tableContainer = document.querySelector(".table-container");
+    if (tableContainer) tableContainer.scrollTop = tableContainer.scrollHeight;
+  }
+
+  function focusOnMount(node: HTMLInputElement) {
+    node.focus();
+  }
+
+  async function confirmAddPlayer(nombre: string): Promise<void> {
+    if (!nombre.trim()) {
+      isAddingPlayer = false;
+      return;
+    }
+
+    let historyRestored = false;
+    let experiencia = "Nuevo";
+    let juegos_este_ano = 0;
+    let prioridad = 0;
+    let partidas_deseadas = 1;
+    let partidas_gm = 0;
+
+    try {
+      const response = await lookupPlayerHistory(
+        [nombre],
+        parentId || undefined,
+      );
+      const playerData = response.players[nombre];
+      if (playerData) {
+        experiencia = playerData.experiencia;
+        juegos_este_ano = playerData.juegos_este_ano;
+        prioridad = playerData.prioridad;
+        partidas_deseadas = playerData.partidas_deseadas;
+        partidas_gm = playerData.partidas_gm;
+        historyRestored = playerData.source === "history";
+      }
+    } catch (e) {
+      console.warn("Failed to lookup player history:", e);
+    }
+
     draftPlayers = [
       ...draftPlayers,
       {
         nombre,
         original_nombre: nombre,
-        experiencia: "Nuevo",
-        juegos_este_ano: 0,
-        prioridad: 0,
-        partidas_deseadas: 1,
-        partidas_gm: 0,
+        experiencia,
+        juegos_este_ano,
+        prioridad,
+        partidas_deseadas,
+        partidas_gm,
+        historyRestored,
       },
     ];
+    isAddingPlayer = false;
+    newPlayerSearchQuery = "";
   }
 
   function handleDeletePlayer(index: number): void {
     draftPlayers = draftPlayers.filter((_, i) => i !== index);
   }
 
-  function handleImportCsv(text: string): void {
+  async function handleImportCsv(text: string): Promise<void> {
     const parsed = parsePlayersCsv(text);
     if (parsed.length === 0) {
       onShowError(
-        "Aviso / Error",
-        "No se encontraron jugadores válidos en el CSV",
+        "CSV Inválido",
+        "No se encontraron jugadores válidos en el archivo.",
       );
       return;
     }
-    draftPlayers = [
-      ...draftPlayers,
-      ...parsed.map((p) => ({ ...p, original_nombre: p.nombre })),
-    ];
+
     showCsvModal = false;
+    const playerNames = parsed.map((p) => p.nombre);
+
+    try {
+      const checkRes = await checkPlayerSimilarity(playerNames);
+      if (checkRes.similarities && checkRes.similarities.length > 0) {
+        pendingCsvPlayers = parsed;
+        resolutionPairs = checkRes.similarities;
+        resolutionVisible = true;
+        return;
+      }
+    } catch (e) {
+      console.error("Similarity check failed", e);
+    }
+
+    await applyFinalCsvPlayers(parsed);
+  }
+
+  async function applyFinalCsvPlayers(parsedRows: any[]) {
+    const playerNames = parsedRows.map((p) => p.nombre);
+    let enhancedPlayers = parsedRows.map((p) => ({
+      ...p,
+      original_nombre: p.nombre,
+      historyRestored: false,
+    }));
+
+    try {
+      const response = await lookupPlayerHistory(
+        playerNames,
+        parentId || undefined,
+      );
+      enhancedPlayers = parsedRows.map((p) => {
+        const playerData = response.players[p.nombre];
+        if (playerData) {
+          return {
+            ...p,
+            original_nombre: p.nombre,
+            experiencia: playerData.experiencia,
+            juegos_este_ano: playerData.juegos_este_ano,
+            prioridad: playerData.prioridad,
+            partidas_deseadas: playerData.partidas_deseadas,
+            partidas_gm: playerData.partidas_gm,
+            historyRestored: playerData.source === "history",
+          };
+        }
+        return {
+          ...p,
+          original_nombre: p.nombre,
+          partidas_deseadas: 1,
+          partidas_gm: 0,
+          historyRestored: false,
+        };
+      });
+    } catch (e) {
+      console.warn("Failed to lookup player history for CSV import:", e);
+    }
+
+    draftPlayers = [...draftPlayers, ...enhancedPlayers];
   }
 
   function handleCancelCsv(): void {
@@ -187,6 +305,7 @@
           prioridad: 0,
           partidas_deseadas: 1,
           partidas_gm: 0,
+          historyRestored: false, // Notion sync doesn't use history restoration
         }));
 
       draftPlayers = [...updatedPlayers, ...newPlayers];
@@ -201,8 +320,25 @@
     fetchedNotionPlayers = [];
   }
 
-  function handleResolutionComplete(merges: MergePair[]): void {
-    mergeNotionPlayers(merges);
+  async function handleResolutionComplete(merges: MergePair[]): Promise<void> {
+    const resolvedMerges = merges;
+    resolutionVisible = false;
+
+    if (pendingCsvPlayers.length > 0) {
+      // It's a CSV import resolution
+      const resolvedRows = pendingCsvPlayers.map((row) => {
+        const mergeTarget = resolvedMerges[row.nombre];
+        if (mergeTarget) {
+          return { ...row, nombre: mergeTarget.to };
+        }
+        return row;
+      });
+      pendingCsvPlayers = [];
+      await applyFinalCsvPlayers(resolvedRows);
+    } else {
+      // It's a Notion Sync resolution (existing logic)
+      await handleImportNotion();
+    }
   }
 
   function handleResolutionCancel(): void {
@@ -317,12 +453,20 @@
   {#snippet body()}
     {#if draftPlayers.length > 0}
       {#snippet nameInput(row: EditPlayerRow, i: number)}
-        <input
-          type="text"
-          class="table-input table-input-ghost text-strong"
-          bind:value={row.nombre}
-          placeholder="Nombre del jugador"
-        />
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <input
+            type="text"
+            class="table-input table-input-ghost text-strong"
+            bind:value={row.nombre}
+            placeholder="Nombre del jugador"
+          />
+          {#if row.historyRestored}
+            <Tooltip
+              text="Perfil histórico cargado desde la base de datos"
+              icon="📚"
+            />
+          {/if}
+        </div>
       {/snippet}
 
       {#snippet expCell(row: EditPlayerRow)}
@@ -375,7 +519,6 @@
           onchange={(e) => handleCheckboxChange(e, i, "partidas_gm")}
         />
       {/snippet}
-
       {#snippet actionsCell(row: EditPlayerRow, i: number)}
         <Button
           variant="ghost"
@@ -397,7 +540,59 @@
         { header: "", cell: actionsCell }
       ]}
 
-      <DataTable data={draftPlayers} columns={tableColumns} />
+      {#snippet addingRow()}
+        {#if isAddingPlayer}
+          <tr>
+            <td
+              colspan={tableColumns.length}
+              style="padding: 0; position: relative;"
+            >
+              <div
+                use:clickOutside={{ callback: () => (isAddingPlayer = false) }}
+              >
+                <input
+                  type="text"
+                  class="table-input text-strong"
+                  bind:value={newPlayerSearchQuery}
+                  placeholder="Escribe para buscar o agregar..."
+                  use:focusOnMount
+                  onkeydown={(e) => {
+                    if (e.key === "Enter")
+                      confirmAddPlayer(newPlayerSearchQuery);
+                    if (e.key === "Escape") isAddingPlayer = false;
+                  }}
+                  style="width: 100%; border: none; outline: none; padding: 10px; background: transparent; color: var(--text-primary, inherit);"
+                />
+                {#if newPlayerSearchQuery.trim().length > 0}
+                  <div
+                    style="position: absolute; bottom: 100%; left: 0; margin-bottom: 2px; background: var(--surface, #ffffff); border: 1px solid var(--border); border-radius: 4px; z-index: 9999; max-height: 200px; overflow-y: auto; width: 100%; box-shadow: var(--shadow-md);"
+                  >
+                    {#each knownPlayers
+                      .filter((n) => n
+                          .toLowerCase()
+                          .includes(newPlayerSearchQuery.toLowerCase()))
+                      .slice(0, 10) as suggestedName (suggestedName)}
+                      <button
+                        type="button"
+                        style="padding: 8px 12px; cursor: pointer; border: none; border-bottom: 1px solid var(--border); background: transparent; width: 100%; text-align: left; color: inherit; font-size:13px;"
+                        onclick={() => confirmAddPlayer(suggestedName)}
+                      >
+                        {suggestedName}
+                      </button>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            </td>
+          </tr>
+        {/if}
+      {/snippet}
+
+      <DataTable
+        data={draftPlayers}
+        columns={tableColumns}
+        footerRow={addingRow}
+      />
     {:else}
       <div class="empty-draft">
         <p>No hay jugadores en el borrador.</p>

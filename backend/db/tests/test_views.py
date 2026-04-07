@@ -293,7 +293,18 @@ class TestSnapshotHistoryInDetail:
             snapshot_id=snap_id,
             action_type="manual_edit",
             changes={"added": [], "removed": [], "renamed": [], "modified": []},
-            previous_state={"players": [{"nombre": "OldPlayer", "experiencia": "Nuevo"}]},
+            previous_state={
+                "players": [
+                    {
+                        "nombre": "OldPlayer",
+                        "experiencia": "Nuevo",
+                        "juegos_este_ano": 0,
+                        "prioridad": 1,
+                        "partidas_deseadas": 1,
+                        "partidas_gm": 0,
+                    }
+                ]
+            },
         )
         await db_session.commit()
 

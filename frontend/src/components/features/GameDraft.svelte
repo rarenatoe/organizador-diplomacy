@@ -414,13 +414,13 @@
       {#if draftData.mesas.length > 0}
         <div class="section">
           <div class="section-title">Partidas ({draftData.mesas.length})</div>
-          {#each draftData.mesas as table, tableIndex (table.numero)}
+          {#each draftData.mesas as table, tableIndex (table.numero + "_" + tableIndex)}
             <GameTableCard
               tableNumber={table.numero}
               gmName={table.gm ? table.gm.nombre : null}
             >
               <ul class="player-list">
-                {#each table.jugadores as j, i (j.nombre)}
+                {#each table.jugadores as j, i (j.nombre + "_" + tableIndex + "_" + i)}
                   {@const target = {
                     type: "table" as const,
                     tableIndex,
@@ -485,7 +485,7 @@
       {#if draftData.tickets_sobrantes.length > 0}
         <div class="section">
           <div class="section-title">Lista de espera</div>
-          {#each draftData.tickets_sobrantes as w, i (w.nombre)}
+          {#each draftData.tickets_sobrantes as w, i (w.nombre + "_" + i)}
             {@const target = { type: "waiting" as const, playerIndex: i }}
             {@const isSelected = isSelectedSwap(target)}
             <div class="waiting-item" class:swapping-active={isSelected}>

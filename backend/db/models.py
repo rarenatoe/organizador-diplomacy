@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime  # noqa: TCH003
 from enum import StrEnum
-from typing import Any, TypedDict
+from typing import Any, NotRequired, TypedDict
 
 from sqlalchemy import JSON, ForeignKey, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, mapped_column, relationship
@@ -17,22 +17,52 @@ RenameDict = TypedDict("RenameDict", {"from": str, "to": str})
 
 class FieldChange(TypedDict):
     """A change to a single field with old and new values."""
+
     old: Any
     new: Any
 
 
 class ModifiedPlayer(TypedDict):
     """A player with modified fields."""
+
     nombre: str
     changes: dict[str, FieldChange]
 
 
 class DeepDiffResult(TypedDict):
     """Result of a deep diff operation on player lists."""
+
     added: list[str]
     removed: list[str]
     renamed: list[RenameDict]
     modified: list[ModifiedPlayer]
+
+
+class PlayerStateDict(TypedDict):
+    """TypedDict for player state in JSON history logs."""
+
+    # Basic fields (always present)
+    nombre: str
+    experiencia: str
+    juegos_este_ano: int
+    prioridad: int
+    partidas_deseadas: int
+    partidas_gm: int
+
+    # Country fields (optional, may not be present in history logs)
+    c_england: NotRequired[int]
+    c_france: NotRequired[int]
+    c_germany: NotRequired[int]
+    c_italy: NotRequired[int]
+    c_austria: NotRequired[int]
+    c_russia: NotRequired[int]
+    c_turkey: NotRequired[int]
+
+
+class HistoryStateDict(TypedDict, total=False):
+    """TypedDict for history state JSON structure."""
+
+    players: list[PlayerStateDict]
 
 
 class HistoryActionType(StrEnum):
@@ -162,8 +192,12 @@ class TablePlayer(Base, kw_only=True):
     country_reason: Mapped[str | None] = mapped_column(default=None)
 
     # Relationships
-    game_table: Mapped[GameTable] = relationship(init=False)
-    player: Mapped[Player] = relationship(init=False)
+    game_table: Mapped[GameTable] = relationship(
+        back_populates="table_players", overlaps="table_players", init=False
+    )
+    player: Mapped[Player] = relationship(
+        back_populates="table_player_links", overlaps="table_player_links", init=False
+    )
 
 
 class WaitingList(Base, kw_only=True):
@@ -211,6 +245,6 @@ class SnapshotHistory(Base, kw_only=True):
     created_at: Mapped[datetime] = mapped_column(default=func.now())
     action_type: Mapped[str] = mapped_column()  # e.g., 'notion_sync', 'manual_edit'
     changes: Mapped[DeepDiffResult] = mapped_column(JSON)  # Structured changes object
-    previous_state: Mapped[dict[str, object]] = mapped_column(
+    previous_state: Mapped[HistoryStateDict] = mapped_column(
         JSON
     )  # Raw dict of the roster before the change

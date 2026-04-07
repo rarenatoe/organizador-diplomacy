@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/svelte";
+import { createRawSnippet } from "svelte";
 import DataTable, { type ColumnDef } from "./DataTable.svelte";
 
 interface TestRow {
@@ -99,5 +100,39 @@ describe("DataTable.svelte", () => {
     const dataRows = screen.queryAllByRole("row");
     // Header row + no data rows = 1 total row
     expect(dataRows).toHaveLength(1);
+  });
+
+  it("renders footerRow snippet as a direct child of tbody", () => {
+    const columns: ColumnDef<TestRow>[] = [
+      { header: "ID", key: "id" },
+      { header: "Name", key: "name" },
+      { header: "Value", key: "value" },
+    ];
+
+    // Programmatically forge a valid Svelte 5 snippet for the test
+    const mockFooterSnippet = createRawSnippet(() => ({
+      render: () =>
+        `<tr data-testid="mock-footer-row"><td>Mock Footer</td></tr>`,
+    }));
+
+    const { container } = render(DataTable as typeof DataTable<TestRow>, {
+      props: {
+        data: testData,
+        columns,
+        footerRow: mockFooterSnippet,
+      },
+    });
+
+    const tbody = container.querySelector("tbody");
+    const footerRow = screen.getByTestId("mock-footer-row");
+
+    // 1. Verify it actually rendered
+    expect(footerRow).toBeInTheDocument();
+
+    // 2. Verify it is structurally inside the <tbody>
+    expect(footerRow.parentElement).toBe(tbody);
+
+    // 3. Verify it was placed exactly at the bottom of the table
+    expect(tbody?.lastElementChild).toBe(footerRow);
   });
 });

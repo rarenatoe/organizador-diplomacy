@@ -1,9 +1,10 @@
 <script lang="ts">
-  let { text }: { text: string } = $props();
+  let { text, icon = "\u2139\uFE0F" }: { text: string; icon?: string } =
+    $props();
 </script>
 
 <div class="tooltip">
-  <span class="info-icon">ℹ️</span>
+  <span class="info-icon">{icon}</span>
   <div class="tooltip-popover">{text}</div>
 </div>
 

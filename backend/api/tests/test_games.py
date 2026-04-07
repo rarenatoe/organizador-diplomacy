@@ -90,6 +90,69 @@ class TestApiGameDraft:
         for key in ("nombre", "es_nuevo", "juegos_este_ano", "tiene_prioridad"):
             assert key in first_player, f"Missing key '{key}' in player dict"
 
+    async def test_unhashable_draftplayer_regression(self, client: Any, db_session: Any) -> None:
+        """Test that duplicate DraftPlayer objects in waitlist don't cause TypeError: unhashable type."""
+        from unittest.mock import patch
+
+        from backend.organizador.models import DraftPlayer, DraftResult, DraftTable
+
+        # Create a mock DraftResult with duplicate DraftPlayer objects in waitlist
+        duplicate_player = DraftPlayer(
+            name="DuplicatePlayer",
+            experience="Veterano",
+            games_this_year=5,
+            priority="False",
+            desired_games=1,
+            gm_games=0,
+        )
+
+        mock_result = DraftResult(
+            tables=[
+                DraftTable(
+                    table_number=1,
+                    players=[
+                        DraftPlayer(
+                            name="OtherPlayer",
+                            experience="Nuevo",
+                            games_this_year=0,
+                            priority="False",
+                            desired_games=1,
+                            gm_games=0,
+                        )
+                    ],
+                    gm=None,
+                )
+            ],
+            waitlist_players=[duplicate_player, duplicate_player],  # Same object twice
+            theoretical_minimum=0,
+            attempts_used=1,
+        )
+
+        snap_id = await make_snapshot_with_players(db_session, 14)
+
+        # Mock calculate_matches to return our result with duplicates
+        with patch("backend.api.routers.games.calculate_matches", return_value=mock_result):
+            resp = await client.post("/api/game/draft", json={"snapshot_id": snap_id})
+
+        # Should return HTTP 200 (proving the TypeError: unhashable type crash is fixed)
+        assert resp.status_code == 200
+        data = resp.json()
+
+        # Verify the response structure
+        assert "mesas" in data
+        assert "tickets_sobrantes" in data
+        assert "minimo_teorico" in data
+        assert "intentos_usados" in data
+
+        # Test Cartesian deduplication: exactly ONE entry for duplicated player
+        assert len(data["tickets_sobrantes"]) == 1
+        assert data["tickets_sobrantes"][0]["nombre"] == "DuplicatePlayer"
+
+        # Verify minimo_teorico equals 0 (theoretical minimum from mock)
+        assert data["minimo_teorico"] == 0
+
+        assert data["tickets_sobrantes"][0]["cupos_faltantes"] == 2
+
 
 # ── POST /api/game/save ───────────────────────────────────────────────────────
 

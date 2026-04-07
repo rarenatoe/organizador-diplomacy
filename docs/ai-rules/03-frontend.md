@@ -4,178 +4,117 @@ title: Pillar 3 - Frontend & Svelte 5 Conventions
 priority: 30
 ---
 
-## Frontend Architecture (CRITICAL)
+## Frontend Architecture
 
-**TECH STACK**: Svelte 5, TypeScript, Vite
-**FILE LIMIT**: 400 lines per file (extract sub-domains when exceeded)
-**TRANSLATION**: All UI translations go through `frontend/src/i18n.ts`
+**Rule:** Use Svelte 5, TypeScript, and Vite as the tech stack.
+**Anti-Pattern:** Using alternative frameworks or build tools.
 
-## Component Architecture & Organization (CRITICAL)
+**Rule:** Maintain 400-line soft limit per file and extract sub-domains when exceeded.
+**Anti-Pattern:** Creating monolithic files with multiple responsibilities.
 
-**FOLDER HIERARCHY:**
-Categorize all components in `frontend/src/components/` by responsibility:
+**Rule:** Route all UI translations through `frontend/src/i18n.ts`.
+**Anti-Pattern:** Hardcoding text strings or using multiple translation systems.
 
-- `ui/`: Atomic/domain-agnostic (e.g., `Button`, `Badge`).
-- `modals/`: Overlays using the `.modal-overlay` pattern.
-- `layout/`: Structural containers (e.g., `SidePanel`, `DataTable`).
-- `features/`: Domain-specific logic (e.g., `SnapshotDraft`, `GameNode`).
+## Component Architecture & Organization
 
-**LEAF COMPONENTS** (Domain-Agnostic):
+**Rule:** Categorize components in `frontend/src/components/` by responsibility: `ui/` for atomic/domain-agnostic, `modals/` for overlays, `layout/` for structural containers, and `features/` for domain-specific logic.
+**Anti-Pattern:** Mixing component types in the same directory or creating unclear categorization.
 
-- `Badge`, `Button`, `Tooltip`, `Input` - NO domain logic
-- Use semantic APIs: `variant="info|success|warning|error"`
-- NEVER use domain names: `variant="gm|veteran"`
+**Rule:** Design leaf components (Badge, Button, Tooltip, Input) as domain-agnostic with semantic APIs like `variant="info|success|warning|error"`.
+**Anti-Pattern:** Using domain names in variant props like `variant="gm|veteran"`.
 
-**DOMAIN LAYOUT COMPONENTS** (Domain-Specific):
+**Rule:** Design domain layout components (GameTableCard, PlayerList) to accept domain data explicitly with clear props like `gmName`, `tableNumber`, `players`.
+**Anti-Pattern:** Over-abstracting with generic snippet APIs or unclear prop interfaces.
 
-- `GameTableCard`, `PlayerList` - Accept domain data explicitly
-- Use clear props: `gmName`, `tableNumber`, `players`
-- AVOID over-abstracting with generic snippet APIs
+**Rule:** For CSS-only abstractions with zero JavaScript logic, extract layout into global CSS utility classes in `style.css` instead of creating Svelte components.
+**Anti-Pattern:** Creating Svelte components purely for structural CSS that forces `:global()` usage and breaks encapsulation.
 
-- **CSS-Only Abstractions vs. Components:** If a planned "component" has zero JavaScript logic and exists purely to apply structural CSS to injected HTML children (like a generic Table wrapper), DO NOT create a Svelte Component for it. This forces the use of `:global()` CSS which breaks encapsulation and snippet rendering. Instead, extract the layout into a global CSS utility class in `style.css` (e.g., `.data-table`) and use native HTML elements in the consumer.
+**Rule:** Build Data-Driven Components (like `<DataTable data={rows} columns={config} />`) that own the HTML structure for complex styling needs.
+**Anti-Pattern:** Building generic wrapper components that expect raw HTML elements via snippets, breaking Svelte's scoped CSS.
 
-- **Data-Driven Components over CSS Wrappers:** To style complex children (like tables with sticky columns), build **Data-Driven Components** (e.g., `<DataTable data={rows} columns={config} />`) that own the HTML structure (`<table>`, `<tr>`, `<td>`). DO NOT build generic wrapper components that expect raw HTML elements passed via snippets, as this breaks Svelte's scoped CSS and forces `:global()` code smells.
+**Rule:** Maintain strict separation between View (read-only) and Edit screens with explicit "Edit" buttons for transitions.
+**Anti-Pattern:** Using inline editing hacks like `window.prompt()` in View screens.
 
-- **Strict View vs. Edit Separation:** Do not blur boundaries between View (read-only) and Edit screens. A View screen MUST NOT contain inline editing hacks like `window.prompt()`. Provide an explicit "Edit" button that transitions the user to a dedicated Draft/Edit screen with proper form inputs.
+**Rule:** Use global utility classes (`.text-strong`, `.table-input`) to ensure typography alignment between plain text and input elements.
+**Anti-Pattern:** Relying on automatic font inheritance for inputs and textareas.
 
-- **Input Typography Inheritance:** HTML `<input>` and `<textarea>` elements do not inherit `font-family` or `font-weight` automatically. Use global utility classes in `style.css` (e.g., `.text-strong`, `.table-input`) to ensure typography perfectly aligns between plain text in View modes and inputs in Edit modes.
+## Svelte 5 Patterns
 
-## Svelte 5 Patterns (CRITICAL)
+**Rule:** Use `$state`, `$derived`, and `$effect` for reactivity.
+**Anti-Pattern:** Using `let` for reactive variables.
 
-**REACTIVITY**:
+**Rule:** Use `:global()` modifier when parent component's scoped CSS needs to affect snippet elements.
+**Anti-Pattern:** Assuming scoped CSS automatically applies to snippet content.
 
-- USE: `$state`, `$derived`, `$effect`
-- AVOID: `let` for reactive variables
+**Rule:** Type snippets in generic components using `import type { Snippet } from "svelte"` and `cell?: Snippet<[T, number]>`.
+**Anti-Pattern:** Downgrading snippets to string-returning functions that prevent internal Svelte component rendering.
 
-**SNIPPETS & CSS SCOPING** (CRITICAL):
+**Rule:** Store global state in `stores.svelte.ts` with loading states using `-1` (unknown) and `0` (loaded).
+**Anti-Pattern:** Scattering state management across multiple files or inconsistent loading conventions.
 
-- Parent → Child snippet injection: Child's scoped CSS **WILL NOT** affect snippet elements
-- SOLUTION: Use `:global()` modifier: `:global(.table-wrap td) { ... }`
-- FAILURE: Results in stripped styles and broken layouts
-
-**TYPING SNIPPETS IN GENERICS** (CRITICAL):
-
-- When passing Svelte 5 snippets to a generic component (like a table cell renderer), you MUST import and use the official Svelte type: `import type { Snippet } from "svelte";` and type it as `cell?: Snippet<[T, number]>`.
-- DO NOT downgrade snippets to string-returning functions (e.g., `(row: T) => string`), as this makes it impossible to render internal Svelte components (like Badges) inside the snippet.
-
-**STORES & STATE**:
-
-- Global stores: `stores.svelte.ts`
-- Loading states: `-1` (unknown), `0` (loaded)
-- Event handlers: `onclick={() => ...}`
-- Bindings: `bind:value={variable}`
-
-**Group Hover Reveal** - Use global utility classes (`.group`, `.group-hover-reveal`) to show/hide secondary actions like delete buttons. This avoids Svelte CSS isolation issues and keeps components DRY.
+**Rule:** Use global utility classes (`.group`, `.group-hover-reveal`) for group hover reveal patterns.
+**Anti-Pattern:** Implementing hover reveal logic in individual Svelte components.
 
 ## Styling & Theming
 
-**COLOR SYSTEM**:
+**Rule:** Use global CSS variables like `var(--info-bg)` and `var(--tooltip-bg)` instead of hardcoded hex colors.
+**Anti-Pattern:** Hardcoding color values in components.
 
-- NEVER use hardcoded hex colors
-- USE global CSS variables: `var(--info-bg)`, `var(--tooltip-bg)`
-- DEFINED in: `frontend/static/style.css`
+**Rule:** Use flexbox for panels and CSS Grid for complex list alignment.
+**Anti-Pattern:** Using inappropriate layout systems for the use case.
 
-**LAYOUT SYSTEM**:
-
-- Panels: Use flexbox
-- Lists: Prefer CSS Grid over Flexbox for complex alignment
-- Components: Use scoped `<style>` blocks
-
-**FLOATING ELEMENTS**:
-
-- Tooltips, popovers, toasts: Use inverted schemes
-- Dark background + light text = maximum Z-axis contrast
-
-**Theme Integrity** - Never hardcode hex colors in components. Always define semantic variables in `style.css` (e.g., `--danger`, `--success`) and reference them in component styles.
+**Rule:** Use inverted schemes (dark background + light text) for floating elements like tooltips and popovers.
+**Anti-Pattern:** Using the same color scheme for both main content and floating elements.
 
 ## Component API Design
 
-**VISUAL PROPS**: Control appearance only
+**Rule:** Use visual props (variant, size, fill, iconOnly) to control appearance only.
+**Anti-Pattern:** Bundling layout behavior into visual props.
 
-- `variant`, `size`, `fill`, `iconOnly`
-
-**LAYOUT PROPS**: Control behavior only
-
-- `fixedWidth`, `align`, `spacing`
-
-**SEPARATION**: Never bundle layout behavior into visual props
-
-- WRONG: `pill` prop that controls width
-- RIGHT: `fixedWidth={true}` + `pill={true}`
+**Rule:** Use layout props (fixedWidth, align, spacing) to control behavior only.
+**Anti-Pattern:** Mixing visual and behavioral concerns in single props.
 
 ## Frontend Coding Standards
 
-**LOGGING**:
+**Rule:** Use `logger.info()`, `logger.warn()`, and `logger.error()` from `src/utils/logger.ts` for all logging.
+**Anti-Pattern:** Using `console.log()` for debugging or logging purposes.
 
-- NEVER use `console.log()`
-- USE: `logger.info()`, `logger.warn()`, `logger.error()`
-- IMPORT: `src/utils/logger.ts`
+**Rule:** Always import and use the Button component instead of native `<button>` tags.
+**Anti-Pattern:** Using native HTML button elements directly.
 
-**BUTTONS**:
+**Rule:** Include `title` attribute for disabled buttons to provide context.
+**Anti-Pattern:** Leaving disabled buttons without explanatory tooltips.
 
-- NEVER use native `<button>` tags
-- ALWAYS import: `import Button from './Button.svelte'`
-- REQUIRED: `title` attribute for disabled buttons
+## Modal & Overlay Patterns
 
-## Testing Strategy
+**Rule:** Use `.modal-overlay` utility and `--modal-backdrop` variable for modal overlays.
+**Anti-Pattern:** Creating custom overlay implementations without consistent styling.
 
-**FRAMEWORK**: Vitest + `@testing-library/svelte`
+**Rule:** Set modal z-index to `1000` to escape `SidePanel` stacking contexts.
+**Anti-Pattern:** Using insufficient z-index values that get covered by other UI elements.
 
-**DOM QUERIES**:
+**Rule:** Apply `backdrop-filter: blur(2px)` for visual depth in modal overlays.
+**Anti-Pattern:** Using flat or unstyled modal backgrounds.
 
-- Buttons: `screen.getByRole('button', { name: /Text/i })`
-- NEVER: `getByText()` for buttons (emojis separated from text)
-- Icon-only buttons: Use `title` attribute for accessible name
+**Rule:** Implement `onclick={onCancel}` on overlay and `e.stopPropagation()` on modal content.
+**Anti-Pattern:** Missing proper event handling that causes modal closing issues.
 
-**STATE MOCKING**:
+**Rule:** Use `use:autofocus` on the primary input/textarea in modals.
+**Anti-Pattern:** Forgetting to focus the primary interaction element.
 
-- NEVER: `vi.mock()` on `.svelte.ts` files with `$state` runes
-- USE: Integration-style testing for state files
+**Rule:** Use standard callback props like `onImport`, `onCancel`, or `onConfirm` for modal actions.
+**Anti-Pattern:** Creating inconsistent modal prop interfaces.
 
-**TEST MAINTENANCE**:
+## Data Entry & UI Flow Patterns
 
-- CSS class changes → IMMEDIATELY update test queries
-- Search for: `querySelector`, `closest`, `getBy` calls
+**Rule:** Bulk data ingestion must never write directly to table state without validation; always intercept via `/api/player/check-similarity` and pause with modal if conflicts exist.
+**Anti-Pattern:** Allowing unvalidated bulk data to bypass similarity checks and modal interruption.
 
-## Modal & Overlay Patterns (CRITICAL)
+**Rule:** When passing dynamic rows into generic components like `DataTable`, use Svelte 5 snippets (e.g., `footerRow`) instead of raw HTML `<tr>` elements for safe `<tbody>` rendering.
+**Anti-Pattern:** Passing raw HTML elements that break table structure and Svelte's rendering system.
 
-**VISUAL CONTRACT:**
+**Rule:** Always use inline Svelte 5 Autocomplete components that fetch from `/api/player/all` and rehydrate history.
+**Anti-Pattern:** Using native browser prompts or custom input implementations without autocomplete functionality.
 
-- **Overlay:** MUST use `.modal-overlay` utility and `--modal-backdrop` variable.
-- **Z-Index:** Set to `1000` to escape `SidePanel` (z-index 50) stacking contexts.
-- **Effect:** Apply `backdrop-filter: blur(2px)` for depth.
-
-**BEHAVIORAL CONTRACT:**
-
-- **Events:** Implement `onclick={onCancel}` on overlay and `e.stopPropagation()` on content.
-- **Focus:** Use `use:autofocus` on the primary input/textarea.
-- **Props:** Use standard callbacks like `onImport`, `onCancel`, or `onConfirm`.
-
-**EXAMPLES:**
-
-```svelte
-<!-- Modal with global overlay utility -->
-<div class="modal-overlay" onclick={handleCancel}>
-  <div class="modal-content" onclick={(e) => e.stopPropagation()}>
-    <!-- Modal content here -->
-  </div>
-</div>
-```
-
-```css
-/* frontend/static/style.css */
-:root {
-  --modal-backdrop: rgba(0, 0, 0, 0.4);
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--modal-backdrop);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(2px);
-}
-```
+**Rule:** Completely ban the use of `window.prompt()` in favor of proper modal dialogs and autocomplete components.
+**Anti-Pattern:** Using native browser prompts for any user input scenarios.

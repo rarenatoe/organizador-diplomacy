@@ -10,6 +10,7 @@ Advanced priority, GM and league balancing tests
 live in test_algoritmo.py.
 Database and db_views tests live in test_db.py.
 """
+
 from __future__ import annotations
 
 import random
@@ -20,6 +21,7 @@ from .core import calculate_matches
 from .models import DraftPlayer, DraftResult
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _j(
     name: str,
@@ -47,8 +49,8 @@ def _pool(n: int, prefix: str = "J", **kwargs: Any) -> list[DraftPlayer]:
 
 # ── Tests de la clase Jugador ─────────────────────────────────────────────────
 
-class TestJugador(unittest.TestCase):
 
+class TestJugador(unittest.TestCase):
     def test_is_new_true(self):
         self.assertTrue(_j("A", experience="Nuevo").is_new)
 
@@ -90,8 +92,8 @@ class TestJugador(unittest.TestCase):
 
 # ── Tests del algoritmo principal ─────────────────────────────────────────────
 
-class TestCalcularPartidas(unittest.TestCase):
 
+class TestCalcularPartidas(unittest.TestCase):
     def setUp(self) -> None:
         # Semilla fija para que los tests que no iteran seeds sean deterministas
         random.seed(0)
@@ -154,11 +156,15 @@ class TestCalcularPartidas(unittest.TestCase):
         assert res is not None
         for name in ("Multi1", "Multi2"):
             tables_del_jugador = [
-                i for i, table in enumerate(res.tables)
+                i
+                for i, table in enumerate(res.tables)
                 if any(j.name == name for j in table.players)
             ]
-            self.assertEqual(len(set(tables_del_jugador)), len(tables_del_jugador),
-                             f"{name} aparece en la misma table más de una vez")
+            self.assertEqual(
+                len(set(tables_del_jugador)),
+                len(tables_del_jugador),
+                f"{name} aparece en la misma table más de una vez",
+            )
 
     # ── Balance de experiencia ────────────────────────────────────────────────
 
@@ -202,6 +208,75 @@ class TestCalcularPartidas(unittest.TestCase):
         res = calculate_matches(_pool(14))
         assert res is not None
         self.assertEqual(len(res.waitlist_players), 0)
+
+    def test_two_phase_pipeline_execution_order(self):
+        """Test that assign_countries_to_table is executed after run_distribution_loop."""
+        from unittest.mock import MagicMock, patch
+
+        from .core import calculate_matches
+
+        # Create mock functions to track execution order
+        distribution_mock = MagicMock()
+        assignment_mock = MagicMock()
+
+        # Create a mock result to return from run_distribution_loop
+        from .models import DraftPlayer, DraftResult, DraftTable
+
+        mock_draft_result = DraftResult(
+            tables=[
+                DraftTable(
+                    table_number=1,
+                    players=[
+                        DraftPlayer(
+                            name=f"Player{i}",
+                            experience="Veterano",
+                            games_this_year=0,
+                            priority="False",
+                            desired_games=1,
+                            gm_games=0,
+                        )
+                        for i in range(7)
+                    ],
+                    gm=None,
+                )
+            ],
+            waitlist_players=[],
+            theoretical_minimum=0,
+            attempts_used=1,
+        )
+
+        # Mock the two main functions
+        with (
+            patch(
+                "backend.organizador.distribution.run_distribution_loop",
+                distribution_mock,
+            ),
+            patch("backend.organizador.core.assign_countries_to_table", assignment_mock),
+        ):
+            # Set up the distribution mock to return our mock result
+            distribution_mock.return_value = mock_draft_result
+
+            # Create basic player pool
+            players = _pool(14)
+
+            # Run calculate_matches
+            calculate_matches(players)
+
+            # Verify both functions were called
+            distribution_mock.assert_called()
+            assignment_mock.assert_called()
+
+            # Verify that assign_countries_to_table was called with player lists (not DraftTable objects)
+            # This should happen after run_distribution_loop creates the tables
+            assignment_calls = assignment_mock.call_args_list
+            # Verify the assignment was called with player lists (from each table)
+            for call in assignment_calls:
+                players_arg = call[0][0]  # First argument should be list of DraftPlayer objects
+                self.assertIsInstance(players_arg, list)
+                if players_arg:  # If list is not empty
+                    self.assertTrue(
+                        hasattr(players_arg[0], "name")
+                    )  # DraftPlayer has name attribute
 
 
 if __name__ == "__main__":

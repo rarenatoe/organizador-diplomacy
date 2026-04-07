@@ -18,7 +18,7 @@ from backend.crud.chain import squash_linear_branch
 from backend.crud.games import save_game_draft, update_game_draft
 from backend.crud.snapshots import delete_snapshot_cascade, get_snapshot_players
 from backend.db.connection import get_session
-from backend.db.models import TimelineEdge
+from backend.db.models import PlayerStateDict, TimelineEdge
 from backend.db.views import get_game_event_detail
 from backend.organizador.core import calculate_matches
 from backend.organizador.models import DraftPlayer, DraftResult
@@ -103,7 +103,7 @@ async def api_game_draft(
         if not request.snapshot_id:
             raise HTTPException(status_code=400, detail="snapshot_id is required")
 
-        rows: list[dict[str, Any]] = await get_snapshot_players(session, request.snapshot_id)
+        rows: list[PlayerStateDict] = await get_snapshot_players(session, request.snapshot_id)
         jugadores: list[DraftPlayer] = [
             DraftPlayer(
                 name=r["nombre"],
@@ -112,13 +112,13 @@ async def api_game_draft(
                 priority=str(bool(r["prioridad"])),
                 desired_games=r["partidas_deseadas"],
                 gm_games=r["partidas_gm"],
-                c_england=r["c_england"],
-                c_france=r["c_france"],
-                c_germany=r["c_germany"],
-                c_italy=r["c_italy"],
-                c_austria=r["c_austria"],
-                c_russia=r["c_russia"],
-                c_turkey=r["c_turkey"],
+                c_england=r.get("c_england", 0),
+                c_france=r.get("c_france", 0),
+                c_germany=r.get("c_germany", 0),
+                c_italy=r.get("c_italy", 0),
+                c_austria=r.get("c_austria", 0),
+                c_russia=r.get("c_russia", 0),
+                c_turkey=r.get("c_turkey", 0),
             )
             for r in rows
         ]
@@ -138,6 +138,9 @@ async def api_game_draft(
             )
 
         await session.commit()
+
+        waitlist_counts = Counter(p.name for p in resultado.waitlist_players)
+        unique_waitlist = list({p.name: p for p in resultado.waitlist_players}.values())
 
         # Convert English DraftResult back to Spanish JSON for frontend
         spanish_result = {
@@ -209,8 +212,9 @@ async def api_game_draft(
                     "pais_reason": player.country_reason,
                     "es_nuevo": player.is_new,
                     "tiene_prioridad": player.has_priority,
+                    "cupos_faltantes": waitlist_counts[player.name],
                 }
-                for player in resultado.waitlist_players
+                for player in unique_waitlist
             ],
             "minimo_teorico": resultado.theoretical_minimum,
             "intentos_usados": resultado.attempts_used,

@@ -12,6 +12,7 @@ import type {
   DraftResponse,
   SaveDraftResponse,
   SaveDraftRequest,
+  SimilarName,
 } from "./types";
 
 // ── Error Handling ────────────────────────────────────────────────────────────
@@ -178,4 +179,58 @@ export async function renamePlayer(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ old_name: oldName, new_name: newName }),
   });
+}
+
+export async function lookupPlayerHistory(
+  names: string[],
+  snapshotId?: number,
+): Promise<{
+  players: Record<
+    string,
+    {
+      prioridad: number;
+      experiencia: string;
+      juegos_este_ano: number;
+      partidas_deseadas: number;
+      partidas_gm: number;
+      source: string;
+    }
+  >;
+}> {
+  return safeFetch<{
+    players: Record<
+      string,
+      {
+        prioridad: number;
+        experiencia: string;
+        juegos_este_ano: number;
+        partidas_deseadas: number;
+        partidas_gm: number;
+        source: string;
+      }
+    >;
+  }>("/api/player/lookup", {
+    method: "POST",
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ names, snapshot_id: snapshotId }),
+  });
+}
+
+export async function getAllPlayers(): Promise<{ names: string[] }> {
+  return safeFetch<{ names: string[] }>("/api/player/all");
+}
+
+export async function checkPlayerSimilarity(
+  names: string[],
+): Promise<{ similarities: SimilarName[] }> {
+  return safeFetch<{ similarities: SimilarName[] }>(
+    "/api/player/check-similarity",
+    {
+      method: "POST",
+      // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ names }),
+    },
+  );
 }

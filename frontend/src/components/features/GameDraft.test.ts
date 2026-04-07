@@ -138,6 +138,77 @@ describe("GameDraft.svelte", () => {
     });
   });
 
+  it("handles duplicate waitlist users without key warnings", async () => {
+    // Create mock draft data with duplicate users in waitlist
+    const mockDraftWithDuplicates = createMockDraftResponse({
+      mesas: [
+        createMockDraftMesa({
+          numero: 1,
+          jugadores: [
+            createMockDraftPlayer({
+              nombre: "Alice",
+              es_nuevo: false,
+              juegos_ano: 5,
+              tiene_prioridad: true,
+              partidas_deseadas: 2,
+              c_england: 1,
+            }),
+          ],
+        }),
+      ],
+      tickets_sobrantes: [
+        createMockDraftPlayer({
+          nombre: "DuplicateUser",
+          juegos_ano: 2,
+          partidas_deseadas: 2,
+          c_germany: 1,
+        }),
+        createMockDraftPlayer({
+          nombre: "DuplicateUser", // Same name as above
+          juegos_ano: 1,
+          partidas_deseadas: 1,
+          c_france: 1,
+        }),
+        createMockDraftPlayer({
+          nombre: "DuplicateUser", // Same name again
+          juegos_ano: 3,
+          partidas_deseadas: 3,
+          c_italy: 1,
+        }),
+      ],
+      minimo_teorico: 3,
+      intentos_usados: 1,
+    });
+
+    const { fetchGameDraft } = vi.mocked(await import("../../api"));
+    fetchGameDraft.mockResolvedValue(mockDraftWithDuplicates);
+
+    // Mock console.warn to catch any duplicate key warnings
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    // Render the component with duplicate waitlist users
+    render(GameDraft, { props: mockProps });
+
+    // Wait for the component to render
+    await vi.waitFor(() => {
+      const duplicateUsers = screen.getAllByText("DuplicateUser");
+      expect(duplicateUsers).toHaveLength(3);
+    });
+
+    // Verify all duplicate users are rendered
+    const duplicateUsers = screen.getAllByText("DuplicateUser");
+    expect(duplicateUsers).toHaveLength(3);
+
+    // Verify that no duplicate key warnings were thrown
+    expect(consoleSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("duplicate key"),
+      expect.any(Object),
+    );
+
+    // Clean up
+    consoleSpy.mockRestore();
+  });
+
   it("shows error when save fails", async () => {
     const { saveGameDraft } = vi.mocked(await import("../../api"));
     saveGameDraft.mockResolvedValue({ game_id: 0, error: "Save failed" });

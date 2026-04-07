@@ -7,7 +7,10 @@ if TYPE_CHECKING:
 
 # ── Weighted Tickets Setup ───────────────────────────────────────────────────
 
-def build_weighted_tickets(players: list[DraftPlayer]) -> tuple[int, int, int, list[DraftPlayer], list[tuple[float, DraftPlayer]]]:
+
+def build_weighted_tickets(
+    players: list[DraftPlayer],
+) -> tuple[int, int, int, list[DraftPlayer], list[tuple[float, DraftPlayer]]]:
     """
     Calculates the estimated and real tables, theoretical minimum waitlist,
     active GMs, and weighted tickets list based on player priority and GM roles.
@@ -72,6 +75,6 @@ def build_weighted_tickets(players: list[DraftPlayer]) -> tuple[int, int, int, l
         return estimated_tables, 0, 0, active_gms, []
 
     # Waitlist floor: tickets that don't fit in any scenario.
-    theoretical_minimum: int = len(weighted_tickets) - actual_tables * 7
+    theoretical_minimum: int = max(0, len(weighted_tickets) - actual_tables * 7)
 
     return estimated_tables, actual_tables, theoretical_minimum, active_gms, weighted_tickets

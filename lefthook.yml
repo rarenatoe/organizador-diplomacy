@@ -8,6 +8,9 @@ pre-commit:
       glob: "backend/**/*.py"
       run: uv run ruff check --fix {staged_files}
       stage_fixed: true
+    backend-typecheck:
+      glob: "backend/**/*.py"
+      run: uv run python -m pyright backend/
     backend-test:
       glob: "backend/**/*.py"
       run: uv run python -m pytest -q

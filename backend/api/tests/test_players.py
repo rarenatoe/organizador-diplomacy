@@ -6,6 +6,7 @@ Tests player renaming functionality.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 import pytest
@@ -25,7 +26,7 @@ pytestmark = pytest.mark.asyncio
 
 
 async def make_snapshot_with_player(
-    db_session: Any, name: str = "Alice", experiencia: str = "Antiguo"
+    db_session: Any, name: str = "Alice", experience: str = "Antiguo"
 ) -> tuple[int, int]:
     """Creates a snapshot with one player; returns (snapshot_id, player_id)."""
     snap_id = await create_snapshot(db_session, "manual")
@@ -34,7 +35,7 @@ async def make_snapshot_with_player(
         db_session,
         snap_id,
         pid,
-        experiencia,
+        experience,
         games_this_year=0,
         priority=1,
         desired_games=2,
@@ -223,3 +224,325 @@ class TestApiSnapshotAddPlayer:
         snapshot_players = result.scalars().all()
         helen_entries = [sp for sp in snapshot_players if sp.player_id == pid]
         assert len(helen_entries) == 1
+
+
+class TestPlayerLookup:
+    """Tests for /api/player/lookup endpoint with deep lookup and multiple fallbacks."""
+
+    async def test_lookup_empty_names_returns_400(self, client: Any) -> None:
+        """Test lookup with empty names list returns 400."""
+        resp = await client.post("/api/player/lookup", json={"names": []})
+        assert resp.status_code == 400
+        assert "names list cannot be empty" in resp.json()["detail"]
+
+    async def test_lookup_no_snapshots_returns_defaults(self, client: Any) -> None:
+        """Test lookup when no snapshots exist returns default values."""
+        resp = await client.post("/api/player/lookup", json={"names": ["Alice", "Bob"]})
+        assert resp.status_code == 200
+        data = resp.json()
+        players = data["players"]
+
+        # Should return default values for both players
+        assert "Alice" in players
+        assert "Bob" in players
+        assert players["Alice"]["source"] == "default"
+        assert players["Bob"]["source"] == "default"
+        assert players["Alice"]["prioridad"] == 0
+        assert players["Alice"]["experiencia"] == "Nuevo"
+        assert players["Alice"]["juegos_este_ano"] == 0
+
+    async def test_lookup_timeline_traversal_finds_history(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Test lookup finds player via TimelineEdge ancestry and returns source='history'."""
+        from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
+        from backend.db.models import TimelineEdge
+
+        # Create player and add to a snapshot to establish history
+        snap_id = await create_snapshot(db_session, "manual")
+        player_id = await get_or_create_player(db_session, "Charlie")
+        await add_player_to_snapshot(
+            session=db_session,
+            snapshot_id=snap_id,
+            player_id=player_id,
+            experience="Veterano",
+            games_this_year=0,
+            priority=1,
+            desired_games=1,
+            gm_games=0,
+        )
+        await db_session.commit()
+
+        # Create timeline edge from snapshot to None (makes it part of timeline)
+        edge = TimelineEdge(
+            id=1, source_snapshot_id=None, output_snapshot_id=snap_id, edge_type="branch"
+        )
+        db_session.add(edge)
+        await db_session.commit()
+
+        resp = await client.post(
+            "/api/player/lookup", json={"names": ["Charlie"], "snapshot_id": None}
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        players = data["players"]
+
+        assert "Charlie" in players
+        # Should be from history, not from Notion global fallback
+        assert players["Charlie"]["source"] == "history"
+        assert players["Charlie"]["prioridad"] == 1
+        assert players["Charlie"]["experiencia"] == "Veterano"  # From snapshot
+        assert players["Charlie"]["juegos_este_ano"] == 0
+
+    async def test_lookup_global_fallback_finds_snapshot_player(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Test lookup finds player in SnapshotPlayer elsewhere and returns source='history'."""
+        from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
+
+        # Create snapshot with player
+        snap_id = await create_snapshot(db_session, "manual")
+        player_id = await get_or_create_player(db_session, "Diana")
+        await add_player_to_snapshot(
+            session=db_session,
+            snapshot_id=snap_id,
+            player_id=player_id,
+            experience="Veterano",
+            games_this_year=1,
+            priority=1,
+            desired_games=1,
+            gm_games=1,
+        )
+        await db_session.commit()
+
+        # Test lookup from different snapshot (should find via global fallback)
+        resp = await client.post(
+            "/api/player/lookup", json={"names": ["Diana"], "snapshot_id": snap_id + 1}
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        players = data["players"]
+
+        assert "Diana" in players
+        assert players["Diana"]["source"] == "history"
+        assert players["Diana"]["prioridad"] == 1
+        assert players["Diana"]["experiencia"] == "Veterano"
+        assert players["Diana"]["juegos_este_ano"] == 1
+
+    async def test_lookup_json_rescue_finds_deleted_player(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Test lookup finds player in SnapshotHistory JSON logs and returns source='history'."""
+        from backend.crud.snapshots import create_snapshot
+        from backend.db.models import (
+            DeepDiffResult,
+            HistoryActionType,
+            HistoryStateDict,
+            SnapshotHistory,
+        )
+
+        # Create player and snapshot with history
+        player_id = await get_or_create_player(db_session, "Eve")
+        snap_id = await create_snapshot(db_session, "manual")
+
+        # Add player to snapshot, then delete player from snapshot, then create history entry
+        await add_player_to_snapshot(db_session, snap_id, player_id, "Veterano", 1, 2, 1, 1)
+        await db_session.commit()
+
+        # Delete player from snapshot (simulating deletion)
+        from backend.db.models import SnapshotPlayer
+
+        result = await db_session.execute(
+            select(SnapshotPlayer).where(SnapshotPlayer.player_id == player_id)
+        )
+        sp_player = result.scalar_one_or_none()
+        if sp_player:
+            await db_session.delete(sp_player)
+            await db_session.commit()
+
+        # Create history log with player data
+        changes = DeepDiffResult(added=[], removed=["Eve"], renamed=[], modified=[])
+        history_state = HistoryStateDict(
+            players=[
+                {
+                    "nombre": "Eve",
+                    "experiencia": "Veterano",
+                    "juegos_este_ano": 1,
+                    "prioridad": 1,
+                    "partidas_deseadas": 2,
+                    "partidas_gm": 1,
+                }
+            ]
+        )
+        history_entry = SnapshotHistory(
+            snapshot_id=snap_id,
+            action_type=HistoryActionType.MANUAL_EDIT,
+            changes=changes,
+            previous_state=history_state,
+        )
+        db_session.add(history_entry)
+        await db_session.commit()
+
+        # Test lookup should find player in JSON logs
+        resp = await client.post(
+            "/api/player/lookup", json={"names": ["Eve"], "snapshot_id": snap_id + 1}
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        players = data["players"]
+
+        assert "Eve" in players
+        assert players["Eve"]["source"] == "history"
+        assert players["Eve"]["prioridad"] == 1
+        assert players["Eve"]["experiencia"] == "Veterano"
+        assert players["Eve"]["juegos_este_ano"] == 1
+
+    async def test_lookup_notion_fallback_returns_notion_stats(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Test lookup finds player only in NotionCache and returns source='notion' with forced defaults."""
+        from backend.db.models import NotionCache
+
+        # Create player in NotionCache
+        notion_player = NotionCache(
+            notion_id="test-notion-id",
+            name="Frank",
+            experience="Veterano",
+            games_this_year=3,
+            c_england=1,
+            c_france=0,
+            c_italy=0,
+            c_austria=1,
+            c_russia=0,
+            c_turkey=1,
+            last_updated=datetime.now(),
+        )
+        db_session.add(notion_player)
+        await db_session.commit()
+
+        # Test lookup should find player in NotionCache
+        resp = await client.post(
+            "/api/player/lookup", json={"names": ["Frank"], "snapshot_id": None}
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        players = data["players"]
+
+        assert "Frank" in players
+        assert players["Frank"]["source"] == "notion"
+        # Notion fallback should force specific defaults regardless of Notion data
+        assert players["Frank"]["prioridad"] == 0
+        assert players["Frank"]["partidas_deseadas"] == 1
+        assert players["Frank"]["partidas_gm"] == 0
+        assert players["Frank"]["experiencia"] == "Veterano"  # From Notion
+        assert players["Frank"]["juegos_este_ano"] == 3
+
+    async def test_lookup_unknown_player_returns_defaults(self, client: Any) -> None:
+        """Test lookup for completely unknown player returns default values."""
+        resp = await client.post("/api/player/lookup", json={"names": ["UnknownPlayer"]})
+        assert resp.status_code == 200
+        data = resp.json()
+        players = data["players"]
+
+        assert "UnknownPlayer" in players
+        assert players["UnknownPlayer"]["source"] == "default"
+        assert players["UnknownPlayer"]["prioridad"] == 0
+        assert players["UnknownPlayer"]["experiencia"] == "Nuevo"
+        assert players["UnknownPlayer"]["juegos_este_ano"] == 0
+
+    async def test_lookup_multiple_players_mixed_sources(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Test lookup with multiple players from different sources."""
+        from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
+        from backend.db.models import NotionCache
+
+        # Setup: Player in snapshot history
+        snap_id1 = await create_snapshot(db_session, "manual")
+        player_id1 = await get_or_create_player(db_session, "Alice")
+        await add_player_to_snapshot(
+            session=db_session,
+            snapshot_id=snap_id1,
+            player_id=player_id1,
+            experience="Veterano",
+            games_this_year=1,
+            priority=1,
+            desired_games=1,
+            gm_games=1,
+        )
+
+        # Setup: Player in NotionCache
+        notion_player = NotionCache(
+            notion_id="test-notion-id",
+            name="Bob",
+            experience="Veterano",
+            games_this_year=3,
+            last_updated=datetime.now(),
+        )
+        db_session.add(notion_player)
+        await db_session.commit()
+
+        # Test lookup for both players
+        resp = await client.post(
+            "/api/player/lookup", json={"names": ["Alice", "Bob"], "snapshot_id": snap_id1}
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        players = data["players"]
+
+        # Alice should be from history
+        assert players["Alice"]["source"] == "history"
+        assert players["Alice"]["prioridad"] == 1
+        assert players["Alice"]["experiencia"] == "Veterano"
+
+        # Bob should be from Notion with forced defaults
+        assert players["Bob"]["source"] == "notion"
+        assert players["Bob"]["prioridad"] == 0
+        assert players["Bob"]["partidas_deseadas"] == 1
+        assert players["Bob"]["partidas_gm"] == 0
+
+    async def test_lookup_with_snapshot_id_prioritizes_history(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Test that providing snapshot_id prioritizes history lookup over global fallbacks."""
+        from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
+        from backend.db.models import NotionCache
+
+        # Create player in NotionCache (global fallback)
+        notion_player = NotionCache(
+            notion_id="global-charlie-id",
+            name="Charlie",
+            experience="Novato",
+            last_updated=datetime.now(),
+        )
+        db_session.add(notion_player)
+        await db_session.commit()
+
+        # Create player in snapshot history
+        snap_id = await create_snapshot(db_session, "manual")
+        player_id = await get_or_create_player(db_session, "Charlie")
+        await add_player_to_snapshot(
+            session=db_session,
+            snapshot_id=snap_id,
+            player_id=player_id,
+            experience="Veterano",
+            games_this_year=1,
+            priority=1,
+            desired_games=1,
+            gm_games=1,
+        )
+        await db_session.commit()
+
+        # Test lookup with snapshot_id should prioritize history
+        resp = await client.post(
+            "/api/player/lookup", json={"names": ["Charlie"], "snapshot_id": snap_id}
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        players = data["players"]
+
+        assert "Charlie" in players
+        # Should be from history, not from Notion global fallback
+        assert players["Charlie"]["source"] == "history"
+        assert players["Charlie"]["prioridad"] == 1
+        assert players["Charlie"]["experiencia"] == "Veterano"  # From snapshot

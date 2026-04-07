@@ -10,6 +10,13 @@ describe("Tooltip.svelte", () => {
     expect(infoIcon).toHaveClass("info-icon");
   });
 
+  it("renders custom icon when provided", () => {
+    render(Tooltip, { props: { text: "Test tooltip", icon: "📚" } });
+    const customIcon = screen.getByText("📚");
+    expect(customIcon).toBeInTheDocument();
+    expect(customIcon).toHaveClass("info-icon");
+  });
+
   it("renders text content in tooltip popover", () => {
     render(Tooltip, { props: { text: "This is a tooltip" } });
     const tooltipPopover = document.querySelector(".tooltip-popover");

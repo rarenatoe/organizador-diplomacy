@@ -24,15 +24,15 @@ async def background_test_engine():
     from sqlalchemy.ext.asyncio import create_async_engine
 
     from backend.db.models import Base
-    
+
     test_engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-    
+
     # Initialize database schema once for the entire module
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
+
     yield test_engine
-    
+
     # Clean up after all tests in the module
     await test_engine.dispose()
 
@@ -298,15 +298,15 @@ class TestNotionSyncBackground:
             alice = players_by_name["Alice"]
             assert alice["experiencia"] == "Antiguo"
             assert alice["juegos_este_ano"] == 5
-            assert alice["c_england"] == 0
-            assert alice["c_france"] == 0
+            assert alice.get("c_england", 0) == 0
+            assert alice.get("c_france", 0) == 0
 
             # Verify Bob data (Nuevo with 2 games)
             assert "Bob" in players_by_name
             bob = players_by_name["Bob"]
             assert bob["experiencia"] == "Nuevo"
             assert bob["juegos_este_ano"] == 2
-            assert bob["c_england"] == 1  # Has England preference
+            assert bob.get("c_england", 0) == 1  # Has England preference
 
     async def test_run_sync_applies_merges_and_renames(
         self,
@@ -424,7 +424,7 @@ class TestNotionSyncBackground:
         # Step 1: Create initial snapshot with 2 players
         from backend.crud.players import get_or_create_player
         from backend.crud.snapshots import add_player_to_snapshot
-        
+
         async with AsyncSession(test_engine) as session:
             snap_id = await create_snapshot(session, "notion_sync")
             player1_id = await get_or_create_player(session, "Alice")

@@ -6,41 +6,66 @@ priority: 10
 
 ## Core Architecture
 
-- **Backend:** Pure Data & Algorithms. Python 3.13, uv, FastAPI, and SQLAlchemy. (No Flask).
-- **Frontend:** Presentation & Translation. Svelte 5, TypeScript, Vite.
-- **File Size:** 400-line soft limit per file. Extract sub-domains into new files unless they are highly cohesive indivisible units.
+**Rule:** Backend serves as pure data and algorithms using Python 3.13, uv, FastAPI, and SQLAlchemy.
+**Anti-Pattern:** Using Flask or mixing presentation logic in backend code.
 
-## The Spanglish Boundary (CRITICAL)
+**Rule:** Frontend handles presentation and translation using Svelte 5, TypeScript, and Vite.
+**Anti-Pattern:** Placing business logic or data processing in frontend components.
 
-**INTERNAL CODE** (English ONLY):
+**Rule:** Maintain 400-line soft limit per file by extracting sub-domains into separate files.
+**Anti-Pattern:** Creating monolithic files with multiple responsibilities unless highly cohesive and indivisible.
 
-- Python/TS variables, types, function names, database schemas, endpoints
-- Component names, CSS classes, DOM variables
-- Example: `let listaEspera = []` → `let waitingList = []`, `class="jugadores-excluidos"` → `class="excluded-players"`
+## Language Boundaries
 
-**UI TEXT** (Spanish ONLY):
+**Rule:** Use English exclusively for internal code including Python/TS variables, types, function names, database schemas, and endpoints.
+**Anti-Pattern:** Using Spanish for variable names like `let listaEspera = []` instead of `let waitingList = []`.
 
-- HTML labels, user messages, button text, error messages
-- Example: "Partida 1", "⚠️ Sin GM", "Copiar jugadores"
+**Rule:** Use Spanish exclusively for UI text including HTML labels, user messages, button text, and error messages.
+**Anti-Pattern:** Translating user-facing text like "Partida 1" or "Copiar jugadores" to English.
 
-**CRITICAL EXCEPTION**: NEVER translate API-coupled data properties:
-
-- `mesa.jugadores`, `juegos_este_ano`, `pais_reason`
-- These map to frontend UI and database schema - translating causes massive ripple effects
+**Rule:** Never translate API-coupled data properties that map between frontend UI and database schema.
+**Anti-Pattern:** Translating properties like `mesa.jugadores`, `juegos_este_ano`, or `pais_reason` which causes ripple effects.
 
 ## Directory Layout
 
-- `backend/api/routers/`: FastAPI endpoints.
-- `backend/db/`: Database models, views, and connection management.
-- `backend/crud/`: Modular data access layer (Repository Pattern) with domain-specific modules.
-- `backend/organizador/`: Core algorithms and pure data modeling.
-- `backend/sync/`: Notion integration and caching daemon.
-- `frontend/src/`: Svelte components, `$state` runes, API utilities, and types.
+**Rule:** Organize backend with `backend/api/routers/` for FastAPI endpoints, `backend/db/` for models and connection management, `backend/crud/` for modular data access, `backend/organizador/` for algorithms, and `backend/sync/` for Notion integration.
+**Anti-Pattern:** Mixing concerns across directories or creating god files.
 
-## Business Logic Patterns
+**Rule:** Place all frontend code in `frontend/src/` with Svelte components, `$state` runes, API utilities, and types.
+**Anti-Pattern:** Scattering frontend code outside the designated src directory.
 
-**Semantic Modifiers** - Prefer semantic boolean props (e.g., `destructive={true}`) over specialized component variants (e.g., `variant="ghost-danger"`) to keep the design system clean and predictable.
+## Component Architecture
 
-## Interaction Patterns
+**Rule:** Prefer semantic boolean props like `destructive={true}` over specialized component variants like `variant="ghost-danger"`.
+**Anti-Pattern:** Creating proliferating component variants that complicate the design system.
 
-**Action Bubbling** - Feature components should bubble up destructive actions (like deletions) to central orchestrators (`App.svelte`) via callback props. Avoid performing API side-effects inside deeply nested UI components to keep confirmation logic and state refreshes consistent.
+**Rule:** Feature components should bubble up destructive actions to central orchestrators via callback props.
+**Anti-Pattern:** Performing API side-effects inside deeply nested UI components.
+
+## Core Workflows & Business Logic
+
+### Player Ingestion Flow
+
+**Rule:** Users enter players via inline Autocomplete or bulk CSV import.
+**Anti-Pattern:** Bypassing the similarity check for unrecognized names.
+
+**Rule:** Unrecognized names MUST be intercepted via Notion similarity check and paused at the `SyncResolutionModal`.
+**Anti-Pattern:** Allowing unrecognized names to proceed without similarity validation.
+
+### History Lookup Flow
+
+**Rule:** Must use strict 4-tier traversal: `TimelineEdge` -> `SnapshotPlayer` -> `SnapshotHistory` JSON logs -> `NotionCache`.
+**Anti-Pattern:** Skipping traversal tiers or accessing data out of sequence.
+
+### Manual Save Philosophy
+
+**Rule:** Implement "Dumb Save" where frontend is the absolute source of truth for manual edits.
+**Anti-Pattern:** Backend attempting to merge historical weights or applying smart corrections.
+
+**Rule:** Backend strictly overwrites existing state without attempting to merge historical weights.
+**Anti-Pattern:** Backend implementing complex merge logic for manual edits.
+
+### Draft Algorithm Pipeline
+
+**Rule:** Execute sequential phases: Calculate Tickets -> Distribute to Tables -> Assign Countries -> Deduplicate Waitlist.
+**Anti-Pattern:** Skipping pipeline phases or executing them out of order.

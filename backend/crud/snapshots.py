@@ -15,7 +15,6 @@ from sqlalchemy import delete, func, select
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.crud.chain import create_timeline_edge
 from backend.crud.players import get_or_create_player
 from backend.db.models import (
     DeepDiffResult,
@@ -23,9 +22,11 @@ from backend.db.models import (
     GameDetail,
     GameTable,
     GraphNode,
+    HistoryStateDict,
     ModifiedPlayer,
     NotionCache,
     Player,
+    PlayerStateDict,
     RenameDict,
     Snapshot,
     SnapshotHistory,
@@ -93,6 +94,7 @@ def generate_deep_diff(
         "renamed": renames,
         "modified": modified,
     }
+
 
 # ── Players ────────────────────────────────────────────────────────────────────
 
@@ -189,7 +191,7 @@ async def snapshots_have_same_roster(
     return snap_dict == notion_dict
 
 
-async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[dict[str, Any]]:
+async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[PlayerStateDict]:
     """Return all players in a snapshot as dictionaries."""
     # Get the deduplicated Notion cache subquery
     deduped_cache = get_deduped_notion_cache_subquery(_session=session)
@@ -320,44 +322,6 @@ async def delete_snapshot_cascade(session: AsyncSession, snapshot_id: int) -> bo
 # ── Game Organization ─────────────────────────────────────────────────────────
 
 
-async def create_manual_snapshot(
-    session: AsyncSession,
-    source_snapshot_id: int,
-    edits: list[dict[str, Any]],
-) -> int:
-    """Create a manual snapshot with edited player data."""
-    source_players: dict[str, dict[str, Any]] = {
-        p["nombre"]: p for p in await get_snapshot_players(session, source_snapshot_id)
-    }
-    snap_id = await create_snapshot(session, "manual")
-
-    for e in edits:
-        nombre = e["nombre"]
-        base = source_players.get(nombre)
-        if base is None:
-            continue
-
-        result = await session.execute(select(Player).where(Player.name == nombre))
-        player: Player | None = result.scalar_one_or_none()
-        if not player:
-            continue
-
-        await add_player_to_snapshot(
-            session,
-            snap_id,
-            player.id,
-            base["experiencia"],
-            base["juegos_este_ano"],
-            int(e.get("prioridad", base["prioridad"])),
-            int(e.get("partidas_deseadas", base["partidas_deseadas"])),
-            int(e.get("partidas_gm", base["partidas_gm"])),
-        )
-
-    # Create event
-    await create_timeline_edge(session, "manual", source_snapshot_id, snap_id)
-    return snap_id
-
-
 async def create_root_manual_snapshot(
     session: AsyncSession,
     players: list[dict[str, Any]],
@@ -388,7 +352,7 @@ async def create_root_manual_snapshot(
 
 def get_deduped_notion_cache_subquery(_session: AsyncSession):
     """Create a reusable SQLAlchemy subquery to deduplicate Notion cache entries.
-    
+
     Returns a subquery that groups by NotionCache.name and selects the maximum
     values for country assignments and other fields to prevent fan-out bugs.
     """
@@ -473,7 +437,7 @@ async def log_snapshot_history(
     snapshot_id: int,
     action_type: str,
     changes: DeepDiffResult,
-    previous_state: dict[str, object],
+    previous_state: HistoryStateDict,
 ) -> None:
     """Log a snapshot history entry."""
     history_entry = SnapshotHistory(

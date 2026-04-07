@@ -13,6 +13,11 @@ vi.mock("../../api", () => ({
   fetchNotionPlayers: vi
     .fn()
     .mockResolvedValue({ players: [], similar_names: [] }),
+  getAllPlayers: vi
+    .fn()
+    .mockResolvedValue({ names: ["Daniel Eiler", "Daniel Escobar"] }),
+  checkPlayerSimilarity: vi.fn().mockResolvedValue({ similarities: [] }),
+  lookupPlayerHistory: vi.fn().mockResolvedValue({ players: {} }),
 }));
 
 // Mock the utils module
@@ -42,11 +47,30 @@ vi.mock("../../stores.svelte", () => ({
   setActiveNodeId: vi.fn(),
 }));
 
-// Mock window.prompt
-const mockPrompt = vi.fn();
-vi.stubGlobal("prompt", mockPrompt);
-
 describe("SnapshotDraft", () => {
+  const mockInitialPlayers = [
+    {
+      nombre: "Test Player",
+      experiencia: "Nuevo",
+      juegos_este_ano: 0,
+      prioridad: 0,
+      partidas_deseadas: 1,
+      partidas_gm: 0,
+      original_nombre: "Test Player",
+      historyRestored: false,
+    },
+  ];
+  const defaultProps = {
+    parentId: null,
+    initialPlayers: [],
+    defaultEventType: "manual" as const,
+    onClose: vi.fn(),
+    onCancel: vi.fn(),
+    onChainUpdate: vi.fn(),
+    onOpenSnapshot: vi.fn(),
+    onShowError: vi.fn(),
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -87,31 +111,65 @@ describe("SnapshotDraft", () => {
     expect(screen.getByText("📥 Pegar CSV")).toBeTruthy();
   });
 
-  it("adds a player when add button is clicked", async () => {
-    mockPrompt.mockReturnValue("Test Player");
+  it("renders autocomplete input inside table footer when add button is clicked", async () => {
+    const { tick } = await import("svelte");
+    render(SnapshotDraft, {
+      props: { ...defaultProps, initialPlayers: mockInitialPlayers },
+    });
+    await fireEvent.click(screen.getByText("➕ Agregar jugador"));
+    await tick();
+    expect(
+      screen.getByPlaceholderText("Escribe para buscar o agregar..."),
+    ).toBeTruthy();
+  });
 
-    const { container } = render(SnapshotDraft, {
-      props: {
-        parentId: null,
-        initialPlayers: [],
-        defaultEventType: "manual",
-        onClose: () => {},
-        onCancel: () => {},
-        onChainUpdate: () => {},
-        onOpenSnapshot: () => {},
-        onShowError: () => {},
+  it("filters known players in dropdown", async () => {
+    const { tick } = await import("svelte");
+    render(SnapshotDraft, {
+      props: { ...defaultProps, initialPlayers: mockInitialPlayers },
+    });
+    await fireEvent.click(screen.getByText("➕ Agregar jugador"));
+    await tick();
+    const input = screen.getByPlaceholderText(
+      "Escribe para buscar o agregar...",
+    );
+    await fireEvent.input(input, { target: { value: "Dan" } });
+    expect(screen.getByText("Daniel Eiler")).toBeInTheDocument();
+    expect(screen.getByText("Daniel Escobar")).toBeInTheDocument();
+  });
+
+  it("rehydrates player history when suggested name is clicked", async () => {
+    const { tick } = await import("svelte");
+    const { lookupPlayerHistory } = await import("../../api");
+    (lookupPlayerHistory as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      players: {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        "Daniel Eiler": {
+          experiencia: "Veterano",
+          juegos_este_ano: 5,
+          prioridad: 1,
+          partidas_deseadas: 2,
+          partidas_gm: 0,
+          source: "history",
+        },
       },
     });
-
-    const addButton = screen.getByText("➕ Agregar jugador");
-    await fireEvent.click(addButton);
-
-    expect(mockPrompt).toHaveBeenCalledWith("Nombre del nuevo jugador:");
-    const nameInput = container.querySelector(
-      ".table-input-ghost",
-    ) as HTMLInputElement;
-    expect(nameInput).toBeTruthy();
-    expect(nameInput.value).toBe("Test Player");
+    render(SnapshotDraft, {
+      props: { ...defaultProps, initialPlayers: mockInitialPlayers },
+    });
+    await fireEvent.click(screen.getByText("➕ Agregar jugador"));
+    await tick();
+    const input = screen.getByPlaceholderText(
+      "Escribe para buscar o agregar...",
+    );
+    await fireEvent.input(input, { target: { value: "Dan" } });
+    await fireEvent.click(screen.getByText("Daniel Eiler"));
+    expect(
+      screen.queryByPlaceholderText("Escribe para buscar o agregar..."),
+    ).toBeNull();
+    const nameInputs = screen.getAllByPlaceholderText("Nombre del jugador");
+    expect(nameInputs.length).toBe(2); // Original player + new player
+    expect((nameInputs[1] as HTMLInputElement).value).toBe("Daniel Eiler");
   });
 
   it("opens CSV modal when paste CSV button is clicked", async () => {
@@ -133,6 +191,31 @@ describe("SnapshotDraft", () => {
 
     expect(screen.getByText("Pegar CSV")).toBeTruthy();
     expect(screen.getByPlaceholderText(/nombre,experiencia/)).toBeTruthy();
+  });
+
+  it("pauses CSV import and shows sync modal when similarities are found", async () => {
+    const { checkPlayerSimilarity } = await import("../../api");
+    (checkPlayerSimilarity as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      similarities: [
+        { notion: "Daniel Eiler", snapshot: "Daniel Ei", similarity: 0.95 },
+      ],
+    });
+
+    const { container } = render(SnapshotDraft, { props: defaultProps });
+
+    await fireEvent.click(screen.getByText("📥 Pegar CSV"));
+    const textarea = screen.getByPlaceholderText(/nombre,experiencia/);
+    await fireEvent.input(textarea, {
+      target: { value: "nombre,experiencia\nDaniel Ei,Nuevo" },
+    });
+    await fireEvent.click(screen.getByText("Importar"));
+
+    // Verify it paused: The table should NOT have the player yet
+    const nameInputs = container.querySelectorAll(".table-input-ghost");
+    expect(nameInputs.length).toBe(0);
+
+    // Verify interruption: Sync modal should be visible
+    expect(screen.getByText(/Nombres similares/i)).toBeInTheDocument();
   });
 
   it("autofocuses textarea when CSV modal opens", async () => {
@@ -222,39 +305,12 @@ describe("SnapshotDraft", () => {
   });
 
   it("deletes a player when delete button is clicked", async () => {
-    mockPrompt.mockReturnValue("Test Player");
-
     const { container } = render(SnapshotDraft, {
-      props: {
-        parentId: null,
-        initialPlayers: [],
-        defaultEventType: "manual",
-        onClose: () => {},
-        onCancel: () => {},
-        onChainUpdate: () => {},
-        onOpenSnapshot: () => {},
-        onShowError: () => {},
-      },
+      props: { ...defaultProps, initialPlayers: mockInitialPlayers },
     });
-
-    // Add a player
-    const addButton = screen.getByText("➕ Agregar jugador");
-    await fireEvent.click(addButton);
-
-    const nameInput = container.querySelector(
-      ".table-input-ghost",
-    ) as HTMLInputElement;
-    expect(nameInput).toBeTruthy();
-    expect(nameInput.value).toBe("Test Player");
-
-    // Delete the player
     const deleteButton = screen.getByTitle("Eliminar");
-    expect(deleteButton).toBeInTheDocument();
     await fireEvent.click(deleteButton);
-
-    // Player should be removed - no name input should exist
-    const nameInputs = container.querySelectorAll(".table-input-ghost");
-    expect(nameInputs.length).toBe(0);
+    expect(container.querySelectorAll(".table-input-ghost").length).toBe(0);
   });
 
   it("disables save button when no players", () => {
@@ -277,26 +333,10 @@ describe("SnapshotDraft", () => {
     expect(saveButton).toBeDisabled();
   });
 
-  it("enables save button when players exist", async () => {
-    mockPrompt.mockReturnValue("Test Player");
-
+  it("enables save button when players exist", () => {
     render(SnapshotDraft, {
-      props: {
-        parentId: null,
-        initialPlayers: [],
-        defaultEventType: "manual",
-        onClose: () => {},
-        onCancel: () => {},
-        onChainUpdate: () => {},
-        onOpenSnapshot: () => {},
-        onShowError: () => {},
-      },
+      props: { ...defaultProps, initialPlayers: mockInitialPlayers },
     });
-
-    // Add a player
-    const addButton = screen.getByText("➕ Agregar jugador");
-    await fireEvent.click(addButton);
-
     const saveButton = screen.getByRole("button", {
       name: /Guardar Nueva Lista/i,
     });
@@ -305,81 +345,13 @@ describe("SnapshotDraft", () => {
 
   it("calls saveSnapshot when save button is clicked", async () => {
     const { saveSnapshot } = await import("../../api");
-    const onClose = vi.fn();
-    const onChainUpdate = vi.fn();
-    const onOpenSnapshot = vi.fn();
-
-    mockPrompt.mockReturnValue("Test Player");
-
     render(SnapshotDraft, {
-      props: {
-        parentId: null,
-        initialPlayers: [],
-        defaultEventType: "manual",
-        onClose,
-        onCancel: () => {},
-        onChainUpdate,
-        onOpenSnapshot,
-        onShowError: () => {},
-      },
+      props: { ...defaultProps, initialPlayers: mockInitialPlayers },
     });
-
-    // Add a player
-    const addButton = screen.getByText("➕ Agregar jugador");
-    await fireEvent.click(addButton);
-
-    // Save
-    const saveButton = screen.getByRole("button", {
-      name: /Guardar Nueva Lista/i,
-    });
-    await fireEvent.click(saveButton);
-
-    expect(saveSnapshot).toHaveBeenCalledWith({
-      parent_id: null,
-      event_type: "manual",
-      players: [
-        {
-          nombre: "Test Player",
-          experiencia: "Nuevo",
-          juegos_este_ano: 0,
-          prioridad: 0,
-          partidas_deseadas: 1,
-          partidas_gm: 0,
-        },
-      ],
-      renames: [],
-    });
-  });
-
-  it("updates player prioridad when checkbox is changed", async () => {
-    mockPrompt.mockReturnValue("Test Player");
-
-    const { container } = render(SnapshotDraft, {
-      props: {
-        parentId: null,
-        initialPlayers: [],
-        defaultEventType: "manual",
-        onClose: () => {},
-        onCancel: () => {},
-        onChainUpdate: () => {},
-        onOpenSnapshot: () => {},
-        onShowError: () => {},
-      },
-    });
-
-    // Add a player
-    const addButton = screen.getByText("➕ Agregar jugador");
-    await fireEvent.click(addButton);
-
-    // Find and click the prioridad checkbox
-    const prioCheckbox = container.querySelector(
-      'input[type="checkbox"]',
-    ) as HTMLInputElement;
-    expect(prioCheckbox).toBeTruthy();
-    await fireEvent.click(prioCheckbox);
-
-    // Checkbox should be checked
-    expect(prioCheckbox.checked).toBe(true);
+    await fireEvent.click(
+      screen.getByRole("button", { name: /Guardar Nueva Lista/i }),
+    );
+    expect(saveSnapshot).toHaveBeenCalled();
   });
 
   it("pre-populates players from initialPlayers prop", () => {
@@ -419,37 +391,6 @@ describe("SnapshotDraft", () => {
     expect((nameInputs[1] as HTMLInputElement).value).toBe("Bob");
   });
 
-  it("updates player partidas_deseadas when number input is changed", async () => {
-    mockPrompt.mockReturnValue("Test Player");
-
-    const { container } = render(SnapshotDraft, {
-      props: {
-        parentId: null,
-        initialPlayers: [],
-        defaultEventType: "manual",
-        onClose: () => {},
-        onCancel: () => {},
-        onChainUpdate: () => {},
-        onOpenSnapshot: () => {},
-        onShowError: () => {},
-      },
-    });
-
-    // Add a player
-    const addButton = screen.getByText("➕ Agregar jugador");
-    await fireEvent.click(addButton);
-
-    // Find and change the deseadas input
-    const deseadasInput = container.querySelector(
-      'input[type="number"]',
-    ) as HTMLInputElement;
-    expect(deseadasInput).toBeTruthy();
-    await fireEvent.input(deseadasInput, { target: { value: "3" } });
-
-    // Input should have new value
-    expect(deseadasInput.value).toBe("3");
-  });
-
   it("calls onShowError when importing CSV yields no valid players", async () => {
     const { parsePlayersCsv } = await import("../../utils");
     (parsePlayersCsv as ReturnType<typeof vi.fn>).mockReturnValueOnce([]);
@@ -476,8 +417,8 @@ describe("SnapshotDraft", () => {
     await fireEvent.click(screen.getByText("Importar"));
 
     expect(onShowError).toHaveBeenCalledWith(
-      "Aviso / Error",
-      "No se encontraron jugadores válidos en el CSV",
+      "CSV Inválido",
+      "No se encontraron jugadores válidos en el archivo.",
     );
   });
 

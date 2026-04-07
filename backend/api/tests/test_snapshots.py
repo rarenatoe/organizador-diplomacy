@@ -11,10 +11,11 @@ from typing import Any
 import pytest
 from sqlalchemy import select
 
-from backend.crud.chain import create_game_edge
+from backend.crud.chain import create_branch_edge, create_game_edge
 from backend.crud.players import get_or_create_player
 from backend.crud.snapshots import (
     add_player_to_snapshot,
+    create_root_manual_snapshot,
     create_snapshot,
     get_snapshot_players,
 )
@@ -33,7 +34,16 @@ async def make_snapshot_with_players(
     snap_id = await create_snapshot(db_session, source)
     for i in range(n):
         pid = await get_or_create_player(db_session, f"P{snap_id}_{i}")
-        await add_player_to_snapshot(db_session, snap_id, pid, "Antiguo", 0, 1, 2, 0)
+        await add_player_to_snapshot(
+            db_session,
+            snap_id,
+            pid,
+            experience="Antiguo",
+            games_this_year=0,
+            priority=1,
+            desired_games=2,
+            gm_games=0,
+        )
     await db_session.commit()
     return snap_id
 
@@ -157,7 +167,6 @@ class TestApiSnapshotDelete:
         3. Any non-game edge is squashed (not just "branch")
         4. Source and created_at are inherited from the child
         """
-        from backend.crud.chain import create_branch_edge
         from backend.crud.snapshots import get_snapshot_players
 
         # Setup: A -> Game -> B
@@ -235,17 +244,53 @@ class TestApiSnapshotDelete:
 
 
 class TestApiSnapshotCreate:
-    async def test_create_without_parent(self, client: Any) -> None:
-        """Creating a snapshot without parent_id creates a root snapshot."""
-        resp = await client.post(
-            "/api/snapshot",
-            json={"source": "manual", "players": []},
+    async def test_save_endpoint_trusts_payload_exactly(self, client: Any, db_session: Any) -> None:
+        """Test that /api/snapshot/save uses exact payload values without overrides."""
+        from backend.crud.players import get_or_create_player
+        from backend.crud.snapshots import (
+            add_player_to_snapshot,
+            create_snapshot,
+            get_snapshot_players,
         )
-        assert resp.status_code in (200, 201)
+
+        # Create parent snapshot with historical player having prioridad=1
+        parent_id = await create_snapshot(db_session, "manual")
+        player_id = await get_or_create_player(db_session, "HistoricalPlayer")
+        await add_player_to_snapshot(db_session, parent_id, player_id, "Veterano", 5, 1, 2, 1)
+        await db_session.commit()
+
+        # Create save payload with completely different values
+        save_payload = {
+            "parent_id": parent_id,
+            "event_type": "manual",
+            "players": [
+                {
+                    "nombre": "HistoricalPlayer",
+                    "experiencia": "Antiguo",  # Different from historical
+                    "juegos_este_ano": 88,  # Different from historical
+                    "prioridad": 0,  # Different from historical
+                    "partidas_deseadas": 4,  # Different from historical
+                    "partidas_gm": 0,  # Different from historical
+                }
+            ],
+        }
+
+        # Save should trust payload exactly and update in-place (since it's a leaf node)
+        resp = await client.post("/api/snapshot/save", json=save_payload)
+        assert resp.status_code == 200
         data = resp.json()
-        # FastAPI returns snapshot_id
-        snap_id = data.get("snapshot_id") or data.get("id")
-        assert snap_id is not None
+        assert data["snapshot_id"] == parent_id
+
+        # Query the DB to prove the dumb save worked and historical values were overwritten
+        players = await get_snapshot_players(db_session, parent_id)
+        assert len(players) == 1
+        player = players[0]
+        assert player["nombre"] == "HistoricalPlayer"
+        assert player["experiencia"] == "Antiguo"
+        assert player["juegos_este_ano"] == 88
+        assert player["prioridad"] == 0
+        assert player["partidas_deseadas"] == 4
+        assert player["partidas_gm"] == 0
 
     async def test_create_with_parent(self, client: Any, db_session: Any) -> None:
         """Creating a snapshot with parent_id links it to parent."""
@@ -417,13 +462,12 @@ class TestApiSnapshotSave:
         """
         Regression test: Algorithm weight fields (c_england, c_france, etc.)
         should be ignored during snapshot save to prevent phantom modifications.
-        
+
         When saving a sync with the same roster but extra algorithm fields,
         the backend should detect no actual changes and return "no_changes".
         """
         # Setup: Create a root snapshot with only Juan using the dedicated helper
-        from backend.crud.snapshots import create_root_manual_snapshot
-        
+
         parent_id = await create_root_manual_snapshot(
             db_session,
             players=[
@@ -438,12 +482,12 @@ class TestApiSnapshotSave:
             ],
         )
         await db_session.commit()
-        
+
         # Verify setup: snapshot should have exactly 1 player
         players_before = await get_snapshot_players(db_session, parent_id)
         assert len(players_before) == 1
         assert players_before[0]["nombre"] == "Juan"
-        
+
         # The Action: Save with same player data BUT include algorithm weights
         # These should be ignored and not trigger a phantom modification
         resp = await client.post(
@@ -466,7 +510,7 @@ class TestApiSnapshotSave:
                 ],
             },
         )
-        
+
         # The Assertion: Backend should ignore extra fields and detect no changes
         assert resp.status_code == 200
         data = resp.json()
