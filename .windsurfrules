@@ -191,6 +191,24 @@
 **Rule:** Use inverted schemes (dark background + light text) for floating elements like tooltips and popovers.
 **Anti-Pattern:** Using the same color scheme for both main content and floating elements.
 
+## CSS & Design System Guidelines
+
+When styling components or adding new UI features, strictly adhere to the following semantic design system rules:
+
+1. **Never Hardcode Colors in Components:** Do NOT use hex codes (e.g., `#ffffff`) or raw palette variables (e.g., `var(--gray-50)`) directly in component styles. Always map to semantic relational variables (e.g., `var(--bg-secondary)`, `var(--text-primary)`). This guarantees flawless Dark Mode inversion.
+
+2. **Solid vs. Subtle Intents:**
+   - Use **Solid** intents (`--primary-bg`, `--danger-bg`) ONLY for high-emphasis actions like Primary Buttons. Solid intents use white text (`--primary-text`).
+   - Use **Subtle** intents (`--primary-bg-subtle`, `--warning-bg-subtle`) for backgrounds, badges, inactive nodes, and alerts. Subtle intents use dark/tinted text (`--primary-text-subtle`).
+
+3. **Ghost & Transparent Hovers:** Never use solid colors for hovering over transparent elements (like Ghost buttons or list items). Always use the mathematical alpha overlays (`var(--overlay-hover)`, `var(--overlay-destructive)`). This ensures the hover state beautifully tints whatever background it sits on.
+
+4. **Form Element Safety:**
+   - Always use `class="input-field"` for text inputs to ensure consistent padding, typography, and dark-mode inheritance.
+   - When defining focus rings (e.g., `:focus`), always use an `inset` box-shadow (`box-shadow: inset 0 0 0 1px var(--border-focus)`). This prevents the focus ring from being clipped when the input is placed inside strict CSS Grids or Table cells.
+
+5. **Icon Contrast in Buttons:** Icons (SVGs/IMGs) inside Solid buttons (Primary, Success, Danger) must use CSS filters (`filter: brightness(0) invert(1);`) to force them to be pure white, ensuring contrast against the solid background.
+
 ## Component API Design
 
 **Rule:** Use visual props (variant, size, fill, iconOnly) to control appearance only.

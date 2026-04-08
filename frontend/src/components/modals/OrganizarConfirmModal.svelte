@@ -77,7 +77,7 @@
   .confirm-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
+    background: var(--modal-backdrop);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -93,16 +93,16 @@
   }
 
   .confirm-card {
-    background: var(--surface);
+    background: var(--bg-secondary);
     border-radius: 14px;
     padding: 24px;
     width: 420px;
     max-width: 90vw;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    box-shadow: var(--shadow-xl);
     display: flex;
     flex-direction: column;
     gap: 16px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-subtle);
   }
 
   .confirm-header {
@@ -118,7 +118,7 @@
   .confirm-title {
     font-size: 15px;
     font-weight: 700;
-    color: var(--text);
+    color: var(--text-primary);
   }
 
   .confirm-body {
@@ -130,11 +130,9 @@
   .warning-item {
     display: flex;
     gap: 10px;
-    background: #fffbeb;
-    border: 1px solid #fde68a;
-    border-radius: 8px;
-    padding: 12px;
-    color: #92400e;
+    background: var(--warning-bg-subtle);
+    border: 1px solid var(--warning-border-subtle);
+    color: var(--warning-text-subtle);
     font-size: 13px;
     line-height: 1.4;
   }
@@ -149,8 +147,8 @@
   }
 
   .excluded-section {
-    background: var(--surface2);
-    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
     border-radius: 8px;
     padding: 12px;
   }
@@ -160,7 +158,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--muted);
+    color: var(--text-muted);
     margin-bottom: 8px;
   }
 
@@ -174,12 +172,12 @@
 
   .excluded-item {
     font-size: 13px;
-    color: var(--text);
+    color: var(--text-primary);
   }
 
   .excluded-more {
     font-size: 12px;
-    color: var(--muted);
+    color: var(--text-muted);
     font-style: italic;
     margin-top: 2px;
   }

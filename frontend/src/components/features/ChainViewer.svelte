@@ -196,7 +196,7 @@
     align-items: center;
     gap: 12px;
     padding: 60px;
-    color: var(--muted);
+    color: var(--text-muted);
     text-align: center;
   }
 
@@ -209,7 +209,7 @@
   }
 
   :global(#chain.panel-open .node:not(.active)) {
-    opacity: 0.4;
+    opacity: 0.6;
     filter: grayscale(60%);
     box-shadow: none;
   }
@@ -246,14 +246,14 @@
   /* Node base styles */
   .node {
     cursor: pointer;
-    border-radius: var(--radius);
+    border-radius: var(--border-radius);
     padding: 14px 16px;
     width: 180px;
     min-height: 160px;
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-base);
     transition:
       transform 0.15s,
       box-shadow 0.15s,
@@ -273,11 +273,14 @@
 
   /* Snapshot node styling */
   .node-snapshot {
-    background: var(--csv-bg);
-    border-color: var(--csv-border);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-left: 4px solid var(--blue-400);
   }
   :global(.node.active.node-snapshot) {
-    border-color: var(--csv-border);
+    background: var(--blue-50);
+    border-color: var(--blue-500);
+    border-left: 4px solid var(--blue-600);
   }
 
   /* Node children styling */
@@ -290,19 +293,19 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--muted);
+    color: var(--text-muted);
     margin-bottom: 3px;
   }
   .node-name {
     font-size: 12px;
     font-weight: 600;
-    color: var(--text);
+    color: var(--text-primary);
     word-break: break-all;
     line-height: 1.4;
   }
   .node-meta {
     font-size: 11px;
-    color: var(--muted);
+    color: var(--text-muted);
     margin-top: 6px;
     line-height: 1.6;
   }

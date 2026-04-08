@@ -522,6 +522,7 @@
       {#snippet actionsCell(row: EditPlayerRow, i: number)}
         <Button
           variant="ghost"
+          destructive={true}
           size="sm"
           iconOnly={true}
           title="Eliminar"
@@ -552,7 +553,7 @@
               >
                 <input
                   type="text"
-                  class="table-input text-strong"
+                  class="input-field text-strong"
                   bind:value={newPlayerSearchQuery}
                   placeholder="Escribe para buscar o agregar..."
                   use:focusOnMount
@@ -561,12 +562,9 @@
                       confirmAddPlayer(newPlayerSearchQuery);
                     if (e.key === "Escape") isAddingPlayer = false;
                   }}
-                  style="width: 100%; border: none; outline: none; padding: 10px; background: transparent; color: var(--text-primary, inherit);"
                 />
                 {#if newPlayerSearchQuery.trim().length > 0}
-                  <div
-                    style="position: absolute; bottom: 100%; left: 0; margin-bottom: 2px; background: var(--surface, #ffffff); border: 1px solid var(--border); border-radius: 4px; z-index: 9999; max-height: 200px; overflow-y: auto; width: 100%; box-shadow: var(--shadow-md);"
-                  >
+                  <div class="autocomplete-dropdown">
                     {#each knownPlayers
                       .filter((n) => n
                           .toLowerCase()
@@ -574,7 +572,7 @@
                       .slice(0, 10) as suggestedName (suggestedName)}
                       <button
                         type="button"
-                        style="padding: 8px 12px; cursor: pointer; border: none; border-bottom: 1px solid var(--border); background: transparent; width: 100%; text-align: left; color: inherit; font-size:13px;"
+                        class="autocomplete-item"
                         onclick={() => confirmAddPlayer(suggestedName)}
                       >
                         {suggestedName}
@@ -658,6 +656,46 @@
     padding: 40px;
     color: var(--muted);
     margin-bottom: 10px;
+  }
+
+  /* Autocomplete Dropdown Styling */
+  .autocomplete-dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 4px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-default);
+    border-radius: 8px;
+    z-index: 9999;
+    max-height: 200px;
+    overflow-y: auto;
+    width: 100%;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .autocomplete-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border: none;
+    border-bottom: 1px solid var(--border-subtle);
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-family: inherit;
+    transition: background-color var(--transition-fast);
+  }
+
+  .autocomplete-item:last-child {
+    border-bottom: none;
+  }
+
+  .autocomplete-item:hover,
+  .autocomplete-item:focus {
+    background: var(--bg-tertiary);
+    outline: none;
   }
 
   .empty-draft p {

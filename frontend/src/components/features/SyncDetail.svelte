@@ -46,7 +46,7 @@
 </script>
 
 {#if loading}
-  <p style="color:var(--muted);font-size:12px;padding:4px 0">Cargando…</p>
+  <p class="loading-text">Cargando…</p>
 {:else if info}
   <PanelLayout>
     {#snippet body()}
@@ -70,3 +70,40 @@
     {/snippet}
   </PanelLayout>
 {/if}
+
+<style>
+  .loading-text {
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 4px 0;
+  }
+
+  .section-title {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+
+  .section {
+    margin-bottom: 22px;
+  }
+
+  .meta-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 14px;
+    font-size: 12px;
+  }
+
+  .meta-key {
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .meta-val {
+    font-weight: 600;
+  }
+</style>

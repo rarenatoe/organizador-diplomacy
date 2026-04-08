@@ -98,7 +98,7 @@
     cursor: not-allowed;
   }
   .btn:focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--border-focus);
     outline-offset: 2px;
   }
   .flex-fill {
@@ -106,56 +106,99 @@
     width: 100%;
   }
 
+  /* --- SOLID BUTTON BASE --- */
+  /* All solid intent buttons share a baseline shadow for elevation */
+  .btn-primary,
+  .btn-success,
+  .btn-warning,
+  .btn-destructive.btn-primary {
+    box-shadow: var(--shadow-sm);
+  }
+
   /* Primary */
   .btn-primary {
-    background: var(--primary);
-    color: var(--white);
-    border-color: var(--primary);
+    background: var(--primary-bg);
+    color: var(--primary-text);
+    border-color: var(--primary-border);
   }
   .btn-primary:hover:not(:disabled) {
     background: var(--primary-hover);
-  }
-
-  /* Secondary */
-  .btn-secondary {
-    background: var(--surface2);
-    border-color: var(--border);
-    color: var(--text);
-  }
-  .btn-secondary:hover:not(:disabled) {
-    background: var(--border);
+    border-color: var(--primary-hover);
   }
 
   /* Success */
   .btn-success {
-    background: var(--success);
-    color: var(--white);
-    border-color: var(--success);
+    background: var(--success-bg);
+    color: var(--success-text);
+    border-color: var(--success-border);
   }
   .btn-success:hover:not(:disabled) {
     background: var(--success-hover);
+    border-color: var(--success-hover);
   }
 
   /* Warning */
   .btn-warning {
-    background: var(--warning);
+    background: var(--warning-bg);
     color: var(--warning-text);
-    border-color: var(--warning);
+    border-color: var(--warning-border);
   }
   .btn-warning:hover:not(:disabled) {
     background: var(--warning-hover);
+    border-color: var(--warning-hover);
   }
 
-  /* Ghost */
+  /* --- SECONDARY BUTTON --- */
+  .btn-secondary {
+    background: var(--bg-secondary);
+    border-color: var(--border-default);
+    color: var(--text-secondary);
+    box-shadow: var(--shadow-sm);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-color: var(--border-default);
+  }
+
+  /* --- GHOST BUTTON --- */
   .btn-ghost {
     background: transparent;
     border-color: transparent;
-    color: var(--text);
-    padding: 4px 8px;
+    color: var(--text-secondary);
   }
   .btn-ghost:hover:not(:disabled) {
-    background: var(--border);
+    background: var(--overlay-hover);
+    color: var(--text-primary);
     border-color: transparent;
+  }
+
+  /* --- DESTRUCTIVE MODIFIERS --- */
+  .btn-destructive.btn-ghost {
+    color: var(--red-600);
+  }
+  .btn-destructive.btn-ghost:hover:not(:disabled) {
+    background: var(
+      --overlay-destructive
+    ); /* 12% Red creates a vivid tint on any background */
+    color: var(--red-700);
+  }
+
+  .btn-destructive.btn-primary {
+    background: var(--danger-bg);
+    border-color: var(--danger-border);
+    color: var(--danger-text);
+  }
+  .btn-destructive.btn-primary:hover:not(:disabled) {
+    background: var(--danger-hover);
+    border-color: var(--danger-hover);
+  }
+
+  /* Force emojis/icons to be pure white inside solid buttons */
+  .btn-primary .btn-icon,
+  .btn-success .btn-icon,
+  .btn-destructive.btn-primary .btn-icon {
+    filter: brightness(0) invert(1);
   }
 
   /* Icon */
@@ -202,22 +245,5 @@
     width: 20px;
     height: 20px;
     border-radius: 4px;
-  }
-
-  /* Destructive Modifiers */
-  .btn-destructive.btn-ghost {
-    color: var(--danger);
-  }
-  .btn-destructive.btn-ghost:hover:not(:disabled) {
-    background: var(--danger-bg-subtle);
-    color: var(--danger-hover);
-  }
-  .btn-destructive.btn-primary {
-    background: var(--danger);
-    border-color: var(--danger);
-  }
-  .btn-destructive.btn-primary:hover:not(:disabled) {
-    background: var(--danger-hover);
-    border-color: var(--danger-hover);
   }
 </style>

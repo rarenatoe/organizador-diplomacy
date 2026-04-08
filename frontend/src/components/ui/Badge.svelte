@@ -4,13 +4,23 @@
     text: string;
     pill?: boolean;
     fixedWidth?: boolean;
+    subtle?: boolean;
   }
 
-  let { variant, text, pill = false, fixedWidth = false }: Props = $props();
+  let {
+    variant,
+    text,
+    pill = false,
+    fixedWidth = false,
+    subtle = true,
+  }: Props = $props();
 </script>
 
-<span class="badge {variant}" class:pill class:fixed-width={fixedWidth}
-  >{text}</span
+<span
+  class="badge {variant}"
+  class:pill
+  class:fixed-width={fixedWidth}
+  class:subtle>{text}</span
 >
 
 <style>
@@ -23,7 +33,7 @@
     text-align: center;
     display: inline-block;
     border: 1px solid transparent;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    box-shadow: var(--shadow-sm);
   }
 
   .pill {
@@ -37,27 +47,51 @@
     min-width: 75px;
   }
 
-  .info {
+  /* Info */
+  .info.subtle {
+    background: var(--info-bg-subtle);
+    color: var(--info-text-subtle);
+    border-color: var(--info-border-subtle);
+  }
+  .info:not(.subtle) {
     background: var(--info-bg);
-    color: var(--info-dark);
+    color: var(--info-text);
     border-color: var(--info-border);
   }
 
-  .success {
+  /* Success */
+  .success.subtle {
+    background: var(--success-bg-subtle);
+    color: var(--success-text-subtle);
+    border-color: var(--success-border-subtle);
+  }
+  .success:not(.subtle) {
     background: var(--success-bg);
-    color: var(--success-dark);
+    color: var(--success-text);
     border-color: var(--success-border);
   }
 
-  .warning {
+  /* Warning */
+  .warning.subtle {
+    background: var(--warning-bg-subtle);
+    color: var(--warning-text-subtle);
+    border-color: var(--warning-border-subtle);
+  }
+  .warning:not(.subtle) {
     background: var(--warning-bg);
-    color: var(--warning-dark);
+    color: var(--warning-text);
     border-color: var(--warning-border);
   }
 
-  .error {
-    background: var(--error-bg);
-    color: var(--error-dark);
-    border-color: var(--error-border);
+  /* Error */
+  .error.subtle {
+    background: var(--danger-bg-subtle);
+    color: var(--danger-text-subtle);
+    border-color: var(--danger-border-subtle);
+  }
+  .error:not(.subtle) {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    border-color: var(--danger-border);
   }
 </style>

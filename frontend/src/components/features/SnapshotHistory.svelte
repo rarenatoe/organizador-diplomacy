@@ -11,38 +11,7 @@
 
 {#if history && history.length > 0}
   <details style="margin: 0 18px;">
-    <summary
-      class="section-title"
-      style="
-      cursor: pointer; 
-      padding: 8px 0; 
-      border-top: 1px solid var(--border);
-      margin: 0;
-      list-style: none;
-      transition: background-color 0.15s ease;
-      user-select: none;
-    "
-      onmouseenter={(e) => {
-        const target = e.target as HTMLElement;
-        if (target) {
-          target.style.backgroundColor = "var(--surface2)";
-          target.style.paddingLeft = "4px";
-          target.style.paddingRight = "4px";
-          target.style.marginLeft = "-4px";
-          target.style.marginRight = "-4px";
-        }
-      }}
-      onmouseleave={(e) => {
-        const target = e.target as HTMLElement;
-        if (target) {
-          target.style.backgroundColor = "transparent";
-          target.style.paddingLeft = "0";
-          target.style.paddingRight = "0";
-          target.style.marginLeft = "0";
-          target.style.marginRight = "0";
-        }
-      }}
-    >
+    <summary class="section-title history-row">
       Historial de Cambios ({history.length})
     </summary>
     <ul class="history-list">
@@ -147,7 +116,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--accent);
+    color: var(--primary-border);
   }
 
   .history-summary {
@@ -187,8 +156,15 @@
     font-weight: 600;
   }
   .mod-detail {
-    color: var(--muted);
+    color: var(--text-muted);
     font-size: 10px;
     margin-left: 4px;
+  }
+  .history-row:hover {
+    background: var(--bg-tertiary);
+    padding-left: 4px;
+    padding-right: 4px;
+    margin-left: -4px;
+    margin-right: -4px;
   }
 </style>

@@ -52,14 +52,14 @@
 <style>
   .node {
     cursor: pointer;
-    border-radius: var(--radius);
+    border-radius: var(--border-radius);
     padding: 14px 16px;
     width: 156px;
     min-height: 160px;
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-base);
     transition:
       transform 0.15s,
       box-shadow 0.15s,
@@ -75,17 +75,20 @@
   }
 
   :global(.node.active) {
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+    box-shadow: 0 0 0 3px var(--active-glow);
     z-index: 45;
   }
 
   .node-report {
-    background: var(--report-bg);
-    border-color: var(--report-border);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-subtle);
+    border-left: 4px solid var(--green-400);
   }
 
   :global(.node.active.node-report) {
-    border-color: var(--report-border);
+    background: var(--green-50);
+    border-color: var(--green-500);
+    border-left: 4px solid var(--green-600);
   }
 
   .node-icon {
@@ -98,21 +101,21 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--muted);
+    color: var(--text-muted);
     margin-bottom: 3px;
   }
 
   .node-name {
     font-size: 12px;
     font-weight: 600;
-    color: var(--text);
+    color: var(--text-primary);
     word-break: break-all;
     line-height: 1.4;
   }
 
   .node-meta {
     font-size: 11px;
-    color: var(--muted);
+    color: var(--text-muted);
     margin-top: 6px;
     line-height: 1.6;
   }

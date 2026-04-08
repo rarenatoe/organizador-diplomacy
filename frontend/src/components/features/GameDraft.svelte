@@ -394,9 +394,7 @@
 <PanelLayout>
   {#snippet body()}
     {#if loading}
-      <p style="color:var(--muted);font-size:12px;padding:4px 0">
-        Generando draft...
-      </p>
+      <p class="loading-text">Generando draft...</p>
     {:else if draftData}
       <div class="section">
         <div class="section-title">
@@ -504,9 +502,7 @@
         </div>
       {/if}
     {:else}
-      <p style="color:var(--danger);font-size:12px;padding:4px 0">
-        No se pudo generar el draft
-      </p>
+      <p class="error-text">No se pudo generar el draft</p>
     {/if}
   {/snippet}
 
@@ -535,12 +531,24 @@
     margin-bottom: 22px;
   }
 
+  .loading-text {
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 4px 0;
+  }
+
+  .error-text {
+    color: var(--danger-text);
+    font-size: 12px;
+    padding: 4px 0;
+  }
+
   .section-title {
     font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    color: var(--muted);
+    color: var(--text-muted);
     margin-bottom: 10px;
   }
 
@@ -552,7 +560,7 @@
   }
 
   .meta-key {
-    color: var(--muted);
+    color: var(--text-muted);
     font-weight: 500;
   }
 
@@ -571,7 +579,7 @@
     grid-template-columns: 16px 1fr 115px 56px 32px;
     align-items: center;
     gap: 8px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .player-list li:last-child {
@@ -579,7 +587,7 @@
   }
 
   .p-num {
-    color: var(--muted);
+    color: var(--text-muted);
     font-size: 11px;
     min-width: 16px;
   }
@@ -605,18 +613,18 @@
   .country-select {
     font-size: 11px;
     padding: 2px 4px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-subtle);
     border-radius: 4px;
-    background: var(--bg);
-    color: var(--text);
+    background: var(--bg-primary);
+    color: var(--text-primary);
     cursor: pointer;
     width: 100%;
     min-width: 0;
   }
 
   .swapping-active {
-    background: #eff6ff;
-    outline: 1px solid var(--accent);
+    background: var(--info-bg-subtle);
+    outline: 1px solid var(--border-focus);
     border-radius: 4px;
   }
 
@@ -625,17 +633,17 @@
     grid-template-columns: 1fr 60px 32px;
     align-items: center;
     padding: 7px 10px;
-    background: #fffbeb;
-    border: 1px solid #fde68a;
+    background: var(--warning-bg-subtle);
+    border: 1px solid var(--warning-border-subtle);
     border-radius: 7px;
     margin-bottom: 6px;
     font-size: 12px;
   }
 
   .waiting-item.swapping-active {
-    background: #eff6ff;
-    outline: 1px solid var(--accent);
-    border-color: var(--accent);
+    background: var(--info-bg-subtle);
+    outline: 1px solid var(--border-focus);
+    border-color: var(--border-focus);
   }
 
   .waiting-name {
@@ -646,7 +654,7 @@
   }
 
   .waiting-cupos {
-    color: #92400e;
+    color: var(--warning-text-subtle);
     font-size: 11px;
     text-align: right;
   }

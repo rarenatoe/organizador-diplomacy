@@ -115,7 +115,7 @@
   .resolution-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.45);
+    background: var(--modal-backdrop);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -131,12 +131,12 @@
   }
 
   .resolution-card {
-    background: var(--surface);
+    background: var(--bg-secondary);
     border-radius: 14px;
     padding: 24px;
     width: 420px;
     max-width: 90vw;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+    box-shadow: var(--shadow-xl);
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -155,13 +155,13 @@
   .resolution-title {
     font-size: 15px;
     font-weight: 700;
-    color: var(--text);
+    color: var(--text-primary);
   }
 
   .resolution-counter {
     font-size: 12px;
     font-weight: 600;
-    color: var(--muted);
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
   }
@@ -170,8 +170,9 @@
     display: flex;
     align-items: center;
     gap: 16px;
-    background: var(--surface2);
-    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-default);
+    box-shadow: var(--shadow-sm);
     border-radius: 10px;
     padding: 16px;
   }
@@ -188,28 +189,28 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--muted);
+    color: var(--text-muted);
   }
 
   .resolution-name {
     font-size: 14px;
     font-weight: 600;
-    color: var(--text);
+    color: var(--text-primary);
     word-break: break-word;
   }
 
   .resolution-name-notion {
-    color: var(--sync-dark);
+    color: var(--info-text-subtle);
   }
 
   .resolution-name-snapshot {
-    color: var(--report-dark);
+    color: var(--success-text-subtle);
   }
 
   .resolution-vs {
     font-size: 11px;
     font-weight: 700;
-    color: var(--muted);
+    color: var(--text-muted);
     text-transform: uppercase;
     flex-shrink: 0;
   }
@@ -217,19 +218,19 @@
   .resolution-similarity {
     font-size: 12px;
     font-weight: 600;
-    color: #f59e0b;
+    color: var(--warning-text-subtle);
     text-align: center;
   }
 
   .resolution-hint {
     font-size: 11px;
     line-height: 1.4;
-    color: var(--muted);
-    background: var(--surface2);
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
     padding: 10px;
     border-radius: 8px;
     margin: 0;
-    border-left: 3px solid #f59e0b;
+    border-left: 3px solid var(--warning-border);
   }
 
   .resolution-actions {

@@ -27,8 +27,8 @@
 
 <style>
   .card {
-    background: var(--surface2);
-    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-default);
     border-radius: 9px;
     padding: 11px 13px;
     margin-bottom: 10px;

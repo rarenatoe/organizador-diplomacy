@@ -276,7 +276,7 @@
 </script>
 
 {#if ui.loading}
-  <p style="color:var(--muted);font-size:12px;padding:4px 0">Cargando…</p>
+  <p class="loading-text">Cargando…</p>
 {:else if data}
   {@const rows = data.players ?? []}
   <PanelLayout scrollable={false}>
@@ -286,13 +286,10 @@
           style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;"
         >
           <div>
-            <div class="section-title" style="margin-bottom: 2px;">
+            <div class="section-title header-title">
               Snapshot #{id} · {sourceLabel(data?.source)}
             </div>
-            <div
-              class="node-meta"
-              style="color: var(--muted); font-size: 11px; font-weight: 400;"
-            >
+            <div class="meta-data">
               {data?.created_at}
             </div>
           </div>
@@ -400,7 +397,17 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.6px;
-    color: var(--muted);
+    color: var(--text-muted);
     margin-bottom: 10px;
+  }
+
+  .header-title {
+    margin-bottom: 2px;
+  }
+
+  .meta-data {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 400;
   }
 </style>

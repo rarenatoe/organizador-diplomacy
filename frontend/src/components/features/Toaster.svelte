@@ -114,9 +114,9 @@
     gap: 10px;
     padding: 12px 16px;
     border-radius: 10px;
-    background: var(--surface);
+    background: var(--bg-secondary);
     box-shadow: var(--shadow-md);
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-subtle);
     font-size: 13px;
     font-weight: 500;
     pointer-events: all;
@@ -129,18 +129,18 @@
   }
 
   .toast-syncing {
-    border-color: var(--accent);
-    background: #eff6ff;
+    border-color: var(--primary-border);
+    background: var(--info-bg-subtle);
   }
 
   .toast-success {
-    border-color: var(--success);
-    background: #f0fdf4;
+    border-color: var(--success-border);
+    background: var(--success-bg-subtle);
   }
 
   .toast-error {
-    border-color: var(--danger);
-    background: #fef2f2;
+    border-color: var(--danger-border);
+    background: var(--danger-bg-subtle);
   }
 
   .toast-icon {
@@ -150,7 +150,7 @@
 
   .toast-message {
     flex: 1;
-    color: var(--text);
+    color: var(--text-primary);
   }
 
   .toast-close {
@@ -158,23 +158,23 @@
     border: none;
     cursor: pointer;
     font-size: 14px;
-    color: var(--muted);
+    color: var(--text-muted);
     padding: 2px 4px;
     border-radius: 4px;
     flex-shrink: 0;
   }
 
   .toast-close:hover {
-    color: var(--text);
-    background: var(--surface2);
+    color: var(--text-primary);
+    background: var(--bg-tertiary);
   }
 
   .toast-spinner {
     display: inline-block;
     width: 14px;
     height: 14px;
-    border: 2px solid rgba(59, 130, 246, 0.3);
-    border-top-color: var(--accent);
+    border: 2px solid var(--ring-primary);
+    border-top-color: var(--primary-border);
     border-radius: 50%;
     animation: spin 0.65s linear infinite;
   }

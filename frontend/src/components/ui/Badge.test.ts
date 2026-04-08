@@ -104,4 +104,20 @@ describe("Badge.svelte", () => {
     expect(badge).toHaveClass("pill");
     expect(badge).toHaveClass("fixed-width");
   });
+
+  it("applies the subtle class by default", () => {
+    const { container } = render(Badge, {
+      props: { variant: "info", text: "Test" },
+    });
+    const badge = container.querySelector(".badge");
+    expect(badge?.classList.contains("subtle")).toBe(true);
+  });
+
+  it("removes the subtle class when subtle prop is false", () => {
+    const { container } = render(Badge, {
+      props: { variant: "success", text: "Solid", subtle: false },
+    });
+    const badge = container.querySelector(".badge");
+    expect(badge?.classList.contains("subtle")).toBe(false);
+  });
 });

@@ -229,8 +229,8 @@ describe("Panel Scroll Pattern", () => {
         .panel-footer {
           flex-shrink: 0;
           padding: 16px 18px;
-          border-top: 1px solid var(--border);
-          background: var(--surface);
+          border-top: 1px solid var(--border-subtle);
+          background: var(--bg-secondary);
           display: flex;
           flex-direction: column;
           gap: 8px;
@@ -324,17 +324,17 @@ describe("Panel Scroll Pattern", () => {
           position: sticky;
           top: 0;
           z-index: 10;
-          background: var(--surface2);
+          background: var(--bg-tertiary);
           transform: translateZ(0);
           background-clip: padding-box;
-          border-bottom: 1px solid var(--border);
+          border-bottom: 1px solid var(--border-subtle);
           box-shadow: none;
         }
         
         .flex-table-wrap th:nth-child(2) {
           z-index: 12;
-          background: var(--surface2);
-          box-shadow: 2px 0 4px -2px rgba(0, 0, 0, 0.1);
+          background: var(--bg-tertiary);
+          box-shadow: var(--shadow-base);
         }
       `;
       document.head.appendChild(style);
@@ -376,7 +376,7 @@ describe("Panel Scroll Pattern", () => {
       const style = document.createElement("style");
       style.textContent = `
         th {
-          border-bottom: 1px solid var(--border);
+          border-bottom: 1px solid var(--border-subtle);
         }
       `;
       document.head.appendChild(style);

@@ -55,7 +55,7 @@
     overflow: auto;
     min-height: 0;
     margin: 0 18px 16px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--border-subtle);
     border-radius: 8px;
     overscroll-behavior-y: none;
   }
@@ -71,15 +71,15 @@
     position: sticky;
     top: 0;
     z-index: 10;
-    background: var(--surface2);
+    background: var(--gray-100);
     padding: 7px 9px;
     text-align: left;
     font-weight: 600;
     font-size: 10px;
-    color: var(--muted);
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.4px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-subtle);
     white-space: nowrap;
     background-clip: padding-box;
     box-shadow: none;
@@ -87,7 +87,7 @@
 
   td {
     padding: 6px 9px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   tr:last-child td {
@@ -95,7 +95,7 @@
   }
 
   tr:hover td {
-    background: var(--surface2);
+    background: var(--bg-tertiary);
   }
 
   /* Dynamic Sticky Column Logic */
@@ -103,16 +103,16 @@
     position: sticky;
     left: 0;
     z-index: 5;
-    background: var(--surface);
+    background: var(--bg-tertiary);
     box-shadow: var(--shadow-sticky);
   }
 
   th.sticky-col {
     z-index: 12;
-    background: var(--surface2);
+    background: var(--gray-100);
   }
 
   tr:hover td.sticky-col {
-    background: var(--surface2);
+    background: var(--bg-tertiary);
   }
 </style>

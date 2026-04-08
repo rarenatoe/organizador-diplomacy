@@ -54,8 +54,8 @@
   .panel-footer {
     flex-shrink: 0;
     padding: 16px 18px;
-    border-top: 1px solid var(--border);
-    background: var(--surface);
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg-secondary);
     display: flex;
     flex-direction: column;
     gap: 8px;

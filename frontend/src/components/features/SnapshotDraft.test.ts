@@ -123,9 +123,20 @@ describe("SnapshotDraft", () => {
     ).toBeTruthy();
   });
 
+  it("renders the new player input with the correct semantic class", async () => {
+    const { container } = render(SnapshotDraft, {
+      props: { ...defaultProps, initialPlayers: mockInitialPlayers },
+    });
+    await fireEvent.click(screen.getByText("➕ Agregar jugador"));
+    const input = container.querySelector(
+      "input[placeholder='Escribe para buscar o agregar...']",
+    );
+    expect(input?.classList.contains("input-field")).toBe(true);
+  });
+
   it("filters known players in dropdown", async () => {
     const { tick } = await import("svelte");
-    render(SnapshotDraft, {
+    const { container } = render(SnapshotDraft, {
       props: { ...defaultProps, initialPlayers: mockInitialPlayers },
     });
     await fireEvent.click(screen.getByText("➕ Agregar jugador"));
@@ -134,6 +145,12 @@ describe("SnapshotDraft", () => {
       "Escribe para buscar o agregar...",
     );
     await fireEvent.input(input, { target: { value: "Dan" } });
+
+    // Check for proper autocomplete dropdown classes
+    const dropdown = container.querySelector(".autocomplete-dropdown");
+    const items = container.querySelectorAll(".autocomplete-item");
+    expect(dropdown).toBeTruthy();
+    expect(items.length).toBe(2);
     expect(screen.getByText("Daniel Eiler")).toBeInTheDocument();
     expect(screen.getByText("Daniel Escobar")).toBeInTheDocument();
   });

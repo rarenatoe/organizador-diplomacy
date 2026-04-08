@@ -45,8 +45,8 @@
   .panel {
     width: 0;
     overflow: hidden;
-    border-left: 1px solid var(--border);
-    background: var(--surface);
+    border-left: 1px solid var(--border-subtle);
+    background: var(--bg-secondary);
     transition: width 0.25s ease;
     display: flex;
     flex-direction: column;
@@ -56,11 +56,11 @@
   }
 
   .panel.open {
-    width: var(--panel-w);
+    width: var(--panel-width);
   }
 
   .panel-inner {
-    width: var(--panel-w);
+    width: var(--panel-width);
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -68,7 +68,7 @@
 
   .panel-header {
     padding: 14px 18px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--border-subtle);
     display: flex;
     align-items: center;
     gap: 10px;
