@@ -4,65 +4,37 @@ title: Pillar 2 - Backend & Database Philosophy
 priority: 20
 ---
 
-## Database Philosophy
+## 1. Database Philosophy
 
-**Rule:** Use disposable local SQLite database with `sqlite (stdlib)` via `aiosqlite`.
-**Anti-Pattern:** Using persistent database systems or external database services.
+- **Database System:** Use disposable local SQLite with `sqlite (stdlib)` via `aiosqlite`. NEVER use persistent or external database services.
+- **Schema Management:** Define DB schema in code, re-create as needed. NEVER use Alembic migrations or separate schema files.
+- **Type Safety:** Use explicit type annotations for all functions and Pydantic models for validation. NEVER use untyped signatures.
 
-**Rule:** Define DB schema in code and re-create as needed without Alembic migrations.
-**Anti-Pattern:** Using database migration tools or maintaining separate schema files.
+## 2. CRUD Architecture (Repository Pattern)
 
-**Rule:** Use explicit type annotations for all function signatures and Pydantic models for request/response validation.
-**Anti-Pattern:** Using untyped function signatures or skipping validation models.
+- **Domain Organization:** Use functional Repository Pattern grouped by domain in `backend/crud/` with separate modules (games, players, snapshots, chain). NEVER cram DB operations into single files.
+- **Domain Separation:** Each CRUD module handles specific domain with focused responsibilities. NEVER create modules handling unrelated domains.
+- **Async Consistency:** Follow consistent async patterns with proper session handling and type annotations. NEVER mix sync/async patterns.
 
-## CRUD Architecture (Repository Pattern)
+## 3. Backend Coding Standards
 
-**Rule:** Use functional Repository Pattern grouped by domain inside `backend/crud/` with separate modules for games, players, snapshots, and chain.
-**Anti-Pattern:** Cramming DB operations into a single file or creating monolithic database modules.
+- **Logging:** Use `from backend.core.logger import logger` with appropriate levels. Use `exc_info=True` for exceptions. NEVER use `print()` or `pprint()`.
 
-**Rule:** Maintain clear domain separation where each CRUD module handles a specific domain with focused responsibilities.
-**Anti-Pattern:** Creating modules that handle multiple unrelated domains or concerns.
+## 4. Schema & Data Integrity
 
-**Rule:** Follow consistent async patterns with proper session handling and type annotations across all CRUD functions.
-**Anti-Pattern:** Mixing sync/async patterns or inconsistent session management.
+- **Universal IDs:** Use centralized `graph_nodes` table for universal IDs and cascading deletes. NEVER implement separate ID systems.
+- **Immutable Snapshots:** Flow data through immutable snapshots connected by `timeline_edges` with explicit source IDs. NEVER create mutable data structures.
 
-## Backend Coding Standards
+## 5. Business Logic Patterns
 
-**Rule:** Use `from backend.core.logger import logger` with appropriate levels for all logging (`logger.info()`, `logger.warning()`, `logger.error(..., exc_info=True)` for exceptions).
-**Anti-Pattern:** Using `print()` or `pprint()` for any logging or debugging purposes.
+- **Country Assignment:** Implement algorithm preventing player repetition with conditional country shields. NEVER allow unrestricted repetition.
+- **Two-Step API:** Enforce `/api/game/draft` (in-memory) followed by `/api/game/save` (persistence). NEVER write draft data directly to database.
+- **Notion Caching:** Cache Notion data locally via `backend/sync/cache_daemon.py`. NEVER make direct API calls during user interactions.
 
-## Schema & Data Integrity
+## 6. API Endpoint Rules
 
-**Rule:** Use centralized `graph_nodes` table for universal IDs and cascading deletes across all entities.
-**Anti-Pattern:** Implementing separate ID systems or manual cascading logic.
-
-**Rule:** Flow data through immutable snapshots connected by events (`timeline_edges`) with explicit source IDs.
-**Anti-Pattern:** Creating mutable data structures or snapshots without proper source tracking.
-
-## Business Logic Patterns
-
-**Rule:** Implement country assignment algorithm that prevents player repetition by conditionally assigning countries as shields.
-**Anti-Pattern:** Allowing unrestricted player repetition or missing shield assignments.
-
-**Rule:** Enforce two-step API with `/api/game/draft` computing tables in memory without database writes, followed by `/api/game/save` for persistence.
-**Anti-Pattern:** Writing draft data directly to database or skipping the review step.
-
-**Rule:** Cache Notion data locally with background orchestration via `backend/sync/cache_daemon.py`.
-**Anti-Pattern:** Making direct API calls to Notion during user interactions.
-
-## API Endpoint Rules
-
-**Rule:** The `/api/snapshot/save` endpoint must blindly and strictly trust the frontend payload without historical overrides.
-**Anti-Pattern:** Backend attempting to merge historical weights or apply smart corrections during save operations.
-
-**Rule:** Lookups via `/api/player/lookup` must use deep 4-tier fallback: Timeline -> Global Snapshot -> JSON Logs -> Notion Cache.
-**Anti-Pattern:** Skipping traversal tiers or accessing data out of sequence during lookups.
-
-**Rule:** Treat the `priority` field as semantically boolean, using strictly `0` or `1` in logic and test setups.
-**Anti-Pattern:** Using non-boolean values for priority fields or treating them as integers.
-
-**Rule:** Execute game generation with two-phase algorithm: distribution loop to group players first, then assign countries second.
-**Anti-Pattern:** Interleaving distribution and country assignment or skipping the grouping phase.
-
-**Rule:** Always hash by primitive attributes (e.g., `.name`) when using `Counter()` or dict keys.
-**Anti-Pattern:** Passing Pydantic models like `DraftPlayer` into `Counter()` or using them as dict keys.
+- **Snapshot Save:** `/api/snapshot/save` MUST blindly trust frontend payload. NEVER merge historical weights or apply corrections.
+- **Player Lookup:** `/api/player/lookup` MUST use 4-tier fallback: Timeline -> Global Snapshot -> JSON Logs -> Notion Cache. NEVER skip tiers.
+- **Priority Field:** Treat `priority` as semantically boolean (strictly `0` or `1`). NEVER use non-boolean values.
+- **Game Generation:** Execute two-phase algorithm: distribution loop first, country assignment second. NEVER interleave phases.
+- **Hashing Keys:** ALWAYS hash by primitive attributes (`.name`) when using `Counter()` or dict keys. NEVER pass Pydantic models as keys.

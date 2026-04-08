@@ -22,6 +22,7 @@
   import PanelLayout from "../layout/PanelLayout.svelte";
   import Badge from "../ui/Badge.svelte";
   import DataTable, { type ColumnDef } from "../layout/DataTable.svelte";
+  import SectionTitle from "../ui/SectionTitle.svelte";
   import SnapshotHistory from "./SnapshotHistory.svelte";
   import { logger } from "../../utils/logger";
 
@@ -281,14 +282,13 @@
   {@const rows = data.players ?? []}
   <PanelLayout scrollable={false}>
     {#snippet header()}
-      <div class="section" style="margin-bottom: 12px;">
-        <div
-          style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;"
-        >
+      <div class="section snapshot-header">
+        <div class="header-row">
           <div>
-            <div class="section-title header-title">
-              Snapshot #{id} · {sourceLabel(data?.source)}
-            </div>
+            <SectionTitle
+              title={`Snapshot #${id} · ${sourceLabel(data?.source)}`}
+              class="header-title"
+            />
             <div class="meta-data">
               {data?.created_at}
             </div>
@@ -301,9 +301,14 @@
             style="min-width: 120px;"
             >{ui.csvCopied ? "Copiado" : "Copiar CSV"}</Button
           >
+          >
         </div>
       </div>
-      <div class="section-title" style="margin-bottom: 4px;">Jugadores</div>
+      <SectionTitle
+        title="Jugadores"
+        count={rows.length}
+        class="compact-title"
+      />
     {/snippet}
 
     {#snippet body()}
@@ -388,21 +393,15 @@
 />
 
 <style>
-  .section {
-    margin-bottom: 22px;
+  .snapshot-header {
+    margin-bottom: 12px;
   }
 
-  .section-title {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: var(--text-muted);
-    margin-bottom: 10px;
-  }
-
-  .header-title {
-    margin-bottom: 2px;
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
   }
 
   .meta-data {

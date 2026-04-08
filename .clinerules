@@ -1,363 +1,191 @@
 
 
-## Core Architecture
+## 1. Core Architecture
 
-**Rule:** Backend serves as pure data and algorithms using Python 3.13, uv, FastAPI, and SQLAlchemy.
-**Anti-Pattern:** Using Flask or mixing presentation logic in backend code.
+- **Backend Stack:** Python 3.13, uv, FastAPI, SQLAlchemy. NEVER use Flask or mix presentation logic in backend.
+- **Frontend Stack:** Svelte 5, TypeScript, Vite. NEVER place business logic or data processing in frontend components.
+- **File Limits:** Maintain 400-line soft limit. Extract sub-domains when exceeded. NEVER create monolithic files.
 
-**Rule:** Frontend handles presentation and translation using Svelte 5, TypeScript, and Vite.
-**Anti-Pattern:** Placing business logic or data processing in frontend components.
+## 2. Language Boundaries
 
-**Rule:** Maintain 400-line soft limit per file by extracting sub-domains into separate files.
-**Anti-Pattern:** Creating monolithic files with multiple responsibilities unless highly cohesive and indivisible.
+- **Internal Code:** English ONLY for Python/TS variables, types, function names, database schemas, endpoints. NEVER use Spanish like `let listaEspera = []`.
+- **UI Text:** Spanish ONLY for HTML labels, user messages, button text, error messages. NEVER translate user-facing text like "Partida 1".
+- **API Properties:** NEVER translate API-coupled data properties (e.g., `mesa.jugadores`, `juegos_este_ano`). This causes ripple effects.
 
-## Language Boundaries
+## 3. Directory Layout
 
-**Rule:** Use English exclusively for internal code including Python/TS variables, types, function names, database schemas, and endpoints.
-**Anti-Pattern:** Using Spanish for variable names like `let listaEspera = []` instead of `let waitingList = []`.
+- **Backend Organization:**
+  - `backend/api/routers/` - FastAPI endpoints
+  - `backend/db/` - Models and connection management
+  - `backend/crud/` - Modular data access
+  - `backend/organizador/` - Algorithms
+  - `backend/sync/` - Notion integration
+- **Frontend Organization:** ALL frontend code in `frontend/src/`. NEVER scatter outside src directory.
 
-**Rule:** Use Spanish exclusively for UI text including HTML labels, user messages, button text, and error messages.
-**Anti-Pattern:** Translating user-facing text like "Partida 1" or "Copiar jugadores" to English.
+## 4. Component Architecture
 
-**Rule:** Never translate API-coupled data properties that map between frontend UI and database schema.
-**Anti-Pattern:** Translating properties like `mesa.jugadores`, `juegos_este_ano`, or `pais_reason` which causes ripple effects.
+- **Semantic Props:** Prefer boolean props like `destructive={true}` over specialized variants like `variant="ghost-danger"`. NEVER create proliferating variants.
+- **Action Bubbling:** Feature components MUST bubble destructive actions to central orchestrators via callback props. NEVER perform API side-effects in nested UI components.
 
-## Directory Layout
-
-**Rule:** Organize backend with `backend/api/routers/` for FastAPI endpoints, `backend/db/` for models and connection management, `backend/crud/` for modular data access, `backend/organizador/` for algorithms, and `backend/sync/` for Notion integration.
-**Anti-Pattern:** Mixing concerns across directories or creating god files.
-
-**Rule:** Place all frontend code in `frontend/src/` with Svelte components, `$state` runes, API utilities, and types.
-**Anti-Pattern:** Scattering frontend code outside the designated src directory.
-
-## Component Architecture
-
-**Rule:** Prefer semantic boolean props like `destructive={true}` over specialized component variants like `variant="ghost-danger"`.
-**Anti-Pattern:** Creating proliferating component variants that complicate the design system.
-
-**Rule:** Feature components should bubble up destructive actions to central orchestrators via callback props.
-**Anti-Pattern:** Performing API side-effects inside deeply nested UI components.
-
-## Core Workflows & Business Logic
+## 5. Core Workflows & Business Logic
 
 ### Player Ingestion Flow
 
-**Rule:** Users enter players via inline Autocomplete or bulk CSV import.
-**Anti-Pattern:** Bypassing the similarity check for unrecognized names.
-
-**Rule:** Unrecognized names MUST be intercepted via Notion similarity check and paused at the `SyncResolutionModal`.
-**Anti-Pattern:** Allowing unrecognized names to proceed without similarity validation.
+- **Entry Methods:** Users enter players via inline Autocomplete or bulk CSV import. NEVER bypass similarity checks.
+- **Similarity Validation:** Unrecognized names MUST be intercepted via Notion similarity check and paused at `SyncResolutionModal`. NEVER allow unrecognized names to proceed without validation.
 
 ### History Lookup Flow
 
-**Rule:** Must use strict 4-tier traversal: `TimelineEdge` -> `SnapshotPlayer` -> `SnapshotHistory` JSON logs -> `NotionCache`.
-**Anti-Pattern:** Skipping traversal tiers or accessing data out of sequence.
+- **Traversal Order:** MUST use strict 4-tier traversal: `TimelineEdge` -> `SnapshotPlayer` -> `SnapshotHistory` JSON logs -> `NotionCache`. NEVER skip tiers or access out of sequence.
 
 ### Manual Save Philosophy
 
-**Rule:** Implement "Dumb Save" where frontend is the absolute source of truth for manual edits.
-**Anti-Pattern:** Backend attempting to merge historical weights or applying smart corrections.
-
-**Rule:** Backend strictly overwrites existing state without attempting to merge historical weights.
-**Anti-Pattern:** Backend implementing complex merge logic for manual edits.
+- **Dumb Save Principle:** Frontend is absolute source of truth for manual edits. NEVER let backend merge historical weights or apply smart corrections.
+- **Backend Overwrites:** Backend strictly overwrites existing state. NEVER implement complex merge logic for manual edits.
 
 ### Draft Algorithm Pipeline
 
-**Rule:** Execute sequential phases: Calculate Tickets -> Distribute to Tables -> Assign Countries -> Deduplicate Waitlist.
-**Anti-Pattern:** Skipping pipeline phases or executing them out of order.
+- **Sequential Execution:** Calculate Tickets -> Distribute to Tables -> Assign Countries -> Deduplicate Waitlist. NEVER skip phases or execute out of order.
 
-## Database Philosophy
+## 1. Database Philosophy
 
-**Rule:** Use disposable local SQLite database with `sqlite (stdlib)` via `aiosqlite`.
-**Anti-Pattern:** Using persistent database systems or external database services.
+- **Database System:** Use disposable local SQLite with `sqlite (stdlib)` via `aiosqlite`. NEVER use persistent or external database services.
+- **Schema Management:** Define DB schema in code, re-create as needed. NEVER use Alembic migrations or separate schema files.
+- **Type Safety:** Use explicit type annotations for all functions and Pydantic models for validation. NEVER use untyped signatures.
 
-**Rule:** Define DB schema in code and re-create as needed without Alembic migrations.
-**Anti-Pattern:** Using database migration tools or maintaining separate schema files.
+## 2. CRUD Architecture (Repository Pattern)
 
-**Rule:** Use explicit type annotations for all function signatures and Pydantic models for request/response validation.
-**Anti-Pattern:** Using untyped function signatures or skipping validation models.
+- **Domain Organization:** Use functional Repository Pattern grouped by domain in `backend/crud/` with separate modules (games, players, snapshots, chain). NEVER cram DB operations into single files.
+- **Domain Separation:** Each CRUD module handles specific domain with focused responsibilities. NEVER create modules handling unrelated domains.
+- **Async Consistency:** Follow consistent async patterns with proper session handling and type annotations. NEVER mix sync/async patterns.
 
-## CRUD Architecture (Repository Pattern)
+## 3. Backend Coding Standards
 
-**Rule:** Use functional Repository Pattern grouped by domain inside `backend/crud/` with separate modules for games, players, snapshots, and chain.
-**Anti-Pattern:** Cramming DB operations into a single file or creating monolithic database modules.
+- **Logging:** Use `from backend.core.logger import logger` with appropriate levels. Use `exc_info=True` for exceptions. NEVER use `print()` or `pprint()`.
 
-**Rule:** Maintain clear domain separation where each CRUD module handles a specific domain with focused responsibilities.
-**Anti-Pattern:** Creating modules that handle multiple unrelated domains or concerns.
+## 4. Schema & Data Integrity
 
-**Rule:** Follow consistent async patterns with proper session handling and type annotations across all CRUD functions.
-**Anti-Pattern:** Mixing sync/async patterns or inconsistent session management.
+- **Universal IDs:** Use centralized `graph_nodes` table for universal IDs and cascading deletes. NEVER implement separate ID systems.
+- **Immutable Snapshots:** Flow data through immutable snapshots connected by `timeline_edges` with explicit source IDs. NEVER create mutable data structures.
 
-## Backend Coding Standards
+## 5. Business Logic Patterns
 
-**Rule:** Use `from backend.core.logger import logger` with appropriate levels for all logging (`logger.info()`, `logger.warning()`, `logger.error(..., exc_info=True)` for exceptions).
-**Anti-Pattern:** Using `print()` or `pprint()` for any logging or debugging purposes.
+- **Country Assignment:** Implement algorithm preventing player repetition with conditional country shields. NEVER allow unrestricted repetition.
+- **Two-Step API:** Enforce `/api/game/draft` (in-memory) followed by `/api/game/save` (persistence). NEVER write draft data directly to database.
+- **Notion Caching:** Cache Notion data locally via `backend/sync/cache_daemon.py`. NEVER make direct API calls during user interactions.
 
-## Schema & Data Integrity
+## 6. API Endpoint Rules
 
-**Rule:** Use centralized `graph_nodes` table for universal IDs and cascading deletes across all entities.
-**Anti-Pattern:** Implementing separate ID systems or manual cascading logic.
+- **Snapshot Save:** `/api/snapshot/save` MUST blindly trust frontend payload. NEVER merge historical weights or apply corrections.
+- **Player Lookup:** `/api/player/lookup` MUST use 4-tier fallback: Timeline -> Global Snapshot -> JSON Logs -> Notion Cache. NEVER skip tiers.
+- **Priority Field:** Treat `priority` as semantically boolean (strictly `0` or `1`). NEVER use non-boolean values.
+- **Game Generation:** Execute two-phase algorithm: distribution loop first, country assignment second. NEVER interleave phases.
+- **Hashing Keys:** ALWAYS hash by primitive attributes (`.name`) when using `Counter()` or dict keys. NEVER pass Pydantic models as keys.
 
-**Rule:** Flow data through immutable snapshots connected by events (`timeline_edges`) with explicit source IDs.
-**Anti-Pattern:** Creating mutable data structures or snapshots without proper source tracking.
+## 1. Core Architecture & Organization
 
-## Business Logic Patterns
+- **Tech Stack:** Svelte 5, TypeScript, Vite. Do not use alternative frameworks.
+- **File Limits:** Maintain a 400-line soft limit per file. Extract sub-domains/components when exceeded.
+- **Localization:** Route ALL UI translations through `frontend/src/i18n.ts`. No hardcoded strings.
+- **Component Routing:** Categorize `frontend/src/components/` strictly by responsibility:
+  - `ui/`: Atomic, domain-agnostic elements (Buttons, Badges).
+  - `modals/`: Overlays and dialogs.
+  - `layout/`: Structural containers.
+  - `features/`: Domain-specific logic and complex views.
+- **Logging:** Use `logger.info()`, `warn()`, and `error()` from `src/utils/logger.ts`. NEVER use `console.log()`.
 
-**Rule:** Implement country assignment algorithm that prevents player repetition by conditionally assigning countries as shields.
-**Anti-Pattern:** Allowing unrestricted player repetition or missing shield assignments.
+## 2. Svelte 5 Reactivity & State
 
-**Rule:** Enforce two-step API with `/api/game/draft` computing tables in memory without database writes, followed by `/api/game/save` for persistence.
-**Anti-Pattern:** Writing draft data directly to database or skipping the review step.
+- **Runes:** Use `$state`, `$derived`, and `$effect`. Never use `let` for reactive variables.
+- **Complex Derivations:** NEVER use nested ternary operators. For complex conditionals, use `$derived.by(() => { if (x) return y; return z; })`.
+- **Context-Aware Components:** Prefer using `$derived` state (e.g., `isEditing = $derived(parentId !== null)`) to adapt a single component for Create/Edit views instead of duplicating the entire component file.
+- **Global State:** Store global state in `stores.svelte.ts`. Use standard loading states: `-1` (unknown/loading) and `0` (loaded).
 
-**Rule:** Cache Notion data locally with background orchestration via `backend/sync/cache_daemon.py`.
-**Anti-Pattern:** Making direct API calls to Notion during user interactions.
+## 3. Component API Design
 
-## API Endpoint Rules
+- **Separation of Concerns:** Keep Visual props (`variant`, `size`) strictly separate from Layout props (`fixedWidth`, `align`).
+- **Domain-Agnostic Leaf Nodes:** Components in `ui/` MUST use semantic props (e.g., `variant="info"`). Never use domain terminology (e.g., `variant="gm"`).
+- **Domain-Specific Nodes:** Components in `features/` MUST accept domain data explicitly (e.g., `gmName`, `players`).
+- **Snippets over HTML:** Type snippets using `import type { Snippet } from "svelte"`. When passing dynamic rows to structural components (like `<DataTable>`), use Svelte 5 snippets instead of raw HTML `<tr>` elements to ensure safe DOM rendering.
+- **Native Elements:** ALWAYS use the custom `<Button>` component instead of native `<button>`. Disabled buttons MUST include a `title` attribute for accessibility.
 
-**Rule:** The `/api/snapshot/save` endpoint must blindly and strictly trust the frontend payload without historical overrides.
-**Anti-Pattern:** Backend attempting to merge historical weights or apply smart corrections during save operations.
+## 4. Styling & Design System (CRITICAL constraints)
 
-**Rule:** Lookups via `/api/player/lookup` must use deep 4-tier fallback: Timeline -> Global Snapshot -> JSON Logs -> Notion Cache.
-**Anti-Pattern:** Skipping traversal tiers or accessing data out of sequence during lookups.
+- **NO Inline Styles:** Never use `style="..."` attributes. Always use semantic class names and Svelte's scoped `<style>` blocks.
+- **Semantic Variables ONLY:** Never hardcode hex codes or raw palette colors (e.g., `var(--gray-50)`). Always map to semantic variables (e.g., `var(--bg-secondary)`, `var(--text-primary)`) to ensure flawless Dark Mode inversion.
+- **Intents:**
+  - **Solid Intents:** (`--primary-bg`) Use for high-emphasis elements. Always pair with white text.
+  - **Subtle Intents:** (`--primary-bg-subtle`) Use for backgrounds/badges. Pair with tinted text (`--primary-text-subtle`).
+- **Transparent Hovers:** Never use solid colors for hovering over transparent items. Use alpha overlays (`var(--overlay-hover)`, `var(--overlay-destructive)`).
+- **Input Safety:** Text inputs must use the `.input-field` class. Focus states MUST use inset shadows (`box-shadow: inset 0 0 0 1px var(--border-focus)`) to prevent grid/table clipping.
 
-**Rule:** Treat the `priority` field as semantically boolean, using strictly `0` or `1` in logic and test setups.
-**Anti-Pattern:** Using non-boolean values for priority fields or treating them as integers.
+## 5. CSS Compilation & Scope Overrides
 
-**Rule:** Execute game generation with two-phase algorithm: distribution loop to group players first, then assign countries second.
-**Anti-Pattern:** Interleaving distribution and country assignment or skipping the grouping phase.
+- **Svelte CSS Pruning:** Svelte automatically strips "unused" CSS. If styling dynamic content, injected HTML, or elements passed via props (like standard `img` or `svg` icons), you MUST wrap the selector in `:global()` (e.g., `.btn-icon :global(svg)`).
+- **Icon Contrast:** Apply `filter: brightness(0) invert(1);` to `:global(img)` and `:global(svg)` inside solid buttons to ensure contrast against dark backgrounds. Do not apply this to text/emojis.
+- **Parent-to-Child Layout:** To pass custom spacing to a child, pass a `class` prop (e.g., `class="compact-title"`) and define `:global(.compact-title)` in the parent's style block. Do not build complex prop-based spacing systems.
 
-**Rule:** Always hash by primitive attributes (e.g., `.name`) when using `Counter()` or dict keys.
-**Anti-Pattern:** Passing Pydantic models like `DraftPlayer` into `Counter()` or using them as dict keys.
+## 6. Modals, Overlays & Data Flow
 
-## Frontend Architecture
+- **Modal Construction:** Use `.modal-overlay`, `var(--modal-backdrop)`, `z-index: 1000`, and `backdrop-filter: blur(2px)`.
+- **Modal Events:** Always apply `onclick={onCancel}` to the overlay and `e.stopPropagation()` to the modal content window. Use standard callback props (`onCancel`, `onConfirm`).
+- **Input Focus:** Use `use:autofocus` on the primary interaction element within a modal.
+- **NO `window.prompt()`:** Completely banned. Always use proper modal dialogs and autocomplete components.
+- **Data Ingestion:** Bulk data entry MUST NEVER write directly to state. Intercept via `/api/player/check-similarity` and pause with a resolution modal if conflicts exist. Inline player additions must use Autocomplete fetching from `/api/player/all`.
 
-**Rule:** Use Svelte 5, TypeScript, and Vite as the tech stack.
-**Anti-Pattern:** Using alternative frameworks or build tools.
+## 1. Testing Execution
 
-**Rule:** Maintain 400-line soft limit per file and extract sub-domains when exceeded.
-**Anti-Pattern:** Creating monolithic files with multiple responsibilities.
+- **Frontend Tests:** ALWAYS use `bun run test` for Vitest suite. NEVER use `bun test` (incompatible with Vitest/Svelte 5).
+- **Type Checking:** ALWAYS run `bun run typecheck` after directory restructuring or prop changes. NEVER skip after structural changes.
+- **Backend Tests:** Use `uv run python -m pytest -q`. NEVER use alternative Python test runners.
 
-**Rule:** Route all UI translations through `frontend/src/i18n.ts`.
-**Anti-Pattern:** Hardcoding text strings or using multiple translation systems.
+## 2. Backend Testing Strategy
 
-## Component Architecture & Organization
+- **Framework:** Use pytest with `test_*.py` files co-located with implementation. NEVER separate test files or use incompatible frameworks.
+- **Database:** Use in-memory SQLite (`:memory:`) exclusively. NEVER use persistent databases or external services.
+- **Mocking:** Use `unittest.mock` for external dependencies, ALWAYS mock Notion API calls. NEVER hit real external APIs.
+- **Test Structure:** Unit tests for pure functions, integration tests for database operations, end-to-end tests for API endpoints. NEVER mix types or miss integration coverage.
 
-**Rule:** Categorize components in `frontend/src/components/` by responsibility: `ui/` for atomic/domain-agnostic, `modals/` for overlays, `layout/` for structural containers, and `features/` for domain-specific logic.
-**Anti-Pattern:** Mixing component types in the same directory or creating unclear categorization.
+## 3. Frontend Testing Strategy
 
-**Rule:** Design leaf components (Badge, Button, Tooltip, Input) as domain-agnostic with semantic APIs like `variant="info|success|warning|error"`.
-**Anti-Pattern:** Using domain names in variant props like `variant="gm|veteran"`.
+- **Framework:** Use Vitest with `@testing-library/svelte`. NEVER use incompatible frameworks.
+- **Component Structure:** Unit tests for pure UI, integration tests for stateful components, accessibility tests for interactive elements. NEVER focus only on visual testing.
+- **Query Selection:** Use `screen.getByRole('button', { name: /Text/i })` for buttons, `screen.getByLabelText()` or `screen.getByPlaceholderText()` for forms. NEVER use `getByText()` for emoji-separated buttons.
+- **State Testing:** Use integration-style testing for `.svelte.ts` files with `$state` runes. NEVER use `vi.mock()` on these files.
+- **Prop Testing:** Test visibility changes based on props (`editing`, `viewMode`, `hasPermission`). NEVER test only static states.
+- **Factory Pattern:** Use fixtures in `frontend/src/tests/fixtures/` (e.g., `createMockPlayer()`). NEVER create giant inline JSON objects.
+- **Helper Extraction:** Extract `render` calls and `waitFor` into shared helpers for complex components. NEVER duplicate render setup.
 
-**Rule:** Design domain layout components (GameTableCard, PlayerList) to accept domain data explicitly with clear props like `gmName`, `tableNumber`, `players`.
-**Anti-Pattern:** Over-abstracting with generic snippet APIs or unclear prop interfaces.
+## 4. Frontend Test Maintenance
 
-**Rule:** For CSS-only abstractions with zero JavaScript logic, extract layout into global CSS utility classes in `style.css` instead of creating Svelte components.
-**Anti-Pattern:** Creating Svelte components purely for structural CSS that forces `:global()` usage and breaks encapsulation.
+- **Snippet Testing:** Use `createRawSnippet` from `svelte` for snippet components. NEVER test without proper Svelte 5 snippet creation.
+- **State Pre-population:** Use component props (`initialPlayers`) to pre-populate data. NEVER rely on fragile UI click-throughs.
+- **DOM Query Updates:** Update queries immediately when CSS classes change or components are extracted. NEVER allow outdated selectors.
+- **Validation:** Run `bun run typecheck` after CSS changes and verify visual regression after component extraction. NEVER skip validation steps.
 
-**Rule:** Build Data-Driven Components (like `<DataTable data={rows} columns={config} />`) that own the HTML structure for complex styling needs.
-**Anti-Pattern:** Building generic wrapper components that expect raw HTML elements via snippets, breaking Svelte's scoped CSS.
+## 5. General Test Editing & Maintenance
 
-**Rule:** Maintain strict separation between View (read-only) and Edit screens with explicit "Edit" buttons for transitions.
-**Anti-Pattern:** Using inline editing hacks like `window.prompt()` in View screens.
+- **AST Integrity:** Use Nuclear Block Replacements (entire `describe`/`it` blocks). NEVER use loose line-deletion commands that break AST structure.
 
-**Rule:** Use global utility classes (`.text-strong`, `.table-input`) to ensure typography alignment between plain text and input elements.
-**Anti-Pattern:** Relying on automatic font inheritance for inputs and textareas.
+## 6. Test Quality Standards
 
-## Svelte 5 Patterns
+- **Query Priority:** Use semantic HTML queries first, test user behavior over implementation details, assert accessible names over visual appearance. NEVER test implementation details or use fragile DOM traversal.
+- **Mocking Strategy:** Mock external dependencies only, test real component interactions. NEVER over-mock that hides real bugs or mock internal logic.
+- **Coverage Requirements:** Achieve 100% coverage for critical paths, ALWAYS test error handling, test edge cases with null/undefined inputs. NEVER skip error states or critical paths.
 
-**Rule:** Use `$state`, `$derived`, and `$effect` for reactivity.
-**Anti-Pattern:** Using `let` for reactive variables.
+## Meta-Prompting & AI Communication
 
-**Rule:** Use `:global()` modifier when parent component's scoped CSS needs to affect snippet elements.
-**Anti-Pattern:** Assuming scoped CSS automatically applies to snippet content.
-
-**Rule:** Type snippets in generic components using `import type { Snippet } from "svelte"` and `cell?: Snippet<[T, number]>`.
-**Anti-Pattern:** Downgrading snippets to string-returning functions that prevent internal Svelte component rendering.
-
-**Rule:** Store global state in `stores.svelte.ts` with loading states using `-1` (unknown) and `0` (loaded).
-**Anti-Pattern:** Scattering state management across multiple files or inconsistent loading conventions.
-
-**Rule:** Use global utility classes (`.group`, `.group-hover-reveal`) for group hover reveal patterns.
-**Anti-Pattern:** Implementing hover reveal logic in individual Svelte components.
-
-## Styling & Theming
-
-**Rule:** Use global CSS variables like `var(--info-bg)` and `var(--tooltip-bg)` instead of hardcoded hex colors.
-**Anti-Pattern:** Hardcoding color values in components.
-
-**Rule:** Use flexbox for panels and CSS Grid for complex list alignment.
-**Anti-Pattern:** Using inappropriate layout systems for the use case.
-
-**Rule:** Use inverted schemes (dark background + light text) for floating elements like tooltips and popovers.
-**Anti-Pattern:** Using the same color scheme for both main content and floating elements.
-
-## CSS & Design System Guidelines
-
-When styling components or adding new UI features, strictly adhere to the following semantic design system rules:
-
-1. **Never Hardcode Colors in Components:** Do NOT use hex codes (e.g., `#ffffff`) or raw palette variables (e.g., `var(--gray-50)`) directly in component styles. Always map to semantic relational variables (e.g., `var(--bg-secondary)`, `var(--text-primary)`). This guarantees flawless Dark Mode inversion.
-
-2. **Solid vs. Subtle Intents:**
-   - Use **Solid** intents (`--primary-bg`, `--danger-bg`) ONLY for high-emphasis actions like Primary Buttons. Solid intents use white text (`--primary-text`).
-   - Use **Subtle** intents (`--primary-bg-subtle`, `--warning-bg-subtle`) for backgrounds, badges, inactive nodes, and alerts. Subtle intents use dark/tinted text (`--primary-text-subtle`).
-
-3. **Ghost & Transparent Hovers:** Never use solid colors for hovering over transparent elements (like Ghost buttons or list items). Always use the mathematical alpha overlays (`var(--overlay-hover)`, `var(--overlay-destructive)`). This ensures the hover state beautifully tints whatever background it sits on.
-
-4. **Form Element Safety:**
-   - Always use `class="input-field"` for text inputs to ensure consistent padding, typography, and dark-mode inheritance.
-   - When defining focus rings (e.g., `:focus`), always use an `inset` box-shadow (`box-shadow: inset 0 0 0 1px var(--border-focus)`). This prevents the focus ring from being clipped when the input is placed inside strict CSS Grids or Table cells.
-
-5. **Icon Contrast in Buttons:** Icons (SVGs/IMGs) inside Solid buttons (Primary, Success, Danger) must use CSS filters (`filter: brightness(0) invert(1);`) to force them to be pure white, ensuring contrast against the solid background.
-
-## Component API Design
-
-**Rule:** Use visual props (variant, size, fill, iconOnly) to control appearance only.
-**Anti-Pattern:** Bundling layout behavior into visual props.
-
-**Rule:** Use layout props (fixedWidth, align, spacing) to control behavior only.
-**Anti-Pattern:** Mixing visual and behavioral concerns in single props.
-
-## Frontend Coding Standards
-
-**Rule:** Use `logger.info()`, `logger.warn()`, and `logger.error()` from `src/utils/logger.ts` for all logging.
-**Anti-Pattern:** Using `console.log()` for debugging or logging purposes.
-
-**Rule:** Always import and use the Button component instead of native `<button>` tags.
-**Anti-Pattern:** Using native HTML button elements directly.
-
-**Rule:** Include `title` attribute for disabled buttons to provide context.
-**Anti-Pattern:** Leaving disabled buttons without explanatory tooltips.
-
-## Modal & Overlay Patterns
-
-**Rule:** Use `.modal-overlay` utility and `--modal-backdrop` variable for modal overlays.
-**Anti-Pattern:** Creating custom overlay implementations without consistent styling.
-
-**Rule:** Set modal z-index to `1000` to escape `SidePanel` stacking contexts.
-**Anti-Pattern:** Using insufficient z-index values that get covered by other UI elements.
-
-**Rule:** Apply `backdrop-filter: blur(2px)` for visual depth in modal overlays.
-**Anti-Pattern:** Using flat or unstyled modal backgrounds.
-
-**Rule:** Implement `onclick={onCancel}` on overlay and `e.stopPropagation()` on modal content.
-**Anti-Pattern:** Missing proper event handling that causes modal closing issues.
-
-**Rule:** Use `use:autofocus` on the primary input/textarea in modals.
-**Anti-Pattern:** Forgetting to focus the primary interaction element.
-
-**Rule:** Use standard callback props like `onImport`, `onCancel`, or `onConfirm` for modal actions.
-**Anti-Pattern:** Creating inconsistent modal prop interfaces.
-
-## Data Entry & UI Flow Patterns
-
-**Rule:** Bulk data ingestion must never write directly to table state without validation; always intercept via `/api/player/check-similarity` and pause with modal if conflicts exist.
-**Anti-Pattern:** Allowing unvalidated bulk data to bypass similarity checks and modal interruption.
-
-**Rule:** When passing dynamic rows into generic components like `DataTable`, use Svelte 5 snippets (e.g., `footerRow`) instead of raw HTML `<tr>` elements for safe `<tbody>` rendering.
-**Anti-Pattern:** Passing raw HTML elements that break table structure and Svelte's rendering system.
-
-**Rule:** Always use inline Svelte 5 Autocomplete components that fetch from `/api/player/all` and rehydrate history.
-**Anti-Pattern:** Using native browser prompts or custom input implementations without autocomplete functionality.
-
-**Rule:** Completely ban the use of `window.prompt()` in favor of proper modal dialogs and autocomplete components.
-**Anti-Pattern:** Using native browser prompts for any user input scenarios.
-
-## Testing Execution
-
-**Rule:** Always use `bun run test` to trigger the Vitest suite specifically configured for this project.
-**Anti-Pattern:** Using `bun test` which is incompatible with Vitest configuration and Svelte 5 runes.
-
-**Rule:** Run `bun run typecheck` after any directory restructuring or prop changes.
-**Anti-Pattern:** Skipping type checking after structural changes that may break imports.
-
-**Rule:** Use `uv run python -m pytest -q` for backend testing.
-**Anti-Pattern:** Using alternative Python test runners or incorrect pytest configurations.
-
-## Backend Testing Strategy
-
-**Rule:** Use pytest framework with `test_*.py` files co-located with implementation.
-**Anti-Pattern:** Separating test files from implementation or using incompatible test frameworks.
-
-**Rule:** Use in-memory SQLite (`:memory:`) exclusively for database testing.
-**Anti-Pattern:** Using persistent databases or external database services in tests.
-
-**Rule:** Use `unittest.mock` for external dependencies and always mock Notion API calls.
-**Anti-Pattern:** Hitting real external APIs or using inadequate mocking strategies.
-
-**Rule:** Structure tests with unit tests for pure functions, integration tests for database operations, and end-to-end tests for API endpoints.
-**Anti-Pattern:** Mixing test types or missing critical integration coverage.
-
-## Frontend Testing Strategy
-
-**Rule:** Use Vitest with `@testing-library/svelte` for frontend testing.
-**Anti-Pattern:** Using incompatible testing frameworks or libraries.
-
-**Rule:** Structure component tests with unit tests for pure UI components, integration tests for stateful components, and accessibility tests for interactive elements.
-**Anti-Pattern:** Focusing only on visual testing without interaction or accessibility coverage.
-
-**Rule:** Use `screen.getByRole('button', { name: /Text/i })` for buttons and `screen.getByLabelText()` or `screen.getByPlaceholderText()` for forms.
-**Anti-Pattern:** Using `getByText()` for buttons with emojis separated from text or inappropriate query selectors.
-
-**Rule:** Use integration-style testing methodology for `.svelte.ts` files with `$state` runes; never use `vi.mock()` on these files.
-**Anti-Pattern:** Mocking state files or components that require real reactivity for accurate testing.
-
-**Rule:** Test visibility changes based on props like `editing`, `viewMode`, `hasPermission` and verify component behavior based on conditional props.
-**Anti-Pattern:** Testing only static states without verifying reactive behavior or prop-driven changes.
-
-**Rule:** Use Factory Pattern via `frontend/src/tests/fixtures/` directory (e.g., `createMockPlayer({ ...overrides })`) instead of giant inline JSON objects.
-**Anti-Pattern:** Creating large inline mock objects or duplicating boilerplate across tests.
-
-**Rule:** Extract `render` calls and loading state `waitFor` into shared `renderMyComponent(propsOverrides)` helpers for complex components.
-**Anti-Pattern:** Duplicating render setup code and boilerplate in multiple test cases.
-
-### Frontend Test Maintenance
-
-**Rule:** When testing components that accept snippets, use `createRawSnippet` from `svelte` to programmatically forge valid snippets.
-**Anti-Pattern:** Attempting to test snippet functionality without proper Svelte 5 snippet creation.
-
-**Rule:** Use component props (e.g., `initialPlayers`) to pre-populate data before asserting behaviors instead of fragile UI click-throughs.
-**Anti-Pattern:** Relying on complex UI interaction sequences to set up initial test state.
-
-**Rule:** Update DOM queries immediately when CSS classes change, components are extracted, or selectors are renamed.
-**Anti-Pattern:** Allowing outdated selectors to persist after DOM structure changes.
-
-**Rule:** Update `querySelector`, `closest`, and `getBy` calls immediately when HTML is abstracted into components or CSS classes are renamed.
-**Anti-Pattern:** Neglecting test updates during CSS/DOM refactors that break integration tests.
-
-**Rule:** Run `bun run typecheck` after CSS changes and verify visual regression after component extraction.
-**Anti-Pattern:** Skipping validation steps that can catch breaking changes early.
-
-## General Test Editing & Maintenance
-
-**Rule:** Use Nuclear Block Replacements (replacing entire `describe` or `it` blocks) to guarantee Abstract Syntax Tree (AST) integrity in test files.
-**Anti-Pattern:** Using loose line-deletion commands that can break AST structure and test file syntax.
-
-## Test Quality Standards
-
-**Rule:** Use semantic HTML queries first, test user behavior rather than implementation details, and assert accessible names rather than visual appearance.
-**Anti-Pattern:** Testing implementation details, visual appearance, or using fragile DOM traversal.
-
-**Rule:** Mock external dependencies only, test real component interactions, and avoid over-mocking that hides real bugs.
-**Anti-Pattern:** Mocking internal component logic or creating mocks that prevent testing of actual behavior.
-
-**Rule:** Achieve 100% coverage for critical user paths, always test error handling, and test edge cases with null/undefined inputs.
-**Anti-Pattern:** Skipping error states, edge cases, or critical user interaction paths.
+- **ABSOLUTE CONSTRAINTS ONLY:** When writing or updating rules, ALWAYS use absolute constraints (MUST, NEVER, BANNED, STRICTLY). NEVER use polite/emotional language ("Please", "Try to", "Avoid") as it dilutes token weights and probabilistic constraints.
+- **LOGICAL GROUPING:** Group concepts with bullet points rather than repetitive "Rule / Anti-Pattern" boilerplate. Use clear headers and concise directives.
+- **TOKEN EFFICIENCY:** Every word MUST serve a constraint purpose. Eliminate filler language and maximize information density.
 
 ## Rule Governance
 
-**Rule:** Store AI rules in `docs/ai-rules/` directory as the source of truth.
-**Anti-Pattern:** Directly editing `.clinerules`, `.windsurfrules`, or `.github/copilot-instructions.md` which are generated artifacts.
-
-**Rule:** Run `bun run scripts/generate-ai-instructions.ts` after editing any markdown files in `docs/ai-rules/` to compile rules into root directory AI files.
-**Anti-Pattern:** Editing AI rule files without running the compilation script, causing inconsistencies across AI instruction files.
+- **Source of Truth:** Store AI rules in `docs/ai-rules/` directory. NEVER directly edit generated artifacts (`.clinerules`, `.windsurfrules`, `.github/copilot-instructions.md`).
+- **Compilation:** ALWAYS run `bun run scripts/generate-ai-instructions.ts` after editing any markdown files in `docs/ai-rules/`. NEVER skip compilation as it causes inconsistencies across AI instruction files.
 
 ## Verification & Commits
 
-**Rule:** Validate all tests and typing before committing using `bun run build && bun run lint && bun run typecheck`.
-**Anti-Pattern:** Committing changes without proper validation that may break the build or introduce errors.
-
-**Rule:** Check for Svelte syntax problems locally before pushing changes.
-**Anti-Pattern:** Relying on CI/CD to catch syntax issues that should be identified during development.
-
-**Rule:** Use conventional commit prefixes: `feat:`, `fix:`, `refactor:`, `test:`.
-**Anti-Pattern:** Using non-standard commit message formats that break automated changelog generation.
+- **Pre-Commit Validation:** ALWAYS validate with `bun run build && bun run lint && bun run typecheck`. NEVER commit without proper validation.
+- **Local Syntax Checking:** ALWAYS check Svelte syntax problems locally. NEVER rely on CI/CD to catch syntax issues.
+- **Commit Format:** Use conventional prefixes: `feat:`, `fix:`, `refactor:`, `test:`. NEVER use non-standard formats that break changelog generation.

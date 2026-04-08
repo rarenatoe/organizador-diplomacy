@@ -10,7 +10,7 @@
 </script>
 
 {#if history && history.length > 0}
-  <details style="margin: 0 18px;">
+  <details class="history-details">
     <summary class="section-title history-row">
       Historial de Cambios ({history.length})
     </summary>
@@ -41,7 +41,7 @@
             {/if}
             {#if log.changes.modified.length > 0}
               <div class="change-modified">
-                <div style="margin-bottom: 2px;">✏️ Editados:</div>
+                <div class="modified-header">✏️ Editados:</div>
                 <ul class="mod-list">
                   {#each log.changes.modified as mod (mod.nombre)}
                     <li>
@@ -67,6 +67,14 @@
 {/if}
 
 <style>
+  .history-details {
+    margin: 0 18px;
+  }
+
+  .modified-header {
+    margin-bottom: 2px;
+  }
+
   .section-title {
     font-size: 10px;
     font-weight: 700;

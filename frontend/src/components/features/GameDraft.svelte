@@ -5,6 +5,8 @@
   import { findLatestGameId } from "../../snapshotUtils";
   import Button from "../ui/Button.svelte";
   import PanelLayout from "../layout/PanelLayout.svelte";
+  import SectionTitle from "../ui/SectionTitle.svelte";
+  import { logger } from "../../utils/logger";
   import Badge from "../ui/Badge.svelte";
   import Tooltip from "../ui/Tooltip.svelte";
   import GameTableCard from "./GameTableCard.svelte";
@@ -397,9 +399,7 @@
       <p class="loading-text">Generando draft...</p>
     {:else if draftData}
       <div class="section">
-        <div class="section-title">
-          Draft de Partidas - Snapshot #{snapshotId}
-        </div>
+        <SectionTitle title={`Draft de Partidas - Snapshot #${snapshotId}`} />
         <div class="meta-grid">
           <span class="meta-key">Mesas generadas</span>
           <span class="meta-val">{draftData.mesas.length}</span>
@@ -411,7 +411,7 @@
       </div>
       {#if draftData.mesas.length > 0}
         <div class="section">
-          <div class="section-title">Partidas ({draftData.mesas.length})</div>
+          <SectionTitle title="Partidas" count={draftData.mesas.length} />
           {#each draftData.mesas as table, tableIndex (table.numero + "_" + tableIndex)}
             <GameTableCard
               tableNumber={table.numero}
@@ -482,7 +482,7 @@
       {/if}
       {#if draftData.tickets_sobrantes.length > 0}
         <div class="section">
-          <div class="section-title">Lista de espera</div>
+          <SectionTitle title="Lista de espera" />
           {#each draftData.tickets_sobrantes as w, i (w.nombre + "_" + i)}
             {@const target = { type: "waiting" as const, playerIndex: i }}
             {@const isSelected = isSelectedSwap(target)}
@@ -541,15 +541,6 @@
     color: var(--danger-text);
     font-size: 12px;
     padding: 4px 0;
-  }
-
-  .section-title {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: var(--text-muted);
-    margin-bottom: 10px;
   }
 
   .meta-grid {

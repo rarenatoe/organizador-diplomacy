@@ -139,9 +139,7 @@
         <div class="icon">📂</div>
         <p>No hay snapshots en la DB.</p>
         <p>Comienza importando jugadores o creando una versión desde cero.</p>
-        <div
-          style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;"
-        >
+        <div class="action-row">
           <Button
             variant="primary"
             icon="☁️"
@@ -198,6 +196,13 @@
     padding: 60px;
     color: var(--text-muted);
     text-align: center;
+  }
+
+  .action-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
   }
 
   .empty-state .icon {

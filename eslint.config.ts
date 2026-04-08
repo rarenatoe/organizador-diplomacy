@@ -74,6 +74,7 @@ export default defineConfig([
         "error",
         { ignoreArrowShorthand: true },
       ],
+      "no-nested-ternary": "error",
     },
   },
   // Vitest test files configuration
@@ -104,6 +105,7 @@ export default defineConfig([
       "@typescript-eslint/no-confusing-void-expression": "off",
       // The flat/recommended config already includes a11y rules
       // Additional custom rules can be added here if needed
+      "no-nested-ternary": "error",
     },
   },
 ]);

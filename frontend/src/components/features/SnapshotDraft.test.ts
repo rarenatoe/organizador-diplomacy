@@ -89,7 +89,7 @@ describe("SnapshotDraft", () => {
       },
     });
 
-    expect(container.textContent).toContain("Nueva Versión");
+    expect(container.textContent).toContain("Nueva Lista");
     expect(container.textContent).toContain("No hay jugadores en el borrador");
   });
 
@@ -345,7 +345,7 @@ describe("SnapshotDraft", () => {
     });
 
     const saveButton = screen.getByRole("button", {
-      name: /Guardar Nueva Lista/i,
+      name: /Crear Versión/i,
     });
     expect(saveButton).toBeDisabled();
   });
@@ -355,7 +355,7 @@ describe("SnapshotDraft", () => {
       props: { ...defaultProps, initialPlayers: mockInitialPlayers },
     });
     const saveButton = screen.getByRole("button", {
-      name: /Guardar Nueva Lista/i,
+      name: /Crear Versión/i,
     });
     expect(saveButton).not.toBeDisabled();
   });
@@ -366,7 +366,7 @@ describe("SnapshotDraft", () => {
       props: { ...defaultProps, initialPlayers: mockInitialPlayers },
     });
     await fireEvent.click(
-      screen.getByRole("button", { name: /Guardar Nueva Lista/i }),
+      screen.getByRole("button", { name: /Crear Versión/i }),
     );
     expect(saveSnapshot).toHaveBeenCalled();
   });
@@ -455,7 +455,7 @@ describe("SnapshotDraft", () => {
     });
 
     const saveButton = screen.getByRole("button", {
-      name: /Guardar Nueva Lista/i,
+      name: /Crear Versión/i,
     });
     // Verify button is disabled and has helpful title
     expect(saveButton).toBeDisabled();
@@ -507,7 +507,7 @@ describe("SnapshotDraft", () => {
 
     // Save
     const saveButton = screen.getByRole("button", {
-      name: /Guardar Edición/i,
+      name: /Guardar Cambios/i,
     });
     await fireEvent.click(saveButton);
 
@@ -559,5 +559,39 @@ describe("SnapshotDraft", () => {
 
     // El botón de agregar jugador SÍ debe estar presente
     expect(screen.getByText("➕ Agregar jugador")).toBeTruthy();
+  });
+
+  it("renders correctly in Edit Mode context", () => {
+    render(SnapshotDraft, {
+      props: {
+        parentId: 123, // Editando una lista existente
+        initialPlayers: [
+          {
+            nombre: "Jugador Existente",
+            experiencia: "Antiguo",
+            juegos_este_ano: 5,
+            prioridad: 1,
+            partidas_deseadas: 2,
+            partidas_gm: 1,
+            original_nombre: "Jugador Existente",
+          },
+        ],
+        defaultEventType: "edit",
+        onClose: vi.fn(),
+        onCancel: vi.fn(),
+        onChainUpdate: vi.fn(),
+        onOpenSnapshot: vi.fn(),
+        onShowError: vi.fn(),
+      },
+    });
+
+    // Assert that the header title renders correctly as "Editando Snapshot #123"
+    expect(screen.getByText("Editando Snapshot #123")).toBeInTheDocument();
+
+    // Assert that the save button renders the text "Guardar Cambios"
+    const saveButton = screen.getByRole("button", {
+      name: /Guardar Cambios/i,
+    });
+    expect(saveButton).toBeInTheDocument();
   });
 });

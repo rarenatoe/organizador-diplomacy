@@ -7,6 +7,7 @@
   import Badge from "../ui/Badge.svelte";
   import Tooltip from "../ui/Tooltip.svelte";
   import GameTableCard from "./GameTableCard.svelte";
+  import SectionTitle from "../ui/SectionTitle.svelte";
 
   interface Props {
     id: number;
@@ -179,7 +180,7 @@
   <PanelLayout footer={gameFooter}>
     {#snippet body()}
       <div class="section">
-        <div class="section-title">Resumen</div>
+        <SectionTitle title="Resumen" />
         <div class="meta-grid">
           <span class="meta-key">Generado</span>
           <span class="meta-val">{data?.created_at}</span>
@@ -205,7 +206,7 @@
       </div>
       {#if mesas.length > 0}
         <div class="section">
-          <div class="section-title">Partidas ({mesas.length})</div>
+          <SectionTitle title="Partidas" count={mesas.length} />
           {#each mesas as table (table.numero)}
             {@const playersTxt = getTableCopyText(table)}
             <GameTableCard tableNumber={table.numero} gmName={table.gm}>
@@ -252,7 +253,7 @@
       {#if waiting.length > 0}
         {@const waitTxt = waiting.map((w) => w.nombre).join("\n")}
         <div class="section">
-          <div class="section-title">Lista de espera</div>
+          <SectionTitle title="Lista de espera" />
           {#each waiting as w (w.nombre)}
             <div class="waiting-item">
               <span class="waiting-name">{w.nombre}</span>
@@ -278,15 +279,6 @@
 <style>
   .section {
     margin-bottom: 22px;
-  }
-
-  .section-title {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: var(--text-muted);
-    margin-bottom: 10px;
   }
 
   .meta-grid {

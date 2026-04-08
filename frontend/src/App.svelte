@@ -101,12 +101,11 @@
     draftInitialPlayers = players;
     panelType = "draft";
     panelOpen = true;
-    panelTitle =
-      parentId === null
-        ? "Nueva Lista"
-        : eventType === "sync"
-          ? `Sincronizando #${parentId}`
-          : `Editando #${parentId}`;
+    panelTitle = (() => {
+      if (parentId === null) return "Nueva Lista";
+      if (eventType === "sync") return `Sincronizando #${parentId}`;
+      return `Editando #${parentId}`;
+    })();
     if (parentId !== null) {
       setActiveNodeId(parentId);
     }

@@ -41,19 +41,26 @@
     ghost: "btn-ghost",
   };
 
-  let finalClass = $derived(
-    [
+  let finalClass = $derived.by(() => {
+    const sizeClassMap = {
+      sm: "btn-sm",
+      md: "btn",
+      xs: "btn-xs",
+    } as const;
+    let sizeClass = sizeClassMap[size];
+
+    return [
       "btn",
       variantClasses[variant],
-      size === "sm" ? "btn-sm" : size === "xs" ? "btn-xs" : "",
+      sizeClass,
       fill ? "flex-fill" : "",
       iconOnly ? "btn-icon-only" : "",
       destructive ? "btn-destructive" : "",
       className,
     ]
       .filter(Boolean)
-      .join(" "),
-  );
+      .join(" ");
+  });
 
   function handleClick(e: MouseEvent) {
     if (!disabled && onclick) {
@@ -194,10 +201,14 @@
     border-color: var(--danger-hover);
   }
 
-  /* Force emojis/icons to be pure white inside solid buttons */
-  .btn-primary .btn-icon,
-  .btn-success .btn-icon,
-  .btn-destructive.btn-primary .btn-icon {
+  /* Force external images and SVGs to be pure white inside solid buttons */
+  /* We specifically target img and svg, avoiding text-based emojis so they don't turn into white squares */
+  .btn-primary .btn-icon :global(img),
+  .btn-primary .btn-icon :global(svg),
+  .btn-success .btn-icon :global(img),
+  .btn-success .btn-icon :global(svg),
+  .btn-destructive.btn-primary .btn-icon :global(img),
+  .btn-destructive.btn-primary .btn-icon :global(svg) {
     filter: brightness(0) invert(1);
   }
 

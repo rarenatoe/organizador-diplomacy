@@ -4,83 +4,42 @@ title: Pillar 4 - Testing & Validation
 priority: 40
 ---
 
-## Testing Execution
+## 1. Testing Execution
 
-**Rule:** Always use `bun run test` to trigger the Vitest suite specifically configured for this project.
-**Anti-Pattern:** Using `bun test` which is incompatible with Vitest configuration and Svelte 5 runes.
+- **Frontend Tests:** ALWAYS use `bun run test` for Vitest suite. NEVER use `bun test` (incompatible with Vitest/Svelte 5).
+- **Type Checking:** ALWAYS run `bun run typecheck` after directory restructuring or prop changes. NEVER skip after structural changes.
+- **Backend Tests:** Use `uv run python -m pytest -q`. NEVER use alternative Python test runners.
 
-**Rule:** Run `bun run typecheck` after any directory restructuring or prop changes.
-**Anti-Pattern:** Skipping type checking after structural changes that may break imports.
+## 2. Backend Testing Strategy
 
-**Rule:** Use `uv run python -m pytest -q` for backend testing.
-**Anti-Pattern:** Using alternative Python test runners or incorrect pytest configurations.
+- **Framework:** Use pytest with `test_*.py` files co-located with implementation. NEVER separate test files or use incompatible frameworks.
+- **Database:** Use in-memory SQLite (`:memory:`) exclusively. NEVER use persistent databases or external services.
+- **Mocking:** Use `unittest.mock` for external dependencies, ALWAYS mock Notion API calls. NEVER hit real external APIs.
+- **Test Structure:** Unit tests for pure functions, integration tests for database operations, end-to-end tests for API endpoints. NEVER mix types or miss integration coverage.
 
-## Backend Testing Strategy
+## 3. Frontend Testing Strategy
 
-**Rule:** Use pytest framework with `test_*.py` files co-located with implementation.
-**Anti-Pattern:** Separating test files from implementation or using incompatible test frameworks.
+- **Framework:** Use Vitest with `@testing-library/svelte`. NEVER use incompatible frameworks.
+- **Component Structure:** Unit tests for pure UI, integration tests for stateful components, accessibility tests for interactive elements. NEVER focus only on visual testing.
+- **Query Selection:** Use `screen.getByRole('button', { name: /Text/i })` for buttons, `screen.getByLabelText()` or `screen.getByPlaceholderText()` for forms. NEVER use `getByText()` for emoji-separated buttons.
+- **State Testing:** Use integration-style testing for `.svelte.ts` files with `$state` runes. NEVER use `vi.mock()` on these files.
+- **Prop Testing:** Test visibility changes based on props (`editing`, `viewMode`, `hasPermission`). NEVER test only static states.
+- **Factory Pattern:** Use fixtures in `frontend/src/tests/fixtures/` (e.g., `createMockPlayer()`). NEVER create giant inline JSON objects.
+- **Helper Extraction:** Extract `render` calls and `waitFor` into shared helpers for complex components. NEVER duplicate render setup.
 
-**Rule:** Use in-memory SQLite (`:memory:`) exclusively for database testing.
-**Anti-Pattern:** Using persistent databases or external database services in tests.
+## 4. Frontend Test Maintenance
 
-**Rule:** Use `unittest.mock` for external dependencies and always mock Notion API calls.
-**Anti-Pattern:** Hitting real external APIs or using inadequate mocking strategies.
+- **Snippet Testing:** Use `createRawSnippet` from `svelte` for snippet components. NEVER test without proper Svelte 5 snippet creation.
+- **State Pre-population:** Use component props (`initialPlayers`) to pre-populate data. NEVER rely on fragile UI click-throughs.
+- **DOM Query Updates:** Update queries immediately when CSS classes change or components are extracted. NEVER allow outdated selectors.
+- **Validation:** Run `bun run typecheck` after CSS changes and verify visual regression after component extraction. NEVER skip validation steps.
 
-**Rule:** Structure tests with unit tests for pure functions, integration tests for database operations, and end-to-end tests for API endpoints.
-**Anti-Pattern:** Mixing test types or missing critical integration coverage.
+## 5. General Test Editing & Maintenance
 
-## Frontend Testing Strategy
+- **AST Integrity:** Use Nuclear Block Replacements (entire `describe`/`it` blocks). NEVER use loose line-deletion commands that break AST structure.
 
-**Rule:** Use Vitest with `@testing-library/svelte` for frontend testing.
-**Anti-Pattern:** Using incompatible testing frameworks or libraries.
+## 6. Test Quality Standards
 
-**Rule:** Structure component tests with unit tests for pure UI components, integration tests for stateful components, and accessibility tests for interactive elements.
-**Anti-Pattern:** Focusing only on visual testing without interaction or accessibility coverage.
-
-**Rule:** Use `screen.getByRole('button', { name: /Text/i })` for buttons and `screen.getByLabelText()` or `screen.getByPlaceholderText()` for forms.
-**Anti-Pattern:** Using `getByText()` for buttons with emojis separated from text or inappropriate query selectors.
-
-**Rule:** Use integration-style testing methodology for `.svelte.ts` files with `$state` runes; never use `vi.mock()` on these files.
-**Anti-Pattern:** Mocking state files or components that require real reactivity for accurate testing.
-
-**Rule:** Test visibility changes based on props like `editing`, `viewMode`, `hasPermission` and verify component behavior based on conditional props.
-**Anti-Pattern:** Testing only static states without verifying reactive behavior or prop-driven changes.
-
-**Rule:** Use Factory Pattern via `frontend/src/tests/fixtures/` directory (e.g., `createMockPlayer({ ...overrides })`) instead of giant inline JSON objects.
-**Anti-Pattern:** Creating large inline mock objects or duplicating boilerplate across tests.
-
-**Rule:** Extract `render` calls and loading state `waitFor` into shared `renderMyComponent(propsOverrides)` helpers for complex components.
-**Anti-Pattern:** Duplicating render setup code and boilerplate in multiple test cases.
-
-### Frontend Test Maintenance
-
-**Rule:** When testing components that accept snippets, use `createRawSnippet` from `svelte` to programmatically forge valid snippets.
-**Anti-Pattern:** Attempting to test snippet functionality without proper Svelte 5 snippet creation.
-
-**Rule:** Use component props (e.g., `initialPlayers`) to pre-populate data before asserting behaviors instead of fragile UI click-throughs.
-**Anti-Pattern:** Relying on complex UI interaction sequences to set up initial test state.
-
-**Rule:** Update DOM queries immediately when CSS classes change, components are extracted, or selectors are renamed.
-**Anti-Pattern:** Allowing outdated selectors to persist after DOM structure changes.
-
-**Rule:** Update `querySelector`, `closest`, and `getBy` calls immediately when HTML is abstracted into components or CSS classes are renamed.
-**Anti-Pattern:** Neglecting test updates during CSS/DOM refactors that break integration tests.
-
-**Rule:** Run `bun run typecheck` after CSS changes and verify visual regression after component extraction.
-**Anti-Pattern:** Skipping validation steps that can catch breaking changes early.
-
-## General Test Editing & Maintenance
-
-**Rule:** Use Nuclear Block Replacements (replacing entire `describe` or `it` blocks) to guarantee Abstract Syntax Tree (AST) integrity in test files.
-**Anti-Pattern:** Using loose line-deletion commands that can break AST structure and test file syntax.
-
-## Test Quality Standards
-
-**Rule:** Use semantic HTML queries first, test user behavior rather than implementation details, and assert accessible names rather than visual appearance.
-**Anti-Pattern:** Testing implementation details, visual appearance, or using fragile DOM traversal.
-
-**Rule:** Mock external dependencies only, test real component interactions, and avoid over-mocking that hides real bugs.
-**Anti-Pattern:** Mocking internal component logic or creating mocks that prevent testing of actual behavior.
-
-**Rule:** Achieve 100% coverage for critical user paths, always test error handling, and test edge cases with null/undefined inputs.
-**Anti-Pattern:** Skipping error states, edge cases, or critical user interaction paths.
+- **Query Priority:** Use semantic HTML queries first, test user behavior over implementation details, assert accessible names over visual appearance. NEVER test implementation details or use fragile DOM traversal.
+- **Mocking Strategy:** Mock external dependencies only, test real component interactions. NEVER over-mock that hides real bugs or mock internal logic.
+- **Coverage Requirements:** Achieve 100% coverage for critical paths, ALWAYS test error handling, test edge cases with null/undefined inputs. NEVER skip error states or critical paths.

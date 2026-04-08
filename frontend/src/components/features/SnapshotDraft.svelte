@@ -23,6 +23,7 @@
   import Badge from "../ui/Badge.svelte";
   import Tooltip from "../ui/Tooltip.svelte";
   import DataTable, { type ColumnDef } from "../layout/DataTable.svelte";
+  import SectionTitle from "../ui/SectionTitle.svelte";
 
   interface Props {
     parentId: number | null;
@@ -73,6 +74,23 @@
   let resolutionVisible = $state(false);
   let resolutionPairs = $state<SimilarName[]>([]);
   let fetchedNotionPlayers = $state<NotionPlayer[]>([]);
+
+  // Derived state for editing vs creating context
+  let isEditing = $derived(parentId !== null);
+  let headerTitle = $derived(
+    isEditing ? `Editando Snapshot #${parentId}` : "Nueva Lista",
+  );
+  let headerSubtitle = $derived(
+    isEditing
+      ? "Modifica los jugadores, su experiencia o prioridad para esta versión."
+      : "Crea una nueva versión desde cero o importa jugadores desde CSV.",
+  );
+  let saveButtonText = $derived.by(() => {
+    if (saving) return "Guardando...";
+    if (eventType === "sync") return "Guardar Sincronización";
+    if (isEditing) return "Guardar Cambios";
+    return "Crear Versión";
+  });
 
   // Auto-action on mount
   let autoActionExecuted = $state(false);
@@ -422,12 +440,12 @@
 
 <PanelLayout scrollable={false}>
   {#snippet header()}
-    <div class="section" style="margin-bottom: 16px;">
-      <div class="section-title">Nueva Versión</div>
-      <div class="node-meta" style="margin-bottom: 8px;">
-        Crea una nueva versión desde cero o importa jugadores desde CSV
+    <div class="section draft-header">
+      <SectionTitle title={headerTitle} />
+      <div class="node-meta">
+        {headerSubtitle}
       </div>
-      <div style="display: flex; gap: 8px;">
+      <div class="action-row">
         <Button variant="secondary" onclick={handleAddPlayer}>
           ➕ Agregar jugador
         </Button>
@@ -445,15 +463,17 @@
         {/if}
       </div>
     </div>
-    <div class="section-title" style="margin-bottom: 6px;">
-      Jugadores ({draftPlayers.length})
-    </div>
+    <SectionTitle
+      title="Jugadores"
+      count={draftPlayers.length}
+      class="compact-title"
+    />
   {/snippet}
 
   {#snippet body()}
     {#if draftPlayers.length > 0}
       {#snippet nameInput(row: EditPlayerRow, i: number)}
-        <div style="display: flex; align-items: center; gap: 4px;">
+        <div class="name-input-wrapper">
           <input
             type="text"
             class="table-input table-input-ghost text-strong"
@@ -611,14 +631,7 @@
       disabled={saving || draftPlayers.length === 0}
       title={draftPlayers.length === 0
         ? "Agrega al menos un jugador para guardar"
-        : ""}
-      >{saving
-        ? "Guardando..."
-        : eventType === "sync"
-          ? "Guardar Sincronización"
-          : parentId
-            ? "Guardar Edición"
-            : "Guardar Nueva Lista"}</Button
+        : ""}>{saveButtonText}</Button
     >
   {/snippet}
 </PanelLayout>
@@ -635,17 +648,27 @@
 />
 
 <style>
-  .section {
-    margin-bottom: 22px;
+  .draft-header {
+    margin-bottom: 16px;
   }
 
-  .section-title {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    color: var(--muted);
-    margin-bottom: 10px;
+  .node-meta {
+    margin-bottom: 8px;
+  }
+
+  .action-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .name-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  :global(.compact-title) {
+    margin-bottom: 6px !important;
   }
 
   .empty-draft {

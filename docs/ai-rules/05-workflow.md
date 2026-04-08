@@ -4,21 +4,19 @@ title: Pillar 5 - Workflow & Git Rules
 priority: 50
 ---
 
+## Meta-Prompting & AI Communication
+
+- **ABSOLUTE CONSTRAINTS ONLY:** When writing or updating rules, ALWAYS use absolute constraints (MUST, NEVER, BANNED, STRICTLY). NEVER use polite/emotional language ("Please", "Try to", "Avoid") as it dilutes token weights and probabilistic constraints.
+- **LOGICAL GROUPING:** Group concepts with bullet points rather than repetitive "Rule / Anti-Pattern" boilerplate. Use clear headers and concise directives.
+- **TOKEN EFFICIENCY:** Every word MUST serve a constraint purpose. Eliminate filler language and maximize information density.
+
 ## Rule Governance
 
-**Rule:** Store AI rules in `docs/ai-rules/` directory as the source of truth.
-**Anti-Pattern:** Directly editing `.clinerules`, `.windsurfrules`, or `.github/copilot-instructions.md` which are generated artifacts.
-
-**Rule:** Run `bun run scripts/generate-ai-instructions.ts` after editing any markdown files in `docs/ai-rules/` to compile rules into root directory AI files.
-**Anti-Pattern:** Editing AI rule files without running the compilation script, causing inconsistencies across AI instruction files.
+- **Source of Truth:** Store AI rules in `docs/ai-rules/` directory. NEVER directly edit generated artifacts (`.clinerules`, `.windsurfrules`, `.github/copilot-instructions.md`).
+- **Compilation:** ALWAYS run `bun run scripts/generate-ai-instructions.ts` after editing any markdown files in `docs/ai-rules/`. NEVER skip compilation as it causes inconsistencies across AI instruction files.
 
 ## Verification & Commits
 
-**Rule:** Validate all tests and typing before committing using `bun run build && bun run lint && bun run typecheck`.
-**Anti-Pattern:** Committing changes without proper validation that may break the build or introduce errors.
-
-**Rule:** Check for Svelte syntax problems locally before pushing changes.
-**Anti-Pattern:** Relying on CI/CD to catch syntax issues that should be identified during development.
-
-**Rule:** Use conventional commit prefixes: `feat:`, `fix:`, `refactor:`, `test:`.
-**Anti-Pattern:** Using non-standard commit message formats that break automated changelog generation.
+- **Pre-Commit Validation:** ALWAYS validate with `bun run build && bun run lint && bun run typecheck`. NEVER commit without proper validation.
+- **Local Syntax Checking:** ALWAYS check Svelte syntax problems locally. NEVER rely on CI/CD to catch syntax issues.
+- **Commit Format:** Use conventional prefixes: `feat:`, `fix:`, `refactor:`, `test:`. NEVER use non-standard formats that break changelog generation.
