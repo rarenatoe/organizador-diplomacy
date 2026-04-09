@@ -63,3 +63,10 @@ priority: 30
 - **Flexbox Gap over Margins:** Leaf components (e.g., typography, buttons, badges) MUST NOT define their own external margins. Parent layouts must govern spacing exclusively using `display: flex; flex-direction: column; gap: var(--space-16);`. `margin-bottom` is reserved solely for spacing between major structural section wrappers.
 - **Pure CSS State Management:** Never use inline JavaScript styles for complex UI states or dynamic colors. Pass primitive boolean props (e.g., `isActive={true}`) from parent to child, and toggle pure CSS classes (e.g., `.node.active`). Use CSS variables to handle internal color shifts.
 - **Shorthand Padding:** Always optimize CSS padding (e.g., use `padding: var(--space-16);` instead of `padding: var(--space-16) var(--space-16);`).
+
+## 8. UI Navigation & State Architecture (Svelte 5)
+
+- **Avoid Flat State for Drill-downs:** Never use flat `$state` variables (e.g., `panelId`, `panelType`) to manage complex, multi-level UI navigation like side panels. This leads to hardcoded "Cancel/Back" logic.
+- **The Navigation Stack Pattern:** Implement side-panel or modal drill-downs using an in-memory stack (array of objects) managed within a pure Svelte 5 `.svelte.ts` module. This allows generic, foolproof `pop()` and `push()` navigation where the UI always knows exactly where to return.
+- **Encapsulate State:** Do not pollute layout components (like `App.svelte`) with business logic or router state. Extract this into singleton classes (e.g., `NavigationManager`) in `.svelte.ts` files.
+- **Svelte 5 Snippets for Routing:** Avoid massive `{#if...} {:else if...}` blocks directly in your main HTML layout. If a component acts as a router rendering different child views, encapsulate that logic inside a `{#snippet panelRouter()}` block and invoke it declaratively with `{@render panelRouter()}` in the DOM.

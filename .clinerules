@@ -142,6 +142,13 @@
 - **Pure CSS State Management:** Never use inline JavaScript styles for complex UI states or dynamic colors. Pass primitive boolean props (e.g., `isActive={true}`) from parent to child, and toggle pure CSS classes (e.g., `.node.active`). Use CSS variables to handle internal color shifts.
 - **Shorthand Padding:** Always optimize CSS padding (e.g., use `padding: var(--space-16);` instead of `padding: var(--space-16) var(--space-16);`).
 
+## 8. UI Navigation & State Architecture (Svelte 5)
+
+- **Avoid Flat State for Drill-downs:** Never use flat `$state` variables (e.g., `panelId`, `panelType`) to manage complex, multi-level UI navigation like side panels. This leads to hardcoded "Cancel/Back" logic.
+- **The Navigation Stack Pattern:** Implement side-panel or modal drill-downs using an in-memory stack (array of objects) managed within a pure Svelte 5 `.svelte.ts` module. This allows generic, foolproof `pop()` and `push()` navigation where the UI always knows exactly where to return.
+- **Encapsulate State:** Do not pollute layout components (like `App.svelte`) with business logic or router state. Extract this into singleton classes (e.g., `NavigationManager`) in `.svelte.ts` files.
+- **Svelte 5 Snippets for Routing:** Avoid massive `{#if...} {:else if...}` blocks directly in your main HTML layout. If a component acts as a router rendering different child views, encapsulate that logic inside a `{#snippet panelRouter()}` block and invoke it declaratively with `{@render panelRouter()}` in the DOM.
+
 ## 1. Testing Execution
 
 - **Frontend Tests:** ALWAYS use `bun run test` for Vitest suite. NEVER use `bun test` (incompatible with Vitest/Svelte 5).
@@ -187,6 +194,13 @@
 - **Assert DOM Layout Wrappers:** Because unit tests cannot test visual CSS rendering, you MUST explicitly test the structural HTML hierarchy. If a layout relies on a `.section` wrapper for Flexbox gaps, write an assertion to ensure that wrapper exists (`expect(container.querySelector('.section')).toBeInTheDocument();`).
 - **Assert State Classes, Not Inline Styles:** Validate component states by asserting the presence of active CSS classes (e.g., `.active`, `.node-game`) rather than brittle inner HTML or inline style strings.
 - **DRY UI Components:** When multiple views share a highly specific layout (e.g., timeline nodes), the UI must be extracted into a single source-of-truth component (e.g., `BaseNode`) to ensure test parity and visual consistency across the app.
+
+## 8. State Module Testing (Svelte 5)
+
+- **Pure Logic Testing:** Any logic extracted into a `.svelte.ts` file (using `$state`, `$derived`) must be tested entirely in isolation as pure TypeScript. Do not mount DOM elements or use component testing libraries to test these modules.
+- **Singleton Resetting:** If testing a reactive singleton (e.g., a globally exported class instance), you MUST wipe its state in a `beforeEach()` block to prevent test pollution.
+- **Test Real State, Not Simulations:** Component integration tests should not simulate logic via dummy variables (e.g., `let draftKey = 0; draftKey++;`). Instead, test how the component reacts to the actual imported state manager.
+- **Verify Component Isolation:** When testing flows that require total UI resets (like opening a "New List" vs editing an existing one), verify that the state generator applies unique Svelte `{#key}` bindings to force true component destruction and recreation.
 
 ## Meta-Prompting & AI Communication
 

@@ -49,3 +49,10 @@ priority: 40
 - **Assert DOM Layout Wrappers:** Because unit tests cannot test visual CSS rendering, you MUST explicitly test the structural HTML hierarchy. If a layout relies on a `.section` wrapper for Flexbox gaps, write an assertion to ensure that wrapper exists (`expect(container.querySelector('.section')).toBeInTheDocument();`).
 - **Assert State Classes, Not Inline Styles:** Validate component states by asserting the presence of active CSS classes (e.g., `.active`, `.node-game`) rather than brittle inner HTML or inline style strings.
 - **DRY UI Components:** When multiple views share a highly specific layout (e.g., timeline nodes), the UI must be extracted into a single source-of-truth component (e.g., `BaseNode`) to ensure test parity and visual consistency across the app.
+
+## 8. State Module Testing (Svelte 5)
+
+- **Pure Logic Testing:** Any logic extracted into a `.svelte.ts` file (using `$state`, `$derived`) must be tested entirely in isolation as pure TypeScript. Do not mount DOM elements or use component testing libraries to test these modules.
+- **Singleton Resetting:** If testing a reactive singleton (e.g., a globally exported class instance), you MUST wipe its state in a `beforeEach()` block to prevent test pollution.
+- **Test Real State, Not Simulations:** Component integration tests should not simulate logic via dummy variables (e.g., `let draftKey = 0; draftKey++;`). Instead, test how the component reacts to the actual imported state manager.
+- **Verify Component Isolation:** When testing flows that require total UI resets (like opening a "New List" vs editing an existing one), verify that the state generator applies unique Svelte `{#key}` bindings to force true component destruction and recreation.

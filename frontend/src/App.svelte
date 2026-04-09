@@ -2,6 +2,7 @@
   import type { EditPlayerRow, DraftResponse } from "./types";
   import { deleteSnapshot as apiDeleteSnapshot, deleteGame } from "./api";
   import { setActiveNodeId } from "./stores.svelte";
+  import { nav, type PanelContext } from "./navigation.svelte";
   import Header from "./components/layout/Header.svelte";
   import ChainViewer from "./components/features/ChainViewer.svelte";
   import SidePanel from "./components/layout/SidePanel.svelte";
@@ -19,23 +20,6 @@
   // @ts-ignore: Component reference needed for exported toast functions
   let toaster = $state<Toaster | null>(null);
 
-  // Panel state
-  let panelOpen = $state(false);
-  let panelTitle = $state("");
-  let panelType = $state<
-    "snapshot" | "game" | "sync" | "draft" | "game_draft" | null
-  >(null);
-  let panelId = $state<number | null>(null);
-
-  // Draft state
-  let draftParentId = $state<number | null>(null);
-  let draftEventType = $state<"sync" | "manual" | "edit">("manual");
-  let draftKey = $state(0);
-  let draftAutoAction = $state<"notion" | "csv" | null>(null);
-  let draftInitialPlayers = $state<EditPlayerRow[]>([]);
-  let draftInitialData = $state<DraftResponse | null>(null);
-  let draftEditingGameId = $state<number | null>(null);
-
   // Modal state
   let modalVisible = $state(false);
   let modalTitle = $state("");
@@ -43,29 +27,20 @@
   let modalIsError = $state(false);
   let modalLoading = $state(false);
 
-  // Panel handlers
-  function openPanel(title: string, type: typeof panelType, id: number): void {
-    panelTitle = title;
-    panelType = type;
-    panelId = id;
-    panelOpen = true;
-  }
-
-  function closePanel(): void {
-    panelOpen = false;
-    panelType = null;
-    panelId = null;
-    setActiveNodeId(null);
+  function showError(title: string, output: string): void {
+    modalTitle = title;
+    modalOutput = output;
+    modalIsError = true;
+    modalLoading = false;
+    modalVisible = true;
   }
 
   function openSnapshot(id: number): void {
-    openPanel(`Snapshot #${id}`, "snapshot", id);
-    setActiveNodeId(id);
+    nav.clearAndPush({ title: `Snapshot #${id}`, type: "snapshot", id });
   }
 
   function openGame(id: number): void {
-    openPanel("Jornada", "game", id);
-    setActiveNodeId(id);
+    nav.clearAndPush({ title: "Jornada", type: "game", id });
   }
 
   function openGameDraft(
@@ -73,20 +48,22 @@
     initialData?: DraftResponse,
     editingGameId?: number,
   ): void {
-    closePanel();
-    draftParentId = snapshotId;
-    draftEventType = "edit";
-    draftAutoAction = null;
-    draftInitialPlayers = [];
-    draftInitialData = initialData ?? null;
-    draftEditingGameId = editingGameId ?? null;
-    panelType = "game_draft";
-    panelOpen = true;
-    panelTitle = editingGameId
-      ? `Editando Jornada #${editingGameId}`
-      : `Draft - Snapshot #${snapshotId}`;
-    panelId = snapshotId;
-    setActiveNodeId(editingGameId || snapshotId);
+    nav.push({
+      title: editingGameId
+        ? `Editando Jornada #${editingGameId}`
+        : `Draft - Snapshot #${snapshotId}`,
+      type: "game_draft",
+      id: editingGameId ?? snapshotId,
+      draftProps: {
+        parentId: snapshotId,
+        eventType: "edit",
+        autoAction: null,
+        initialPlayers: [],
+        initialData: initialData ?? null,
+        editingGameId: editingGameId ?? null,
+        draftKey: Date.now(), // Simple way to force re-renders if needed
+      },
+    });
   }
 
   function openDraft(
@@ -95,21 +72,36 @@
     autoAction: "notion" | "csv" | null = null,
     players: EditPlayerRow[] = [],
   ): void {
-    closePanel();
-    draftKey++;
-    draftParentId = parentId;
-    draftEventType = eventType;
-    draftAutoAction = autoAction;
-    draftInitialPlayers = players;
-    panelType = "draft";
-    panelOpen = true;
-    panelTitle = (() => {
-      if (parentId === null) return "Nueva Lista";
-      if (eventType === "sync") return `Sincronizando #${parentId}`;
-      return `Editando #${parentId}`;
-    })();
-    if (parentId !== null) {
-      setActiveNodeId(parentId);
+    let title: string;
+    if (parentId === null) {
+      title = "Nueva Lista";
+    } else if (eventType === "sync") {
+      title = `Sincronizando #${parentId}`;
+    } else {
+      title = `Editando #${parentId}`;
+    }
+
+    const panelConfig: PanelContext = {
+      title,
+      type: "draft",
+      id: parentId,
+      draftProps: {
+        parentId,
+        eventType,
+        autoAction,
+        initialPlayers: players,
+        initialData: null,
+        editingGameId: null,
+        draftKey: Date.now(),
+      },
+    };
+
+    // If there is no parent, it's a brand new root-level flow. Reset the stack.
+    if (parentId === null) {
+      nav.clearAndPush(panelConfig);
+    } else {
+      // Otherwise, we are drilling down from an existing snapshot.
+      nav.push(panelConfig);
     }
   }
 
@@ -127,7 +119,7 @@
         alert(`Error al eliminar: ${data.error}`);
         return;
       }
-      closePanel();
+      nav.close();
       await chainViewer?.loadChain();
     } catch (e) {
       alert(`Error de conexión: ${String(e)}`);
@@ -142,7 +134,7 @@
       return;
     try {
       await deleteGame(id);
-      closePanel();
+      nav.close();
       await chainViewer?.loadChain();
     } catch (e) {
       alert(`Error de conexión: ${String(e)}`);
@@ -165,79 +157,55 @@
     onDeleteGame={handleDeleteGame}
     onNewDraft={(options) =>
       openDraft(null, "manual", options?.autoAction ?? null)}
-    {panelOpen}
+    panelOpen={nav.isOpen}
   />
-  <SidePanel title={panelTitle} open={panelOpen} onClose={closePanel}>
-    {#if panelType === "snapshot" && panelId !== null}
+  <SidePanel
+    title={nav.current?.title ?? ""}
+    open={nav.isOpen}
+    onClose={nav.close}
+  >
+    {#if nav.current?.type === "snapshot" && nav.current.id !== null}
       <SnapshotDetail
-        id={panelId}
-        onClose={closePanel}
+        id={nav.current.id}
+        onClose={nav.close}
         onChainUpdate={handleChainUpdate}
         onOpenSnapshot={openSnapshot}
         onOpenGame={openGame}
         onOpenGameDraft={openGameDraft}
-        onEditDraft={(
-          parentId: number,
-          eventType: "sync" | "manual" | "edit",
-          autoAction?: "notion" | "csv" | null,
-          players?: EditPlayerRow[],
-        ) => openDraft(parentId, eventType, autoAction ?? null, players ?? [])}
-        onShowError={(title, output) => {
-          modalTitle = title;
-          modalOutput = output;
-          modalIsError = true;
-          modalLoading = false;
-          modalVisible = true;
-        }}
-        onShowToast={(message) => {
-          toaster?.showSuccessToast(message);
-        }}
+        onEditDraft={(parentId, eventType, autoAction, players) =>
+          openDraft(parentId, eventType, autoAction ?? null, players ?? [])}
+        onShowError={showError}
+        onShowToast={(message) => toaster?.showSuccessToast(message)}
       />
-    {:else if panelType === "draft"}
-      {#key draftKey}
+    {:else if nav.current?.type === "draft"}
+      {#key nav.current.draftProps?.draftKey}
         <SnapshotDraft
-          parentId={draftParentId}
-          initialPlayers={draftInitialPlayers}
-          defaultEventType={draftEventType}
-          autoAction={draftAutoAction}
-          onClose={closePanel}
-          onCancel={() =>
-            draftParentId !== null ? openSnapshot(draftParentId) : closePanel()}
+          parentId={nav.current.draftProps?.parentId ?? null}
+          initialPlayers={nav.current.draftProps?.initialPlayers ?? []}
+          defaultEventType={nav.current.draftProps?.eventType ?? "manual"}
+          autoAction={nav.current.draftProps?.autoAction ?? null}
+          onClose={nav.close}
+          onCancel={nav.pop}
           onChainUpdate={handleChainUpdate}
           onOpenSnapshot={openSnapshot}
-          onShowError={(title, output) => {
-            modalTitle = title;
-            modalOutput = output;
-            modalIsError = true;
-            modalLoading = false;
-            modalVisible = true;
-          }}
+          onShowError={showError}
         />
       {/key}
-    {:else if panelType === "game" && panelId !== null}
-      <GameDetail id={panelId} {openGameDraft} />
-    {:else if panelType === "game_draft" && panelId !== null}
+    {:else if nav.current?.type === "game" && nav.current.id !== null}
+      <GameDetail id={nav.current.id} {openGameDraft} />
+    {:else if nav.current?.type === "game_draft" && nav.current.id !== null}
       <GameDraft
-        snapshotId={panelId}
-        onClose={closePanel}
-        onCancel={() =>
-          draftEditingGameId !== null
-            ? openGame(draftEditingGameId)
-            : closePanel()}
+        snapshotId={nav.current.draftProps?.parentId ?? 0}
+        onClose={nav.close}
+        onCancel={nav.pop}
         onChainUpdate={handleChainUpdate}
         onOpenGame={openGame}
-        onShowError={(title, output) => {
-          modalTitle = title;
-          modalOutput = output;
-          modalIsError = true;
-          modalLoading = false;
-          modalVisible = true;
-        }}
-        editingGameId={draftEditingGameId}
-        initialDraft={draftInitialData}
+        onShowError={showError}
+        editingGameId={nav.current.draftProps?.editingGameId ?? null}
+        initialDraft={nav.current.draftProps?.initialData ?? null}
       />
-    {:else if panelType === "sync" && panelId !== null}
-      <SyncDetail id={panelId} />
+    {:else if nav.current?.type === "sync" && nav.current.id !== null}
+      <SyncDetail id={nav.current.id} />
     {/if}
   </SidePanel>
 </div>
