@@ -14,7 +14,7 @@
     display: inline-flex;
     align-items: center;
     cursor: help;
-    margin-left: 4px;
+    margin-left: var(--space-4);
   }
   .info-icon {
     font-size: 11px;
@@ -32,26 +32,26 @@
     transform: translateX(-50%);
     background: var(--tooltip-bg);
     color: var(--tooltip-text);
-    padding: 6px 10px;
-    border-radius: 6px;
+    padding: var(--space-4) var(--space-8);
+    border-radius: var(--space-8);
     font-size: 11px;
     font-weight: 500;
     white-space: normal;
     width: max-content;
-    max-width: 220px;
+    max-width: calc(var(--space-8) * 27);
     z-index: 9999;
-    margin-bottom: 6px;
+    margin-bottom: var(--space-8);
     box-shadow: var(--shadow-md);
     text-align: center;
-    line-height: 1.4;
+    line-height: var(--line-height-16);
   }
   .tooltip-popover::after {
     content: "";
     position: absolute;
     top: 100%;
     left: 50%;
-    margin-left: -4px;
-    border-width: 4px;
+    margin-left: calc(-1 * var(--space-4));
+    border-width: var(--space-4);
     border-style: solid;
     border-color: var(--tooltip-bg) transparent transparent transparent;
   }

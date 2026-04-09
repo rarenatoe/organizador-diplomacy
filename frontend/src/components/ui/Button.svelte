@@ -86,9 +86,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 10px 14px;
-    border-radius: 8px;
+    gap: var(--space-8);
+    padding: var(--space-8) var(--space-16);
+    border-radius: var(--space-8);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -98,7 +98,7 @@
     box-shadow: none;
     outline: none;
     box-sizing: border-box;
-    line-height: 1;
+    line-height: var(--line-height-16);
   }
   .btn:disabled {
     opacity: 0.6;
@@ -106,7 +106,7 @@
   }
   .btn:focus-visible {
     outline: 2px solid var(--border-focus);
-    outline-offset: 2px;
+    outline-offset: var(--space-4);
   }
   .flex-fill {
     flex: 1 1 auto;
@@ -222,39 +222,39 @@
 
   /* Sizes */
   .btn-sm {
-    padding: 4px 8px;
+    padding: var(--space-4) var(--space-8);
     font-size: 11px;
-    gap: 4px;
+    gap: var(--space-4);
   }
 
   /* Extra Small Size */
   .btn-xs {
-    padding: 2px 4px;
+    padding: var(--space-4) var(--space-4);
     font-size: 11px;
-    gap: 4px;
+    gap: var(--space-4);
   }
 
   /* Icon Only */
   .btn-icon-only {
     padding: 0;
-    width: 32px;
-    height: 32px;
+    width: var(--space-32);
+    height: var(--space-32);
     flex-shrink: 0;
-    border-radius: 6px;
+    border-radius: var(--space-8);
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
   .btn-sm.btn-icon-only {
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
+    width: var(--space-24);
+    height: var(--space-24);
+    border-radius: var(--space-4);
   }
 
   .btn-xs.btn-icon-only {
-    width: 20px;
-    height: 20px;
-    border-radius: 4px;
+    width: var(--space-16);
+    height: var(--space-16);
+    border-radius: var(--space-4);
   }
 </style>

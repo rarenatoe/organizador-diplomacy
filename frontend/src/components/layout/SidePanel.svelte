@@ -67,11 +67,11 @@
   }
 
   .panel-header {
-    padding: 14px 18px;
+    padding: var(--space-16);
     border-bottom: 1px solid var(--border-subtle);
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-8);
     flex-shrink: 0;
   }
 

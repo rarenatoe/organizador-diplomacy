@@ -40,7 +40,7 @@
   }
 
   .panel-body-fixed {
-    padding: 16px 18px 0;
+    padding: var(--space-16) var(--space-16) 0 var(--space-16);
     flex-shrink: 0;
   }
 
@@ -48,16 +48,16 @@
     flex: 1;
     overflow-y: auto;
     min-height: 0;
-    padding: 16px 18px;
+    padding: var(--space-16);
   }
 
   .panel-footer {
     flex-shrink: 0;
-    padding: 16px 18px;
+    padding: var(--space-16);
     border-top: 1px solid var(--border-subtle);
     background: var(--bg-secondary);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-8);
   }
 </style>

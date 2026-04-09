@@ -6,13 +6,6 @@ vi.mock("../../api", () => ({
   fetchChain: vi.fn(),
 }));
 
-// Mock the GameNode component
-vi.mock("./GameNode.svelte", () => ({
-  default: vi.fn(() => ({
-    $$: { on_destroy: [] },
-  })),
-}));
-
 // Import ChainViewer and API
 import ChainViewer from "./ChainViewer.svelte";
 import { fetchChain } from "../../api";
@@ -196,7 +189,7 @@ describe("ChainViewer.svelte - Delete Functionality", () => {
   });
 
   // Note: Game deletion testing is not possible with current mock setup
-  // but the functionality is verified in GameNode component tests
+  // but the functionality is verified in BaseNode component tests
 });
 
 describe("ChainViewer.svelte - Layout Regression Guards", () => {

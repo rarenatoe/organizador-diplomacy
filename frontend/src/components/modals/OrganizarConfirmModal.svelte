@@ -94,21 +94,21 @@
 
   .confirm-card {
     background: var(--bg-secondary);
-    border-radius: 14px;
-    padding: 24px;
-    width: 420px;
-    max-width: 90vw;
+    border-radius: var(--space-16);
+    padding: var(--space-24);
+    width: 100%;
+    max-width: calc(var(--space-8) * 52);
     box-shadow: var(--shadow-xl);
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: var(--space-16);
     border: 1px solid var(--border-subtle);
   }
 
   .confirm-header {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-8);
   }
 
   .confirm-icon {
@@ -124,17 +124,19 @@
   .confirm-body {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-16);
   }
 
   .warning-item {
     display: flex;
-    gap: 10px;
+    gap: var(--space-8);
     background: var(--warning-bg-subtle);
     border: 1px solid var(--warning-border-subtle);
     color: var(--warning-text-subtle);
     font-size: 13px;
-    line-height: 1.4;
+    line-height: var(--line-height-16);
+    padding: var(--space-16);
+    border-radius: var(--space-8);
   }
 
   .warning-item .warning-icon {
@@ -149,8 +151,8 @@
   .excluded-section {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    padding: 12px;
+    border-radius: var(--space-8);
+    padding: var(--space-16);
   }
 
   .excluded-title {
@@ -159,15 +161,14 @@
     text-transform: uppercase;
     letter-spacing: 0.5px;
     color: var(--text-muted);
-    margin-bottom: 8px;
   }
 
   .excluded-list {
-    max-height: 120px;
+    max-height: calc(var(--space-8) * 15);
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--space-4);
   }
 
   .excluded-item {
@@ -179,13 +180,12 @@
     font-size: 12px;
     color: var(--text-muted);
     font-style: italic;
-    margin-top: 2px;
+    margin-top: var(--space-4);
   }
 
   .confirm-actions {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-top: 8px;
+    gap: var(--space-8);
   }
 </style>

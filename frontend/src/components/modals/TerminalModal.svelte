@@ -57,13 +57,13 @@
 
   .modal-box {
     background: var(--bg-inverse);
-    border-radius: 14px;
-    padding: 22px;
-    width: 560px;
-    max-width: 90vw;
+    border-radius: var(--space-16);
+    padding: var(--space-24);
+    width: 100%;
+    max-width: calc(var(--space-8) * 70);
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: var(--space-16);
     box-shadow: var(--shadow-xl);
   }
 
@@ -73,7 +73,7 @@
     color: var(--text-inverse);
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-8);
   }
 
   .modal-out {
@@ -81,12 +81,13 @@
     font-size: 12px;
     color: var(--success-text);
     background: var(--gray-800);
-    border-radius: 8px;
-    padding: 12px;
-    min-height: 100px;
-    max-height: 280px;
+    border-radius: var(--space-8);
+    padding: var(--space-16);
+    min-height: var(--space-96);
+    max-height: calc(var(--space-8) * 35);
     overflow-y: auto;
     white-space: pre-wrap;
+    flex-grow: 1;
   }
 
   .modal-out.err {
@@ -100,8 +101,8 @@
 
   .spinner {
     display: inline-block;
-    width: 14px;
-    height: 14px;
+    width: var(--space-16);
+    height: var(--space-16);
     border: 2px solid rgba(255, 255, 255, 0.3);
     border-top-color: var(--text-inverse);
     border-radius: 50%;

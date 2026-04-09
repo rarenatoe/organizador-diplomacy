@@ -482,7 +482,7 @@
       {/if}
       {#if draftData.tickets_sobrantes.length > 0}
         <div class="section">
-          <SectionTitle title="Lista de espera" />
+          <SectionTitle title="Lista de espera" class="waiting-title" />
           {#each draftData.tickets_sobrantes as w, i (w.nombre + "_" + i)}
             {@const target = { type: "waiting" as const, playerIndex: i }}
             {@const isSelected = isSelectedSwap(target)}
@@ -528,25 +528,32 @@
 
 <style>
   .section {
-    margin-bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-16);
+    margin-bottom: var(--space-24);
+  }
+
+  :global(.waiting-title) {
+    margin-top: var(--space-16);
   }
 
   .loading-text {
     color: var(--text-muted);
     font-size: 12px;
-    padding: 4px 0;
+    padding: var(--space-4) 0;
   }
 
   .error-text {
     color: var(--danger-text);
     font-size: 12px;
-    padding: 4px 0;
+    padding: var(--space-4) 0;
   }
 
   .meta-grid {
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: 4px 14px;
+    gap: var(--space-4) var(--space-16);
     font-size: 12px;
   }
 
@@ -565,11 +572,13 @@
 
   .player-list li {
     font-size: 12px;
-    padding: 4px 0;
+    padding: var(--space-4) 0;
     display: grid;
-    grid-template-columns: 16px 1fr 115px 56px 32px;
+    grid-template-columns: var(--space-24) 1fr var(--space-128) min-content var(
+        --space-32
+      );
     align-items: center;
-    gap: 8px;
+    gap: var(--space-8);
     border-bottom: 1px solid var(--border-subtle);
   }
 
@@ -580,7 +589,7 @@
   .p-num {
     color: var(--text-muted);
     font-size: 11px;
-    min-width: 16px;
+    min-width: var(--space-16);
   }
 
   .p-name {
@@ -598,14 +607,14 @@
   .country-container {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-4);
   }
 
   .country-select {
     font-size: 11px;
-    padding: 2px 4px;
+    padding: var(--space-4);
     border: 1px solid var(--border-subtle);
-    border-radius: 4px;
+    border-radius: var(--space-4);
     background: var(--bg-primary);
     color: var(--text-primary);
     cursor: pointer;
@@ -616,24 +625,24 @@
   .swapping-active {
     background: var(--info-bg-subtle);
     outline: 1px solid var(--border-focus);
-    border-radius: 4px;
+    border-radius: var(--space-4);
   }
 
   .waiting-item {
     display: grid;
-    grid-template-columns: 1fr 60px 32px;
+    grid-template-columns: 1fr var(--space-56) var(--space-32);
     align-items: center;
-    padding: 7px 10px;
+    padding: var(--space-8);
     background: var(--warning-bg-subtle);
     border: 1px solid var(--warning-border-subtle);
-    border-radius: 7px;
-    margin-bottom: 6px;
+    border-radius: var(--space-8);
+    margin-bottom: var(--space-8);
     font-size: 12px;
   }
 
   .waiting-item.swapping-active {
     background: var(--info-bg-subtle);
-    outline: 1px solid var(--border-focus);
+    outline: var(--space-4) solid var(--border-focus);
     border-color: var(--border-focus);
   }
 

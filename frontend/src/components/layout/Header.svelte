@@ -15,13 +15,12 @@
 
 <style>
   header {
-    height: var(--header-height);
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-subtle);
     display: flex;
     align-items: center;
-    padding: 0 20px;
-    gap: 10px;
+    padding: var(--space-16);
+    gap: var(--space-8);
     box-shadow: var(--shadow-base);
     flex-shrink: 0;
     z-index: 10;
@@ -33,7 +32,7 @@
     flex: 1;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-8);
   }
 
   #pending-badge {
@@ -42,8 +41,8 @@
     background: var(--warning-bg);
     color: var(--warning-text);
     border: 1px solid var(--pending-border);
-    padding: 2px 8px;
-    border-radius: 99px;
+    padding: var(--space-4) var(--space-8);
+    border-radius: var(--space-16);
     display: none;
   }
 

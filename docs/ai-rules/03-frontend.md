@@ -54,3 +54,12 @@ priority: 30
 - **Input Focus:** Use `use:autofocus` on the primary interaction element within a modal.
 - **NO `window.prompt()`:** Completely banned. Always use proper modal dialogs and autocomplete components.
 - **Data Ingestion:** Bulk data entry MUST NEVER write directly to state. Intercept via `/api/player/check-similarity` and pause with a resolution modal if conflicts exist. Inline player additions must use Autocomplete fetching from `/api/player/all`.
+
+## 7. UI Design System & Layout (The Rule of 8)
+
+- **Strict Rule of 8:** All paddings, margins, gaps, and dimensions must use absolute-reference variables (e.g., `var(--space-8)`, `var(--space-16)`). For non-standard multiples, strictly use explicit math: `calc(var(--space-8) * X)`. Never use "magic numbers" in pixels.
+- **Intrinsic Sizing:** Components should not have fixed pixel `width` or `height`. Use padding, standard line-heights, and `max-width` to allow containers to wrap their contents naturally.
+- **The Border Exemption:** Border widths are structural lines and are exempt from the Rule of 8. They must use standard `1px` or `2px` values, never a `--space-*` variable.
+- **Flexbox Gap over Margins:** Leaf components (e.g., typography, buttons, badges) MUST NOT define their own external margins. Parent layouts must govern spacing exclusively using `display: flex; flex-direction: column; gap: var(--space-16);`. `margin-bottom` is reserved solely for spacing between major structural section wrappers.
+- **Pure CSS State Management:** Never use inline JavaScript styles for complex UI states or dynamic colors. Pass primitive boolean props (e.g., `isActive={true}`) from parent to child, and toggle pure CSS classes (e.g., `.node.active`). Use CSS variables to handle internal color shifts.
+- **Shorthand Padding:** Always optimize CSS padding (e.g., use `padding: var(--space-16);` instead of `padding: var(--space-16) var(--space-16);`).

@@ -133,6 +133,15 @@
 - **NO `window.prompt()`:** Completely banned. Always use proper modal dialogs and autocomplete components.
 - **Data Ingestion:** Bulk data entry MUST NEVER write directly to state. Intercept via `/api/player/check-similarity` and pause with a resolution modal if conflicts exist. Inline player additions must use Autocomplete fetching from `/api/player/all`.
 
+## 7. UI Design System & Layout (The Rule of 8)
+
+- **Strict Rule of 8:** All paddings, margins, gaps, and dimensions must use absolute-reference variables (e.g., `var(--space-8)`, `var(--space-16)`). For non-standard multiples, strictly use explicit math: `calc(var(--space-8) * X)`. Never use "magic numbers" in pixels.
+- **Intrinsic Sizing:** Components should not have fixed pixel `width` or `height`. Use padding, standard line-heights, and `max-width` to allow containers to wrap their contents naturally.
+- **The Border Exemption:** Border widths are structural lines and are exempt from the Rule of 8. They must use standard `1px` or `2px` values, never a `--space-*` variable.
+- **Flexbox Gap over Margins:** Leaf components (e.g., typography, buttons, badges) MUST NOT define their own external margins. Parent layouts must govern spacing exclusively using `display: flex; flex-direction: column; gap: var(--space-16);`. `margin-bottom` is reserved solely for spacing between major structural section wrappers.
+- **Pure CSS State Management:** Never use inline JavaScript styles for complex UI states or dynamic colors. Pass primitive boolean props (e.g., `isActive={true}`) from parent to child, and toggle pure CSS classes (e.g., `.node.active`). Use CSS variables to handle internal color shifts.
+- **Shorthand Padding:** Always optimize CSS padding (e.g., use `padding: var(--space-16);` instead of `padding: var(--space-16) var(--space-16);`).
+
 ## 1. Testing Execution
 
 - **Frontend Tests:** ALWAYS use `bun run test` for Vitest suite. NEVER use `bun test` (incompatible with Vitest/Svelte 5).
@@ -172,6 +181,12 @@
 - **Query Priority:** Use semantic HTML queries first, test user behavior over implementation details, assert accessible names over visual appearance. NEVER test implementation details or use fragile DOM traversal.
 - **Mocking Strategy:** Mock external dependencies only, test real component interactions. NEVER over-mock that hides real bugs or mock internal logic.
 - **Coverage Requirements:** Achieve 100% coverage for critical paths, ALWAYS test error handling, test edge cases with null/undefined inputs. NEVER skip error states or critical paths.
+
+## 7. Frontend Structural Regression Guards
+
+- **Assert DOM Layout Wrappers:** Because unit tests cannot test visual CSS rendering, you MUST explicitly test the structural HTML hierarchy. If a layout relies on a `.section` wrapper for Flexbox gaps, write an assertion to ensure that wrapper exists (`expect(container.querySelector('.section')).toBeInTheDocument();`).
+- **Assert State Classes, Not Inline Styles:** Validate component states by asserting the presence of active CSS classes (e.g., `.active`, `.node-game`) rather than brittle inner HTML or inline style strings.
+- **DRY UI Components:** When multiple views share a highly specific layout (e.g., timeline nodes), the UI must be extracted into a single source-of-truth component (e.g., `BaseNode`) to ensure test parity and visual consistency across the app.
 
 ## Meta-Prompting & AI Communication
 

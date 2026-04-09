@@ -23,6 +23,5 @@
     text-transform: uppercase;
     letter-spacing: 0.6px;
     color: var(--text-muted);
-    margin-bottom: 10px;
   }
 </style>

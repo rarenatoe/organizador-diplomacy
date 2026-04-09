@@ -102,7 +102,10 @@ describe("SnapshotDetail", () => {
   });
 
   it("renders snapshot details with players", async () => {
-    await renderSnapshotDetail();
+    const { container } = await renderSnapshotDetail();
+
+    // Assert structural hierarchy - major content blocks should be wrapped in .section divs
+    expect(container.querySelector(".section")).toBeInTheDocument();
 
     expect(screen.getByText("P1")).toBeInTheDocument();
     expect(screen.getByText("P2")).toBeInTheDocument();

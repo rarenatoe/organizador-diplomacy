@@ -63,47 +63,48 @@
   .modal-content {
     background: var(--bg-secondary);
     border: 1px solid var(--border-subtle);
-    border-radius: 12px;
-    padding: 24px;
-    max-width: 500px;
-    width: 90%;
+    border-radius: var(--space-16);
+    padding: var(--space-24);
+    width: 100%;
+    max-width: calc(var(--space-8) * 62);
     max-height: 80vh;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-16);
   }
 
   .modal-title {
     font-size: 16px;
     font-weight: 700;
-    margin-bottom: 8px;
   }
 
   .modal-description {
     font-size: 12px;
     color: var(--text-muted);
-    margin-bottom: 16px;
   }
 
   .modal-content textarea {
     width: 100%;
     border: 1px solid var(--border-subtle);
-    border-radius: 8px;
-    padding: 12px;
+    border-radius: var(--space-8);
+    padding: var(--space-16);
     font-family: monospace;
     font-size: 12px;
     background: var(--bg-tertiary);
     color: var(--text-primary);
     resize: vertical;
-    margin-bottom: 16px;
+    flex-grow: 1;
   }
 
   .modal-content textarea:focus {
-    outline: 2px solid var(--border-focus);
+    outline: 1px solid var(--border-focus);
     border-color: var(--border-focus);
   }
 
   .modal-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--space-8);
     justify-content: flex-end;
   }
 </style>

@@ -68,11 +68,11 @@
 
 <style>
   .history-details {
-    margin: 0 18px;
+    margin: 0 var(--space-16);
   }
 
   .modified-header {
-    margin-bottom: 2px;
+    margin-bottom: var(--space-4);
   }
 
   .section-title {
@@ -81,26 +81,26 @@
     text-transform: uppercase;
     letter-spacing: 0.6px;
     color: var(--muted);
-    margin-bottom: 10px;
+    margin-bottom: var(--space-8);
   }
 
   .history-list {
     list-style: none;
     padding: 0;
-    margin: 0 18px 16px;
+    margin: 0 var(--space-16) var(--space-16);
     max-height: 25vh;
     overflow-y: auto;
-    border: 1px solid var(--border);
-    border-radius: 8px;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--space-8);
     background: var(--surface);
   }
 
   .history-item {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border);
+    gap: var(--space-4);
+    padding: var(--space-8) var(--space-16);
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   .history-item:last-child {
@@ -153,12 +153,12 @@
   }
   .mod-list {
     list-style: none;
-    padding: 0 0 0 8px;
+    padding: 0 0 0 var(--space-8);
     margin: 0;
-    border-left: 2px solid var(--border);
+    border-left: var(--space-4) solid var(--border-subtle);
   }
   .mod-list li {
-    margin-bottom: 2px;
+    margin-bottom: var(--space-4);
   }
   .mod-name {
     font-weight: 600;
@@ -166,13 +166,13 @@
   .mod-detail {
     color: var(--text-muted);
     font-size: 10px;
-    margin-left: 4px;
+    margin-left: var(--space-4);
   }
   .history-row:hover {
     background: var(--bg-tertiary);
-    padding-left: 4px;
-    padding-right: 4px;
-    margin-left: -4px;
-    margin-right: -4px;
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+    margin-left: calc(-1 * var(--space-4));
+    margin-right: calc(-1 * var(--space-4));
   }
 </style>

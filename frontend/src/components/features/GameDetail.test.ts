@@ -58,7 +58,7 @@ describe("GameDetail", () => {
   });
 
   it("renders game details with mesas and waiting list", async () => {
-    render(GameDetail, {
+    const { container } = render(GameDetail, {
       props: {
         id: 1,
         openGameDraft: vi.fn(),
@@ -69,6 +69,9 @@ describe("GameDetail", () => {
     await waitFor(() => {
       expect(screen.queryByText("Cargando…")).toBeNull();
     });
+
+    // Assert structural hierarchy - major content blocks should be wrapped in .section divs
+    expect(container.querySelector(".section")).toBeInTheDocument();
 
     // Verify game info is displayed
     expect(screen.getByText(/Resumen/)).toBeTruthy();

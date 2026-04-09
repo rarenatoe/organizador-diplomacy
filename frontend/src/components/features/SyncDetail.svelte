@@ -75,7 +75,7 @@
   .loading-text {
     color: var(--text-muted);
     font-size: 12px;
-    padding: 4px 0;
+    padding: var(--space-4) 0;
   }
 
   .section-title {
@@ -88,13 +88,16 @@
   }
 
   .section {
-    margin-bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-16);
+    margin-bottom: var(--space-24);
   }
 
   .meta-grid {
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: 4px 14px;
+    gap: var(--space-4) var(--space-16);
     font-size: 12px;
   }
 

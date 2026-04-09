@@ -165,8 +165,31 @@
 
   /* Structural Variables */
   --panel-width: max(460px, 45vw);
-  --header-height: 56px;
-  --border-radius: 10px;
+  --border-radius: var(--space-8);
+
+  /* Rule of 8 - Absolute Reference Spacing Scale */
+  --space-4: 4px; /* Sub-grid for micro-adjustments */
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-40: 40px;
+  --space-48: 48px;
+  --space-56: 56px;
+  --space-72: 72px;
+  --space-96: 96px;
+  --space-128: 128px;
+
+  /* Line Heights - Snapped to 8px Grid */
+  --line-height-16: 16px;
+  --line-height-24: 24px;
+  --line-height-32: 32px;
+
+  /* Intrinsic Sizing - Responsive Container Max-Widths */
+  --container-sm: 400px;
+  --container-md: 560px;
+  --container-lg: 800px;
   /* Shadow Scale */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-base: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.05);

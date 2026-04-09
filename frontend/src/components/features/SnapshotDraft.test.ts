@@ -89,6 +89,9 @@ describe("SnapshotDraft", () => {
       },
     });
 
+    // Assert structural hierarchy - major content blocks should be wrapped in .section divs
+    expect(container.querySelector(".section")).toBeInTheDocument();
+
     expect(container.textContent).toContain("Nueva Lista");
     expect(container.textContent).toContain("No hay jugadores en el borrador");
   });

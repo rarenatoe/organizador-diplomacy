@@ -54,9 +54,9 @@
     flex: 1;
     overflow: auto;
     min-height: 0;
-    margin: 0 18px 16px;
+    margin: 0 var(--space-16) var(--space-16);
     border: 1px solid var(--border-subtle);
-    border-radius: 8px;
+    border-radius: var(--space-8);
     overscroll-behavior-y: none;
   }
 
@@ -72,7 +72,7 @@
     top: 0;
     z-index: 10;
     background: var(--gray-100);
-    padding: 7px 9px;
+    padding: var(--space-8);
     text-align: left;
     font-weight: 600;
     font-size: 10px;
@@ -86,7 +86,7 @@
   }
 
   td {
-    padding: 6px 9px;
+    padding: var(--space-8);
     border-bottom: 1px solid var(--border-subtle);
   }
 

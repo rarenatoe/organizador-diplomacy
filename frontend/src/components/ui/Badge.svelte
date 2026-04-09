@@ -26,8 +26,8 @@
 <style>
   .badge {
     font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 4px;
+    padding: var(--space-4) var(--space-8);
+    border-radius: var(--space-4);
     font-weight: 600;
     white-space: nowrap;
     text-align: center;
@@ -37,14 +37,14 @@
   }
 
   .pill {
-    border-radius: 99px;
-    padding: 2px 8px;
+    border-radius: var(--space-16);
+    padding: var(--space-4) var(--space-8);
     font-size: 11px;
   }
 
   /* Explicit alignment class for table layouts */
   .fixed-width {
-    min-width: 75px;
+    min-width: var(--space-72);
   }
 
   /* Info */

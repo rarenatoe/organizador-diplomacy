@@ -298,9 +298,8 @@
             variant={ui.csvCopied ? "success" : "secondary"}
             icon={ui.csvCopied ? "✅" : "📋"}
             onclick={copyCsv}
-            style="min-width: 120px;"
+            style="min-width: calc(var(--space-8) * 15);"
             >{ui.csvCopied ? "Copiado" : "Copiar CSV"}</Button
-          >
           >
         </div>
       </div>
@@ -394,19 +393,25 @@
 
 <style>
   .snapshot-header {
-    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-16);
   }
 
   .header-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 4px;
+    gap: var(--space-4);
   }
 
   .meta-data {
     color: var(--text-muted);
     font-size: 11px;
     font-weight: 400;
+  }
+
+  .header-row :global(.section-title) {
+    margin-bottom: 0;
   }
 </style>

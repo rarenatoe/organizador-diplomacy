@@ -132,20 +132,20 @@
 
   .resolution-card {
     background: var(--bg-secondary);
-    border-radius: 14px;
-    padding: 24px;
-    width: 420px;
-    max-width: 90vw;
+    border-radius: var(--space-16);
+    padding: var(--space-24);
+    width: 100%;
+    max-width: calc(var(--space-8) * 52);
     box-shadow: var(--shadow-xl);
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: var(--space-16);
   }
 
   .resolution-header {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-8);
   }
 
   .resolution-icon {
@@ -169,19 +169,19 @@
   .resolution-pair {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: var(--space-16);
     background: var(--bg-tertiary);
     border: 1px solid var(--border-default);
     box-shadow: var(--shadow-sm);
-    border-radius: 10px;
-    padding: 16px;
+    border-radius: var(--space-8);
+    padding: var(--space-16);
   }
 
   .resolution-side {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-8);
   }
 
   .resolution-label {
@@ -224,24 +224,23 @@
 
   .resolution-hint {
     font-size: 11px;
-    line-height: 1.4;
+    line-height: var(--line-height-16);
     color: var(--text-muted);
     background: var(--bg-tertiary);
-    padding: 10px;
-    border-radius: 8px;
+    padding: var(--space-8) var(--space-16);
+    border-radius: var(--space-8);
     margin: 0;
-    border-left: 3px solid var(--warning-border);
+    border-left: var(--space-4) solid var(--warning-border);
   }
 
   .resolution-actions {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-8);
   }
 
   .resolution-footer {
     display: flex;
     justify-content: center;
-    padding-top: 4px;
   }
 </style>

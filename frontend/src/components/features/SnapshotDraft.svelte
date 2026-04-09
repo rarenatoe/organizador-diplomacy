@@ -505,7 +505,7 @@
           class="table-input"
           value={row.juegos_este_ano}
           min="0"
-          style="width: 48px;"
+          style="width: var(--space-48);"
           onchange={(e) => handleNumberChange(e, i, "juegos_este_ano")}
         />
       {/snippet}
@@ -526,7 +526,7 @@
           value={row.partidas_deseadas}
           min="1"
           max="9"
-          style="width: 48px;"
+          style="width: var(--space-48);"
           onchange={(e) => handleNumberChange(e, i, "partidas_deseadas")}
         />
       {/snippet}
@@ -649,36 +649,33 @@
 
 <style>
   .draft-header {
-    margin-bottom: 16px;
-  }
-
-  .node-meta {
-    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-16);
   }
 
   .action-row {
     display: flex;
-    gap: 8px;
+    gap: var(--space-8);
   }
 
   .name-input-wrapper {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-4);
   }
 
   :global(.compact-title) {
-    margin-bottom: 6px !important;
+    margin-bottom: var(--space-8) !important;
   }
 
   .empty-draft {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
-    padding: 40px;
+    gap: var(--space-8);
+    padding: var(--space-40);
     color: var(--muted);
-    margin-bottom: 10px;
   }
 
   /* Autocomplete Dropdown Styling */
@@ -686,19 +683,19 @@
     position: absolute;
     bottom: 100%;
     left: 0;
-    margin-bottom: 4px;
+    margin-bottom: var(--space-4);
     background: var(--bg-secondary);
     border: 1px solid var(--border-default);
-    border-radius: 8px;
+    border-radius: var(--space-8);
     z-index: 9999;
-    max-height: 200px;
+    max-height: calc(var(--space-8) * 25);
     overflow-y: auto;
     width: 100%;
     box-shadow: var(--shadow-lg);
   }
 
   .autocomplete-item {
-    padding: 8px 12px;
+    padding: var(--space-8) var(--space-16);
     cursor: pointer;
     border: none;
     border-bottom: 1px solid var(--border-subtle);

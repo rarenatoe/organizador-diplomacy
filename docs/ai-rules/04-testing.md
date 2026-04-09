@@ -43,3 +43,9 @@ priority: 40
 - **Query Priority:** Use semantic HTML queries first, test user behavior over implementation details, assert accessible names over visual appearance. NEVER test implementation details or use fragile DOM traversal.
 - **Mocking Strategy:** Mock external dependencies only, test real component interactions. NEVER over-mock that hides real bugs or mock internal logic.
 - **Coverage Requirements:** Achieve 100% coverage for critical paths, ALWAYS test error handling, test edge cases with null/undefined inputs. NEVER skip error states or critical paths.
+
+## 7. Frontend Structural Regression Guards
+
+- **Assert DOM Layout Wrappers:** Because unit tests cannot test visual CSS rendering, you MUST explicitly test the structural HTML hierarchy. If a layout relies on a `.section` wrapper for Flexbox gaps, write an assertion to ensure that wrapper exists (`expect(container.querySelector('.section')).toBeInTheDocument();`).
+- **Assert State Classes, Not Inline Styles:** Validate component states by asserting the presence of active CSS classes (e.g., `.active`, `.node-game`) rather than brittle inner HTML or inline style strings.
+- **DRY UI Components:** When multiple views share a highly specific layout (e.g., timeline nodes), the UI must be extracted into a single source-of-truth component (e.g., `BaseNode`) to ensure test parity and visual consistency across the app.

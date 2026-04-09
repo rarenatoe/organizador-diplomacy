@@ -278,13 +278,16 @@
 
 <style>
   .section {
-    margin-bottom: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-16);
+    margin-bottom: var(--space-24);
   }
 
   .meta-grid {
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: 4px 14px;
+    gap: var(--space-4) var(--space-16);
     font-size: 12px;
   }
 
@@ -303,11 +306,11 @@
 
   .player-list li {
     font-size: 12px;
-    padding: 4px 0;
+    padding: var(--space-4) 0;
     display: grid;
-    grid-template-columns: 16px 1fr 120px;
+    grid-template-columns: var(--space-16) 1fr calc(var(--space-8) * 15);
     align-items: center;
-    gap: 8px;
+    gap: var(--space-8);
     border-bottom: 1px solid var(--border-subtle);
   }
 
@@ -318,7 +321,7 @@
   .p-num {
     color: var(--text-muted);
     font-size: 11px;
-    min-width: 16px;
+    min-width: var(--space-16);
   }
 
   .p-name {
@@ -335,13 +338,13 @@
 
   .waiting-item {
     display: grid;
-    grid-template-columns: 1fr 60px;
+    grid-template-columns: 1fr var(--space-56);
     align-items: center;
-    padding: 7px 10px;
+    padding: var(--space-8);
     background: var(--warning-bg-subtle);
     border: 1px solid var(--warning-border-subtle);
-    border-radius: 7px;
-    margin-bottom: 6px;
+    border-radius: var(--space-8);
+    margin-bottom: var(--space-8);
     font-size: 12px;
   }
 

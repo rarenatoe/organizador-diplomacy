@@ -6,8 +6,8 @@
     setChainData,
     getActiveNodeId,
   } from "../../stores.svelte";
-  import GameNode from "./GameNode.svelte";
   import Button from "../ui/Button.svelte";
+  import Node from "../ui/Node.svelte";
 
   interface Props {
     onOpenSnapshot: (id: number) => void;
@@ -59,45 +59,21 @@
 {#snippet renderTree(nodes: SnapshotNode[])}
   {#each nodes as node (node.id)}
     <div class="chain-row">
-      <div
-        class="node node-snapshot group"
-        class:active={getActiveNodeId() === node.id}
-        data-id={node.id}
-        onclick={() => handleSelect(node.id)}
-        role="button"
-        tabindex="0"
-        onkeydown={(e) => e.key === "Enter" && handleSelect(node.id)}
-      >
-        <Button
-          variant="ghost"
-          destructive={true}
-          size="xs"
-          iconOnly={true}
-          icon="🗑"
-          class="absolute-top-right group-hover-reveal"
-          title="Eliminar snapshot"
-          onclick={(e) => {
-            e.stopPropagation();
-            handleDelete(node.id);
-          }}
-        />
-
-        <div class="node-icon">📋</div>
-        <div class="node-label">Snapshot #{node.id}</div>
-        <div class="node-name">
-          {(node.created_at || "").split(" ")[0] ?? ""}
-        </div>
-        <div class="node-meta">
-          {(node.created_at || "").split(" ")[1] ?? ""}<br />
-          {node.player_count} jugadores · {node.source}
-        </div>
-
-        <div class="node-badges">
-          {#if node.is_latest}
-            <span class="badge badge-latest">Actual</span>
-          {/if}
-        </div>
-      </div>
+      <Node
+        variant="snapshot"
+        nodeId={node.id}
+        isActive={getActiveNodeId() === node.id}
+        title={`Snapshot #${node.id}`}
+        subtitle={(node.created_at || "").split(" ")[0] ?? ""}
+        icon="📋"
+        metadata={[
+          (node.created_at || "").split(" ")[1] ?? "",
+          `${node.player_count} jugadores`,
+          node.source,
+        ]}
+        onDelete={() => handleDelete(node.id)}
+        onClick={() => handleSelect(node.id)}
+      />
 
       {#if node.branches && node.branches.length > 0}
         <div class="chain-fork">
@@ -106,10 +82,23 @@
               <div class="chain-branch">
                 <span class="arrow">→</span>
                 {#if branch.edge && branch.edge.type === "game"}
-                  <GameNode
-                    node={branch.edge}
-                    onOpen={onOpenGame}
-                    onDelete={onDeleteGame}
+                  <Node
+                    variant="game"
+                    nodeId={branch.edge.id}
+                    isActive={getActiveNodeId() === branch.edge.id}
+                    title="Jornada"
+                    subtitle={(branch.edge.created_at || "").split(" ")[0] ??
+                      ""}
+                    icon="📊"
+                    metadata={[
+                      (branch.edge.created_at || "").split(" ")[1] ?? "",
+                      `${branch.edge.mesa_count} partida(s)`,
+                      `${branch.edge.espera_count} en espera`,
+                    ]}
+                    onDelete={onDeleteGame
+                      ? () => onDeleteGame(branch.edge.id)
+                      : undefined}
+                    onClick={() => onOpenGame(branch.edge.id)}
                   />
                   {#if branch.output}
                     <span class="arrow">→</span>
@@ -176,7 +165,7 @@
     flex: 1;
     overflow-x: auto;
     overflow-y: auto;
-    padding: 40px 36px;
+    padding: var(--space-40) var(--space-32);
     display: flex;
     align-items: flex-start;
   }
@@ -184,29 +173,29 @@
   #chain {
     display: flex;
     flex-direction: column;
-    gap: 20px;
-    min-height: 140px;
+    gap: var(--space-16);
+    min-height: calc(var(--space-8) * 17);
   }
 
   .empty-state {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 12px;
-    padding: 60px;
+    gap: var(--space-16);
+    padding: var(--space-56);
     color: var(--text-muted);
     text-align: center;
   }
 
   .action-row {
     display: flex;
-    gap: 8px;
+    gap: var(--space-8);
     flex-wrap: wrap;
     justify-content: center;
   }
 
   .empty-state .icon {
-    font-size: 40px;
+    font-size: var(--space-40);
   }
 
   .empty-state p {
@@ -222,9 +211,9 @@
   .tree-container {
     display: flex;
     flex-direction: column;
-    gap: 32px;
+    gap: var(--space-32);
     align-items: flex-start;
-    padding: 16px 0;
+    padding: var(--space-16) 0;
   }
   .chain-row {
     display: flex;
@@ -234,7 +223,7 @@
   .chain-fork {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-16);
   }
   .chain-branch {
     display: flex;
@@ -242,100 +231,9 @@
   }
   .arrow {
     color: var(--arrow-color);
-    font-size: 18px;
-    padding: 0 6px;
+    font-size: var(--space-16);
+    padding: 0 var(--space-8);
     flex-shrink: 0;
     user-select: none;
-  }
-
-  /* Node base styles */
-  .node {
-    cursor: pointer;
-    border-radius: var(--border-radius);
-    padding: 14px 16px;
-    width: 180px;
-    min-height: 160px;
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    box-shadow: var(--shadow-base);
-    transition:
-      transform 0.15s,
-      box-shadow 0.15s,
-      border-color 0.15s;
-    border: 2px solid transparent;
-    user-select: none;
-    position: relative;
-  }
-  .node:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-  }
-  :global(.node.active) {
-    box-shadow: 0 0 0 3px var(--active-glow);
-    z-index: 45;
-  }
-
-  /* Snapshot node styling */
-  .node-snapshot {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-subtle);
-    border-left: 4px solid var(--blue-400);
-  }
-  :global(.node.active.node-snapshot) {
-    background: var(--blue-50);
-    border-color: var(--blue-500);
-    border-left: 4px solid var(--blue-600);
-  }
-
-  /* Node children styling */
-  .node-icon {
-    font-size: 20px;
-    margin-bottom: 5px;
-  }
-  .node-label {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--text-muted);
-    margin-bottom: 3px;
-  }
-  .node-name {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-primary);
-    word-break: break-all;
-    line-height: 1.4;
-  }
-  .node-meta {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 6px;
-    line-height: 1.6;
-  }
-
-  /* Badges */
-  .node-badges {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin-top: auto;
-    min-height: 18px;
-  }
-  .badge {
-    display: inline-block;
-    padding: 2px 7px;
-    border-radius: 99px;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    margin-top: 5px;
-  }
-  .badge-latest {
-    background: var(--badge-latest-bg);
-    color: var(--badge-latest-text);
-    border: 1px solid var(--badge-latest-border);
   }
 </style>

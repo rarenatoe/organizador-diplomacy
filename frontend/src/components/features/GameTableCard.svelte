@@ -29,15 +29,17 @@
   .card {
     background: var(--bg-tertiary);
     border: 1px solid var(--border-default);
-    border-radius: 9px;
-    padding: 11px 13px;
-    margin-bottom: 10px;
+    border-radius: var(--space-8);
+    padding: var(--space-8) var(--space-16);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
   }
   .card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    gap: var(--space-8);
   }
   .card-title {
     font-weight: 700;

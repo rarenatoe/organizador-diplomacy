@@ -64,10 +64,13 @@ describe("GameDraft.svelte", () => {
   });
 
   it("renders draft data when loaded", async () => {
-    render(GameDraft, { props: mockProps });
+    const { container } = render(GameDraft, { props: mockProps });
 
-    // Wait a bit for the component to render
+    // Wait a bit for component to render
     await new Promise((resolve) => setTimeout(resolve, 100));
+
+    // Assert structural hierarchy - major content blocks should be wrapped in .section divs
+    expect(container.querySelector(".section")).toBeInTheDocument();
 
     expect(screen.getByText("Partida 1")).toBeInTheDocument();
     expect(screen.getByText("Alice")).toBeInTheDocument();
