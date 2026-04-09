@@ -30,6 +30,7 @@
   // Draft state
   let draftParentId = $state<number | null>(null);
   let draftEventType = $state<"sync" | "manual" | "edit">("manual");
+  let draftKey = $state(0);
   let draftAutoAction = $state<"notion" | "csv" | null>(null);
   let draftInitialPlayers = $state<EditPlayerRow[]>([]);
   let draftInitialData = $state<DraftResponse | null>(null);
@@ -95,6 +96,7 @@
     players: EditPlayerRow[] = [],
   ): void {
     closePanel();
+    draftKey++;
     draftParentId = parentId;
     draftEventType = eventType;
     draftAutoAction = autoAction;
@@ -192,24 +194,26 @@
         }}
       />
     {:else if panelType === "draft"}
-      <SnapshotDraft
-        parentId={draftParentId}
-        initialPlayers={draftInitialPlayers}
-        defaultEventType={draftEventType}
-        autoAction={draftAutoAction}
-        onClose={closePanel}
-        onCancel={() =>
-          draftParentId !== null ? openSnapshot(draftParentId) : closePanel()}
-        onChainUpdate={handleChainUpdate}
-        onOpenSnapshot={openSnapshot}
-        onShowError={(title, output) => {
-          modalTitle = title;
-          modalOutput = output;
-          modalIsError = true;
-          modalLoading = false;
-          modalVisible = true;
-        }}
-      />
+      {#key draftKey}
+        <SnapshotDraft
+          parentId={draftParentId}
+          initialPlayers={draftInitialPlayers}
+          defaultEventType={draftEventType}
+          autoAction={draftAutoAction}
+          onClose={closePanel}
+          onCancel={() =>
+            draftParentId !== null ? openSnapshot(draftParentId) : closePanel()}
+          onChainUpdate={handleChainUpdate}
+          onOpenSnapshot={openSnapshot}
+          onShowError={(title, output) => {
+            modalTitle = title;
+            modalOutput = output;
+            modalIsError = true;
+            modalLoading = false;
+            modalVisible = true;
+          }}
+        />
+      {/key}
     {:else if panelType === "game" && panelId !== null}
       <GameDetail id={panelId} {openGameDraft} />
     {:else if panelType === "game_draft" && panelId !== null}
