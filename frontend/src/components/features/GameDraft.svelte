@@ -96,7 +96,10 @@
     if (conflictingPlayer) {
       // Automatically swap the entire country object between the two players
       const conflictingPlayerIndex = table.jugadores.indexOf(conflictingPlayer);
-      const currentPlayer = table.jugadores[playerIndex]!;
+      const currentPlayer = table.jugadores[playerIndex];
+      if (!currentPlayer) {
+        return;
+      }
 
       const tempCountryObj = currentPlayer.country;
 
@@ -110,7 +113,10 @@
       }
     } else {
       // Just assign country if no conflict and clear reason (since it's a fresh manual override)
-      const currentPlayer = table.jugadores[playerIndex]!;
+      const currentPlayer = table.jugadores[playerIndex];
+      if (!currentPlayer) {
+        return;
+      }
       currentPlayer.country = newCountry !== "" ? { name: newCountry } : null;
     }
   }

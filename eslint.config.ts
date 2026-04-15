@@ -66,9 +66,8 @@ export default defineConfig([
         "error",
         { allowNumber: true, allowNullish: false },
       ],
-      // Non-null assertions are acceptable for document.getElementById() calls in
-      // a browser script where the developer controls the HTML structure.
-      "@typescript-eslint/no-non-null-assertion": "off",
+      // Non-null assertions are not allowed - use proper type guards or optional chaining
+      "@typescript-eslint/no-non-null-assertion": "error",
       // Allow void expressions in arrow function callbacks (e.g., `setTimeout(() => toast.remove(), 300)`)
       "@typescript-eslint/no-confusing-void-expression": [
         "error",
@@ -109,6 +108,8 @@ export default defineConfig([
       "@typescript-eslint/no-floating-promises": "off",
       "@typescript-eslint/restrict-template-expressions": "off",
       "@typescript-eslint/no-confusing-void-expression": "off",
+      // Non-null assertions are not allowed - use proper type guards or optional chaining
+      "@typescript-eslint/no-non-null-assertion": "error",
       // The flat/recommended config already includes a11y rules
       // Additional custom rules can be added here if needed
       "no-nested-ternary": "error",

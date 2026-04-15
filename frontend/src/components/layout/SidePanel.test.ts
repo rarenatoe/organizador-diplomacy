@@ -66,7 +66,9 @@ describe("SidePanel", () => {
 
     const aside = panelContainer.querySelector("aside");
     expect(aside).not.toBeNull();
-    expect(aside!.classList.contains("open")).toBe(true);
+    if (aside) {
+      expect(aside.classList.contains("open")).toBe(true);
+    }
   });
 
   it("does not apply open class when open prop is false", () => {
@@ -84,7 +86,9 @@ describe("SidePanel", () => {
 
     const aside = panelContainer.querySelector("aside");
     expect(aside).not.toBeNull();
-    expect(aside!.classList.contains("open")).toBe(false);
+    if (aside) {
+      expect(aside.classList.contains("open")).toBe(false);
+    }
   });
 
   it("uses clickOutside action with correct ignore selectors", () => {
@@ -103,9 +107,11 @@ describe("SidePanel", () => {
     const aside = panelContainer.querySelector("aside");
     expect(aside).not.toBeNull();
 
-    // Verify the aside element exists and has the panel class
+    // Verify aside element exists and has the panel class
     // The clickOutside action is applied via use:clickOutside directive
-    expect(aside!.classList.contains("panel")).toBe(true);
+    if (aside) {
+      expect(aside.classList.contains("panel")).toBe(true);
+    }
   });
 
   it("calls onClose when clicking outside panel", async () => {
@@ -146,11 +152,12 @@ describe("SidePanel", () => {
       target: container,
     });
 
-    // Click inside the panel
+    // Click inside panel
     const panelHeader = panelContainer.querySelector(".panel-header");
     expect(panelHeader).not.toBeNull();
-
-    await fireEvent.click(panelHeader!);
+    if (panelHeader) {
+      await fireEvent.click(panelHeader);
+    }
 
     // onClose should NOT be called because click was inside panel
     expect(onClose).not.toHaveBeenCalled();

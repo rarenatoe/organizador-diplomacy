@@ -25,8 +25,11 @@ describe("Tooltip.svelte", () => {
     expect(document.body.querySelector(".tooltip-popover")).toBeNull();
 
     // Trigger hover
-    const trigger = container.querySelector(".tooltip-trigger")!;
-    await fireEvent.mouseEnter(trigger);
+    const trigger = container.querySelector(".tooltip-trigger");
+    expect(trigger).toBeDefined();
+    if (trigger) {
+      await fireEvent.mouseEnter(trigger);
+    }
     await tick();
 
     const tooltipPopover = document.body.querySelector(".tooltip-popover");
@@ -48,8 +51,11 @@ describe("Tooltip.svelte", () => {
   it("handles empty text gracefully on hover", async () => {
     const { container } = render(Tooltip, { props: { text: "", icon: "ℹ️" } });
 
-    const trigger = container.querySelector(".tooltip-trigger")!;
-    await fireEvent.mouseEnter(trigger);
+    const trigger = container.querySelector(".tooltip-trigger");
+    expect(trigger).toBeDefined();
+    if (trigger) {
+      await fireEvent.mouseEnter(trigger);
+    }
     await tick();
 
     const tooltipPopover = document.body.querySelector(".tooltip-popover");
@@ -63,8 +69,11 @@ describe("Tooltip.svelte", () => {
       props: { text: specialText, icon: "ℹ️" },
     });
 
-    const trigger = container.querySelector(".tooltip-trigger")!;
-    await fireEvent.mouseEnter(trigger);
+    const trigger = container.querySelector(".tooltip-trigger");
+    expect(trigger).toBeDefined();
+    if (trigger) {
+      await fireEvent.mouseEnter(trigger);
+    }
     await tick();
 
     const tooltipPopover = document.body.querySelector(".tooltip-popover");

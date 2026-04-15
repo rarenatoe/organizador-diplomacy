@@ -89,7 +89,9 @@ describe("SyncResolutionModal.svelte", () => {
 
   it("calls onComplete with merges when all resolved (Notion name)", async () => {
     const onComplete = vi.fn();
-    const firstPair = mockPairs[0]!;
+    const firstPair = mockPairs[0];
+    expect(firstPair).toBeDefined();
+    if (!firstPair) return;
     render(SyncResolutionModal, {
       props: {
         visible: true,
@@ -117,7 +119,9 @@ describe("SyncResolutionModal.svelte", () => {
 
   it("calls onComplete with merges when all resolved (Local name)", async () => {
     const onComplete = vi.fn();
-    const firstPair = mockPairs[0]!;
+    const firstPair = mockPairs[0];
+    expect(firstPair).toBeDefined();
+    if (!firstPair) return;
     render(SyncResolutionModal, {
       props: {
         visible: true,
@@ -143,7 +147,9 @@ describe("SyncResolutionModal.svelte", () => {
 
   it("calls onComplete with empty array when all skipped", async () => {
     const onComplete = vi.fn();
-    const firstPair = mockPairs[0]!;
+    const firstPair = mockPairs[0];
+    expect(firstPair).toBeDefined();
+    if (!firstPair) return;
     render(SyncResolutionModal, {
       props: {
         visible: true,

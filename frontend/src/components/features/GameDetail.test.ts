@@ -384,9 +384,12 @@ describe("GameDetail", () => {
       expect(tooltips.length).toBe(1);
 
       // Verify the tooltip trigger exists and has the info icon
-      const tooltipTrigger = tooltips[0]!;
-      expect(tooltipTrigger).toBeInTheDocument();
-      expect(tooltipTrigger.querySelector(".info-icon")).toBeInTheDocument();
+      const tooltipTrigger = tooltips[0];
+      expect(tooltipTrigger).toBeDefined();
+      if (tooltipTrigger) {
+        expect(tooltipTrigger).toBeInTheDocument();
+        expect(tooltipTrigger.querySelector(".info-icon")).toBeInTheDocument();
+      }
     });
   });
 
@@ -414,15 +417,69 @@ describe("GameDetail", () => {
       expect(tooltips.length).toBe(1);
 
       // Verify the tooltip trigger exists and has the info icon
-      const tooltipTrigger = tooltips[0]!;
-      expect(tooltipTrigger).toBeInTheDocument();
-      expect(tooltipTrigger.querySelector(".info-icon")).toBeInTheDocument();
+      const tooltipTrigger = tooltips[0];
+      expect(tooltipTrigger).toBeDefined();
 
-      // Trigger hover to render the portal popover
-      await fireEvent.mouseEnter(tooltipTrigger);
+      // Click the copy players button
+      const playersButton = screen.getByRole("button", {
+        name: /Copiar jugadores/i,
+      });
+      await fireEvent.click(playersButton);
+
+      // Verify the clipboard includes footnote marker (asterisk) for Alice
+      expect(mockClipboard.writeText).toHaveBeenCalledWith(
+        expect.stringContaining("Alice (Inglaterra*)"),
+      );
+
+      // Verify Bob has no asterisk (no country.reason)
+      const clipboardText = mockClipboard.writeText.mock
+        .calls[0]?.[0] as string;
+      expect(clipboardText).toContain("Bob (Francia)");
+      expect(clipboardText).not.toContain("Bob (Francia*)");
+
+      // Verify the clipboard includes the footnote explanation
+      expect(clipboardText).toContain("* Algorithm says so");
+    });
+  });
+
+  describe("country_reason DOM rendering", () => {
+    it("renders info icon and tooltip only for players with country_reason", async () => {
+      render(GameDetail, {
+        props: {
+          id: 1,
+          openGameDraft: vi.fn(),
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Find all info icons (should only be for Alice who has country.reason)
+      const infoIcons = document.querySelectorAll(".info-icon");
+      expect(infoIcons.length).toBe(1);
+
+      // Find all tooltips (should only be for Alice)
+      const tooltips = document.querySelectorAll(
+        ".tooltip-cell .tooltip-trigger",
+      );
+      expect(tooltips.length).toBe(1);
+
+      // Verify the tooltip trigger exists and has the info icon
+      const tooltipTrigger = tooltips[0];
+      expect(tooltipTrigger).toBeDefined();
+      if (tooltipTrigger) {
+        expect(tooltipTrigger).toBeInTheDocument();
+        expect(tooltipTrigger.querySelector(".info-icon")).toBeInTheDocument();
+      }
+
+      // Trigger hover to render portal popover
+      if (tooltipTrigger) {
+        await fireEvent.mouseEnter(tooltipTrigger);
+      }
       await tick();
 
-      // Verify the tooltip contains the reason text in the document body
+      // Verify tooltip contains reason text in document body
       const tooltipPopover = document.body.querySelector(".tooltip-popover");
       expect(tooltipPopover).toHaveTextContent("Algorithm says so");
     });

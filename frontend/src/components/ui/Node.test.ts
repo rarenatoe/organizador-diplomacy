@@ -74,8 +74,9 @@ describe("Node", () => {
 
     const deleteButton = container.querySelector('button[title*="Eliminar"]');
     expect(deleteButton).toBeInTheDocument();
-
-    await fireEvent.click(deleteButton!);
+    if (deleteButton) {
+      await fireEvent.click(deleteButton);
+    }
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
@@ -95,7 +96,10 @@ describe("Node", () => {
     });
 
     const node = container.querySelector(".node");
-    await fireEvent.click(node!);
+    expect(node).toBeInTheDocument();
+    if (node) {
+      await fireEvent.click(node);
+    }
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
@@ -106,7 +110,10 @@ describe("Node", () => {
     });
 
     const node = container.querySelector(".node");
-    await fireEvent.keyDown(node!, { key: "Enter" });
+    expect(node).toBeInTheDocument();
+    if (node) {
+      await fireEvent.keyDown(node, { key: "Enter" });
+    }
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 

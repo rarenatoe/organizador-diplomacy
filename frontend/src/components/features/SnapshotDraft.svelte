@@ -534,7 +534,10 @@
     field: "prioridad" | "partidas_gm",
   ): void {
     const cb = e.target as HTMLInputElement;
-    draftPlayers[index]![field] = cb.checked ? 1 : 0;
+    const player = draftPlayers[index];
+    if (player) {
+      player[field] = cb.checked ? 1 : 0;
+    }
   }
 
   function handleNumberChange(
@@ -543,7 +546,10 @@
     field: "juegos_este_ano" | "partidas_deseadas",
   ): void {
     const input = e.target as HTMLInputElement;
-    draftPlayers[index]![field] = parseInt(input.value, 10) || 0;
+    const player = draftPlayers[index];
+    if (player) {
+      player[field] = parseInt(input.value, 10) || 0;
+    }
   }
 
   function handleInputKeydown(e: KeyboardEvent) {
@@ -616,20 +622,22 @@
 
   {#snippet body()}
     {#snippet nameInput(row: EditPlayerRow, i: number)}
-      <div class="name-input-wrapper">
-        <PlayerName
-          bind:player={draftPlayers[i]!}
-          editable={true}
-          showNotionIndicator={true}
-        />
-
-        {#if draftPlayers[i]?.historyRestored}
-          <Tooltip
-            text="Perfil histórico cargado desde la base de datos"
-            icon="📚"
+      {#if draftPlayers[i]}
+        <div class="name-input-wrapper">
+          <PlayerName
+            bind:player={draftPlayers[i]}
+            editable={true}
+            showNotionIndicator={true}
           />
-        {/if}
-      </div>
+
+          {#if draftPlayers[i]?.historyRestored}
+            <Tooltip
+              text="Perfil histórico cargado desde la base de datos"
+              icon="📚"
+            />
+          {/if}
+        </div>
+      {/if}
     {/snippet}
 
     {#snippet expCell(row: EditPlayerRow)}

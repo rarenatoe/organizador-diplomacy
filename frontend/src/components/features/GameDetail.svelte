@@ -194,7 +194,10 @@
         minimo_teorico: 0,
         intentos_usados: data?.intentos || 0,
       };
-      openGameDraft(data!.input_snapshot_id, draft, id);
+      if (!data) {
+        throw new Error("Game data is required for editing");
+      }
+      openGameDraft(data.input_snapshot_id, draft, id);
     }}>Editar Jornada</Button
   >
 {/snippet}

@@ -192,7 +192,9 @@ describe("SnapshotHistory.svelte", () => {
     expect(summary).toBeTruthy();
 
     // Click to expand
-    await fireEvent.click(summary!);
+    if (summary) {
+      await fireEvent.click(summary);
+    }
 
     const details = container.querySelector("details");
     expect(details?.open).toBe(true);
@@ -221,10 +223,14 @@ describe("SnapshotHistory.svelte", () => {
     expect(summary).toBeTruthy();
 
     // Mouse enter should add hover styles
-    await fireEvent.mouseEnter(summary!);
+    if (summary) {
+      await fireEvent.mouseEnter(summary);
+    }
 
     // Mouse leave should remove hover styles
-    await fireEvent.mouseLeave(summary!);
+    if (summary) {
+      await fireEvent.mouseLeave(summary);
+    }
 
     // We can't easily test inline styles in jsdom, but we can verify the events don't crash
     expect(summary).toBeTruthy();

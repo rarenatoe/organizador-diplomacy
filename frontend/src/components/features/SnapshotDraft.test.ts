@@ -355,7 +355,10 @@ describe("SnapshotDraft", () => {
     const allCancelButtons = screen.getAllByText("Cancelar");
     // The modal cancel button should be the last one (inside the modal)
     const modalCancelButton = allCancelButtons[allCancelButtons.length - 1];
-    await fireEvent.click(modalCancelButton!);
+    expect(modalCancelButton).toBeDefined();
+    if (modalCancelButton) {
+      await fireEvent.click(modalCancelButton);
+    }
 
     // Modal should be closed
     expect(screen.queryByText("Pegar CSV")).toBeNull();
