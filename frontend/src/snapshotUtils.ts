@@ -1,4 +1,4 @@
-import type { SnapshotNode, Branch } from "./types";
+import type { SnapshotNode, Branch, EditPlayerRow } from "./types";
 
 /**
  * Generic DFS walker for the snapshot chain tree.
@@ -58,4 +58,27 @@ export function findLatestGameId(
   });
 
   return latestId;
+}
+
+/**
+ * Builds a complete EditPlayerRow from base data and history
+ */
+export function buildPlayerRow(
+  base: Partial<EditPlayerRow> & { nombre: string },
+  history: Partial<
+    EditPlayerRow & { source: "history" | "notion" | "default" }
+  >,
+): EditPlayerRow {
+  return {
+    nombre: base.nombre,
+    original_nombre: base.nombre,
+    experiencia: base.experiencia ?? history.experiencia ?? "Nuevo",
+    juegos_este_ano: base.juegos_este_ano ?? history.juegos_este_ano ?? 0,
+    prioridad: base.prioridad ?? history.prioridad ?? 0,
+    partidas_deseadas: base.partidas_deseadas ?? history.partidas_deseadas ?? 1,
+    partidas_gm: base.partidas_gm ?? history.partidas_gm ?? 0,
+    notion_id: base.notion_id ?? history.notion_id ?? null,
+    notion_name: base.notion_name ?? history.notion_name ?? null,
+    historyRestored: history.source === "history",
+  };
 }

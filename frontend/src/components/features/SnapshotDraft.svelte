@@ -21,27 +21,7 @@
     notion_alias?: string[] | null;
   };
 
-  function buildPlayerRow(
-    base: Partial<EditPlayerRow> & { nombre: string },
-    history: Partial<
-      EditPlayerRow & { source: "history" | "notion" | "default" }
-    >,
-  ): EditPlayerRow {
-    return {
-      nombre: base.nombre,
-      original_nombre: base.nombre,
-      experiencia: base.experiencia ?? history.experiencia ?? "Nuevo",
-      juegos_este_ano: base.juegos_este_ano ?? history.juegos_este_ano ?? 0,
-      prioridad: base.prioridad ?? history.prioridad ?? 0,
-      partidas_deseadas:
-        base.partidas_deseadas ?? history.partidas_deseadas ?? 1,
-      partidas_gm: base.partidas_gm ?? history.partidas_gm ?? 0,
-      notion_id: base.notion_id ?? history.notion_id ?? null,
-      notion_name: base.notion_name ?? history.notion_name ?? null,
-      historyRestored: history.source === "history",
-    };
-  }
-
+  import { buildPlayerRow } from "../../snapshotUtils";
   import PlayerName from "../ui/PlayerName.svelte";
   import {
     saveSnapshot,
@@ -175,12 +155,9 @@
       .catch(console.error);
   });
 
-  async function handleAddPlayer(): Promise<void> {
+  function handleAddPlayer(): void {
     isAddingPlayer = true;
     newPlayerSearchQuery = "";
-    await tick();
-    const tableContainer = document.querySelector(".table-container");
-    if (tableContainer) tableContainer.scrollTop = tableContainer.scrollHeight;
   }
 
   function focusOnMount(node: HTMLInputElement) {
@@ -279,7 +256,7 @@
     const newPlayer = buildPlayerRow(baseInput, historyData);
 
     // 6. Push to Svelte State
-    draftPlayers = [...draftPlayers, newPlayer];
+    draftPlayers = [newPlayer, ...draftPlayers];
 
     // 7. Reset UI
     isAddingPlayer = false;
@@ -288,7 +265,7 @@
   }
 
   function handleDeletePlayer(index: number): void {
-    draftPlayers = draftPlayers.filter((_, i) => i !== index);
+    draftPlayers.splice(index, 1);
   }
 
   async function handleImportCsv(text: string): Promise<void> {
@@ -557,9 +534,7 @@
     field: "prioridad" | "partidas_gm",
   ): void {
     const cb = e.target as HTMLInputElement;
-    const updated = [...draftPlayers];
-    updated[index]![field] = cb.checked ? 1 : 0;
-    draftPlayers = updated;
+    draftPlayers[index]![field] = cb.checked ? 1 : 0;
   }
 
   function handleNumberChange(
@@ -568,9 +543,42 @@
     field: "juegos_este_ano" | "partidas_deseadas",
   ): void {
     const input = e.target as HTMLInputElement;
-    const updated = [...draftPlayers];
-    updated[index]![field] = parseInt(input.value, 10) || 0;
-    draftPlayers = updated;
+    draftPlayers[index]![field] = parseInt(input.value, 10) || 0;
+  }
+
+  function handleInputKeydown(e: KeyboardEvent) {
+    if (e.key === "Enter") {
+      if (
+        activeSuggestionIndex >= 0 &&
+        activeSuggestionIndex < suggestedPlayers.length
+      ) {
+        const selectedPlayer = suggestedPlayers[activeSuggestionIndex];
+        if (selectedPlayer) {
+          confirmAddPlayer(selectedPlayer, true);
+        } else {
+          confirmAddPlayer(newPlayerSearchQuery);
+        }
+      } else {
+        confirmAddPlayer(newPlayerSearchQuery);
+      }
+    } else if (e.key === "Escape") {
+      isAddingPlayer = false;
+      activeSuggestionIndex = -1;
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (suggestedPlayers.length > 0) {
+        activeSuggestionIndex =
+          (activeSuggestionIndex + 1) % suggestedPlayers.length;
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (suggestedPlayers.length > 0) {
+        activeSuggestionIndex =
+          activeSuggestionIndex <= 0
+            ? suggestedPlayers.length - 1
+            : activeSuggestionIndex - 1;
+      }
+    }
   }
 </script>
 
@@ -607,87 +615,86 @@
   {/snippet}
 
   {#snippet body()}
-    {#if draftPlayers.length > 0 || isAddingPlayer}
-      {#snippet nameInput(row: EditPlayerRow, i: number)}
-        <div class="name-input-wrapper">
-          <PlayerName
-            bind:player={draftPlayers[i]!}
-            editable={true}
-            showNotionIndicator={true}
-          />
+    {#snippet nameInput(row: EditPlayerRow, i: number)}
+      <div class="name-input-wrapper">
+        <PlayerName
+          bind:player={draftPlayers[i]!}
+          editable={true}
+          showNotionIndicator={true}
+        />
 
-          {#if draftPlayers[i]?.historyRestored}
-            <Tooltip
-              text="Perfil histórico cargado desde la base de datos"
-              icon="📚"
-            />
-          {/if}
-        </div>
-      {/snippet}
-
-      {#snippet expCell(row: EditPlayerRow)}
-        {#if row.experiencia}
-          <Badge
-            variant={row.experiencia === "Nuevo" ? "warning" : "success"}
-            text={row.experiencia}
-            fixedWidth={true}
+        {#if draftPlayers[i]?.historyRestored}
+          <Tooltip
+            text="Perfil histórico cargado desde la base de datos"
+            icon="📚"
           />
         {/if}
-      {/snippet}
+      </div>
+    {/snippet}
 
-      {#snippet gamesInput(row: EditPlayerRow, i: number)}
-        <input
-          type="number"
-          class="table-input"
-          value={row.juegos_este_ano}
-          min="0"
-          style="width: var(--space-48);"
-          onchange={(e) => handleNumberChange(e, i, "juegos_este_ano")}
+    {#snippet expCell(row: EditPlayerRow)}
+      {#if row.experiencia}
+        <Badge
+          variant={row.experiencia === "Nuevo" ? "warning" : "success"}
+          text={row.experiencia}
+          fixedWidth={true}
         />
-      {/snippet}
+      {/if}
+    {/snippet}
 
-      {#snippet priorInput(row: EditPlayerRow, i: number)}
-        <input
-          type="checkbox"
-          class="table-checkbox"
-          checked={row.prioridad === 1}
-          onchange={(e) => handleCheckboxChange(e, i, "prioridad")}
-        />
-      {/snippet}
+    {#snippet gamesInput(row: EditPlayerRow, i: number)}
+      <input
+        type="number"
+        class="table-input"
+        value={row.juegos_este_ano}
+        min="0"
+        style="width: var(--space-48);"
+        onchange={(e) => handleNumberChange(e, i, "juegos_este_ano")}
+      />
+    {/snippet}
 
-      {#snippet deseaInput(row: EditPlayerRow, i: number)}
-        <input
-          type="number"
-          class="table-input"
-          value={row.partidas_deseadas}
-          min="1"
-          max="9"
-          style="width: var(--space-48);"
-          onchange={(e) => handleNumberChange(e, i, "partidas_deseadas")}
-        />
-      {/snippet}
+    {#snippet priorInput(row: EditPlayerRow, i: number)}
+      <input
+        type="checkbox"
+        class="table-checkbox"
+        checked={row.prioridad === 1}
+        onchange={(e) => handleCheckboxChange(e, i, "prioridad")}
+      />
+    {/snippet}
 
-      {#snippet gmInput(row: EditPlayerRow, i: number)}
-        <input
-          type="checkbox"
-          class="table-checkbox"
-          checked={row.partidas_gm > 0}
-          onchange={(e) => handleCheckboxChange(e, i, "partidas_gm")}
-        />
-      {/snippet}
-      {#snippet actionsCell(row: EditPlayerRow, i: number)}
-        <Button
-          variant="ghost"
-          destructive={true}
-          size="sm"
-          iconOnly={true}
-          title="Eliminar"
-          onclick={() => handleDeletePlayer(i)}
-          icon="🗑"
-        />
-      {/snippet}
+    {#snippet deseaInput(row: EditPlayerRow, i: number)}
+      <input
+        type="number"
+        class="table-input"
+        value={row.partidas_deseadas}
+        min="1"
+        max="9"
+        style="width: var(--space-48);"
+        onchange={(e) => handleNumberChange(e, i, "partidas_deseadas")}
+      />
+    {/snippet}
 
-      {@const tableColumns: ColumnDef<EditPlayerRow>[] = [
+    {#snippet gmInput(row: EditPlayerRow, i: number)}
+      <input
+        type="checkbox"
+        class="table-checkbox"
+        checked={row.partidas_gm > 0}
+        onchange={(e) => handleCheckboxChange(e, i, "partidas_gm")}
+      />
+    {/snippet}
+    {#snippet actionsCell(row: EditPlayerRow, i: number)}
+      <Button
+        variant="ghost"
+        destructive={true}
+        size="sm"
+        iconOnly={true}
+        title="Eliminar"
+        onclick={() => handleDeletePlayer(i)}
+        icon="🗑"
+      />
+    {/snippet}
+
+    {@const tableColumns: ColumnDef<EditPlayerRow>[] = [
         { header: "Nombre", cell: nameInput, sticky: true },
         { header: "Exp.", cell: expCell },
         { header: "Juegos", cell: gamesInput },
@@ -697,97 +704,73 @@
         { header: "", cell: actionsCell }
       ]}
 
-      {#snippet addingRow()}
-        {#if isAddingPlayer}
-          <tr>
-            <td
-              colspan={tableColumns.length}
-              style="padding: 0; position: relative;"
+    {#snippet addingRow()}
+      {#if isAddingPlayer}
+        <tr>
+          <td
+            colspan={tableColumns.length}
+            style="padding: 0; position: relative;"
+          >
+            <div
+              use:clickOutside={{ callback: () => (isAddingPlayer = false) }}
             >
-              <div
-                use:clickOutside={{ callback: () => (isAddingPlayer = false) }}
-              >
-                <input
-                  type="text"
-                  class="input-field text-strong"
-                  bind:value={newPlayerSearchQuery}
-                  placeholder="Escribe para buscar o agregar..."
-                  use:focusOnMount
-                  onkeydown={(e) => {
-                    if (e.key === "Enter") {
-                      if (
-                        activeSuggestionIndex >= 0 &&
-                        activeSuggestionIndex < suggestedPlayers.length
-                      ) {
-                        const selectedPlayer =
-                          suggestedPlayers[activeSuggestionIndex];
-                        if (selectedPlayer) {
-                          confirmAddPlayer(selectedPlayer, true);
-                        } else {
-                          confirmAddPlayer(newPlayerSearchQuery);
-                        }
-                      } else {
-                        confirmAddPlayer(newPlayerSearchQuery);
-                      }
-                    }
-                    if (e.key === "Escape") {
-                      isAddingPlayer = false;
-                      activeSuggestionIndex = -1;
-                    }
-                    if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      if (suggestedPlayers.length > 0) {
-                        activeSuggestionIndex =
-                          (activeSuggestionIndex + 1) % suggestedPlayers.length;
-                      }
-                    }
-                    if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      if (suggestedPlayers.length > 0) {
-                        activeSuggestionIndex =
-                          activeSuggestionIndex <= 0
-                            ? suggestedPlayers.length - 1
-                            : activeSuggestionIndex - 1;
-                      }
-                    }
-                  }}
-                />
-                {#if newPlayerSearchQuery.trim().length > 0}
-                  <div class="autocomplete-dropdown">
-                    {#each suggestedPlayers as suggestion, index (suggestion.display)}
-                      <button
-                        type="button"
-                        class="autocomplete-item"
-                        class:active={activeSuggestionIndex === index}
-                        onclick={() => confirmAddPlayer(suggestion, true)}
-                      >
-                        {suggestion.display}
-                        {#if suggestion.is_alias && suggestion.notion_name}
-                          <span class="alias-text text-gray-400">
-                            ↪ {suggestion.notion_name}</span
-                          >
-                        {/if}
-                      </button>
-                    {/each}
-                  </div>
-                {/if}
-              </div>
-            </td>
-          </tr>
-        {/if}
-      {/snippet}
+              <input
+                type="text"
+                class="input-field text-strong"
+                bind:value={newPlayerSearchQuery}
+                placeholder="Escribe para buscar o agregar..."
+                use:focusOnMount
+                onkeydown={handleInputKeydown}
+              />
+              {#if newPlayerSearchQuery.trim().length > 0 && suggestedPlayers.length > 0}
+                <div class="autocomplete-dropdown">
+                  {#each suggestedPlayers as suggestion, index (suggestion.display)}
+                    <button
+                      type="button"
+                      class="autocomplete-item"
+                      class:active={activeSuggestionIndex === index}
+                      onclick={() => confirmAddPlayer(suggestion, true)}
+                    >
+                      {suggestion.display}
+                      {#if suggestion.is_alias && suggestion.notion_name}
+                        <span class="alias-text text-gray-400">
+                          ↪ {suggestion.notion_name}</span
+                        >
+                      {/if}
+                    </button>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          </td>
+        </tr>
+      {/if}
+    {/snippet}
 
-      <DataTable
-        data={draftPlayers}
-        columns={tableColumns}
-        footerRow={addingRow}
-      />
-    {:else}
-      <div class="empty-draft">
-        <p>No hay jugadores en el borrador.</p>
-        <p>Agrega jugadores manualmente o importa desde CSV.</p>
-      </div>
-    {/if}
+    {#snippet emptyState()}
+      {#if draftPlayers.length === 0 && !isAddingPlayer}
+        <tr>
+          <td
+            colspan={tableColumns.length}
+            style="padding: var(--space-40) var(--space-16); text-align: center; color: var(--text-muted);"
+          >
+            <div style="font-size: 13px; margin-bottom: var(--space-8);">
+              No hay jugadores en el borrador.
+            </div>
+            <div style="font-size: 13px;">
+              Agrega jugadores manualmente o importa desde CSV.
+            </div>
+          </td>
+        </tr>
+      {/if}
+    {/snippet}
+
+    <DataTable
+      data={draftPlayers}
+      columns={tableColumns}
+      headerRow={addingRow}
+      footerRow={emptyState}
+    />
   {/snippet}
 
   {#snippet footer()}
@@ -848,21 +831,12 @@
     margin-bottom: var(--space-8) !important;
   }
 
-  .empty-draft {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-8);
-    padding: var(--space-40);
-    color: var(--muted);
-  }
-
   /* Autocomplete Dropdown Styling */
   .autocomplete-dropdown {
     position: absolute;
-    bottom: 100%;
+    top: 100%;
     left: 0;
-    margin-bottom: var(--space-4);
+    margin-top: var(--space-4);
     background: var(--bg-secondary);
     border: 1px solid var(--border-default);
     border-radius: var(--space-8);
@@ -908,10 +882,5 @@
     font-size: 11px;
     margin-left: var(--space-8);
     font-style: italic;
-  }
-
-  .empty-draft p {
-    font-size: 13px;
-    margin: 0;
   }
 </style>

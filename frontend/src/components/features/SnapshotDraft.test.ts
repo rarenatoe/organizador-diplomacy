@@ -120,7 +120,7 @@ describe("SnapshotDraft", () => {
     expect(screen.getByText("📥 Pegar CSV")).toBeTruthy();
   });
 
-  it("renders autocomplete input inside table footer when add button is clicked", async () => {
+  it("renders autocomplete input inside table header when add button is clicked", async () => {
     const { tick } = await import("svelte");
     render(SnapshotDraft, {
       props: { ...defaultProps, initialPlayers: mockInitialPlayers },
@@ -202,7 +202,7 @@ describe("SnapshotDraft", () => {
     ).toBeNull();
     const nameInputs = screen.getAllByPlaceholderText("Nombre del jugador");
     expect(nameInputs.length).toBe(2); // Original player + new player
-    expect((nameInputs[1] as HTMLInputElement).value).toBe("Daniel Eiler");
+    expect((nameInputs[0] as HTMLInputElement).value).toBe("Daniel Eiler");
   });
 
   it("opens CSV modal when paste CSV button is clicked", async () => {
@@ -953,6 +953,25 @@ describe("SnapshotDraft", () => {
       const allRows = document.querySelectorAll(".table-input-ghost");
       expect(allRows.length).toBe(1);
       expect((allRows[0] as HTMLInputElement).value).toBe("Daniel E");
+    });
+
+    it("does not render the autocomplete dropdown if there are no suggested players", async () => {
+      const { tick } = await import("svelte");
+      const { container } = render(SnapshotDraft, {
+        props: { ...defaultProps, initialPlayers: mockInitialPlayers },
+      });
+
+      await fireEvent.click(screen.getByText("➕ Agregar jugador"));
+      await tick();
+
+      const input = screen.getByPlaceholderText(
+        "Escribe para buscar o agregar...",
+      );
+      await fireEvent.input(input, { target: { value: "ZxcvbnmNoMatch" } });
+      await tick();
+
+      const dropdown = container.querySelector(".autocomplete-dropdown");
+      expect(dropdown).toBeNull();
     });
 
     it("applies notion_id and shows ? icon when resolving via 'Vincular Solo'", async () => {

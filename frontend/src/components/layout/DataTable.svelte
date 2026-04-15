@@ -14,9 +14,10 @@
     data: T[];
     columns: ColumnDef<T>[];
     footerRow?: import("svelte").Snippet;
+    headerRow?: import("svelte").Snippet;
   }
 
-  let { data, columns, footerRow }: Props = $props();
+  let { data, columns, footerRow, headerRow }: Props = $props();
 </script>
 
 <div class="data-table-wrapper">
@@ -29,6 +30,9 @@
       </tr>
     </thead>
     <tbody>
+      {#if headerRow}
+        {@render headerRow()}
+      {/if}
       {#each data as row, i (i)}
         <tr>
           {#each columns as col, j (j)}
