@@ -160,7 +160,9 @@ describe("SyncResolutionModal.svelte", () => {
     });
 
     // Click skip button
-    const skipBtn = screen.getByRole("button", { name: /Omitir/i });
+    const skipBtn = screen.getByRole("button", {
+      name: /Añadir sin vincular/i,
+    });
     await fireEvent.click(skipBtn);
 
     expect(onComplete).toHaveBeenCalledWith([]);

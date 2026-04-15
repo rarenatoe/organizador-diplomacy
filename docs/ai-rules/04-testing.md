@@ -61,3 +61,8 @@ priority: 40
 
 - **Kill Zombie Tests:** If you fix the architectural root cause of a bug (e.g., introducing `notion_id`), aggressively HUNT DOWN and DELETE tests written specifically to verify the old, hacky workarounds (e.g., `GROUP BY max()` deduplication queries).
 - **Scope DOM Selectors:** When testing UI interactions, ALWAYS scope DOM selectors to their specific domain context (e.g., `document.querySelectorAll('.country-cell .tooltip-trigger')`) to prevent test breakage as the design system expands.
+
+## 10. Test Suite Optimization
+
+- **The Fixture Rule:** Test files MUST remain hyper-focused on assertions. Any mock data array, object, or `defaultProps` setup exceeding 10 lines MUST be extracted to a sibling `*.fixtures.ts` file.
+- **The Render Wrapper Standard:** NEVER repeat `render(Component, { props: {...} })` across multiple test cases. Every test file MUST implement a centralized `renderComponent(overrides = {})` factory function to keep component mounting DRY and reduce visual noise.

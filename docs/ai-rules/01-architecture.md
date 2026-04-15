@@ -67,3 +67,16 @@ priority: 10
 - **Strict API Purity:** The backend MUST NEVER send formatted UI strings (e.g., `etiqueta: "Antiguo (15 juegos)"`). APIs MUST send strictly typed, pure primitive data. The frontend is solely responsible for localization and UI formatting.
 - **Synchronize Read & Write Models (CQRS):** When altering a database schema or write payload, you MUST simultaneously update the aggregate SQL views (e.g., `get_game_event_detail`) and their TypeScript interfaces.
 - **Explicit Error Contracts:** The frontend API wrapper MUST explicitly handle framework-specific error shapes (like FastAPI's 422 `HTTPValidationError` array) and surface exact field-level rejections to the user.
+
+## 7. State Management
+
+### Svelte 5 State Patterns
+
+- **Functional POJO State Modules:** Extract complex state into functional POJOs (Plain Old JavaScript Objects) using Svelte 5 runes (`$state`, `$derived`), NEVER ES6 Classes. This guarantees method purity and eases serialization.
+- **Discriminated Union State Grouping:** Group related state variables (e.g., `isVisible`, `pendingData`, `resultsArray`) into a single Discriminated Union type (e.g., `type State = { status: 'idle' } | { status: 'resolving', data: X }`). This strictly eliminates impossible states.
+- **Logic File Naming:** NEVER name a logic file identically to a UI file (e.g., avoid `Component.svelte` and `Component.svelte.ts`). Use `lowerCamelCaseState.svelte.ts` for the logic file to prevent bundler collisions.
+
+### Type Architecture
+
+- **Strict Type Safety:** Absolutely NO `any`, `unknown`, or dirty type casting (`as Type`) to bypass errors.
+- **Component-Level Generics:** Use component-level Generics (`<script lang="ts" generics="T extends {...}">`) so components adapt safely to the data shapes passed to them.

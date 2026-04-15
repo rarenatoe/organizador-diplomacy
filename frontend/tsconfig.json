@@ -6,6 +6,8 @@
     "module": "ESNext",
     "moduleDetection": "auto",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
     "types": ["svelte", "vite/client"]
   },
   "include": ["src/**/*", "vitest.d.ts"],

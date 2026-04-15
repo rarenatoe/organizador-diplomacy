@@ -42,6 +42,7 @@
   import Tooltip from "../ui/Tooltip.svelte";
   import DataTable, { type ColumnDef } from "../layout/DataTable.svelte";
   import SectionTitle from "../ui/SectionTitle.svelte";
+  import PlayerAutocompleteInput from "./PlayerAutocompleteInput.svelte";
 
   let resolutionModal: ReturnType<typeof SyncResolutionModal>;
 
@@ -87,7 +88,6 @@
   );
   let eventType = $state(untrack(() => defaultEventType));
   let knownPlayers: AutocompletePlayer[] = $state([]);
-  let activeSuggestionIndex = $state(-1);
   let isAddingPlayer = $state(false);
   let newPlayerSearchQuery = $state("");
   let pendingCsvPlayers: CsvPlayerRow[] = $state([]);
@@ -98,24 +98,6 @@
   let resolutionVisible = $state(false);
   let resolutionPairs = $state<SimilarName[]>([]);
   let fetchedNotionPlayers = $state<NotionPlayer[]>([]);
-
-  // Derived state for the autocomplete dropdown. Automatically filters by text and hides already-linked identities.
-  let suggestedPlayers = $derived.by(() => {
-    const query = newPlayerSearchQuery.trim().toLowerCase();
-    if (!query) return [];
-
-    return knownPlayers
-      .filter((player) => {
-        if (!player.display.toLowerCase().includes(query)) return false;
-
-        return !draftPlayers.some(
-          (p) =>
-            p.nombre === player.nombre ||
-            (player.notion_id && p.notion_id === player.notion_id), // Fixed
-        );
-      })
-      .slice(0, 10);
-  });
 
   // Derived state for editing vs creating context
   let isEditing = $derived(parentId !== null);
@@ -182,7 +164,6 @@
 
   async function confirmAddPlayer(
     input: string | AutocompletePlayer,
-    skipSimilarity: boolean = false,
     silentDuplicate: boolean = false,
   ): Promise<void> {
     // 1. Normalize input (Handle both string and rich objects)
@@ -206,26 +187,10 @@
       }
       isAddingPlayer = false;
       newPlayerSearchQuery = "";
-      activeSuggestionIndex = -1;
       return;
     }
 
-    // 3. Similarity Check (Only for raw strings)
-    if (isRawString && !skipSimilarity) {
-      try {
-        const checkRes = await checkPlayerSimilarity([name]);
-        if (checkRes.similarities && checkRes.similarities.length > 0) {
-          pendingInlinePlayer = name;
-          resolutionPairs = enrichSimilaritiesWithDraft(checkRes.similarities);
-          resolutionVisible = true;
-          return; // Stop here; the modal will call handleResolutionComplete
-        }
-      } catch (e) {
-        console.error("Similarity check failed", e);
-      }
-    }
-
-    // 4. Fetch History (Wait for data to prevent UI flickering)
+    // 3. Fetch History (Wait for data to prevent UI flickering)
     let historyData: Partial<
       EditPlayerRow & { source: "history" | "notion" | "default" }
     > = {};
@@ -244,24 +209,23 @@
       console.warn("Failed to lookup player history:", e);
     }
 
-    // 5. Construct the perfect, fully-populated row
+    // 4. Construct the perfect, fully-populated row
     const baseInput = isRawString
       ? { nombre: name }
       : {
-          nombre: name,
+          nombre: input.nombre,
           notion_id: input.notion_id,
           notion_name: input.notion_name,
         };
 
     const newPlayer = buildPlayerRow(baseInput, historyData);
 
-    // 6. Push to Svelte State
+    // 5. Push to Svelte State
     draftPlayers = [newPlayer, ...draftPlayers];
 
-    // 7. Reset UI
+    // 6. Reset UI
     isAddingPlayer = false;
     newPlayerSearchQuery = "";
-    activeSuggestionIndex = -1;
   }
 
   function handleDeletePlayer(index: number): void {
@@ -457,7 +421,7 @@
           is_alias: false,
         } as AutocompletePlayer;
 
-        await confirmAddPlayer(playerObj, true, isUseExisting);
+        await confirmAddPlayer(playerObj, isUseExisting);
       }
     } else {
       // It's a Notion Sync resolution
@@ -551,41 +515,6 @@
       player[field] = parseInt(input.value, 10) || 0;
     }
   }
-
-  function handleInputKeydown(e: KeyboardEvent) {
-    if (e.key === "Enter") {
-      if (
-        activeSuggestionIndex >= 0 &&
-        activeSuggestionIndex < suggestedPlayers.length
-      ) {
-        const selectedPlayer = suggestedPlayers[activeSuggestionIndex];
-        if (selectedPlayer) {
-          confirmAddPlayer(selectedPlayer, true);
-        } else {
-          confirmAddPlayer(newPlayerSearchQuery);
-        }
-      } else {
-        confirmAddPlayer(newPlayerSearchQuery);
-      }
-    } else if (e.key === "Escape") {
-      isAddingPlayer = false;
-      activeSuggestionIndex = -1;
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      if (suggestedPlayers.length > 0) {
-        activeSuggestionIndex =
-          (activeSuggestionIndex + 1) % suggestedPlayers.length;
-      }
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      if (suggestedPlayers.length > 0) {
-        activeSuggestionIndex =
-          activeSuggestionIndex <= 0
-            ? suggestedPlayers.length - 1
-            : activeSuggestionIndex - 1;
-      }
-    }
-  }
 </script>
 
 <PanelLayout scrollable={false}>
@@ -628,6 +557,8 @@
             bind:player={draftPlayers[i]}
             editable={true}
             showNotionIndicator={true}
+            {knownPlayers}
+            existingPlayers={draftPlayers}
           />
 
           {#if draftPlayers[i]?.historyRestored}
@@ -722,33 +653,16 @@
             <div
               use:clickOutside={{ callback: () => (isAddingPlayer = false) }}
             >
-              <input
-                type="text"
-                class="input-field text-strong"
+              <PlayerAutocompleteInput
                 bind:value={newPlayerSearchQuery}
-                placeholder="Escribe para buscar o agregar..."
-                use:focusOnMount
-                onkeydown={handleInputKeydown}
+                {knownPlayers}
+                existingPlayers={draftPlayers}
+                onConfirm={(input, silent) => confirmAddPlayer(input, silent)}
+                onClickOutside={() => (isAddingPlayer = false)}
+                clearOnConfirm={true}
+                autofocus={true}
+                wrapperClass="autocomplete-wrapper"
               />
-              {#if newPlayerSearchQuery.trim().length > 0 && suggestedPlayers.length > 0}
-                <div class="autocomplete-dropdown">
-                  {#each suggestedPlayers as suggestion, index (suggestion.display)}
-                    <button
-                      type="button"
-                      class="autocomplete-item"
-                      class:active={activeSuggestionIndex === index}
-                      onclick={() => confirmAddPlayer(suggestion, true)}
-                    >
-                      {suggestion.display}
-                      {#if suggestion.is_alias && suggestion.notion_name}
-                        <span class="alias-text text-gray-400">
-                          ↪ {suggestion.notion_name}</span
-                        >
-                      {/if}
-                    </button>
-                  {/each}
-                </div>
-              {/if}
             </div>
           </td>
         </tr>
@@ -837,58 +751,5 @@
 
   :global(.compact-title) {
     margin-bottom: var(--space-8) !important;
-  }
-
-  /* Autocomplete Dropdown Styling */
-  .autocomplete-dropdown {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    margin-top: var(--space-4);
-    background: var(--bg-secondary);
-    border: 1px solid var(--border-default);
-    border-radius: var(--space-8);
-    z-index: 9999;
-    max-height: calc(var(--space-8) * 25);
-    overflow-y: auto;
-    width: 100%;
-    box-shadow: var(--shadow-lg);
-  }
-
-  .autocomplete-item {
-    padding: var(--space-8) var(--space-16);
-    cursor: pointer;
-    border: none;
-    border-bottom: 1px solid var(--border-subtle);
-    background: transparent;
-    width: 100%;
-    text-align: left;
-    color: var(--text-primary);
-    font-size: 13px;
-    font-family: inherit;
-    transition: background-color var(--transition-fast);
-  }
-
-  .autocomplete-item:last-child {
-    border-bottom: none;
-  }
-
-  .autocomplete-item:hover,
-  .autocomplete-item:focus {
-    background: var(--bg-tertiary);
-    outline: none;
-  }
-
-  .autocomplete-item.active {
-    background: var(--bg-tertiary);
-    outline: 2px solid var(--accent-primary);
-    outline-offset: -2px;
-  }
-
-  .alias-text {
-    color: var(--text-muted);
-    font-size: 11px;
-    margin-left: var(--space-8);
-    font-style: italic;
   }
 </style>

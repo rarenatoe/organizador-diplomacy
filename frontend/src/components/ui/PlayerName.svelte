@@ -2,14 +2,18 @@
   lang="ts"
   generics="T extends { nombre: string; notion_id?: string | null; notion_name?: string | null }"
 >
+  import type { AutocompletePlayer, EditPlayerRow } from "../../types";
   import { normalizeName } from "../../utils";
   import Tooltip from "./Tooltip.svelte";
+  import PlayerAutocompleteInput from "../features/PlayerAutocompleteInput.svelte";
 
   interface Props {
     player: T;
     editable?: boolean;
     showNotionIndicator?: boolean;
     compact?: boolean;
+    knownPlayers?: AutocompletePlayer[];
+    existingPlayers?: T[];
   }
 
   let {
@@ -17,6 +21,8 @@
     editable = false,
     showNotionIndicator = true,
     compact = false,
+    knownPlayers = [],
+    existingPlayers = [],
   }: Props = $props();
 
   let isNotionLinked = $derived(!!player.notion_id || !!player.notion_name);
@@ -28,11 +34,23 @@
 
 <div class="player-name-wrapper" class:compact>
   {#if editable}
-    <input
-      type="text"
-      class="table-input table-input-ghost text-strong name-element"
+    <PlayerAutocompleteInput
       bind:value={player.nombre}
+      {knownPlayers}
+      {existingPlayers}
+      currentPlayer={player}
+      wrapperClass="name-element autocomplete-wrapper"
+      class="table-input table-input-ghost text-strong"
       placeholder="Nombre del jugador"
+      onConfirm={(input) => {
+        if (typeof input === "string") {
+          player.nombre = input;
+        } else {
+          player.nombre = input.nombre;
+          if (input.notion_id) player.notion_id = input.notion_id;
+          if (input.notion_name) player.notion_name = input.notion_name;
+        }
+      }}
     />
   {:else}
     <span
@@ -68,16 +86,28 @@
 
   .name-element {
     flex: 1;
-    min-width: 0; /* Allow both input and span to shrink without blowing out grid */
+    min-width: 0; /* Allow both input wrapper and read-only span to shrink */
+  }
+
+  /* Target ONLY the autocomplete wrapper, keeping it out of the read-only span's way */
+  :global(.autocomplete-wrapper) {
+    display: block;
+    width: 100%;
+  }
+
+  /* Ensure the inner input shrinks correctly and takes full width */
+  :global(.autocomplete-wrapper input) {
+    width: 100%;
+    min-width: 0; /* Critical: allows input to shrink below browser's intrinsic default */
+    box-sizing: border-box;
   }
 
   .read-only-name {
-    /* Mimic the padding of .table-input to prevent layout shift between Draft and Detail views */
+    /* Mimic the padding of .table-input to prevent layout shift */
     padding: var(--space-4) var(--space-8);
   }
 
   .player-name-wrapper.compact .read-only-name {
-    /* Remove padding in dense UI areas like Game Cards */
     padding: 0;
   }
   .player-name-wrapper.compact {

@@ -119,4 +119,9 @@
   tr:hover td.sticky-col {
     background: var(--bg-tertiary);
   }
+
+  /* Elevate the active cell so dropdowns can float over subsequent rows */
+  td.sticky-col:focus-within {
+    z-index: 50;
+  }
 </style>

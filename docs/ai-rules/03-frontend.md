@@ -46,3 +46,15 @@ priority: 30
 - **Banned Browser APIs:** NEVER use `window.prompt()`, `window.alert()`, or `window.confirm()`. ALWAYS use proper custom modal components.
 - **Encapsulate State:** Do not pollute layout components (`App.svelte`) with business logic. Extract complex state into singleton classes in `.svelte.ts` files.
 - **Data Ingestion:** Bulk data entry MUST NEVER write directly to state. Intercept via `/api/player/check-similarity` and present `SyncResolutionModal` if conflicts exist.
+
+## 6. Defensive UI & Layout
+
+- **Floating UI Guard:** Do not base the visibility of floating elements (dropdowns, modals) solely on derived array lengths or data states. ALWAYS pair visibility with an explicit user-interaction boolean (e.g., `isActive` triggered by `onfocus` or `oninput`) to prevent background state syncs from creating zombie UI elements.
+- **Pre-Flight Validations:** ALWAYS validate operations against local, synchronous state before firing async API calls or opening resolution modals.
+
+## 7. CSS & Styling Constraints
+
+- **Class Injection:** NEVER use raw string concatenation for dynamic classes (e.g., `class="{base} {active ? 'active' : ''}"`). ALWAYS use a dedicated utility like `cx()` or `clsx` to prevent `undefined` or `false` from bleeding into the DOM.
+- **Structural vs. Visual:** STRICTLY separate structural layout classes (`wrapperClass`) from visual/text classes (`class`). NEVER apply `display: flex` to shared text-formatting classes, as it breaks truncation (`text-overflow: ellipsis`).
+- **Flexbox Inputs:** HTML `<input>` elements have a browser-default intrinsic width. When placing them inside a `flex` container, you MUST apply `min-width: 0` to the input, otherwise it will refuse to shrink and blow out the grid layout.
+- **Sticky Stacking Contexts:** Elements inside a `position: sticky` table cell are trapped in its stacking context. To make an absolute child (like a dropdown) overlap the next table row, you MUST elevate the parent cell itself (e.g., `td.sticky-col:focus-within { z-index: 50; }`).

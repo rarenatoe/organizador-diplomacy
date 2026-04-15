@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
 import SnapshotDraft from "./SnapshotDraft.svelte";
+import { defaultProps, mockInitialPlayers } from "./SnapshotDraft.fixtures";
 
 // Mock the API module
 vi.mock("../../api", () => ({
@@ -53,30 +54,11 @@ vi.mock("../../stores.svelte", () => ({
   setActiveNodeId: vi.fn(),
 }));
 
-describe("SnapshotDraft", () => {
-  const mockInitialPlayers = [
-    {
-      nombre: "Test Player",
-      experiencia: "Nuevo",
-      juegos_este_ano: 0,
-      prioridad: 0,
-      partidas_deseadas: 1,
-      partidas_gm: 0,
-      original_nombre: "Test Player",
-      historyRestored: false,
-    },
-  ];
-  const defaultProps = {
-    parentId: null,
-    initialPlayers: [],
-    defaultEventType: "manual" as const,
-    onClose: vi.fn(),
-    onCancel: vi.fn(),
-    onChainUpdate: vi.fn(),
-    onOpenSnapshot: vi.fn(),
-    onShowError: vi.fn(),
-  };
+function renderDraft(overrides = {}) {
+  return render(SnapshotDraft, { props: { ...defaultProps, ...overrides } });
+}
 
+describe("SnapshotDraft", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -122,9 +104,7 @@ describe("SnapshotDraft", () => {
 
   it("renders autocomplete input inside table header when add button is clicked", async () => {
     const { tick } = await import("svelte");
-    render(SnapshotDraft, {
-      props: { ...defaultProps, initialPlayers: mockInitialPlayers },
-    });
+    renderDraft({ initialPlayers: mockInitialPlayers });
     await fireEvent.click(screen.getByText("➕ Agregar jugador"));
     await tick();
     expect(
@@ -133,9 +113,7 @@ describe("SnapshotDraft", () => {
   });
 
   it("renders the new player input with the correct semantic class", async () => {
-    const { container } = render(SnapshotDraft, {
-      props: { ...defaultProps, initialPlayers: mockInitialPlayers },
-    });
+    const { container } = renderDraft({ initialPlayers: mockInitialPlayers });
     await fireEvent.click(screen.getByText("➕ Agregar jugador"));
     const input = container.querySelector(
       "input[placeholder='Escribe para buscar o agregar...']",
@@ -143,11 +121,49 @@ describe("SnapshotDraft", () => {
     expect(input?.classList.contains("input-field")).toBe(true);
   });
 
+  it("autofocuses the new player input when adding a player", async () => {
+    const { tick } = await import("svelte");
+    renderDraft({ initialPlayers: mockInitialPlayers });
+    await fireEvent.click(screen.getByText("➕ Agregar jugador"));
+    await tick();
+    const input = screen.getByPlaceholderText(
+      "Escribe para buscar o agregar...",
+    );
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("does not autofocus inline player edit inputs on mount", () => {
+    renderDraft({
+      initialPlayers: [
+        {
+          nombre: "Alice",
+          experiencia: "Nuevo",
+          juegos_este_ano: 0,
+          prioridad: 0,
+          partidas_deseadas: 1,
+          partidas_gm: 0,
+        },
+        {
+          nombre: "Bob",
+          experiencia: "Antiguo",
+          juegos_este_ano: 3,
+          prioridad: 1,
+          partidas_deseadas: 2,
+          partidas_gm: 1,
+        },
+      ],
+    });
+
+    const nameInputs = screen.getAllByPlaceholderText("Nombre del jugador");
+    expect(nameInputs.length).toBe(2);
+    // Verify neither inline input stole focus
+    expect(document.activeElement).not.toBe(nameInputs[0]);
+    expect(document.activeElement).not.toBe(nameInputs[1]);
+  });
+
   it("filters known players in dropdown", async () => {
     const { tick } = await import("svelte");
-    const { container } = render(SnapshotDraft, {
-      props: { ...defaultProps, initialPlayers: mockInitialPlayers },
-    });
+    const { container } = renderDraft({ initialPlayers: mockInitialPlayers });
     await fireEvent.click(screen.getByText("➕ Agregar jugador"));
     await tick();
     const input = screen.getByPlaceholderText(
@@ -163,6 +179,39 @@ describe("SnapshotDraft", () => {
     expect(items.length).toBe(2);
     expect(screen.getByText("Daniel Eiler")).toBeInTheDocument();
     expect(screen.getByText("Daniel Escobar")).toBeInTheDocument();
+  });
+
+  it("applies active-dropdown class to elevate z-index when suggestions are open (regression guard)", async () => {
+    const { tick } = await import("svelte");
+    const { container } = renderDraft({ initialPlayers: mockInitialPlayers });
+
+    await fireEvent.click(screen.getByText("➕ Agregar jugador"));
+    await tick();
+
+    const input = screen.getByPlaceholderText(
+      "Escribe para buscar o agregar...",
+    );
+
+    // The wrapper is the parent element containing our custom class
+    const wrapper = container.querySelector(".autocomplete-wrapper");
+    expect(wrapper).toBeTruthy();
+
+    // 1. Before typing, dropdown is closed, should NOT have active-dropdown
+    expect(wrapper?.classList.contains("active-dropdown")).toBe(false);
+
+    // 2. Type to trigger suggestions and open dropdown
+    await fireEvent.input(input, { target: { value: "Dan" } });
+    await tick();
+
+    // 3. Dropdown is open, MUST have active-dropdown to elevate z-index
+    expect(wrapper?.classList.contains("active-dropdown")).toBe(true);
+
+    // 4. Clear input to close dropdown
+    await fireEvent.input(input, { target: { value: "" } });
+    await tick();
+
+    // 5. Dropdown is closed, MUST lose active-dropdown to restore normal stacking
+    expect(wrapper?.classList.contains("active-dropdown")).toBe(false);
   });
 
   it("rehydrates player history when suggested name is clicked", async () => {
@@ -181,9 +230,7 @@ describe("SnapshotDraft", () => {
         },
       },
     });
-    render(SnapshotDraft, {
-      props: { ...defaultProps, initialPlayers: mockInitialPlayers },
-    });
+    renderDraft({ initialPlayers: mockInitialPlayers });
     await fireEvent.click(screen.getByText("➕ Agregar jugador"));
     await tick();
     const input = screen.getByPlaceholderText(
@@ -243,7 +290,7 @@ describe("SnapshotDraft", () => {
       ],
     });
 
-    const { container } = render(SnapshotDraft, { props: defaultProps });
+    const { container } = renderDraft();
 
     await fireEvent.click(screen.getByText("📥 Pegar CSV"));
     await tick(); // <--- Flush modal open
@@ -365,9 +412,7 @@ describe("SnapshotDraft", () => {
   });
 
   it("deletes a player when delete button is clicked", async () => {
-    const { container } = render(SnapshotDraft, {
-      props: { ...defaultProps, initialPlayers: mockInitialPlayers },
-    });
+    const { container } = renderDraft({ initialPlayers: mockInitialPlayers });
     const deleteButton = screen.getByTitle("Eliminar");
     await fireEvent.click(deleteButton);
     expect(container.querySelectorAll(".table-input-ghost").length).toBe(0);
@@ -394,9 +439,7 @@ describe("SnapshotDraft", () => {
   });
 
   it("enables save button when players exist", () => {
-    render(SnapshotDraft, {
-      props: { ...defaultProps, initialPlayers: mockInitialPlayers },
-    });
+    renderDraft({ initialPlayers: mockInitialPlayers });
     const saveButton = screen.getByRole("button", {
       name: /Crear Versión/i,
     });
@@ -405,9 +448,7 @@ describe("SnapshotDraft", () => {
 
   it("calls saveSnapshot when save button is clicked", async () => {
     const { saveSnapshot } = await import("../../api");
-    render(SnapshotDraft, {
-      props: { ...defaultProps, initialPlayers: mockInitialPlayers },
-    });
+    renderDraft({ initialPlayers: mockInitialPlayers });
     await fireEvent.click(
       screen.getByRole("button", { name: /Crear Versión/i }),
     );
@@ -518,7 +559,7 @@ describe("SnapshotDraft", () => {
       },
     });
 
-    render(SnapshotDraft, { props: defaultProps });
+    renderDraft();
 
     // Trigger CSV Import
     await fireEvent.click(screen.getByText(/Pegar CSV/));
@@ -716,12 +757,9 @@ describe("SnapshotDraft", () => {
     it("should block duplicate when player already exists", async () => {
       const { tick } = await import("svelte");
       const onShowErrorMock = vi.fn();
-      render(SnapshotDraft, {
-        props: {
-          ...defaultProps,
-          initialPlayers: mockInitialPlayers, // Contains "Test Player"
-          onShowError: onShowErrorMock,
-        },
+      renderDraft({
+        initialPlayers: mockInitialPlayers, // Contains "Test Player"
+        onShowError: onShowErrorMock,
       });
 
       await fireEvent.click(screen.getByText("➕ Agregar jugador"));
@@ -759,12 +797,9 @@ describe("SnapshotDraft", () => {
         ],
       });
 
-      render(SnapshotDraft, {
-        props: {
-          ...defaultProps,
-          initialPlayers: mockInitialPlayers, // Contains "Test Player"
-          onShowError: onShowErrorMock,
-        },
+      renderDraft({
+        initialPlayers: mockInitialPlayers, // Contains "Test Player"
+        onShowError: onShowErrorMock,
       });
 
       await fireEvent.click(screen.getByText("➕ Agregar jugador"));
@@ -852,12 +887,7 @@ describe("SnapshotDraft", () => {
       const { tick } = await import("svelte");
       const api = await import("../../api");
 
-      render(SnapshotDraft, {
-        props: {
-          ...defaultProps,
-          initialPlayers: mockInitialPlayers,
-        },
-      });
+      renderDraft({ initialPlayers: mockInitialPlayers });
 
       const mockSimilarNames = [
         {
@@ -887,7 +917,7 @@ describe("SnapshotDraft", () => {
 
       expect(screen.getByText(/Resolver Conflictos/i)).toBeInTheDocument();
       expect(screen.getByText(/Usar John Doe/i)).toBeInTheDocument();
-      expect(screen.getByText(/Omitir/i)).toBeInTheDocument();
+      expect(screen.getByText(/Añadir sin vincular/i)).toBeInTheDocument();
     });
 
     it("should show autocorrect to draft player on inline add similarity", async () => {
@@ -958,11 +988,97 @@ describe("SnapshotDraft", () => {
       expect((allRows[0] as HTMLInputElement).value).toBe("Daniel E");
     });
 
+    it("should handle similarity resolution modal correctly when adding inline", async () => {
+      const { tick } = await import("svelte");
+      const api = await import("../../api");
+
+      vi.mocked(api.checkPlayerSimilarity).mockResolvedValueOnce({
+        similarities: [
+          {
+            notion_id: "notion-cheder",
+            notion_name: "Cheder",
+            snapshot: "Chede",
+            similarity: 0.95,
+            match_method: "fuzzy",
+          },
+        ],
+      });
+
+      renderDraft();
+
+      await fireEvent.click(screen.getByText(/Agregar jugador/i));
+      await tick();
+      const input = screen.getByPlaceholderText(
+        "Escribe para buscar o agregar...",
+      );
+
+      await fireEvent.input(input, { target: { value: "Chede" } });
+      await fireEvent.keyDown(input, { key: "Enter" });
+
+      await tick();
+      await new Promise((r) => setTimeout(r, 0));
+      await tick();
+
+      expect(screen.getByText(/Resolver Conflictos/i)).toBeInTheDocument();
+
+      const renameBtn = screen.getByRole("button", {
+        name: /Vincular & Renombrar/i,
+      });
+      await fireEvent.click(renameBtn);
+
+      await tick();
+
+      const addedRow = screen.getByDisplayValue("Cheder");
+      expect(addedRow).toBeInTheDocument();
+    });
+
+    it("should handle similarity resolution modal 'Añadir sin vincular' correctly when adding inline", async () => {
+      const { tick } = await import("svelte");
+      const api = await import("../../api");
+
+      vi.mocked(api.checkPlayerSimilarity).mockResolvedValueOnce({
+        similarities: [
+          {
+            notion_id: "notion-cheder",
+            notion_name: "Cheder",
+            snapshot: "Chede",
+            similarity: 0.95,
+            match_method: "fuzzy",
+          },
+        ],
+      });
+
+      renderDraft();
+
+      await fireEvent.click(screen.getByText(/Agregar jugador/i));
+      await tick();
+      const input = screen.getByPlaceholderText(
+        "Escribe para buscar o agregar...",
+      );
+
+      await fireEvent.input(input, { target: { value: "Chede" } });
+      await fireEvent.keyDown(input, { key: "Enter" });
+
+      await tick();
+      await new Promise((r) => setTimeout(r, 0));
+      await tick();
+
+      expect(screen.getByText(/Resolver Conflictos/i)).toBeInTheDocument();
+
+      const skipBtn = screen.getByRole("button", {
+        name: /Añadir sin vincular/i,
+      });
+      await fireEvent.click(skipBtn);
+
+      await tick();
+
+      const addedRow = screen.getByDisplayValue("Chede");
+      expect(addedRow).toBeInTheDocument();
+    });
+
     it("does not render the autocomplete dropdown if there are no suggested players", async () => {
       const { tick } = await import("svelte");
-      const { container } = render(SnapshotDraft, {
-        props: { ...defaultProps, initialPlayers: mockInitialPlayers },
-      });
+      const { container } = renderDraft({ initialPlayers: mockInitialPlayers });
 
       await fireEvent.click(screen.getByText("➕ Agregar jugador"));
       await tick();
@@ -982,20 +1098,17 @@ describe("SnapshotDraft", () => {
       const api = await import("../../api");
 
       // Setup initial player
-      render(SnapshotDraft, {
-        props: {
-          ...defaultProps,
-          initialPlayers: [
-            {
-              nombre: "Local Name",
-              experiencia: "Nuevo",
-              juegos_este_ano: 0,
-              prioridad: 0,
-              partidas_deseadas: 1,
-              partidas_gm: 0,
-            },
-          ],
-        },
+      renderDraft({
+        initialPlayers: [
+          {
+            nombre: "Local Name",
+            experiencia: "Nuevo",
+            juegos_este_ano: 0,
+            prioridad: 0,
+            partidas_deseadas: 1,
+            partidas_gm: 0,
+          },
+        ],
       });
 
       // Mock Notion sync response with conflict
@@ -1094,7 +1207,7 @@ describe("SnapshotDraft", () => {
         },
       });
 
-      render(SnapshotDraft, { props: defaultProps });
+      renderDraft();
 
       // 2. Trigger CSV Import
       await fireEvent.click(screen.getByText("📥 Pegar CSV"));
@@ -1167,7 +1280,7 @@ describe("SnapshotDraft", () => {
         ],
       });
 
-      render(SnapshotDraft, { props: { ...defaultProps, onShowError } });
+      renderDraft({ onShowError });
 
       // Test 1: Adding raw string through autocomplete
       await fireEvent.click(screen.getByText(/Agregar jugador/i));

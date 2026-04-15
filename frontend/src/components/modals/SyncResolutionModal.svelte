@@ -118,7 +118,7 @@
               variant="ghost"
               title="No realizar ninguna acción"
               onclick={() => handleAction("skip")}
-              icon="⏭">Omitir</Button
+              icon="⏭">Añadir sin vincular</Button
             >
           </div>
           <div class="compact-hint">
@@ -155,7 +155,7 @@
               variant="ghost"
               title="No realizar ninguna acción"
               onclick={() => handleAction("skip")}
-              icon="⏭">Omitir</Button
+              icon="⏭">Añadir sin vincular</Button
             >
           </div>
           <div class="compact-hint">

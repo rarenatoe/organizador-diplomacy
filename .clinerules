@@ -64,6 +64,19 @@
 - **Synchronize Read & Write Models (CQRS):** When altering a database schema or write payload, you MUST simultaneously update the aggregate SQL views (e.g., `get_game_event_detail`) and their TypeScript interfaces.
 - **Explicit Error Contracts:** The frontend API wrapper MUST explicitly handle framework-specific error shapes (like FastAPI's 422 `HTTPValidationError` array) and surface exact field-level rejections to the user.
 
+## 7. State Management
+
+### Svelte 5 State Patterns
+
+- **Functional POJO State Modules:** Extract complex state into functional POJOs (Plain Old JavaScript Objects) using Svelte 5 runes (`$state`, `$derived`), NEVER ES6 Classes. This guarantees method purity and eases serialization.
+- **Discriminated Union State Grouping:** Group related state variables (e.g., `isVisible`, `pendingData`, `resultsArray`) into a single Discriminated Union type (e.g., `type State = { status: 'idle' } | { status: 'resolving', data: X }`). This strictly eliminates impossible states.
+- **Logic File Naming:** NEVER name a logic file identically to a UI file (e.g., avoid `Component.svelte` and `Component.svelte.ts`). Use `lowerCamelCaseState.svelte.ts` for the logic file to prevent bundler collisions.
+
+### Type Architecture
+
+- **Strict Type Safety:** Absolutely NO `any`, `unknown`, or dirty type casting (`as Type`) to bypass errors.
+- **Component-Level Generics:** Use component-level Generics (`<script lang="ts" generics="T extends {...}">`) so components adapt safely to the data shapes passed to them.
+
 ## 1. Database Philosophy
 
 - **Database System:** Use disposable local SQLite with `sqlite (stdlib)` via `aiosqlite`. NEVER use persistent or external database services.
@@ -149,6 +162,18 @@
 - **Encapsulate State:** Do not pollute layout components (`App.svelte`) with business logic. Extract complex state into singleton classes in `.svelte.ts` files.
 - **Data Ingestion:** Bulk data entry MUST NEVER write directly to state. Intercept via `/api/player/check-similarity` and present `SyncResolutionModal` if conflicts exist.
 
+## 6. Defensive UI & Layout
+
+- **Floating UI Guard:** Do not base the visibility of floating elements (dropdowns, modals) solely on derived array lengths or data states. ALWAYS pair visibility with an explicit user-interaction boolean (e.g., `isActive` triggered by `onfocus` or `oninput`) to prevent background state syncs from creating zombie UI elements.
+- **Pre-Flight Validations:** ALWAYS validate operations against local, synchronous state before firing async API calls or opening resolution modals.
+
+## 7. CSS & Styling Constraints
+
+- **Class Injection:** NEVER use raw string concatenation for dynamic classes (e.g., `class="{base} {active ? 'active' : ''}"`). ALWAYS use a dedicated utility like `cx()` or `clsx` to prevent `undefined` or `false` from bleeding into the DOM.
+- **Structural vs. Visual:** STRICTLY separate structural layout classes (`wrapperClass`) from visual/text classes (`class`). NEVER apply `display: flex` to shared text-formatting classes, as it breaks truncation (`text-overflow: ellipsis`).
+- **Flexbox Inputs:** HTML `<input>` elements have a browser-default intrinsic width. When placing them inside a `flex` container, you MUST apply `min-width: 0` to the input, otherwise it will refuse to shrink and blow out the grid layout.
+- **Sticky Stacking Contexts:** Elements inside a `position: sticky` table cell are trapped in its stacking context. To make an absolute child (like a dropdown) overlap the next table row, you MUST elevate the parent cell itself (e.g., `td.sticky-col:focus-within { z-index: 50; }`).
+
 ## 1. Testing Execution
 
 - **Frontend Tests:** ALWAYS use `bun run test` for Vitest suite. NEVER use `bun test` (incompatible with Vitest/Svelte 5).
@@ -206,6 +231,11 @@
 
 - **Kill Zombie Tests:** If you fix the architectural root cause of a bug (e.g., introducing `notion_id`), aggressively HUNT DOWN and DELETE tests written specifically to verify the old, hacky workarounds (e.g., `GROUP BY max()` deduplication queries).
 - **Scope DOM Selectors:** When testing UI interactions, ALWAYS scope DOM selectors to their specific domain context (e.g., `document.querySelectorAll('.country-cell .tooltip-trigger')`) to prevent test breakage as the design system expands.
+
+## 10. Test Suite Optimization
+
+- **The Fixture Rule:** Test files MUST remain hyper-focused on assertions. Any mock data array, object, or `defaultProps` setup exceeding 10 lines MUST be extracted to a sibling `*.fixtures.ts` file.
+- **The Render Wrapper Standard:** NEVER repeat `render(Component, { props: {...} })` across multiple test cases. Every test file MUST implement a centralized `renderComponent(overrides = {})` factory function to keep component mounting DRY and reduce visual noise.
 
 ## Meta-Prompting & AI Communication
 
