@@ -342,10 +342,11 @@ class TestApiSnapshotCreate:
         assert len(history_records) == 0
 
     async def test_create_snapshot_adds_players(self, client: Any, db_session: Any) -> None:
-        """Creating a snapshot should add provided players."""
+        """Creating a snapshot should add provided players and their notion_ids."""
         players = [
             {
                 "nombre": f"Player{i}",
+                "notion_id": f"notion_{i}",
                 "experiencia": "Antiguo",
                 "juegos_este_ano": i,
                 "prioridad": 1,
@@ -361,11 +362,22 @@ class TestApiSnapshotCreate:
         assert resp.status_code in (200, 201)
         data = resp.json()
         snap_id = data["snapshot_id"]
-        # Verify players were added
+
+        # Verify players were added to snapshot
         from backend.crud.snapshots import get_snapshot_players
 
         db_players = await get_snapshot_players(db_session, snap_id)
         assert len(db_players) == 3
+
+        # Verify notion_id was correctly saved to the Player table
+        from sqlalchemy import select
+
+        from backend.db.models import Player
+
+        for i in range(3):
+            res = await db_session.execute(select(Player).where(Player.name == f"Player{i}"))
+            player_record = res.scalar_one()
+            assert player_record.notion_id == f"notion_{i}"
 
 
 # ── POST /api/snapshot/<id>/save ──────────────────────────────────────────────
@@ -373,11 +385,12 @@ class TestApiSnapshotCreate:
 
 class TestApiSnapshotSave:
     async def test_save_snapshot_manual(self, client: Any, db_session: Any) -> None:
-        """Saving a snapshot should update its players and metadata."""
+        """Saving a snapshot should update its players, metadata, and notion_ids."""
         snap_id = await make_snapshot_with_players(db_session, n=3)
         new_players = [
             {
                 "nombre": f"NewPlayer{i}",
+                "notion_id": f"new_notion_{i}",
                 "experiencia": "Nuevo",
                 "juegos_este_ano": 0,
                 "prioridad": 1,
@@ -388,12 +401,10 @@ class TestApiSnapshotSave:
         ]
         resp = await client.post(
             f"/api/snapshot/{snap_id}/save",
-            json={
-                "source": "manual",
-                "players": new_players,
-            },
+            json={"source": "manual", "players": new_players},
         )
         assert resp.status_code == 200
+
         # Verify players were replaced
         from backend.crud.snapshots import get_snapshot_players
 
@@ -401,6 +412,16 @@ class TestApiSnapshotSave:
         assert len(db_players) == 2
         names = {p["nombre"] for p in db_players}
         assert names == {"NewPlayer0", "NewPlayer1"}
+
+        # Verify notion_id was saved
+        from sqlalchemy import select
+
+        from backend.db.models import Player
+
+        for i in range(2):
+            res = await db_session.execute(select(Player).where(Player.name == f"NewPlayer{i}"))
+            player_record = res.scalar_one()
+            assert player_record.notion_id == f"new_notion_{i}"
 
     async def test_save_notion_sync(self, client: Any, db_session: Any) -> None:
         """Saving with notion_sync source should work."""

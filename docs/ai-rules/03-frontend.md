@@ -1,72 +1,48 @@
 ---
-id: frontend
 title: Pillar 3 - Frontend & Svelte 5 Conventions
 priority: 30
 ---
 
-## 1. Core Architecture & Organization
+## 1. Core Architecture & Svelte 5 Reactivity
 
-- **Tech Stack:** Svelte 5, TypeScript, Vite. Do not use alternative frameworks.
-- **File Limits:** Maintain a 400-line soft limit per file. Extract sub-domains/components when exceeded.
-- **Localization:** Route ALL UI translations through `frontend/src/i18n.ts`. No hardcoded strings.
-- **Component Routing:** Categorize `frontend/src/components/` strictly by responsibility:
-  - `ui/`: Atomic, domain-agnostic elements (Buttons, Badges).
-  - `modals/`: Overlays and dialogs.
-  - `layout/`: Structural containers.
-  - `features/`: Domain-specific logic and complex views.
-- **Logging:** Use `logger.info()`, `warn()`, and `error()` from `src/utils/logger.ts`. NEVER use `console.log()`.
+- **Stack:** STRICTLY Svelte 5, TypeScript, Vite. NEVER use other frameworks.
+- **Runes ONLY:** USE `$state`, `$derived`, `$effect`. NEVER use `let` for reactive state.
+- **Derived State:** USE `$derived.by(() => {...})` for complex logic. NEVER use nested ternaries.
+- **Context Adaptation:** USE `$derived` (e.g., `isEditing = $derived(id !== null)`) to adapt a single component for Create/Edit views.
+- **Component Routing:** Categorize strictly. `ui/` MUST be domain-agnostic (e.g., `variant="danger"`). `features/` MUST be domain-aware (e.g., `player={player}`).
+- **Logging:** ALWAYS use `logger.info()`, `warn()`, and `error()` from `src/utils/logger.ts`. NEVER use `console.log()`.
 
-## 2. Svelte 5 Reactivity & State
+## 2. Layout, CSS Grid & The Rule of 8
 
-- **Runes:** Use `$state`, `$derived`, and `$effect`. Never use `let` for reactive variables.
-- **Complex Derivations:** NEVER use nested ternary operators. For complex conditionals, use `$derived.by(() => { if (x) return y; return z; })`.
-- **Context-Aware Components:** Prefer using `$derived` state (e.g., `isEditing = $derived(parentId !== null)`) to adapt a single component for Create/Edit views instead of duplicating the entire component file.
-- **Global State:** Store global state in `stores.svelte.ts`. Use standard loading states: `-1` (unknown/loading) and `0` (loaded).
+- **Strict Rule of 8:** ALL paddings, margins, gaps, and dimensions MUST use absolute-reference variables (`var(--space-8)`). For non-standard multiples, use `calc(var(--space-8) * X)`. Border widths (`1px`) are the ONLY exception.
+- **The Border Exemption:** Border widths (`1px` or `2px`) are structural lines and are EXEMPT from the Rule of 8.
+- **Svelte CSS Pruning:** Svelte strips "unused" CSS. WHEN styling dynamic content, injected HTML, or standard `<svg>` elements, you MUST wrap the selector in `:global()` (e.g., `.btn-icon :global(svg)`).
+- **Icon Contrast:** ALWAYS apply `filter: brightness(0) invert(1);` to `:global(img)` and `:global(svg)` inside solid primary buttons to ensure contrast against dark backgrounds.
+- **The Flexbox-in-Grid Blowout:** When nesting a `display: flex` container inside a CSS Grid column, flex items default to `min-width: auto` and blow out `minmax()` constraints. ALWAYS apply `min-width: 0` to both the flex container and its flex children.
+- **Ghost Cells for Tabular Grids:** NEVER conditionally omit structural grid cells. If data is null, omit the content but render the empty wrapper `div` cell to prevent trailing elements from sliding into the wrong columns.
+- **Zero Layout Shift:** When toggling a component between an editable state (`<input>`) and a read-only state (`<span>`), the read-only element MUST mimic the exact padding, height, and margins of the input field.
+- **Intrinsic Sizing:** Components MUST NOT have fixed pixel `width` or `height`. Use padding, standard line-heights, and `max-width` to allow containers to wrap their contents naturally.
+- **Flexbox Gap over Margins:** Leaf components (typography, buttons, badges) MUST NOT define their own external margins. Parent layouts must govern spacing exclusively using `display: flex; gap: var(--space-X);`.
 
-## 3. Component API Design
+## 3. UI Design System & Component API
 
-- **Separation of Concerns:** Keep Visual props (`variant`, `size`) strictly separate from Layout props (`fixedWidth`, `align`).
-- **Domain-Agnostic Leaf Nodes:** Components in `ui/` MUST use semantic props (e.g., `variant="info"`). Never use domain terminology (e.g., `variant="gm"`).
-- **Domain-Specific Nodes:** Components in `features/` MUST accept domain data explicitly (e.g., `gmName`, `players`).
-- **Snippets over HTML:** Type snippets using `import type { Snippet } from "svelte"`. When passing dynamic rows to structural components (like `<DataTable>`), use Svelte 5 snippets instead of raw HTML `<tr>` elements to ensure safe DOM rendering.
-- **Native Elements:** ALWAYS use the custom `<Button>` component instead of native `<button>`. Disabled buttons MUST include a `title` attribute for accessibility.
+- **Pure CSS ONLY:** NEVER use Tailwind or utility classes. NEVER use `style="..."`. Wrap dynamic DOM target selectors in `:global()` (e.g., `:global(svg)`).
+- **Semantic Variables:** ALWAYS map colors to semantic variables (e.g., `var(--bg-secondary)`). NEVER hardcode hex codes to guarantee Dark Mode inversion.
+- **Reference Swapping over Mutation:** When exchanging complex nested objects between UI elements, swap the entire object reference. NEVER manually overwrite individual properties, as this silently destroys auxiliary metadata (like tooltips).
+- **Snippets over HTML:** USE `import type { Snippet }` and Svelte snippets instead of raw HTML strings for dynamic rendering.
 
-## 4. Styling & Design System (CRITICAL constraints)
+## 4. Product UX & Signal-to-Noise
 
-- **NO Inline Styles:** Never use `style="..."` attributes. Always use semantic class names and Svelte's scoped `<style>` blocks.
-- **Semantic Variables ONLY:** Never hardcode hex codes or raw palette colors (e.g., `var(--gray-50)`). Always map to semantic variables (e.g., `var(--bg-secondary)`, `var(--text-primary)`) to ensure flawless Dark Mode inversion.
-- **Intents:**
-  - **Solid Intents:** (`--primary-bg`) Use for high-emphasis elements. Always pair with white text.
-  - **Subtle Intents:** (`--primary-bg-subtle`) Use for backgrounds/badges. Pair with tinted text (`--primary-text-subtle`).
-- **Transparent Hovers:** Never use solid colors for hovering over transparent items. Use alpha overlays (`var(--overlay-hover)`, `var(--overlay-destructive)`).
-- **Input Safety:** Text inputs must use the `.input-field` class. Focus states MUST use inset shadows (`box-shadow: inset 0 0 0 1px var(--border-focus)`) to prevent grid/table clipping.
+- **Gestalt Proximity (Wrapper Tooltips):** Do not force standalone icons (`ℹ️`) next to elements if the data relates directly to the element. `<Tooltip>` components MUST accept Svelte Snippets (`children`) to invisibly wrap components, turning the element itself into the hover surface.
+- **Zero-Delay Data Discovery:** NEVER rely on the native HTML `title` attribute for critical data discovery (it has an OS-forced 500ms delay). ALWAYS use custom JS/Svelte popover components.
+- **Contextual Metadata:** Hide administrative metadata (like Notion link indicators) in read-only domain summaries. Expose props (e.g., `showNotionIndicator={false}`) to keep layouts focused on domain output.
+- **Concise Badges:** Keep badge text categorical (`"Antiguo"`). Push verbose supplementary data (`"15 juegos"`) into Wrapper Tooltips.
 
-## 5. CSS Compilation & Scope Overrides
+## 5. State & Data Flow
 
-- **Svelte CSS Pruning:** Svelte automatically strips "unused" CSS. If styling dynamic content, injected HTML, or elements passed via props (like standard `img` or `svg` icons), you MUST wrap the selector in `:global()` (e.g., `.btn-icon :global(svg)`).
-- **Icon Contrast:** Apply `filter: brightness(0) invert(1);` to `:global(img)` and `:global(svg)` inside solid buttons to ensure contrast against dark backgrounds. Do not apply this to text/emojis.
-- **Parent-to-Child Layout:** To pass custom spacing to a child, pass a `class` prop (e.g., `class="compact-title"`) and define `:global(.compact-title)` in the parent's style block. Do not build complex prop-based spacing systems.
-
-## 6. Modals, Overlays & Data Flow
-
-- **Modal Construction:** Use `.modal-overlay`, `var(--modal-backdrop)`, `z-index: 1000`, and `backdrop-filter: blur(2px)`.
-- **Modal Events:** Always apply `onclick={onCancel}` to the overlay and `e.stopPropagation()` to the modal content window. Use standard callback props (`onCancel`, `onConfirm`).
-- **Input Focus:** Use `use:autofocus` on the primary interaction element within a modal.
-- **NO `window.prompt()`:** Completely banned. Always use proper modal dialogs and autocomplete components.
-- **Data Ingestion:** Bulk data entry MUST NEVER write directly to state. Intercept via `/api/player/check-similarity` and pause with a resolution modal if conflicts exist. Inline player additions must use Autocomplete fetching from `/api/player/all`.
-
-## 7. UI Design System & Layout (The Rule of 8)
-
-- **Strict Rule of 8:** All paddings, margins, gaps, and dimensions must use absolute-reference variables (e.g., `var(--space-8)`, `var(--space-16)`). For non-standard multiples, strictly use explicit math: `calc(var(--space-8) * X)`. Never use "magic numbers" in pixels.
-- **Intrinsic Sizing:** Components should not have fixed pixel `width` or `height`. Use padding, standard line-heights, and `max-width` to allow containers to wrap their contents naturally.
-- **The Border Exemption:** Border widths are structural lines and are exempt from the Rule of 8. They must use standard `1px` or `2px` values, never a `--space-*` variable.
-- **Flexbox Gap over Margins:** Leaf components (e.g., typography, buttons, badges) MUST NOT define their own external margins. Parent layouts must govern spacing exclusively using `display: flex; flex-direction: column; gap: var(--space-16);`. `margin-bottom` is reserved solely for spacing between major structural section wrappers.
-- **Pure CSS State Management:** Never use inline JavaScript styles for complex UI states or dynamic colors. Pass primitive boolean props (e.g., `isActive={true}`) from parent to child, and toggle pure CSS classes (e.g., `.node.active`). Use CSS variables to handle internal color shifts.
-- **Shorthand Padding:** Always optimize CSS padding (e.g., use `padding: var(--space-16);` instead of `padding: var(--space-16) var(--space-16);`).
-
-## 8. UI Navigation & State Architecture (Svelte 5)
-
-- **Avoid Flat State for Drill-downs:** Never use flat `$state` variables (e.g., `panelId`, `panelType`) to manage complex, multi-level UI navigation like side panels. This leads to hardcoded "Cancel/Back" logic.
-- **The Navigation Stack Pattern:** Implement side-panel or modal drill-downs using an in-memory stack (array of objects) managed within a pure Svelte 5 `.svelte.ts` module. This allows generic, foolproof `pop()` and `push()` navigation where the UI always knows exactly where to return.
-- **Encapsulate State:** Do not pollute layout components (like `App.svelte`) with business logic or router state. Extract this into singleton classes (e.g., `NavigationManager`) in `.svelte.ts` files.
-- **Svelte 5 Snippets for Routing:** Avoid massive `{#if...} {:else if...}` blocks directly in your main HTML layout. If a component acts as a router rendering different child views, encapsulate that logic inside a `{#snippet panelRouter()}` block and invoke it declaratively with `{@render panelRouter()}` in the DOM.
+- **The Navigation Stack Pattern:** USE an in-memory stack (array in `.svelte.ts`) for multi-level navigation. NEVER use flat variables (`$state(panelId)`), as this leads to hardcoded "Back" logic.
+- **Modals:** USE `.modal-overlay`, `var(--modal-backdrop)`. ALWAYS apply `onclick={onCancel}` to overlay and `e.stopPropagation()` to content.
+- **Input Focus:** ALWAYS use `use:autofocus` on the primary interaction element within a modal or panel.
+- **Banned Browser APIs:** NEVER use `window.prompt()`, `window.alert()`, or `window.confirm()`. ALWAYS use proper custom modal components.
+- **Encapsulate State:** Do not pollute layout components (`App.svelte`) with business logic. Extract complex state into singleton classes in `.svelte.ts` files.
+- **Data Ingestion:** Bulk data entry MUST NEVER write directly to state. Intercept via `/api/player/check-similarity` and present `SyncResolutionModal` if conflicts exist.

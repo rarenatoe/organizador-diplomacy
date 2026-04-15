@@ -18,7 +18,7 @@ from backend.api.routers.snapshots import router as snapshots_router
 from backend.api.routers.sync import router as sync_router
 from backend.config import FRONTEND_DIR
 from backend.db.connection import init_db
-from backend.sync.cache_daemon import daemon_loop
+from backend.sync.notion_sync import daemon_loop
 
 
 @asynccontextmanager

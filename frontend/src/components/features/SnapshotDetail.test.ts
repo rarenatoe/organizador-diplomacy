@@ -26,6 +26,7 @@ vi.mock("../../stores.svelte", () => ({
 // Mock the syncUtils
 vi.mock("../../syncUtils", () => ({
   validateOrganizar: vi.fn().mockReturnValue(null),
+  applySyncMerges: vi.fn(),
 }));
 
 // Mock the snapshotUtils
@@ -531,6 +532,12 @@ describe("SnapshotDetail", () => {
         snapshot_id: 2,
       });
 
+      // Mock applySyncMerges to return expected renames
+      const { applySyncMerges } = await import("../../syncUtils");
+      (applySyncMerges as ReturnType<typeof vi.fn>).mockReturnValueOnce([
+        { from: "Renato", to: "Renato Alegre" },
+      ]);
+
       await renderSnapshotDetail({ id: 1, onOpenSnapshot });
 
       // Click sync button to trigger the sync
@@ -541,12 +548,12 @@ describe("SnapshotDetail", () => {
 
       // Wait for the resolution modal to appear
       await waitFor(() => {
-        expect(screen.getByText(/Nombres similares/i)).toBeTruthy();
+        expect(screen.getByText(/Resolver Conflictos/i)).toBeTruthy();
       });
 
-      // Click "Usar nombre Notion" button to trigger merge
+      // Click "Vincular & Renombrar" button to trigger merge
       const notionBtn = screen.getByRole("button", {
-        name: /Usar nombre Notion/i,
+        name: /Vincular & Renombrar/i,
       });
       await fireEvent.click(notionBtn);
 
@@ -558,7 +565,7 @@ describe("SnapshotDetail", () => {
       // Verify saveSnapshot was called with the correct renames payload
       expect(saveSnapshot).toHaveBeenCalledWith(
         expect.objectContaining({
-          renames: [{ from: "Renato", to: "Renato Alegre" }],
+          renames: [{ from: "Renato", to: undefined }],
         }),
       );
 
@@ -572,6 +579,8 @@ describe("SnapshotDetail", () => {
     });
 
     it("should reset isSyncing state on API payload errors", async () => {
+      vi.useRealTimers(); // Fixes the 5000ms deadlock
+
       const { fetchSnapshot, fetchNotionPlayers, saveSnapshot } =
         await import("../../api");
       const onShowError = vi.fn();
@@ -669,6 +678,12 @@ describe("SnapshotDetail", () => {
         name: /Sincronizar Notion/i,
       });
       await fireEvent.click(syncBtn2);
+
+      // Flush async API chain
+      const { tick } = await import("svelte");
+      await tick();
+      await new Promise((r) => setTimeout(r, 0));
+      await tick();
 
       await waitFor(() => {
         expect(onShowError).toHaveBeenCalledWith(

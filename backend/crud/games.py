@@ -102,13 +102,18 @@ async def save_game_draft(
             table_obj.gm_player_id = gm_pid
         for order, player in enumerate(table.get("jugadores", []), start=1):
             pid = await get_or_create_player(session, player["nombre"])
+            # Extract country data from the new country object structure
+            country_data = player.get("country", {})
+            country_name = country_data.get("name", "") if country_data else ""
+            country_reason = country_data.get("reason") if country_data else None
+
             await add_table_player(
                 session=session,
                 table_id=table_id,
                 player_id=pid,
                 seat_order=order,
-                country=player.get("pais", ""),
-                country_reason=player.get("pais_reason"),
+                country=country_name,
+                country_reason=country_reason,
             )
 
     # 5. Create waiting list
@@ -249,13 +254,18 @@ async def update_game_draft(
             table_obj.gm_player_id = gm_pid
         for order, player in enumerate(table.get("jugadores", []), start=1):
             pid = await get_or_create_player(session, player["nombre"])
+            # Extract country data from the new country object structure
+            country_data = player.get("country", {})
+            country_name = country_data.get("name", "") if country_data else ""
+            country_reason = country_data.get("reason") if country_data else None
+
             await add_table_player(
                 session=session,
                 table_id=table_id,
                 player_id=pid,
                 seat_order=order,
-                country=player.get("pais", ""),
-                country_reason=player.get("pais_reason"),
+                country=country_name,
+                country_reason=country_reason,
             )
 
     # 5. Create waiting list

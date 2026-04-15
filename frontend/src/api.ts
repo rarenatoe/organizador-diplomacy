@@ -13,6 +13,7 @@ import type {
   SaveDraftResponse,
   SaveDraftRequest,
   SimilarName,
+  AutocompletePlayer,
 } from "./types";
 
 // ── Error Handling ────────────────────────────────────────────────────────────
@@ -63,9 +64,12 @@ async function safeFetch<T>(url: string, options?: RequestInit): Promise<T> {
       return { error: messages.join("; ") } as T;
     }
 
-    // Handle FastAPI HTTPException - normalize "detail" to "error"
+    // Handle FastAPI HTTPException
     if (typeof data.detail === "string") {
       return { error: data.detail } as T;
+    } else if (data.detail && typeof data.detail === "object") {
+      // Forward the detail object so the caller can inspect it for collisions
+      return { error: "Conflict", detail: data.detail } as unknown as T;
     }
 
     // Fallback for other errors
@@ -182,43 +186,30 @@ export async function renamePlayer(
 }
 
 export async function lookupPlayerHistory(
-  names: string[],
+  name: string,
+  notionId?: string,
   snapshotId?: number,
 ): Promise<{
-  players: Record<
-    string,
-    {
-      prioridad: number;
-      experiencia: string;
-      juegos_este_ano: number;
-      partidas_deseadas: number;
-      partidas_gm: number;
-      source: string;
-    }
-  >;
+  player: EditPlayerRow & { source: "history" | "notion" | "default" };
 }> {
   return safeFetch<{
-    players: Record<
-      string,
-      {
-        prioridad: number;
-        experiencia: string;
-        juegos_este_ano: number;
-        partidas_deseadas: number;
-        partidas_gm: number;
-        source: string;
-      }
-    >;
+    player: EditPlayerRow & { source: "history" | "notion" | "default" };
   }>("/api/player/lookup", {
     method: "POST",
     // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ names, snapshot_id: snapshotId }),
+    body: JSON.stringify({
+      name,
+      notion_id: notionId,
+      snapshot_id: snapshotId,
+    }),
   });
 }
 
-export async function getAllPlayers(): Promise<{ names: string[] }> {
-  return safeFetch<{ names: string[] }>("/api/player/all");
+export async function getAllPlayers(): Promise<{
+  players: AutocompletePlayer[];
+}> {
+  return safeFetch<{ players: AutocompletePlayer[] }>("/api/player/all");
 }
 
 export async function checkPlayerSimilarity(

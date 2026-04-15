@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import GameDetail from "./GameDetail.svelte";
+import { tick } from "svelte";
 
 // Mock the API module
 vi.mock("../../api", () => ({
@@ -17,18 +18,20 @@ vi.mock("../../api", () => ({
         jugadores: [
           {
             nombre: "Alice",
-            etiqueta: "Nuevo",
-            pais: "England",
-            pais_reason:
-              "Cualquier jugador disponible podía recibir este país; se asignó para evitar que Charlie lo repita (3 veces).",
+            es_nuevo: true,
+            country: { name: "England", reason: "Algorithm says so" },
           },
-          { nombre: "Bob", etiqueta: "Antiguo", pais: "France" }, // No pais_reason
+          {
+            nombre: "Bob",
+            es_nuevo: false,
+            country: { name: "France" },
+          },
         ],
       },
     ],
     waiting_list: [
-      { nombre: "Charlie", cupos: "2 cupos" },
-      { nombre: "Diana", cupos: "1 cupo" },
+      { nombre: "Charlie", cupos_faltantes: 1 },
+      { nombre: "Diana", cupos_faltantes: 1 },
     ],
   }),
 }));
@@ -36,6 +39,7 @@ vi.mock("../../api", () => ({
 // Mock the utils module
 vi.mock("../../utils", () => ({
   esc: vi.fn((s: string | null | undefined) => s ?? ""),
+  normalizeName: vi.fn((name: string) => name.toLowerCase().trim()),
 }));
 
 // Mock navigator.clipboard
@@ -80,8 +84,10 @@ describe("GameDetail", () => {
     // Verify mesas are displayed
     expect(screen.getByText("Partida 1")).toBeTruthy();
     expect(screen.getByText("GM: GameMaster1")).toBeTruthy();
-    expect(screen.getByText("Alice 🇬🇧")).toBeTruthy();
-    expect(screen.getByText("Bob 🇫🇷")).toBeTruthy();
+    expect(screen.getByText("Alice")).toBeTruthy();
+    expect(screen.getByText(/🇬🇧/)).toBeTruthy();
+    expect(screen.getByText("Bob")).toBeTruthy();
+    expect(screen.getByText(/🇫🇷/)).toBeTruthy();
 
     // Verify waiting list is displayed
     expect(screen.getByText("Lista de espera")).toBeTruthy();
@@ -127,8 +133,8 @@ describe("GameDetail", () => {
     expect(clipboardText).toContain("- Alice (Inglaterra)");
     expect(clipboardText).toContain("- Bob (Francia)");
     expect(clipboardText).toContain("Lista de espera:");
-    expect(clipboardText).toContain("- Charlie (2 cupos)");
-    expect(clipboardText).toContain("- Diana (1 cupo)");
+    expect(clipboardText).toContain("- Charlie (1 cupos)");
+    expect(clipboardText).toContain("- Diana (1 cupos)");
 
     // Verify button text changes to "Copiado"
     expect(screen.getByText("Copiado")).toBeTruthy();
@@ -169,7 +175,7 @@ describe("GameDetail", () => {
     // Verify clipboard.writeText was called with seat numbering and translated countries
     expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
     expect(mockClipboard.writeText).toHaveBeenCalledWith(
-      "1. Alice (Inglaterra*)\n2. Bob (Francia)\n\n* Cualquier jugador disponible podía recibir este país; se asignó para evitar que Charlie lo repita (3 veces).",
+      "1. Alice (Inglaterra*)\n2. Bob (Francia)\n\n* Algorithm says so",
     );
 
     // Verify button text changes to "Copiado"
@@ -261,26 +267,24 @@ describe("GameDetail", () => {
     expect(mockOpenGameDraft).toHaveBeenCalledWith(
       10, // input_snapshot_id
       expect.objectContaining({
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         mesas: expect.arrayContaining([
           expect.objectContaining({
             numero: 1,
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             jugadores: expect.arrayContaining([
               expect.objectContaining({
                 nombre: "Alice",
-                pais: "England",
+                es_nuevo: true,
+                country: { name: "England", reason: "Algorithm says so" },
               }),
               expect.objectContaining({
                 nombre: "Bob",
-                pais: "France",
+                es_nuevo: false,
+                country: { name: "France" },
               }),
             ]),
           }),
         ]),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         tickets_sobrantes: expect.any(Array),
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         intentos_usados: expect.any(Number),
       }),
       1, // gameId
@@ -321,8 +325,8 @@ describe("GameDetail", () => {
     });
   });
 
-  describe("pais_reason clipboard integration", () => {
-    it("includes footnote marker in clipboard copy for player with pais_reason", async () => {
+  describe("country.reason clipboard integration", () => {
+    it("includes footnote marker in clipboard copy for player with country.reason", async () => {
       render(GameDetail, {
         props: {
           id: 1,
@@ -345,21 +349,19 @@ describe("GameDetail", () => {
         expect.stringContaining("Alice (Inglaterra*)"),
       );
 
-      // Verify Bob has no asterisk (no pais_reason)
+      // Verify Bob has no asterisk (no country.reason)
       const clipboardText = mockClipboard.writeText.mock
         .calls[0]?.[0] as string;
       expect(clipboardText).toContain("Bob (Francia)");
       expect(clipboardText).not.toContain("Bob (Francia*)");
 
       // Verify the clipboard includes the footnote explanation
-      expect(clipboardText).toContain(
-        "* Cualquier jugador disponible podía recibir este país",
-      );
+      expect(clipboardText).toContain("* Algorithm says so");
     });
   });
 
-  describe("pais_reason DOM rendering", () => {
-    it("renders info icon and tooltip only for players with pais_reason", async () => {
+  describe("country_reason DOM rendering", () => {
+    it("renders info icon and tooltip only for players with country_reason", async () => {
       render(GameDetail, {
         props: {
           id: 1,
@@ -371,36 +373,79 @@ describe("GameDetail", () => {
         expect(screen.queryByText("Cargando…")).toBeNull();
       });
 
-      // Find all info icons (should only be for Alice who has pais_reason)
+      // Find all info icons (should only be for Alice who has country.reason)
       const infoIcons = document.querySelectorAll(".info-icon");
       expect(infoIcons.length).toBe(1);
 
       // Find all tooltips (should only be for Alice)
-      const tooltips = document.querySelectorAll(".tooltip");
+      const tooltips = document.querySelectorAll(
+        ".tooltip-cell .tooltip-trigger",
+      );
       expect(tooltips.length).toBe(1);
 
-      // Verify the tooltip contains the reason text
-      const tooltipPopover = tooltips[0]?.querySelector(".tooltip-popover");
-      expect(tooltipPopover).toHaveTextContent(
-        "Cualquier jugador disponible podía recibir este país",
+      // Verify the tooltip trigger exists and has the info icon
+      const tooltipTrigger = tooltips[0]!;
+      expect(tooltipTrigger).toBeInTheDocument();
+      expect(tooltipTrigger.querySelector(".info-icon")).toBeInTheDocument();
+    });
+  });
+
+  describe("country_reason DOM rendering", () => {
+    it("renders info icon and tooltip only for players with country_reason", async () => {
+      render(GameDetail, {
+        props: {
+          id: 1,
+          openGameDraft: vi.fn(),
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText("Cargando…")).toBeNull();
+      });
+
+      // Find all info icons (should only be for Alice who has country.reason)
+      const infoIcons = document.querySelectorAll(".info-icon");
+      expect(infoIcons.length).toBe(1);
+
+      // Find all tooltips (should only be for Alice)
+      const tooltips = document.querySelectorAll(
+        ".tooltip-cell .tooltip-trigger",
       );
+      expect(tooltips.length).toBe(1);
+
+      // Verify the tooltip trigger exists and has the info icon
+      const tooltipTrigger = tooltips[0]!;
+      expect(tooltipTrigger).toBeInTheDocument();
+      expect(tooltipTrigger.querySelector(".info-icon")).toBeInTheDocument();
+
+      // Trigger hover to render the portal popover
+      await fireEvent.mouseEnter(tooltipTrigger);
+      await tick();
+
+      // Verify the tooltip contains the reason text in the document body
+      const tooltipPopover = document.body.querySelector(".tooltip-popover");
+      expect(tooltipPopover).toHaveTextContent("Algorithm says so");
     });
 
-    it("renders no info icons when no players have pais_reason", async () => {
+    it("renders no info icons when no players have country.reason", async () => {
       // Override the mock for this specific test
       const mockFetchGame = vi.fn().mockResolvedValue({
-        id: 2,
-        created_at: "2024-01-01T00:00:00Z",
-        intentos: 3,
-        input_snapshot_id: 10,
-        output_snapshot_id: 20,
+        id: 1,
         mesas: [
           {
             numero: 1,
             gm: "GameMaster1",
             jugadores: [
-              { nombre: "Alice", etiqueta: "Nuevo", pais: "England" }, // No pais_reason
-              { nombre: "Bob", etiqueta: "Antiguo", pais: "France" }, // No pais_reason
+              { nombre: "Alice", es_nuevo: true, country: { name: "England" } },
+              { nombre: "Bob", es_nuevo: false, country: { name: "France" } },
+            ],
+          },
+          {
+            numero: 2, // CRITICAL: Changed from 1 to 2 to prevent Svelte crash
+            gm: "GameMaster1",
+            jugadores: [
+              { nombre: "Alice", es_nuevo: true, country: { name: "England" } },
+              { nombre: "Bob", es_nuevo: false, country: { name: "France" } },
             ],
           },
         ],

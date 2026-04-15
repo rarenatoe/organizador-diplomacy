@@ -9,8 +9,12 @@ from pydantic import BaseModel
 
 from backend.core.logger import logger
 from backend.db.connection import async_engine
-from backend.sync.cache_daemon import update_notion_cache
-from backend.sync.notion_sync import run_notion_sync_background
+from backend.sync.notion_sync import (
+    build_notion_players_lookup,
+    fetch_notion_data,
+    notion_cache_to_db,
+    run_notion_sync_background,
+)
 
 router = APIRouter()
 
@@ -65,28 +69,17 @@ async def api_notion_force_refresh(
 
 
 async def _run_cache_refresh() -> None:
-    """Helper to run cache refresh with a new session."""
-    import os
-
-    from dotenv import load_dotenv
-    from notion_client import Client
-
-    load_dotenv()
-    token = os.getenv("NOTION_TOKEN")
-    db_id = os.getenv("NOTION_DATABASE_ID")
-    part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
-
-    if not token or not db_id or not part_db_id or token.startswith("secret_XXX"):
-        logger.info("[Cache Refresh] Skipping: Missing Notion credentials")
-        return
-
-    client = Client(auth=token)
-
+    """Helper to run cache refresh using unified pipeline."""
     from sqlalchemy.ext.asyncio.session import AsyncSession
 
     async with AsyncSession(async_engine) as session:
         try:
-            await update_notion_cache(session, client, db_id, part_db_id)
+            # 1. Fetch and parse data from Notion using unified pipeline
+            pages, conteo, _client = await fetch_notion_data()
+            notion_players = build_notion_players_lookup(pages, conteo)
+
+            # 2. Save it to database using unified function
+            await notion_cache_to_db(session, notion_players)
             await session.commit()
             logger.info("[Cache Refresh] Completed successfully")
         except Exception as e:

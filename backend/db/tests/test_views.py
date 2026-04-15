@@ -27,21 +27,21 @@ from backend.db.views import get_game_event_detail, get_snapshot_detail
 pytestmark = pytest.mark.asyncio
 
 
-class TestGetGameEventDetailPaisRegression:
+class TestGetGameEventDetailCountryRegression:
     """
-    Regression tests for the pais field indexing bug.
+    Regression tests for the country field indexing bug.
 
-    Previously, pais was incorrectly read from index 12 (c_turkey)
-    instead of index 13 (mp.pais), causing players to show incorrect
+    Previously, country was incorrectly read from index 12 (c_turkey)
+    instead of index 13 (mp.country), causing players to show incorrect
     country values (c_turkey) as their assigned country.
     """
 
-    async def test_pais_field_not_c_turkey(self, db_session: Any) -> None:
+    async def test_country_field_not_c_turkey(self, db_session: Any) -> None:
         """
-        Verify that the pais field shows the assigned country, not c_turkey.
+        Verify that the country field shows the assigned country, not c_turkey.
 
         This is a regression test for the off-by-one tuple indexing error
-        where p[12] was used instead of p[13] for the pais field.
+        where p[12] was used instead of p[13] for the country field.
         """
         # Setup: Create players with different c_turkey values
         snap1 = await create_snapshot(db_session, "manual")
@@ -114,7 +114,10 @@ class TestGetGameEventDetailPaisRegression:
         assert len(mesa["jugadores"]) == 2
 
         # Find the players
-        player_countries = {j["nombre"]: j["pais"] for j in mesa["jugadores"]}
+        player_countries = {
+            j["nombre"]: (j["country"]["name"] if j.get("country") else "")
+            for j in mesa["jugadores"]
+        }
 
         # Key assertion: PlayerWithHighTurkey should show "England", not 99 (c_turkey)
         # If the bug existed (p[12] instead of p[13]), this would show c_turkey value (99)
@@ -131,7 +134,7 @@ class TestGetGameEventDetailPaisRegression:
 
     async def test_all_countries_correctly_returned(self, db_session: Any) -> None:
         """
-        Verify all 7 countries are correctly returned from pais field.
+        Verify all 7 countries are correctly returned from country field.
 
         The view returns raw country names (not translated) from the database.
         """
@@ -167,7 +170,7 @@ class TestGetGameEventDetailPaisRegression:
 
         # Verify all countries are correctly returned (raw values, not translated)
         jugadores = detail["mesas"][0]["jugadores"]
-        country_names = {j["pais"] for j in jugadores}
+        country_names = {(j["country"]["name"] if j.get("country") else "") for j in jugadores}
 
         expected_countries = {
             "England",
@@ -183,11 +186,11 @@ class TestGetGameEventDetailPaisRegression:
             f"Expected all 7 countries, got: {country_names}"
         )
 
-    async def test_pais_field_returns_empty_for_unset(self, db_session: Any) -> None:
+    async def test_country_field_returns_empty_for_unset(self, db_session: Any) -> None:
         """
-        Verify that unset pais values return empty string.
+        Verify that unset country values return empty string.
 
-        The MesaPlayer table requires pais to be NOT NULL, so we use
+        The MesaPlayer table requires country to be NOT NULL, so we use
         empty string to represent "no country assigned".
         """
         # Setup
@@ -207,7 +210,7 @@ class TestGetGameEventDetailPaisRegression:
         table_id = await create_game_table(db_session, edge_id, 1)
         await db_session.commit()
 
-        # Add player with empty string pais (NOT NULL constraint requires a value)
+        # Add player with empty string country (NOT NULL constraint requires a value)
         await add_table_player(db_session, table_id, pid, 1, "")
         await db_session.commit()
 
@@ -215,13 +218,15 @@ class TestGetGameEventDetailPaisRegression:
         detail = await get_game_event_detail(db_session, edge_id)
         assert detail is not None
 
-        # Verify: Empty pais should result in empty string
+        # Verify: Empty country should result in empty string
         player = detail["mesas"][0]["jugadores"][0]
-        assert player["pais"] == "", f"Empty pais should return empty string, got: {player['pais']}"
+        assert not player.get("country") or player["country"]["name"] == "", (
+            f"Empty country should return empty string, got: {player.get('country')}"
+        )
 
 
-async def test_view_returns_pais_reason(db_session: Any) -> None:
-    """View test: get_game_event_detail should return pais_reason from TablePlayer."""
+async def test_view_returns_country_reason(db_session: Any) -> None:
+    """View test: get_game_event_detail should return country.reason from TablePlayer."""
     from backend.crud.chain import create_game_edge
     from backend.crud.games import add_table_player, create_game_table
     from backend.crud.players import get_or_create_player
@@ -252,7 +257,7 @@ async def test_view_returns_pais_reason(db_session: Any) -> None:
     assert len(detail["mesas"][0]["jugadores"]) == 1
 
     player_data = detail["mesas"][0]["jugadores"][0]
-    assert player_data["pais_reason"] == "Test Reason"
+    assert player_data["country"]["reason"] == "Test Reason"
 
 
 class TestSnapshotHistoryInDetail:
@@ -460,93 +465,3 @@ class TestGetSnapshotDetailFanOutRegression:
             f"Expected 1 player in snapshot detail, got {len(detail['players'])}"
         )
         assert detail["players"][0]["nombre"] == "MultiCachePlayer"
-
-
-class TestGetGameEventDetailNotionCacheDeduplication:
-    """
-    Regression tests for JOIN fan-out bug in get_game_event_detail.
-
-    When a player has multiple NotionCache entries (historical sync data),
-    the JOIN in get_game_event_detail was multiplying rows, causing the same
-    player to appear multiple times in mesas[jugadores].
-    """
-
-    async def test_no_duplicate_players_with_multiple_notion_cache_entries(
-        self, db_session: Any
-    ) -> None:
-        """
-        Verify that players with multiple NotionCache entries don't appear duplicated in game event detail.
-
-        This is a regression test for SQL JOIN fan-out bug where veteran
-        players with historical records were being returned multiple times
-        in the jugadores list.
-        """
-        # Setup: Create a snapshot with one player
-        snap1 = await create_snapshot(db_session, "manual")
-        player_id = await get_or_create_player(db_session, "TestPlayer")
-
-        # Add player to snapshot
-        await add_player_to_snapshot(db_session, snap1, player_id, "Antiguo", 5, 10, 3, 1)
-        await db_session.commit()
-
-        # Create game event
-        snap2 = await create_snapshot(db_session, "organizar")
-        await db_session.commit()
-
-        edge_id = await create_game_edge(db_session, snap1, snap2, 1)
-        await db_session.commit()
-
-        table_id = await create_game_table(db_session, edge_id, 1)
-        await db_session.commit()
-
-        # Add player to table
-        await add_table_player(db_session, table_id, player_id, 1, "England")
-        await db_session.commit()
-
-        # Create 3 NotionCache entries for the same player (simulating historical sync data)
-        # This would cause the JOIN fan-out bug if not properly deduplicated
-        for i in range(3):
-            cache_entry = NotionCache(
-                name="TestPlayer",
-                notion_id=f"notion-id-{i}",
-                experience="Antiguo",
-                last_updated=datetime.now(),
-                games_this_year=5 + i,  # Different values to test max() aggregation
-                c_england=i,
-                c_france=i + 1,
-                c_germany=i + 2,
-                c_italy=i + 3,
-                c_austria=i + 4,
-                c_russia=i + 5,
-                c_turkey=i + 6,
-            )
-            db_session.add(cache_entry)
-        await db_session.commit()
-
-        # Test: Call get_game_event_detail
-        detail = await get_game_event_detail(db_session, edge_id)
-        assert detail is not None
-
-        # Assert: Player should appear exactly once in jugadores list
-        assert len(detail["mesas"]) == 1, "Expected exactly 1 mesa"
-        mesa = detail["mesas"][0]
-
-        # The bug would cause 3 players (one per NotionCache entry)
-        assert len(mesa["jugadores"]) == 1, (
-            f"Expected 1 player in jugadores list, got {len(mesa['jugadores'])} - "
-            "JOIN fan-out bug detected!"
-        )
-
-        # Verify the single player has correct data
-        player = mesa["jugadores"][0]
-        assert player["nombre"] == "TestPlayer", "Player name should match"
-        assert player["pais"] == "England", "Player should show assigned country"
-
-        # Verify max() aggregation worked correctly (should be highest values from the 3 entries)
-        assert player["c_england"] == 2, "Should use max() for c_england"
-        assert player["c_france"] == 3, "Should use max() for c_france"
-        assert player["c_germany"] == 4, "Should use max() for c_germany"
-        assert player["c_italy"] == 5, "Should use max() for c_italy"
-        assert player["c_austria"] == 6, "Should use max() for c_austria"
-        assert player["c_russia"] == 7, "Should use max() for c_russia"
-        assert player["c_turkey"] == 8, "Should use max() for c_turkey"

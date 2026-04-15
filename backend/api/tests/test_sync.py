@@ -7,7 +7,7 @@ Tests the sync daemon and Notion cache functionality.
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
@@ -158,7 +158,7 @@ class TestApiNotionPlayers:
         # Should detect "Renato" as similar to "Renato Alegre"
         assert len(data["similar_names"]) > 0
         assert any(
-            match["notion"] == "Renato Alegre" and match["snapshot"] == "Renato"
+            match["notion_name"] == "Renato Alegre" and match["snapshot"] == "Renato"
             for match in data["similar_names"]
         )
 
@@ -173,10 +173,16 @@ class TestApiNotionForceRefresh:
         db_session: Any,  # noqa: ARG002
     ) -> None:
         """Force refresh should trigger an immediate cache update."""
-        with patch(
-            "backend.api.routers.sync.update_notion_cache",
-            new_callable=AsyncMock,
-        ) as mock_update:
+        with (
+            patch(
+                "backend.api.routers.sync.notion_cache_to_db", new_callable=AsyncMock
+            ) as mock_update,
+            patch(
+                "backend.api.routers.sync.fetch_notion_data",
+                new_callable=AsyncMock,
+                return_value=([], {}, MagicMock()),
+            ),
+        ):
             resp = await client.post("/api/notion/force_refresh")
             assert resp.status_code == 200
             mock_update.assert_called_once()
@@ -187,9 +193,14 @@ class TestApiNotionForceRefresh:
         db_session: Any,  # noqa: ARG002
     ) -> None:
         """Force refresh should return a success message."""
-        with patch(
-            "backend.api.routers.sync.update_notion_cache",
-            new_callable=AsyncMock,
+
+        with (
+            patch("backend.api.routers.sync.notion_cache_to_db", new_callable=AsyncMock),
+            patch(
+                "backend.api.routers.sync.fetch_notion_data",
+                new_callable=AsyncMock,
+                return_value=([], {}, MagicMock()),
+            ),
         ):
             resp = await client.post("/api/notion/force_refresh")
             assert resp.status_code == 200
@@ -216,7 +227,6 @@ class TestNotionSyncBackground:
         - Outdated Event imports
         - Spanish/English JSON key mismatches (participaciones vs games_this_year)
         """
-        from unittest.mock import MagicMock
 
         from backend.sync.notion_sync import run_notion_sync_background
 
@@ -265,7 +275,7 @@ class TestNotionSyncBackground:
         # Patch both _fetch_notion_data and async_engine to use test engine
         with (
             patch(
-                "backend.sync.notion_sync._fetch_notion_data",
+                "backend.sync.notion_sync.fetch_notion_data",
                 return_value=(mock_pages, mock_conteo, mock_client),
                 new_callable=AsyncMock,
             ),
@@ -317,7 +327,6 @@ class TestNotionSyncBackground:
         the player in the database, preserving continuity.
         Previously, the player was treated as new, breaking game history.
         """
-        from unittest.mock import MagicMock
 
         from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -361,7 +370,7 @@ class TestNotionSyncBackground:
         # Step 3: Run sync with merges payload renaming AliceOld -> AliceNew
         with (
             patch(
-                "backend.sync.notion_sync._fetch_notion_data",
+                "backend.sync.notion_sync.fetch_notion_data",
                 return_value=(mock_pages, mock_conteo, mock_client),
                 new_callable=AsyncMock,
             ),
@@ -409,7 +418,6 @@ class TestNotionSyncBackground:
         Regression test: When syncing with Notion updates a snapshot in-place,
         the previous roster should be logged to SnapshotHistory.
         """
-        from unittest.mock import MagicMock
 
         from sqlalchemy import select
         from sqlalchemy.ext.asyncio import AsyncSession
@@ -484,7 +492,7 @@ class TestNotionSyncBackground:
         # Step 4: Run sync (should update in-place and log history)
         with (
             patch(
-                "backend.sync.notion_sync._fetch_notion_data",
+                "backend.sync.notion_sync.fetch_notion_data",
                 return_value=(mock_pages, mock_conteo, mock_client),
                 new_callable=AsyncMock,
             ),

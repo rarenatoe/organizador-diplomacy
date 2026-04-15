@@ -81,6 +81,9 @@ export default defineConfig([
   {
     files: ["frontend/src/**/*.test.ts", "frontend/test-setup.ts"],
     ...vitest.configs.recommended,
+    rules: {
+      "@typescript-eslint/no-unsafe-assignment": "off",
+    },
   },
   // Svelte files configuration with proper TypeScript support
   ...svelte.configs["flat/recommended"].map((config) => ({
@@ -95,10 +98,13 @@ export default defineConfig([
     languageOptions: {
       parserOptions: {
         parser: tseslint.parser,
+        extraFileExtensions: [".svelte"],
       },
     },
     rules: {
       "dot-notation": "error",
+      // Enable basic TypeScript checking for Svelte files (but disable rules that require type information)
+      "@typescript-eslint/no-explicit-any": "error",
       // Disable TypeScript rules that require type information for Svelte files
       "@typescript-eslint/no-floating-promises": "off",
       "@typescript-eslint/restrict-template-expressions": "off",

@@ -6,9 +6,9 @@ extracted from the monolithic crud.py file for better organization.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, func, select, update
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,14 +25,38 @@ from backend.db.models import (
 )
 
 
-async def get_or_create_player(session: AsyncSession, name: str) -> int:
-    """Returns the player id, inserting a new row if the name is unknown."""
+def normalize_player_name(name: str) -> str:
+    """
+    Normalize player name by stripping whitespace, collapsing internal spaces,
+    and converting to Title Case.
+
+    Args:
+        name: Raw player name
+
+    Returns:
+        Normalized player name
+    """
+    # Strip leading/trailing whitespace
+    name = name.strip()
+    # Collapse multiple internal spaces into single space
+    name = " ".join(name.split())
+    # Convert to Title Case
+    return name.title()
+
+
+async def get_or_create_player(
+    session: AsyncSession, name: str, notion_id: str | None = None
+) -> int:
     result = await session.execute(select(Player).where(Player.name == name))
     player = result.scalar_one_or_none()
+
     if player:
+        if notion_id and player.notion_id != notion_id:
+            player.notion_id = notion_id
+            await session.flush()
         return player.id
 
-    new_player: Player = Player(name=name)
+    new_player = Player(name=name, notion_id=notion_id)
     session.add(new_player)
     await session.flush()
     return new_player.id
@@ -107,6 +131,12 @@ async def rename_player(session: AsyncSession, old_name: str, new_name: str) -> 
             update(WaitingList).where(WaitingList.player_id == old_id).values(player_id=new_id)
         )
 
+        # Transfer Notion ID if the old player had one and the new player doesn't
+        if old_player.notion_id and not new_player.notion_id:
+            await session.execute(
+                update(Player).where(Player.id == new_id).values(notion_id=old_player.notion_id)
+            )
+
         # Check if old player is orphaned
         result = await session.execute(
             select(SnapshotPlayer).where(SnapshotPlayer.player_id == old_id).limit(1)
@@ -140,19 +170,21 @@ async def rename_player(session: AsyncSession, old_name: str, new_name: str) -> 
 
 async def lookup_player_history(
     session: AsyncSession,
-    names: list[str],
+    name: str,
+    notion_id: str | None = None,
     snapshot_id: int | None = None,
-) -> dict[str, dict[str, int | str]]:
+) -> dict[str, Any]:
     """
     Walk backward through timeline to find player's historical stats.
 
     Args:
         session: Database session
-        names: List of player names to lookup
+        name: Player name to lookup
+        notion_id: Optional notion_id to prioritize lookup
         snapshot_id: Starting snapshot ID (uses latest if None)
 
     Returns:
-        Dictionary mapping player names to their stats and source flag
+        Dictionary mapping player name to their stats and source flag
     """
     # Get starting snapshot ID if not provided
     if snapshot_id is None:
@@ -160,124 +192,137 @@ async def lookup_player_history(
 
         snapshot_id = await get_latest_snapshot_id(session)
 
-    result: dict[str, dict[str, int | str]] = {}
+    # Walk backward through timeline
+    current_snapshot_id = snapshot_id
+    found_in_history = False
+    player = None  # Initialize player variable
 
-    for name in names:
-        # Walk backward through timeline
-        current_snapshot_id = snapshot_id
-        found_in_history = False
-        player = None  # Initialize player variable
+    # Normalize name for database lookups to prevent trailing whitespace/casing misses
+    norm_name = normalize_player_name(name)
 
-        while current_snapshot_id is not None and not found_in_history:
-            # Check if player exists in current snapshot
-            player_result = await session.execute(select(Player).where(Player.name == name))
-            player = player_result.scalar_one_or_none()
+    # Check if player exists and grab notion info (outside loop)
+    player_result = await session.execute(select(Player).where(Player.name == norm_name))
+    player = player_result.scalar_one_or_none()
+    notion_info = {}
 
-            if player:
-                # Check if player is linked to this snapshot
-                snapshot_player_result = await session.execute(
-                    select(SnapshotPlayer).where(
-                        SnapshotPlayer.snapshot_id == current_snapshot_id,
-                        SnapshotPlayer.player_id == player.id,
-                    )
+    # Prioritize provided notion_id (Crucial for "Vincular Solo" CSV imports)
+    if notion_id:
+        nc_res = await session.execute(
+            select(NotionCache).where(NotionCache.notion_id == notion_id)
+        )
+        nc = nc_res.scalar_one_or_none()
+        if nc:
+            notion_info = {"notion_id": nc.notion_id, "notion_name": nc.name}
+    elif player and player.notion_id:
+        nc_res = await session.execute(
+            select(NotionCache).where(NotionCache.notion_id == player.notion_id)
+        )
+        nc = nc_res.scalar_one_or_none()
+        if nc:
+            notion_info = {"notion_id": player.notion_id, "notion_name": nc.name}
+    else:
+        nc_res = await session.execute(
+            select(NotionCache).where(func.lower(NotionCache.name) == name.lower())
+        )
+        nc = nc_res.scalar_one_or_none()
+        if nc:
+            notion_info = {"notion_id": nc.notion_id, "notion_name": nc.name}
+
+    while current_snapshot_id is not None and not found_in_history:
+        if player:
+            # Check if player is linked to this snapshot
+            snapshot_player_result = await session.execute(
+                select(SnapshotPlayer).where(
+                    SnapshotPlayer.snapshot_id == current_snapshot_id,
+                    SnapshotPlayer.player_id == player.id,
                 )
-                snapshot_player = snapshot_player_result.scalar_one_or_none()
-
-                if snapshot_player:
-                    # Found player in history
-                    result[name] = {
-                        "prioridad": snapshot_player.priority,
-                        "experiencia": snapshot_player.experience,
-                        "juegos_este_ano": snapshot_player.games_this_year,
-                        "partidas_deseadas": snapshot_player.desired_games,
-                        "partidas_gm": snapshot_player.gm_games,
-                        "source": "history",
-                    }
-                    found_in_history = True
-                    break
-
-            # Move to previous snapshot via timeline edge
-            edge_result = await session.execute(
-                select(TimelineEdge).where(TimelineEdge.output_snapshot_id == current_snapshot_id)
             )
-            edge = edge_result.scalar_one_or_none()
-            current_snapshot_id = edge.source_snapshot_id if edge else None
+            snapshot_player = snapshot_player_result.scalar_one_or_none()
 
-        # Fallback 1: Global Search against SnapshotPlayer table
-        if not found_in_history and player:
-            global_search_result = await session.execute(
-                select(SnapshotPlayer)
-                .where(SnapshotPlayer.player_id == player.id)
-                .order_by(SnapshotPlayer.snapshot_id.desc())
-                .limit(1)
-            )
-            global_snapshot_player = global_search_result.scalar_one_or_none()
-
-            if global_snapshot_player:
-                # Found in global search
-                result[name] = {
-                    "prioridad": global_snapshot_player.priority,
-                    "experiencia": global_snapshot_player.experience,
-                    "juegos_este_ano": global_snapshot_player.games_this_year,
-                    "partidas_deseadas": global_snapshot_player.desired_games,
-                    "partidas_gm": global_snapshot_player.gm_games,
+            if snapshot_player:
+                # Found player in history
+                return {
+                    "prioridad": snapshot_player.priority,
+                    "experiencia": snapshot_player.experience,
+                    "juegos_este_ano": snapshot_player.games_this_year,
+                    "partidas_deseadas": snapshot_player.desired_games,
+                    "partidas_gm": snapshot_player.gm_games,
                     "source": "history",
-                }
-                found_in_history = True
-
-        # Fallback 2: JSON Logs Search in SnapshotHistory
-        if not found_in_history:
-            history_logs_result = await session.execute(
-                select(SnapshotHistory).order_by(SnapshotHistory.id.desc()).limit(50)
-            )
-            history_logs = history_logs_result.scalars().all()
-
-            for history_log in history_logs:
-                if history_log.previous_state and "players" in history_log.previous_state:
-                    players_in_log = history_log.previous_state["players"]
-                    for logged_player in players_in_log:
-                        if logged_player.get("nombre") == name:
-                            # Found in JSON logs - TypedDict provides type safety
-                            player_data: dict[str, int | str] = {
-                                "prioridad": logged_player.get("prioridad", 0),
-                                "experiencia": logged_player.get("experiencia", "Nuevo"),
-                                "juegos_este_ano": logged_player.get("juegos_este_ano", 0),
-                                "partidas_deseadas": logged_player.get("partidas_deseadas", 1),
-                                "partidas_gm": logged_player.get("partidas_gm", 0),
-                                "source": "history",
-                            }
-                            result[name] = player_data
-                            found_in_history = True
-                            break
-                if found_in_history:
-                    break
-
-        if not found_in_history:
-            # Check Notion cache as fallback
-            notion_result = await session.execute(
-                select(NotionCache).where(NotionCache.name == name)
-            )
-            notion_player = notion_result.scalar_one_or_none()
-
-            if notion_player:
-                # Found in Notion cache, force priority to 0
-                result[name] = {
-                    "prioridad": 0,
-                    "experiencia": notion_player.experience,
-                    "juegos_este_ano": notion_player.games_this_year,
-                    "partidas_deseadas": 1,
-                    "partidas_gm": 0,
-                    "source": "notion",
-                }
-            else:
-                # Not found anywhere, return defaults
-                result[name] = {
-                    "prioridad": 0,
-                    "experiencia": "Nuevo",
-                    "juegos_este_ano": 0,
-                    "partidas_deseadas": 1,
-                    "partidas_gm": 0,
-                    "source": "default",
+                    **notion_info,
                 }
 
-    return result
+        # Move to previous snapshot via timeline edge
+        edge_result = await session.execute(
+            select(TimelineEdge).where(TimelineEdge.output_snapshot_id == current_snapshot_id)
+        )
+        edge = edge_result.scalar_one_or_none()
+        current_snapshot_id = edge.source_snapshot_id if edge else None
+
+    # Fallback 1: Global Search against SnapshotPlayer table
+    if not found_in_history and player:
+        global_search_result = await session.execute(
+            select(SnapshotPlayer)
+            .where(SnapshotPlayer.player_id == player.id)
+            .order_by(SnapshotPlayer.snapshot_id.desc())
+            .limit(1)
+        )
+        global_snapshot_player = global_search_result.scalar_one_or_none()
+
+        if global_snapshot_player:
+            # Found in global search
+            return {
+                "prioridad": global_snapshot_player.priority,
+                "experiencia": global_snapshot_player.experience,
+                "juegos_este_ano": global_snapshot_player.games_this_year,
+                "partidas_deseadas": global_snapshot_player.desired_games,
+                "partidas_gm": global_snapshot_player.gm_games,
+                "source": "history",
+                **notion_info,
+            }
+
+    # Fallback 2: JSON Logs Search in SnapshotHistory
+    history_logs_result = await session.execute(
+        select(SnapshotHistory).order_by(SnapshotHistory.id.desc()).limit(50)
+    )
+    history_logs = history_logs_result.scalars().all()
+
+    for history_log in history_logs:
+        if history_log.previous_state and "players" in history_log.previous_state:
+            players_in_log = history_log.previous_state["players"]
+            for logged_player in players_in_log:
+                if logged_player.get("nombre") == name:
+                    # Found in JSON logs - TypedDict provides type safety
+                    return {
+                        "prioridad": logged_player.get("prioridad", 0),
+                        "experiencia": logged_player.get("experiencia", "Nuevo"),
+                        "juegos_este_ano": logged_player.get("juegos_este_ano", 0),
+                        "partidas_deseadas": logged_player.get("partidas_deseadas", 1),
+                        "partidas_gm": logged_player.get("partidas_gm", 0),
+                        "source": "history",
+                        **notion_info,
+                    }
+
+    # Fallback 3: Check Notion cache as fallback
+    # We already fetched the NotionCache record ('nc') at the top of the function!
+    if nc:
+        # Found in Notion cache, force priority to 0
+        return {
+            "prioridad": 0,
+            "experiencia": nc.experience,
+            "juegos_este_ano": nc.games_this_year,
+            "partidas_deseadas": 1,
+            "partidas_gm": 0,
+            "source": "notion",
+            **notion_info,
+        }
+    else:
+        # Not found anywhere, return defaults
+        return {
+            "prioridad": 0,
+            "experiencia": "Nuevo",
+            "juegos_este_ano": 0,
+            "partidas_deseadas": 1,
+            "partidas_gm": 0,
+            "source": "default",
+            **notion_info,
+        }

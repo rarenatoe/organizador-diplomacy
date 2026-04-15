@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING, Any
 
-from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, HTTPException
-from notion_client import Client
 from pydantic import BaseModel
 from sqlalchemy import delete, select, update
 
@@ -33,10 +30,12 @@ from backend.db.models import (
     SnapshotPlayer,
 )
 from backend.db.views import get_snapshot_detail
-from backend.sync.cache_daemon import update_notion_cache
 from backend.sync.notion_sync import (
+    build_notion_players_lookup,
     detect_similar_names,
+    fetch_notion_data,
     normalize_name,
+    notion_cache_to_db,
 )
 
 
@@ -49,7 +48,7 @@ async def _insert_snapshot_players(
     for player in players:
         if not player.nombre:
             continue
-        player_id = await get_or_create_player(session, player.nombre)
+        player_id = await get_or_create_player(session, player.nombre, player.notion_id)
         await add_player_to_snapshot(
             session,
             snapshot_id,
@@ -67,6 +66,8 @@ router = APIRouter(prefix="/api/snapshot")
 
 class PlayerCreate(BaseModel):
     nombre: str
+    notion_id: str | None = None
+    notion_name: str | None = None
     experiencia: str = "Nuevo"
     juegos_este_ano: int = 0
     prioridad: int = 0
@@ -93,6 +94,8 @@ class NotionFetchRequest(BaseModel):
 
 class AddPlayerRequest(BaseModel):
     nombre: str
+    notion_id: str | None = None
+    notion_name: str | None = None
     experiencia: str = "Nuevo"
     juegos_este_ano: int = 0
     prioridad: int = 0
@@ -136,7 +139,6 @@ async def api_create_snapshot_root(
     Returns: {"snapshot_id": <new_id>}
     """
     from backend.crud.chain import create_branch_edge
-    from backend.crud.players import get_or_create_player
     from backend.crud.snapshots import create_snapshot
 
     try:
@@ -151,21 +153,8 @@ async def api_create_snapshot_root(
         # Create new snapshot
         snap_id = await create_snapshot(session, request.source)
 
-        # Add players
-        for player in request.players:
-            if not player.nombre:
-                continue
-            player_id = await get_or_create_player(session, player.nombre)
-            await add_player_to_snapshot(
-                session,
-                snap_id,
-                player_id,
-                player.experiencia,
-                player.juegos_este_ano,
-                player.prioridad,
-                player.partidas_deseadas,
-                player.partidas_gm,
-            )
+        # Add players using DRY helper
+        await _insert_snapshot_players(session, snap_id, request.players)
 
         # Create event linking to parent if provided
         if parent_id is not None:
@@ -248,6 +237,7 @@ async def api_create_snapshot(
         players_data = [
             {
                 "nombre": p.nombre,
+                "notion_id": p.notion_id,
                 "experiencia": p.experiencia,
                 "juegos_este_ano": p.juegos_este_ano,
                 "prioridad": p.prioridad,
@@ -290,21 +280,8 @@ async def api_snapshot_save_by_id(
             delete(SnapshotPlayer).where(SnapshotPlayer.snapshot_id == snapshot_id)
         )
 
-        # Add new players
-        for player in request.players:
-            if not player.nombre:
-                continue
-            player_id = await get_or_create_player(session, player.nombre)
-            await add_player_to_snapshot(
-                session,
-                snapshot_id,
-                player_id,
-                player.experiencia,
-                player.juegos_este_ano,
-                player.prioridad,
-                player.partidas_deseadas,
-                player.partidas_gm,
-            )
+        # Add players using DRY helper
+        await _insert_snapshot_players(session, snapshot_id, request.players)
 
         await session.commit()
         return {"snapshot_id": snapshot_id}
@@ -325,7 +302,6 @@ async def api_snapshot_save(
     Returns: {"snapshot_id": <new_id>}
     """
     from backend.crud.chain import create_branch_edge
-    from backend.crud.players import get_or_create_player
     from backend.crud.snapshots import create_snapshot
 
     try:
@@ -443,21 +419,8 @@ async def api_snapshot_save(
         source = "notion_sync" if event_type == "sync" else "manual"
         snap_id = await create_snapshot(session, source)
 
-        # Add players with defaults for missing fields
-        for player in request.players:
-            if not player.nombre:
-                continue
-            player_id = await get_or_create_player(session, player.nombre)
-            await add_player_to_snapshot(
-                session,
-                snap_id,
-                player_id,
-                player.experiencia,
-                player.juegos_este_ano,
-                player.prioridad,
-                player.partidas_deseadas,
-                player.partidas_gm,
-            )
+        # Add players using DRY helper
+        await _insert_snapshot_players(session, snap_id, request.players)
 
         # Create event linking parent to new snapshot if parent provided
         if parent_id is not None:
@@ -488,7 +451,7 @@ async def api_add_player(
         if not request.nombre:
             raise HTTPException(status_code=400, detail="nombre is required")
 
-        player_id = await get_or_create_player(session, request.nombre)
+        player_id = await get_or_create_player(session, request.nombre, request.notion_id)
 
         # Check if player already exists in this snapshot
         existing = await session.execute(
@@ -546,6 +509,7 @@ async def api_notion_fetch(
         for r in rows:
             players.append(
                 {
+                    "notion_id": r.notion_id,
                     "nombre": r.name,
                     "experiencia": r.experience,
                     "juegos_este_ano": r.games_this_year,
@@ -588,20 +552,14 @@ async def api_notion_force_refresh(
     Manually triggers a Notion cache update synchronously.
     Returns: {"success": true, "message": "..."}
     """
-    load_dotenv()
-    token = os.getenv("NOTION_TOKEN")
-    db_id = os.getenv("NOTION_DATABASE_ID")
-    part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
-
-    if not token or not db_id or not part_db_id:
-        raise HTTPException(status_code=500, detail="Notion credentials not configured")
-    if token.startswith("secret_XXX"):
-        raise HTTPException(status_code=500, detail="Notion token is a placeholder value")
-
-    client = Client(auth=token)
     try:
-        await update_notion_cache(session, client, db_id, part_db_id)
+        # Use the unified sync pipeline
+        pages, conteo, _client = await fetch_notion_data()
+        notion_players = build_notion_players_lookup(pages, conteo)
+
+        await notion_cache_to_db(session, notion_players)
         await session.commit()
+
         return {"success": True, "message": "Cache updated successfully"}
     except Exception as exc:
         await session.rollback()

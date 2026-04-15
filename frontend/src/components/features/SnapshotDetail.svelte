@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SvelteSet } from "svelte/reactivity";
   import type {
     SnapshotDetail,
     EditPlayerRow,
@@ -7,24 +8,23 @@
     NotionPlayer,
     OrganizarValidation,
   } from "../../types";
-  import {
-    fetchSnapshot,
-    renamePlayer,
-    fetchNotionPlayers,
-    saveSnapshot,
-  } from "../../api";
+  import { fetchSnapshot, fetchNotionPlayers, saveSnapshot } from "../../api";
   import { setActiveNodeId } from "../../stores.svelte";
-  import { validateOrganizar } from "../../syncUtils";
+  import { validateOrganizar, applySyncMerges } from "../../syncUtils";
   import { normalizeName } from "../../utils";
-  import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
   import OrganizarConfirmModal from "../modals/OrganizarConfirmModal.svelte";
   import Button from "../ui/Button.svelte";
   import PanelLayout from "../layout/PanelLayout.svelte";
   import Badge from "../ui/Badge.svelte";
   import DataTable, { type ColumnDef } from "../layout/DataTable.svelte";
   import SectionTitle from "../ui/SectionTitle.svelte";
+  import PlayerName from "../ui/PlayerName.svelte";
   import SnapshotHistory from "./SnapshotHistory.svelte";
   import { logger } from "../../utils/logger";
+  import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
+  import Tooltip from "../ui/Tooltip.svelte";
+
+  let resolutionModal: ReturnType<typeof SyncResolutionModal>;
 
   interface Props {
     id: number;
@@ -97,6 +97,8 @@
       prioridad: p.prioridad ?? 0,
       partidas_deseadas: p.partidas_deseadas ?? 1,
       partidas_gm: p.partidas_gm ?? 0,
+      notion_id: p.notion_id ?? null,
+      notion_name: p.notion_name ?? null,
     }));
   });
 
@@ -146,8 +148,9 @@
   async function handleDirectSync(): Promise<void> {
     ui.isSyncing = true;
     try {
-      const currentNames = (data?.players ?? []).map((p) => p.nombre);
-      const response = await fetchNotionPlayers(currentNames);
+      const unlinkedNames =
+        data?.players?.filter((p) => !p.notion_id).map((p) => p.nombre) || [];
+      const response = await fetchNotionPlayers(unlinkedNames);
 
       if (response.error) {
         onShowError(
@@ -174,56 +177,52 @@
     }
   }
 
+  async function handleResolutionComplete(merges: MergePair[]): Promise<void> {
+    try {
+      // 1. Process collision merges first via rename endpoint
+      const collisionMerges = merges.filter((m) => m.action === "merge_local");
+      for (const merge of collisionMerges) {
+        const { renamePlayer } = await import("../../api");
+        const res = await renamePlayer(merge.from, merge.to);
+        if (res.error) {
+          onShowError("Error al fusionar", res.error);
+          return;
+        }
+      }
+
+      // 3. Execute sync merge for all actions to update the DB and reload
+      await executeSyncMerge(merges);
+    } catch (e) {
+      onShowError("Error al procesar resolución", String(e));
+    }
+
+    // Reset visibility state at the end
+    ui.resolutionVisible = false;
+    if ("isSyncing" in ui) ui.isSyncing = false; // Only needed in Detail, safe for Draft
+  }
+
   async function executeSyncMerge(merges: MergePair[]): Promise<void> {
     const mergeMap = new Map(merges.map((m) => [m.from, m]));
     const currentRows = data?.players ?? [];
 
     // Extract renames payload for the backend diff algorithm
+    const renameActions = ["link_rename", "merge_local", "use_existing"];
     const renamesPayload = merges
-      .filter((m) => m.action === "merge_notion")
+      .filter((m) => renameActions.includes(m.action))
       .map((m) => ({ from: m.from, to: m.to }));
 
-    // Update existing players with Notion data (Strict Roster Rule: only update existing)
-    const mergedPlayers = currentRows.map((row) => {
-      const currentName = row.nombre;
-      const mergeInfo = mergeMap.get(currentName);
-      const notionName = mergeInfo ? mergeInfo.to : currentName;
-      const normName = normalizeName(notionName);
-
-      const notionPlayer = fetchedNotionPlayers.find(
-        (p) =>
-          normalizeName(p.nombre) === normName ||
-          p.alias?.some((a: string) => normalizeName(a) === normName),
-      );
-
-      if (notionPlayer) {
-        return {
-          nombre:
-            mergeInfo?.action === "merge_notion"
-              ? notionPlayer.nombre
-              : currentName,
-          experiencia: notionPlayer.experiencia,
-          juegos_este_ano: notionPlayer.juegos_este_ano,
-          prioridad: row.prioridad,
-          partidas_deseadas: row.partidas_deseadas,
-          partidas_gm: row.partidas_gm,
-        };
-      }
-      return {
-        nombre: currentName,
-        experiencia: row.experiencia ?? "Nuevo",
-        juegos_este_ano: row.juegos_este_ano ?? 0,
-        prioridad: row.prioridad,
-        partidas_deseadas: row.partidas_deseadas,
-        partidas_gm: row.partidas_gm,
-      };
-    });
+    const deduplicatedPlayers = applySyncMerges(
+      data?.players || [],
+      merges,
+      fetchedNotionPlayers,
+    );
+    if (data) data.players = deduplicatedPlayers;
 
     try {
       const result = await saveSnapshot({
         parent_id: id,
         event_type: "sync",
-        players: mergedPlayers,
+        players: deduplicatedPlayers,
         renames: renamesPayload,
       });
 
@@ -258,10 +257,6 @@
       fetchedNotionPlayers = [];
       ui.isSyncing = false;
     }
-  }
-
-  function handleResolutionComplete(merges: MergePair[]): void {
-    void executeSyncMerge(merges);
   }
 
   function handleResolutionCancel(): void {
@@ -311,8 +306,8 @@
     {/snippet}
 
     {#snippet body()}
-      {#snippet nameCell(row: EditPlayerRow, index: number)}
-        <span class="text-strong">{row.nombre}</span>
+      {#snippet nameCell(row: EditPlayerRow)}
+        <PlayerName player={row} editable={false} showNotionIndicator={true} />
       {/snippet}
 
       {#snippet expCell(row: EditPlayerRow, index: number)}
@@ -372,6 +367,7 @@
 {/if}
 
 <SyncResolutionModal
+  bind:this={resolutionModal}
   visible={ui.resolutionVisible}
   pairs={resolutionPairs}
   onComplete={handleResolutionComplete}

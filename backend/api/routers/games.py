@@ -142,8 +142,8 @@ async def api_game_draft(
         waitlist_counts = Counter(p.name for p in resultado.waitlist_players)
         unique_waitlist = list({p.name: p for p in resultado.waitlist_players}.values())
 
-        # Convert English DraftResult back to Spanish JSON for frontend
-        spanish_result = {
+        # Convert DraftResult to JSON for frontend with country object structure
+        result = {
             "mesas": [
                 {
                     "numero": table.table_number,
@@ -161,8 +161,9 @@ async def api_game_draft(
                         "c_austria": table.gm.c_austria,
                         "c_russia": table.gm.c_russia,
                         "c_turkey": table.gm.c_turkey,
-                        "pais": table.gm.country,
-                        "pais_reason": table.gm.country_reason,
+                        "country": {"name": table.gm.country, "reason": table.gm.country_reason}
+                        if table.gm.country
+                        else None,
                         "es_nuevo": table.gm.is_new,
                         "tiene_prioridad": table.gm.has_priority,
                     }
@@ -183,8 +184,9 @@ async def api_game_draft(
                             "c_austria": player.c_austria,
                             "c_russia": player.c_russia,
                             "c_turkey": player.c_turkey,
-                            "pais": player.country,
-                            "pais_reason": player.country_reason,
+                            "country": {"name": player.country, "reason": player.country_reason}
+                            if player.country
+                            else None,
                             "es_nuevo": player.is_new,
                             "tiene_prioridad": player.has_priority,
                         }
@@ -208,8 +210,9 @@ async def api_game_draft(
                     "c_austria": player.c_austria,
                     "c_russia": player.c_russia,
                     "c_turkey": player.c_turkey,
-                    "pais": player.country,
-                    "pais_reason": player.country_reason,
+                    "country": {"name": player.country, "reason": player.country_reason}
+                    if player.country
+                    else None,
                     "es_nuevo": player.is_new,
                     "tiene_prioridad": player.has_priority,
                     "cupos_faltantes": waitlist_counts[player.name],
@@ -220,7 +223,7 @@ async def api_game_draft(
             "intentos_usados": resultado.attempts_used,
         }
 
-        return spanish_result
+        return result
     except HTTPException:
         raise
     except AttributeError as exc:

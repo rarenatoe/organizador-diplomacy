@@ -647,4 +647,173 @@ describe("GameDraft.svelte", () => {
       expect(badge).toHaveClass("success");
     });
   });
+
+  it("renders tabular grid layout with separated select and tooltip cells to prevent layout shift", async () => {
+    const { tick } = await import("svelte");
+    const api = await import("../../api");
+
+    // Add a reason to first player so tooltip renders
+    const modifiedDraft = JSON.parse(
+      JSON.stringify(mockDraftData),
+    ) as typeof mockDraftData;
+    if (modifiedDraft.mesas[0]?.jugadores[0]) {
+      modifiedDraft.mesas[0].jugadores[0].country = {
+        name: "France",
+        reason: "Test Reason",
+      };
+    }
+
+    vi.mocked(api.fetchGameDraft).mockResolvedValueOnce(modifiedDraft);
+
+    render(GameDraft, { props: mockProps });
+
+    await tick();
+    await new Promise((r) => setTimeout(r, 0));
+    await tick();
+
+    // Verify select and tooltip are not wrapped together
+    const selects = document.querySelectorAll(".country-select");
+    expect(selects.length).toBeGreaterThan(0);
+
+    const firstSelect = selects[0]!;
+    const parentRow = firstSelect.closest("li")!;
+
+    // Verify grid structure classes
+    expect(parentRow.querySelector(".tooltip-cell")).toBeInTheDocument();
+
+    // The select should be a direct child of row, NOT inside a flex container with tooltip
+    expect(firstSelect.parentElement).toBe(parentRow);
+  });
+
+  it("swaps country.reason along with the country during a player swap", async () => {
+    const { fetchGameDraft } = vi.mocked(await import("../../api"));
+    const draftData = createMockDraftResponse({
+      mesas: [
+        createMockDraftMesa({
+          numero: 1,
+          jugadores: [
+            createMockDraftPlayer({
+              nombre: "Player A",
+              country: { name: "France", reason: "Algorithm says so" },
+            }),
+            createMockDraftPlayer({
+              nombre: "Player B",
+              country: { name: "Germany" },
+            }), // No reason
+          ],
+        }),
+      ],
+    });
+    fetchGameDraft.mockResolvedValue(draftData);
+
+    render(GameDraft, { props: mockProps });
+    await vi.waitFor(() =>
+      expect(screen.getByText("Player A")).toBeInTheDocument(),
+    );
+
+    const swapButtons = screen.getAllByTitle("Intercambiar");
+    await fireEvent.click(swapButtons[0]!); // Click Player A
+    await fireEvent.click(swapButtons[1]!); // Click Player B
+
+    await vi.waitFor(() => {
+      // Player B should now be in slot 1 and inherited the tooltip
+      const rows = document.querySelectorAll(".player-list li");
+      const row1 = rows[0]!;
+      const row2 = rows[1]!;
+
+      expect(row1.textContent).toContain("Player B");
+      expect(row1.querySelector(".tooltip-cell")).not.toBeEmptyDOMElement();
+
+      expect(row2.textContent).toContain("Player A");
+      expect(row2.querySelector(".tooltip-cell")).toBeEmptyDOMElement();
+    });
+  });
+
+  it("swaps country reason when manually changing dropdown causes a conflict", async () => {
+    const { fetchGameDraft } = vi.mocked(await import("../../api"));
+    const { tick } = await import("svelte");
+    const draftData = createMockDraftResponse({
+      mesas: [
+        createMockDraftMesa({
+          numero: 1,
+          jugadores: [
+            createMockDraftPlayer({
+              nombre: "Player A",
+              country: { name: "France", reason: "Reason A" },
+            }),
+            createMockDraftPlayer({
+              nombre: "Player B",
+              country: { name: "Germany", reason: "Reason B" },
+            }),
+          ],
+        }),
+      ],
+    });
+    fetchGameDraft.mockResolvedValue(draftData);
+
+    render(GameDraft, { props: mockProps });
+    await vi.waitFor(() =>
+      expect(screen.getByText("Player A")).toBeInTheDocument(),
+    );
+
+    const selects = document.querySelectorAll(".country-select");
+    const selectA = selects[0]!;
+
+    // Player A steals Germany (currently held by Player B)
+    await fireEvent.change(selectA, { target: { value: "Germany" } });
+
+    await vi.waitFor(() => {
+      const rows = document.querySelectorAll(".player-list li");
+      const row1 = rows[0]!; // Player A
+      const row2 = rows[1]!; // Player B
+
+      expect(row1.querySelector(".country-select")).toHaveValue("Germany");
+      expect(row2.querySelector(".country-select")).toHaveValue("France");
+    });
+
+    // Hover over Player A's new tooltip to verify they inherited "Reason B"
+    const rows = document.querySelectorAll(".player-list li");
+    const tooltipA = rows[0]!.querySelector(".tooltip-trigger")!;
+    await fireEvent.mouseEnter(tooltipA);
+    await tick();
+
+    expect(document.body.querySelector(".tooltip-popover")).toHaveTextContent(
+      "Reason B",
+    );
+  });
+
+  it("clears country.reason when manually changing the country dropdown", async () => {
+    const { fetchGameDraft } = vi.mocked(await import("../../api"));
+    const draftData = createMockDraftResponse({
+      mesas: [
+        createMockDraftMesa({
+          numero: 1,
+          jugadores: [
+            createMockDraftPlayer({
+              nombre: "Player C",
+              country: { name: "France", reason: "Manual override test" },
+            }),
+          ],
+        }),
+      ],
+    });
+    fetchGameDraft.mockResolvedValue(draftData);
+
+    render(GameDraft, { props: mockProps });
+    await vi.waitFor(() =>
+      expect(screen.getByText("Player C")).toBeInTheDocument(),
+    );
+
+    const row = document.querySelector(".player-list li")!;
+    expect(row.querySelector(".tooltip-cell")).not.toBeEmptyDOMElement();
+
+    const select = row.querySelector(".country-select") as HTMLSelectElement;
+    await fireEvent.change(select, { target: { value: "Germany" } });
+
+    await vi.waitFor(() => {
+      expect(select.value).toBe("Germany");
+      // Tooltip should be destroyed since the algorithm was overridden
+      expect(row.querySelector(".tooltip-cell")).toBeEmptyDOMElement();
+    });
+  });
 });

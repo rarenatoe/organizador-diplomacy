@@ -192,24 +192,22 @@ async def snapshots_have_same_roster(
 
 
 async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[PlayerStateDict]:
-    """Return all players in a snapshot as dictionaries."""
-    # Get the deduplicated Notion cache subquery
-    deduped_cache = get_deduped_notion_cache_subquery(_session=session)
-
+    """Return all players in a snapshot as dictionaries with Notion identity data."""
     result = await session.execute(
         select(
             SnapshotPlayer,
             Player,
-            deduped_cache.c.c_england,
-            deduped_cache.c.c_france,
-            deduped_cache.c.c_germany,
-            deduped_cache.c.c_italy,
-            deduped_cache.c.c_austria,
-            deduped_cache.c.c_russia,
-            deduped_cache.c.c_turkey,
+            NotionCache.name.label("notion_name"),
+            NotionCache.c_england,
+            NotionCache.c_france,
+            NotionCache.c_germany,
+            NotionCache.c_italy,
+            NotionCache.c_austria,
+            NotionCache.c_russia,
+            NotionCache.c_turkey,
         )
         .join(Player)
-        .outerjoin(deduped_cache, Player.name == deduped_cache.c.name)
+        .outerjoin(NotionCache, NotionCache.notion_id == Player.notion_id)
         .where(SnapshotPlayer.snapshot_id == snapshot_id)
         .order_by(SnapshotPlayer.priority.desc(), Player.name)
     )
@@ -218,6 +216,8 @@ async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[
     return [
         {
             "nombre": player.name,
+            "notion_id": player.notion_id,
+            "notion_name": notion_name,
             "experiencia": sp.experience,
             "juegos_este_ano": sp.games_this_year,
             "prioridad": sp.priority,
@@ -231,7 +231,7 @@ async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[
             "c_russia": c_russia or 0,
             "c_turkey": c_turkey or 0,
         }
-        for sp, player, c_england, c_france, c_germany, c_italy, c_austria, c_russia, c_turkey in rows
+        for sp, player, notion_name, c_england, c_france, c_germany, c_italy, c_austria, c_russia, c_turkey in rows
     ]
 
 
@@ -332,7 +332,7 @@ async def create_root_manual_snapshot(
     for p in players:
         if not p["nombre"]:
             continue
-        player_id = await get_or_create_player(session, p["nombre"])
+        player_id = await get_or_create_player(session, p["nombre"], p.get("notion_id"))
         await add_player_to_snapshot(
             session,
             snap_id,
@@ -348,30 +348,6 @@ async def create_root_manual_snapshot(
 
 
 # ── Notion Cache ─────────────────────────────────────────────────────────────
-
-
-def get_deduped_notion_cache_subquery(_session: AsyncSession):
-    """Create a reusable SQLAlchemy subquery to deduplicate Notion cache entries.
-
-    Returns a subquery that groups by NotionCache.name and selects the maximum
-    values for country assignments and other fields to prevent fan-out bugs.
-    """
-    return (
-        select(
-            NotionCache.name,
-            func.max(NotionCache.c_austria).label("c_austria"),
-            func.max(NotionCache.c_england).label("c_england"),
-            func.max(NotionCache.c_france).label("c_france"),
-            func.max(NotionCache.c_germany).label("c_germany"),
-            func.max(NotionCache.c_italy).label("c_italy"),
-            func.max(NotionCache.c_russia).label("c_russia"),
-            func.max(NotionCache.c_turkey).label("c_turkey"),
-            func.max(NotionCache.experience).label("experience"),
-            func.max(NotionCache.games_this_year).label("games_this_year"),
-        )
-        .group_by(NotionCache.name)
-        .subquery()
-    )
 
 
 async def update_notion_cache(session: AsyncSession, rows: list[dict[str, Any]]) -> None:

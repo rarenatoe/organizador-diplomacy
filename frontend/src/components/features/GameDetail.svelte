@@ -1,13 +1,41 @@
 <script lang="ts">
   import type { GameDetail, DraftResponse, DraftPlayer } from "../../types";
+
+  type GamePlayerData = {
+    nombre: string;
+    experiencia?: string;
+    es_nuevo?: boolean;
+    juegos_este_ano?: number;
+    prioridad?: number;
+    partidas_deseadas?: number;
+    partidas_gm?: number;
+    c_england?: number;
+    c_france?: number;
+    c_germany?: number;
+    c_italy?: number;
+    c_austria?: number;
+    c_russia?: number;
+    c_turkey?: number;
+    country?: { name: string; reason?: string } | null;
+  };
+
+  type GameTableData = {
+    jugadores: Array<{
+      nombre: string;
+      country?: { name: string; reason?: string } | null;
+    }>;
+  };
   import { fetchGame } from "../../api";
   import { translateCountry, getCountryEmoji } from "../../i18n";
   import Button from "../ui/Button.svelte";
   import PanelLayout from "../layout/PanelLayout.svelte";
   import Badge from "../ui/Badge.svelte";
   import Tooltip from "../ui/Tooltip.svelte";
+  import PlayerName from "../ui/PlayerName.svelte";
   import GameTableCard from "./GameTableCard.svelte";
   import SectionTitle from "../ui/SectionTitle.svelte";
+  import CardGrid from "../layout/CardGrid.svelte";
+  import CardGridItem from "../layout/CardGridItem.svelte";
 
   interface Props {
     id: number;
@@ -41,7 +69,7 @@
     }, 1500);
   }
 
-  function mapToDraftPlayer(player: any): DraftPlayer {
+  function mapToDraftPlayer(player: GamePlayerData): DraftPlayer {
     return {
       nombre: player.nombre,
       es_nuevo: player.es_nuevo ?? false,
@@ -56,12 +84,11 @@
       c_austria: player.c_austria ?? 0,
       c_russia: player.c_russia ?? 0,
       c_turkey: player.c_turkey ?? 0,
-      pais: player.pais || null,
-      pais_reason: player.pais_reason || null,
+      country: player.country,
     };
   }
 
-  function getTableCopyText(table: any): string {
+  function getTableCopyText(table: GameTableData): string {
     const footnotes: Record<string, string> = {};
     let footnoteCounter = 0;
 
@@ -70,15 +97,15 @@
     let index = 1;
     for (const player of table.jugadores) {
       let line = `${index}. ${player.nombre}`;
-      if (player.pais) {
-        const translated = translateCountry(player.pais);
-        if (player.pais_reason) {
+      if (player.country) {
+        const translated = translateCountry(player.country.name);
+        if (player.country.reason) {
           // Get or create footnote marker
-          if (!footnotes[player.pais_reason]) {
+          if (!footnotes[player.country.reason]) {
             footnoteCounter++;
-            footnotes[player.pais_reason] = "*".repeat(footnoteCounter);
+            footnotes[player.country.reason] = "*".repeat(footnoteCounter);
           }
-          const marker = footnotes[player.pais_reason];
+          const marker = footnotes[player.country.reason];
           line += ` (${translated}${marker})`;
         } else {
           line += ` (${translated})`;
@@ -120,8 +147,8 @@
         // Add players
         for (const player of table.jugadores) {
           let playerLine = `- ${player.nombre}`;
-          if (player.pais) {
-            const translated = translateCountry(player.pais);
+          if (player.country) {
+            const translated = translateCountry(player.country.name);
             playerLine += ` (${translated})`;
           }
           lines.push(playerLine);
@@ -135,7 +162,7 @@
     if (gameData.waiting_list && gameData.waiting_list.length > 0) {
       lines.push("Lista de espera:");
       for (const waiter of gameData.waiting_list) {
-        lines.push(`- ${waiter.nombre} (${waiter.cupos})`);
+        lines.push(`- ${waiter.nombre} (${waiter.cupos_faltantes} cupos)`);
       }
     }
 
@@ -207,47 +234,70 @@
       {#if mesas.length > 0}
         <div class="section">
           <SectionTitle title="Partidas" count={mesas.length} />
-          {#each mesas as table (table.numero)}
-            {@const playersTxt = getTableCopyText(table)}
-            <GameTableCard tableNumber={table.numero} gmName={table.gm}>
-              <ul class="player-list">
-                {#each table.jugadores as player, i (player.nombre)}
-                  <li>
-                    <span class="p-num">{i + 1}.</span>
-                    <span class="p-name"
-                      >{player.nombre}
-                      {player.pais ? getCountryEmoji(player.pais) : ""}
-                      {#if player.pais_reason}
-                        <Tooltip text={player.pais_reason} />
-                      {/if}</span
-                    >
-                    <div class="tag-wrapper">
-                      <Badge
-                        variant={player.etiqueta === "Nuevo"
-                          ? "warning"
-                          : "success"}
-                        text={player.etiqueta}
-                        fixedWidth={true}
-                      />
-                    </div>
-                  </li>
-                {/each}
-              </ul>
-              <Button
-                size="sm"
-                variant={copiedId === "players-" + table.numero
-                  ? "success"
-                  : "secondary"}
-                icon={copiedId === "players-" + table.numero ? "✅" : "📋"}
-                class={copiedId === "players-" + table.numero ? "ok" : ""}
-                fill={true}
-                onclick={() => copyText(playersTxt, "players-" + table.numero)}
-                >{copiedId === "players-" + table.numero
-                  ? "Copiado"
-                  : "Copiar jugadores"}</Button
-              >
-            </GameTableCard>
-          {/each}
+          <CardGrid>
+            {#each mesas as table (table.numero)}
+              {@const playersTxt = getTableCopyText(table)}
+              <CardGridItem>
+                <GameTableCard tableNumber={table.numero} gmName={table.gm}>
+                  <ul class="player-list">
+                    {#each table.jugadores as player, i (player.nombre)}
+                      <li>
+                        <span class="p-num">{i + 1}.</span>
+                        <PlayerName
+                          {player}
+                          compact={true}
+                          showNotionIndicator={false}
+                        />
+                        <div class="country-cell">
+                          {#if player.country}
+                            <span
+                              class="country-text"
+                              title={translateCountry(player.country.name)}
+                            >
+                              {getCountryEmoji(player.country.name)}
+                              {translateCountry(player.country.name)}
+                            </span>
+                          {/if}
+                        </div>
+                        <div class="tooltip-cell">
+                          {#if player.country?.reason}
+                            <Tooltip text={player.country.reason} icon="ℹ️" />
+                          {/if}
+                        </div>
+                        <div class="tag-wrapper">
+                          <Tooltip
+                            text={player.es_nuevo
+                              ? "Sin partidas previas"
+                              : `${player.juegos_este_ano} juegos este año`}
+                          >
+                            <Badge
+                              variant={player.es_nuevo ? "warning" : "success"}
+                              text={player.es_nuevo ? "Nuevo" : "Antiguo"}
+                              fixedWidth={true}
+                            />
+                          </Tooltip>
+                        </div>
+                      </li>
+                    {/each}
+                  </ul>
+                  <Button
+                    size="sm"
+                    variant={copiedId === "players-" + table.numero
+                      ? "success"
+                      : "secondary"}
+                    icon={copiedId === "players-" + table.numero ? "✅" : "📋"}
+                    class={copiedId === "players-" + table.numero ? "ok" : ""}
+                    fill={true}
+                    onclick={() =>
+                      copyText(playersTxt, "players-" + table.numero)}
+                    >{copiedId === "players-" + table.numero
+                      ? "Copiado"
+                      : "Copiar jugadores"}</Button
+                  >
+                </GameTableCard>
+              </CardGridItem>
+            {/each}
+          </CardGrid>
         </div>
       {/if}
       {#if waiting.length > 0}
@@ -256,8 +306,12 @@
           <SectionTitle title="Lista de espera" />
           {#each waiting as w (w.nombre)}
             <div class="waiting-item">
-              <span class="waiting-name">{w.nombre}</span>
-              <span class="waiting-cupos">{w.cupos}</span>
+              <PlayerName
+                player={w}
+                compact={true}
+                showNotionIndicator={false}
+              />
+              <span class="waiting-cupos">{w.cupos_faltantes} cupo(s)</span>
             </div>
           {/each}
           <Button
@@ -308,10 +362,36 @@
     font-size: 12px;
     padding: var(--space-4) 0;
     display: grid;
-    grid-template-columns: var(--space-16) 1fr calc(var(--space-8) * 15);
+    /* num (24) | name (minmax) | country (85px) | tooltip (24) | badge (80) */
+    grid-template-columns:
+      var(--space-24) minmax(0, 1fr) 85px var(--space-24)
+      80px;
     align-items: center;
     gap: var(--space-8);
     border-bottom: 1px solid var(--border-subtle);
+    width: 100%;
+  }
+
+  .country-cell {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .country-text {
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tooltip-cell {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
   }
 
   .player-list li:last-child {
@@ -324,35 +404,23 @@
     min-width: var(--space-16);
   }
 
-  .p-name {
-    overflow: visible;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 500;
-  }
-
   .tag-wrapper {
     display: flex;
+    align-items: center;
     justify-content: flex-end;
+    gap: var(--space-8);
   }
 
   .waiting-item {
     display: grid;
     grid-template-columns: 1fr var(--space-56);
     align-items: center;
-    padding: var(--space-8);
+    padding: var(--space-4) var(--space-8);
     background: var(--warning-bg-subtle);
     border: 1px solid var(--warning-border-subtle);
     border-radius: var(--space-8);
-    margin-bottom: var(--space-8);
+    margin-bottom: var(--space-4);
     font-size: 12px;
-  }
-
-  .waiting-name {
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .waiting-cupos {

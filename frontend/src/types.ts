@@ -1,10 +1,25 @@
 // ── Domain types ──────────────────────────────────────────────────────────────
 
+export interface AutocompletePlayer {
+  display: string;
+  nombre: string;
+  notion_id?: string;
+  notion_name?: string;
+  is_local: boolean;
+  is_alias: boolean;
+}
+
+export interface CountryAssignment {
+  name: string;
+  reason?: string;
+}
+
 export interface PlayerData {
   nombre: string;
-  etiqueta: string;
-  pais?: string | null;
-  pais_reason?: string | null;
+  notion_id?: string | null;
+  notion_name?: string | null;
+  notion_alias?: string[] | null;
+  country?: CountryAssignment | null;
   es_nuevo?: boolean;
   juegos_este_ano?: number;
   prioridad?: number;
@@ -28,8 +43,11 @@ export interface MesaData {
 
 export interface WaitingItem {
   nombre: string;
-  cupos: string;
-  pais?: string | null;
+  notion_id?: string | null;
+  notion_name?: string | null;
+  notion_alias?: string[] | null;
+  cupos_faltantes: number;
+  country?: CountryAssignment | null;
   es_nuevo?: boolean;
   juegos_este_ano?: number;
   prioridad?: number;
@@ -140,6 +158,8 @@ export interface HistoryLog {
 
 export interface EditPlayerRow {
   nombre: string;
+  notion_id?: string | null;
+  notion_name?: string | null;
   original_nombre?: string;
   experiencia?: string;
   juegos_este_ano?: number;
@@ -165,12 +185,17 @@ export interface NotionPlayer {
   experiencia: string;
   juegos_este_ano: number;
   alias?: string[];
+  notion_id?: string | null;
 }
 
 export interface SimilarName {
-  notion: string;
+  notion_id: string;
+  notion_name: string;
   snapshot: string;
   similarity: number;
+  match_method: string;
+  matched_alias?: string;
+  existing_local_name?: string;
 }
 
 export interface OrganizarValidation {
@@ -193,6 +218,7 @@ export interface MergePair {
   from: string;
   to: string;
   action: ResolutionAction;
+  notion_id?: string;
 }
 
 // ── Toast notification types ─────────────────────────────────────────────────
@@ -207,7 +233,13 @@ export interface ToastOptions {
 
 // ── Resolution card types ────────────────────────────────────────────────────
 
-export type ResolutionAction = "merge_notion" | "merge_local" | "skip";
+export type ResolutionAction =
+  | "merge_notion"
+  | "merge_local"
+  | "link_only"
+  | "link_rename"
+  | "use_existing"
+  | "skip";
 
 export interface ResolutionDecision {
   pair: SimilarName;
@@ -237,6 +269,9 @@ export interface SnapshotGroup {
 
 export interface DraftPlayer {
   nombre: string;
+  notion_id?: string | null;
+  notion_name?: string | null;
+  notion_alias?: string[] | null;
   es_nuevo: boolean;
   juegos_ano: number;
   tiene_prioridad: boolean;
@@ -249,8 +284,7 @@ export interface DraftPlayer {
   c_austria: number;
   c_russia: number;
   c_turkey: number;
-  pais: string;
-  pais_reason?: string;
+  country?: CountryAssignment | null;
 }
 
 export interface DraftMesa {

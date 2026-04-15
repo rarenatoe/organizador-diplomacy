@@ -6,7 +6,7 @@ from datetime import datetime  # noqa: TCH003
 from enum import StrEnum
 from typing import Any, NotRequired, TypedDict
 
-from sqlalchemy import JSON, ForeignKey, func
+from sqlalchemy import JSON, ForeignKey, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, mapped_column, relationship
 
 # ── TypedDict types for diffing logic ─────────────────────────────────────────
@@ -43,6 +43,8 @@ class PlayerStateDict(TypedDict):
 
     # Basic fields (always present)
     nombre: str
+    notion_id: NotRequired[str | None]
+    notion_name: NotRequired[str | None]
     experiencia: str
     juegos_este_ano: int
     prioridad: int
@@ -96,7 +98,8 @@ class Player(Base, kw_only=True):
     __tablename__ = "players"
 
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
-    name: Mapped[str] = mapped_column(unique=True)
+    name: Mapped[str] = mapped_column(String(collation="NOCASE"), unique=True)
+    notion_id: Mapped[str | None] = mapped_column(default=None)
 
     # Relationships
     snapshot_links: Mapped[list[SnapshotPlayer]] = relationship(init=False)

@@ -56,3 +56,8 @@ priority: 40
 - **Singleton Resetting:** If testing a reactive singleton (e.g., a globally exported class instance), you MUST wipe its state in a `beforeEach()` block to prevent test pollution.
 - **Test Real State, Not Simulations:** Component integration tests should not simulate logic via dummy variables (e.g., `let draftKey = 0; draftKey++;`). Instead, test how the component reacts to the actual imported state manager.
 - **Verify Component Isolation:** When testing flows that require total UI resets (like opening a "New List" vs editing an existing one), verify that the state generator applies unique Svelte `{#key}` bindings to force true component destruction and recreation.
+
+## 9. Test Maintenance & Resilience
+
+- **Kill Zombie Tests:** If you fix the architectural root cause of a bug (e.g., introducing `notion_id`), aggressively HUNT DOWN and DELETE tests written specifically to verify the old, hacky workarounds (e.g., `GROUP BY max()` deduplication queries).
+- **Scope DOM Selectors:** When testing UI interactions, ALWAYS scope DOM selectors to their specific domain context (e.g., `document.querySelectorAll('.country-cell .tooltip-trigger')`) to prevent test breakage as the design system expands.

@@ -38,3 +38,9 @@ priority: 20
 - **Priority Field:** Treat `priority` as semantically boolean (strictly `0` or `1`). NEVER use non-boolean values.
 - **Game Generation:** Execute two-phase algorithm: distribution loop first, country assignment second. NEVER interleave phases.
 - **Hashing Keys:** ALWAYS hash by primitive attributes (`.name`) when using `Counter()` or dict keys. NEVER pass Pydantic models as keys.
+
+## 7. Query Mechanics & Synchronization
+
+- **The Cartesian Product Trap:** When optimizing SQLAlchemy queries by removing unused models from a `select()` list, NEVER remove the `.join()` clause if it restricts the relational mapping. Missing joins cause cross-join fan-outs that crash the frontend.
+- **Unified Sync Pipeline:** Disparate logic for background daemons and manual API syncs causes race conditions. ALWAYS unify into a singular pipeline: Extraction (`fetch_notion_data`) -> Transformation (`build_notion_players_lookup`) -> Loading (`notion_cache_to_db`).
+- **Granular Conflict Resolution:** Bulk data ingestion MUST intercept similarities and pause. Let the user decide the resolution strategy (`link_rename`, `link_only`, `use_existing`, `merge`). Blindly merging data destroys user intent.

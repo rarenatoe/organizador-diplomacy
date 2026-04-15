@@ -4,8 +4,20 @@ import SyncResolutionModal from "./SyncResolutionModal.svelte";
 
 describe("SyncResolutionModal.svelte", () => {
   const mockPairs = [
-    { notion: "Juan Pérez", snapshot: "Juan Perez", similarity: 0.95 },
-    { notion: "María García", snapshot: "Maria Garcia", similarity: 0.85 },
+    {
+      notion_id: "notion-1",
+      notion_name: "Juan Pérez",
+      snapshot: "Juan Perez",
+      similarity: 0.95,
+      match_method: "exact",
+    },
+    {
+      notion_id: "notion-2",
+      notion_name: "María García",
+      snapshot: "Maria Garcia",
+      similarity: 0.85,
+      match_method: "fuzzy",
+    },
   ];
 
   it("does not render when visible is false", () => {
@@ -89,12 +101,17 @@ describe("SyncResolutionModal.svelte", () => {
 
     // Click merge Notion button
     const mergeBtn = screen.getByRole("button", {
-      name: /Usar nombre Notion/i,
+      name: /Vincular & Renombrar/i,
     });
     await fireEvent.click(mergeBtn);
 
     expect(onComplete).toHaveBeenCalledWith([
-      { from: "Juan Perez", to: "Juan Pérez", action: "merge_notion" },
+      {
+        from: "Juan Perez",
+        to: "Juan Pérez",
+        action: "link_rename",
+        notion_id: "notion-1",
+      },
     ]);
   });
 
@@ -111,11 +128,16 @@ describe("SyncResolutionModal.svelte", () => {
     });
 
     // Click merge local button
-    const mergeBtn = screen.getByRole("button", { name: /Mantener local/i });
+    const mergeBtn = screen.getByRole("button", { name: /Vincular Solo/i });
     await fireEvent.click(mergeBtn);
 
     expect(onComplete).toHaveBeenCalledWith([
-      { from: "Juan Perez", to: "Juan Pérez", action: "merge_local" },
+      {
+        from: "Juan Perez",
+        to: "Juan Pérez",
+        action: "link_only",
+        notion_id: "notion-1",
+      },
     ]);
   });
 
@@ -167,12 +189,70 @@ describe("SyncResolutionModal.svelte", () => {
 
     // Click merge on first pair
     const mergeBtn = screen.getByRole("button", {
-      name: /Usar nombre Notion/i,
+      name: /Vincular & Renombrar/i,
     });
     await fireEvent.click(mergeBtn);
 
     // Should show second pair
     expect(container.textContent).toContain("María García");
     expect(container.textContent).toContain("Conflicto 2 de 2");
+  });
+
+  describe("Modal Snippets", () => {
+    it("should render Autocorrect View when existing_local_name exists", () => {
+      const autocorrectPairs = [
+        {
+          notion_id: "notion-1",
+          notion_name: "Juan Pérez",
+          snapshot: "Juan Perez",
+          similarity: 0.95,
+          match_method: "exact",
+          existing_local_name: "Local Name", // This triggers autocorrect view
+        },
+      ];
+
+      const { container } = render(SyncResolutionModal, {
+        props: {
+          visible: true,
+          pairs: autocorrectPairs,
+          onComplete: vi.fn(),
+          onCancel: vi.fn(),
+        },
+      });
+
+      // Should render "Usar Local Name" button for autocorrect
+      expect(container.textContent).toContain("Usar Local Name");
+      expect(container.querySelector(".comparison-card")).toBeTruthy();
+
+      // Should NOT contain "Vincular & Renombrar" in autocorrect view
+      expect(container.textContent).not.toContain("Vincular & Renombrar");
+    });
+
+    it("should render Standard View when existing_local_name is undefined", () => {
+      const standardPairs = [
+        {
+          notion_id: "notion-1",
+          notion_name: "Juan Pérez",
+          snapshot: "Juan Perez",
+          similarity: 0.95,
+          match_method: "exact",
+          // existing_local_name is undefined - triggers standard view
+        },
+      ];
+
+      const { container } = render(SyncResolutionModal, {
+        props: {
+          visible: true,
+          pairs: standardPairs,
+          onComplete: vi.fn(),
+          onCancel: vi.fn(),
+        },
+      });
+
+      // Should render both "Vincular & Renombrar" and "Vincular Solo" for standard view
+      expect(container.textContent).toContain("Vincular & Renombrar");
+      expect(container.textContent).toContain("Vincular Solo");
+      expect(container.querySelector(".comparison-card")).toBeTruthy();
+    });
   });
 });

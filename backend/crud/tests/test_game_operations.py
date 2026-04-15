@@ -62,15 +62,15 @@ class TestGameDraftOperations:
                     "numero": 1,
                     "gm": {"nombre": "Alice"},
                     "jugadores": [
-                        {"nombre": "Bob", "pais": "England", "pais_reason": "Available"},
-                        {"nombre": "Charlie", "pais": "France", "pais_reason": "Shielding"},
+                        {"nombre": "Bob", "country": {"name": "England", "reason": "Available"}},
+                        {"nombre": "Charlie", "country": {"name": "France", "reason": "Shielding"}},
                     ],
                 },
                 {
                     "numero": 2,
                     "gm": None,
                     "jugadores": [
-                        {"nombre": "David", "pais": "Germany", "pais_reason": "Available"}
+                        {"nombre": "David", "country": {"name": "Germany", "reason": "Available"}}
                     ],
                 },
             ],
@@ -100,7 +100,7 @@ class TestGameDraftOperations:
         table_players = tables_result.scalars().all()
         assert len(table_players) == 3  # 2 players in table 1, 1 in table 2
 
-        # Verify: Pais reason was saved
+        # Verify: Country reason was saved
         reasons = {tp.country_reason for tp in table_players if tp.country_reason}
         assert "Shielding" in reasons
         assert "Available" in reasons
@@ -172,8 +172,8 @@ class TestGameDraftOperations:
                     "numero": 1,
                     "gm": {"nombre": "Bob"},
                     "jugadores": [
-                        {"nombre": "Alice", "pais": "France", "pais_reason": "Updated"},
-                        {"nombre": "Bob", "pais": "Germany", "pais_reason": "GM playing"},
+                        {"nombre": "Alice", "country": {"name": "France", "reason": "Updated"}},
+                        {"nombre": "Bob", "country": {"name": "Germany", "reason": "GM playing"}},
                     ],
                 }
             ],
@@ -242,7 +242,7 @@ class TestGameDraftOperations:
                     "numero": 1,
                     "gm": None,
                     "jugadores": [
-                        {"nombre": "Charlie", "pais": "Italy", "pais_reason": "Only player"}
+                        {"nombre": "Charlie", "country": {"name": "Italy", "reason": "Only player"}}
                     ],
                 }
             ],

@@ -87,7 +87,7 @@
   .panel-body {
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-y: auto;
     flex: 1;
     padding: 0;
   }

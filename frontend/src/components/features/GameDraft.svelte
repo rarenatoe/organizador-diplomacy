@@ -10,6 +10,9 @@
   import Badge from "../ui/Badge.svelte";
   import Tooltip from "../ui/Tooltip.svelte";
   import GameTableCard from "./GameTableCard.svelte";
+  import PlayerName from "../ui/PlayerName.svelte";
+  import CardGrid from "../layout/CardGrid.svelte";
+  import CardGridItem from "../layout/CardGridItem.svelte";
 
   interface Props {
     snapshotId: number;
@@ -41,6 +44,16 @@
     | { type: "table"; tableIndex: number; playerIndex: number }
     | { type: "waiting"; playerIndex: number };
   let selectedSwap = $state<SwapTarget | null>(null);
+
+  const COUNTRY_OPTIONS = [
+    { value: "England", label: "🇬🇧 Inglaterra" },
+    { value: "France", label: "🇫🇷 Francia" },
+    { value: "Germany", label: "🇩🇪 Alemania" },
+    { value: "Italy", label: "🇮🇹 Italia" },
+    { value: "Austria", label: "🇦🇹 Austria" },
+    { value: "Russia", label: "🇷🇺 Rusia" },
+    { value: "Turkey", label: "🇹🇷 Turquía" },
+  ];
 
   async function loadDraft(): Promise<void> {
     loading = true;
@@ -75,36 +88,30 @@
 
     const conflictingPlayer = table.jugadores.find(
       (j, idx) =>
-        idx !== playerIndex && j.pais === newCountry && newCountry !== "",
+        idx !== playerIndex &&
+        j.country?.name === newCountry &&
+        newCountry !== "",
     );
 
     if (conflictingPlayer) {
-      // Automatically swap countries between the two players
+      // Automatically swap the entire country object between the two players
       const conflictingPlayerIndex = table.jugadores.indexOf(conflictingPlayer);
       const currentPlayer = table.jugadores[playerIndex]!;
-      const tempCountry = currentPlayer.pais;
 
-      // Assign new country to current player
-      if (newCountry !== "") {
-        currentPlayer.pais = newCountry;
-      } else {
-        // Handle "Aleatorio" selection - remove country assignment
-        currentPlayer.pais = "";
-      }
+      const tempCountryObj = currentPlayer.country;
 
-      // Give old country to conflicting player
+      // Assign the conflicting player's full country object (including reason) to current
+      currentPlayer.country = conflictingPlayer.country;
+
+      // Give old country object to conflicting player
       const conflictingPlayerObj = table.jugadores[conflictingPlayerIndex];
       if (conflictingPlayerObj) {
-        conflictingPlayerObj.pais = tempCountry;
+        conflictingPlayerObj.country = tempCountryObj;
       }
     } else {
-      // Just assign country if no conflict
+      // Just assign country if no conflict and clear reason (since it's a fresh manual override)
       const currentPlayer = table.jugadores[playerIndex]!;
-      if (newCountry !== "") {
-        currentPlayer.pais = newCountry;
-      } else {
-        currentPlayer.pais = "";
-      }
+      currentPlayer.country = newCountry !== "" ? { name: newCountry } : null;
     }
   }
 
@@ -113,20 +120,28 @@
 
     saving = true;
     try {
-      // Strip empty pais/pais_reason before sending so the API receives clean data
+      // Strip empty country data before sending so the API receives clean data
       const cleanTables = draftData.mesas.map((table) => ({
         ...table,
-        jugadores: table.jugadores.map(({ pais, pais_reason, ...rest }) => ({
+        jugadores: table.jugadores.map(({ country, ...rest }) => ({
           ...rest,
-          pais: pais || "",
-          ...(pais_reason ? { pais_reason } : {}),
+          country: country?.name
+            ? {
+                name: country.name,
+                ...(country.reason ? { reason: country.reason } : {}),
+              }
+            : null,
         })),
       }));
       const cleanTicketsSobrantes = draftData.tickets_sobrantes.map(
-        ({ pais, pais_reason, ...rest }) => ({
+        ({ country, ...rest }) => ({
           ...rest,
-          pais: pais || "",
-          ...(pais_reason ? { pais_reason } : {}),
+          country: country?.name
+            ? {
+                name: country.name,
+                ...(country.reason ? { reason: country.reason } : {}),
+              }
+            : null,
         }),
       );
       const payload: DraftResponse = {
@@ -257,6 +272,13 @@
       }
 
       // Execute the swap
+      // 1. Swap country object so that slot retains its assigned properties
+      const tempCountry = playerA.country;
+
+      playerA.country = playerB.country;
+      playerB.country = tempCountry;
+
+      // 2. Swap the player objects in the state arrays
       if (selectedSwap.type === "table") {
         const selectedTableIndex = selectedSwap.tableIndex;
         const selectedPlayerIndex = selectedSwap.playerIndex;
@@ -272,21 +294,6 @@
             ] &&
             draftData.mesas[targetTableIndex]?.jugadores[targetPlayerIndex]
           ) {
-            // Swap countries so slot retains assigned country
-            const tempPais =
-              draftData.mesas[selectedTableIndex].jugadores[selectedPlayerIndex]
-                .pais;
-            const targetPais =
-              draftData.mesas[targetTableIndex].jugadores[targetPlayerIndex]
-                .pais;
-
-            draftData.mesas[selectedTableIndex].jugadores[
-              selectedPlayerIndex
-            ].pais = targetPais;
-            draftData.mesas[targetTableIndex].jugadores[
-              targetPlayerIndex
-            ].pais = tempPais;
-
             draftData.mesas[selectedTableIndex].jugadores[selectedPlayerIndex] =
               playerB;
             draftData.mesas[targetTableIndex].jugadores[targetPlayerIndex] =
@@ -302,18 +309,6 @@
             ] &&
             draftData.tickets_sobrantes[targetPlayerIndex] !== undefined
           ) {
-            // Swap countries so slot retains assigned country
-            const tempPais =
-              draftData.mesas[selectedTableIndex].jugadores[selectedPlayerIndex]
-                .pais;
-            const targetPais =
-              draftData.tickets_sobrantes[targetPlayerIndex].pais;
-
-            draftData.mesas[selectedTableIndex].jugadores[
-              selectedPlayerIndex
-            ].pais = targetPais;
-            draftData.tickets_sobrantes[targetPlayerIndex].pais = tempPais;
-
             draftData.mesas[selectedTableIndex].jugadores[selectedPlayerIndex] =
               playerB;
             draftData.tickets_sobrantes[targetPlayerIndex] = playerA;
@@ -331,18 +326,6 @@
             draftData.tickets_sobrantes[selectedPlayerIndex] !== undefined &&
             draftData.mesas[targetTableIndex]?.jugadores[targetPlayerIndex]
           ) {
-            // Swap countries so slot retains assigned country
-            const tempPais =
-              draftData.tickets_sobrantes[selectedPlayerIndex].pais;
-            const targetPais =
-              draftData.mesas[targetTableIndex].jugadores[targetPlayerIndex]
-                .pais;
-
-            draftData.tickets_sobrantes[selectedPlayerIndex].pais = targetPais;
-            draftData.mesas[targetTableIndex].jugadores[
-              targetPlayerIndex
-            ].pais = tempPais;
-
             draftData.tickets_sobrantes[selectedPlayerIndex] = playerB;
             draftData.mesas[targetTableIndex].jugadores[targetPlayerIndex] =
               playerA;
@@ -355,15 +338,6 @@
             draftData.tickets_sobrantes[selectedPlayerIndex] !== undefined &&
             draftData.tickets_sobrantes[targetPlayerIndex] !== undefined
           ) {
-            // Swap countries so slot retains assigned country
-            const tempPais =
-              draftData.tickets_sobrantes[selectedPlayerIndex].pais;
-            const targetPais =
-              draftData.tickets_sobrantes[targetPlayerIndex].pais;
-
-            draftData.tickets_sobrantes[selectedPlayerIndex].pais = targetPais;
-            draftData.tickets_sobrantes[targetPlayerIndex].pais = tempPais;
-
             draftData.tickets_sobrantes[selectedPlayerIndex] = playerB;
             draftData.tickets_sobrantes[targetPlayerIndex] = playerA;
           }
@@ -412,72 +386,75 @@
       {#if draftData.mesas.length > 0}
         <div class="section">
           <SectionTitle title="Partidas" count={draftData.mesas.length} />
-          {#each draftData.mesas as table, tableIndex (table.numero + "_" + tableIndex)}
-            <GameTableCard
-              tableNumber={table.numero}
-              gmName={table.gm ? table.gm.nombre : null}
-            >
-              <ul class="player-list">
-                {#each table.jugadores as j, i (j.nombre + "_" + tableIndex + "_" + i)}
-                  {@const target = {
-                    type: "table" as const,
-                    tableIndex,
-                    playerIndex: i,
-                  }}
-                  {@const isSelected = isSelectedSwap(target)}
-                  <li class:swapping-active={isSelected}>
-                    <span class="p-num">{i + 1}.</span>
-                    <span class="p-name">{j.nombre}</span>
-                    <div class="country-container">
-                      <select
-                        class="country-select"
-                        value={j.pais || ""}
-                        onchange={(e) => {
-                          const target = e.target as HTMLSelectElement;
-                          handleCountryChange(tableIndex, i, target.value);
-                        }}
-                      >
-                        <option value="">🎲 Aleatorio</option>
-                        <option value="England">🇬🇧 Inglaterra</option>
-                        <option value="France">🇫🇷 Francia</option>
-                        <option value="Germany">🇩🇪 Alemania</option>
-                        <option value="Italy">🇮🇹 Italia</option>
-                        <option value="Austria">🇦🇹 Austria</option>
-                        <option value="Russia">🇷🇺 Rusia</option>
-                        <option value="Turkey">🇹🇷 Turquía</option>
-                      </select>
-                      {#if j.pais_reason}
-                        <Tooltip text={j.pais_reason} />
-                      {/if}
-                    </div>
-                    <div class="tag-wrapper">
-                      {#if j.es_nuevo}
-                        <Badge
-                          variant="warning"
-                          text="Nuevo"
-                          fixedWidth={true}
+          <CardGrid>
+            {#each draftData.mesas as table, tableIndex (table.numero + "_" + tableIndex)}
+              <CardGridItem>
+                <GameTableCard
+                  tableNumber={table.numero}
+                  gmName={table.gm ? table.gm.nombre : null}
+                >
+                  <ul class="player-list">
+                    {#each table.jugadores as j, i (j.nombre + "_" + tableIndex + "_" + i)}
+                      {@const target = {
+                        type: "table" as const,
+                        tableIndex,
+                        playerIndex: i,
+                      }}
+                      {@const isSelected = isSelectedSwap(target)}
+                      <li class:swapping-active={isSelected}>
+                        <span class="p-num">{i + 1}.</span>
+
+                        <PlayerName
+                          player={j}
+                          compact={true}
+                          showNotionIndicator={false}
                         />
-                      {:else}
-                        <Badge
-                          variant="success"
-                          text="Antiguo"
-                          fixedWidth={true}
+
+                        <select
+                          class="country-select"
+                          value={j.country?.name || ""}
+                          onchange={(e) => {
+                            const target = e.target as HTMLSelectElement;
+                            handleCountryChange(tableIndex, i, target.value);
+                          }}
+                        >
+                          <option value="">🎲 Aleatorio</option>
+                          {#each COUNTRY_OPTIONS as country (country.value)}
+                            <option value={country.value}
+                              >{country.label}</option
+                            >
+                          {/each}
+                        </select>
+
+                        <div class="tooltip-cell">
+                          {#if j.country?.reason}
+                            <Tooltip text={j.country.reason} icon="ℹ️" />
+                          {/if}
+                        </div>
+
+                        <div class="tag-wrapper">
+                          <Badge
+                            variant={j.es_nuevo ? "warning" : "success"}
+                            text={j.es_nuevo ? "Nuevo" : "Antiguo"}
+                            fixedWidth={true}
+                          />
+                        </div>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          iconOnly={true}
+                          icon="🔄"
+                          title="Intercambiar"
+                          onclick={() => handlePlayerClick(target)}
                         />
-                      {/if}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconOnly={true}
-                      icon="🔄"
-                      title="Intercambiar"
-                      onclick={() => handlePlayerClick(target)}
-                    />
-                  </li>
-                {/each}
-              </ul>
-            </GameTableCard>
-          {/each}
+                      </li>
+                    {/each}
+                  </ul>
+                </GameTableCard>
+              </CardGridItem>
+            {/each}
+          </CardGrid>
         </div>
       {/if}
       {#if draftData.tickets_sobrantes.length > 0}
@@ -574,12 +551,33 @@
     font-size: 12px;
     padding: var(--space-4) 0;
     display: grid;
-    grid-template-columns: var(--space-24) 1fr var(--space-128) min-content var(
-        --space-32
-      );
+    /* Col 1: Num (24px)
+      Col 2: Name (minmax forces truncation without blowing out grid)
+      Col 3: Dropdown (120px)
+      Col 4: Tooltip (24px fixed so dropdowns NEVER shift)
+      Col 5: Badge (80px)
+      Col 6: Button (32px)
+    */
+    grid-template-columns:
+      var(--space-24) minmax(0, 1fr) 120px var(--space-24)
+      80px var(--space-32);
     align-items: center;
     gap: var(--space-8);
     border-bottom: 1px solid var(--border-subtle);
+    width: 100%;
+  }
+
+  .tooltip-cell {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Make sure select fills its grid cell perfectly */
+  .country-select {
+    width: 100%;
   }
 
   .player-list li:last-child {
@@ -592,22 +590,9 @@
     min-width: var(--space-16);
   }
 
-  .p-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-weight: 500;
-  }
-
   .tag-wrapper {
     display: flex;
     justify-content: center;
-  }
-
-  .country-container {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
   }
 
   .country-select {

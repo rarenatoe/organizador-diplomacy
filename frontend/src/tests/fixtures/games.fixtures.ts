@@ -22,7 +22,7 @@ export const createMockDraftPlayer = (
     c_austria: 0,
     c_russia: 0,
     c_turkey: 0,
-    pais: "",
+    country: null,
   };
 
   return { ...baseDraftPlayer, ...overrides };

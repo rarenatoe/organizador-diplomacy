@@ -4,6 +4,14 @@ title: Pillar 1 - Stack & Architecture
 priority: 10
 ---
 
+## 0. Domain Context (CRITICAL)
+
+- **The Application:** This is a Diplomacy Tournament Organizer.
+- **Core Entities:** - `Snapshots` (imported/synced player rosters).
+  - `Games` (Generated tables consisting of exactly 7 players + optional Game Masters).
+  - `Waitlists` (Players who did not get seated).
+- **The Algorithm:** Prioritizes seating based on veteran status, games played this year, and historical country assignments to prevent repetition.
+
 ## 1. Core Architecture
 
 - **Backend Stack:** Python 3.13, uv, FastAPI, SQLAlchemy. NEVER use Flask or mix presentation logic in backend.
@@ -50,3 +58,12 @@ priority: 10
 ### Draft Algorithm Pipeline
 
 - **Sequential Execution:** Calculate Tickets -> Distribute to Tables -> Assign Countries -> Deduplicate Waitlist. NEVER skip phases or execute out of order.
+
+## 6. Data Modeling & API Boundaries
+
+- **Immutable Identity (`notion_id` over `name`):** NEVER rely on user-editable strings for relational mapping or deduplication. ALWAYS anchor to an immutable external ID (`notion_id`).
+- **Safe Legacy Migrations:** When introducing immutable IDs, write custom SQLAlchemy lifecycle hooks to auto-link existing records via heuristics BEFORE enforcing unique constraints.
+- **Nested Objects over Flat Keys:** Group related data into nested objects (e.g., `country: { name, reason }`). Swapping an object reference automatically carries its related metadata, preventing orphaned data.
+- **Strict API Purity:** The backend MUST NEVER send formatted UI strings (e.g., `etiqueta: "Antiguo (15 juegos)"`). APIs MUST send strictly typed, pure primitive data. The frontend is solely responsible for localization and UI formatting.
+- **Synchronize Read & Write Models (CQRS):** When altering a database schema or write payload, you MUST simultaneously update the aggregate SQL views (e.g., `get_game_event_detail`) and their TypeScript interfaces.
+- **Explicit Error Contracts:** The frontend API wrapper MUST explicitly handle framework-specific error shapes (like FastAPI's 422 `HTTPValidationError` array) and surface exact field-level rejections to the user.

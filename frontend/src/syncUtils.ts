@@ -1,7 +1,13 @@
-// ── Sync Utilities ────────────────────────────────────────────────────────────
+// ── Sync Utilities ────────────────────────────────────────────────────
 // Name similarity detection logic ported from backend/sync/notion_sync.py
 
-import type { EditPlayerRow, OrganizarValidation } from "./types";
+import type {
+  EditPlayerRow,
+  MergePair,
+  NotionPlayer,
+  OrganizarValidation,
+} from "./types";
+import { normalizeName } from "./utils";
 
 // ── Validation Utilities ──────────────────────────────────────────────────────
 
@@ -50,4 +56,56 @@ export function validateOrganizar(
   }
 
   return null;
+}
+
+export function applySyncMerges(
+  currentRows: EditPlayerRow[],
+  merges: MergePair[],
+  fetchedNotionPlayers: NotionPlayer[],
+): EditPlayerRow[] {
+  const renameActions = ["link_rename", "merge_notion", "use_existing"];
+  const mergeMap = new Map(merges.map((m) => [m.from, m]));
+  const seenNames = new Set<string>();
+  const deduplicatedPlayers: EditPlayerRow[] = [];
+
+  for (const row of currentRows) {
+    const mergeInfo = mergeMap.get(row.nombre);
+
+    // The final display name we will save in the database
+    const newName =
+      mergeInfo && renameActions.includes(mergeInfo.action)
+        ? mergeInfo.to
+        : row.nombre;
+
+    // The identity we use to look up the Notion record (always use 'to' if a merge exists)
+    const searchIdentity = mergeInfo ? mergeInfo.to : row.nombre;
+    const normSearch = normalizeName(searchIdentity);
+
+    // Deduplicate based on the final saved name
+    const normName = normalizeName(newName);
+    if (seenNames.has(normName)) continue;
+    seenNames.add(normName);
+
+    // Search Notion players using the search identity, not the local typo
+    const notionPlayer = fetchedNotionPlayers.find(
+      (p) =>
+        (row.notion_id && p.notion_id === row.notion_id) ||
+        normalizeName(p.nombre) === normSearch ||
+        p.alias?.some((a: string) => normalizeName(a) === normSearch),
+    );
+
+    if (notionPlayer) {
+      deduplicatedPlayers.push({
+        ...row,
+        nombre: newName,
+        experiencia: notionPlayer.experiencia,
+        juegos_este_ano: notionPlayer.juegos_este_ano,
+        notion_id: notionPlayer.notion_id || null,
+        notion_name: notionPlayer.nombre || null,
+      });
+    } else {
+      deduplicatedPlayers.push({ ...row, nombre: newName });
+    }
+  }
+  return deduplicatedPlayers;
 }

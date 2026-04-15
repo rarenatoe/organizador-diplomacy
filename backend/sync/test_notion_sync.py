@@ -5,12 +5,15 @@ Covers:
   - Name normalization
   - Filtering to snapshot players
 """
+
 from __future__ import annotations
 
 from typing import Any, cast
 
 from backend.sync.notion_sync import (
+    NotionPage,
     NotionPlayerDict,
+    build_notion_players_lookup,
     detect_similar_names,
     find_notion_player,
     normalize_name,
@@ -18,6 +21,7 @@ from backend.sync.notion_sync import (
 )
 
 # ── Name normalization ────────────────────────────────────────────────────────
+
 
 class TestNormalizeName:
     def test_lowercases(self):
@@ -38,6 +42,7 @@ class TestNormalizeName:
 
 
 # ── Similarity calculation ────────────────────────────────────────────────────
+
 
 class TestSimilarity:
     def test_identical_strings(self):
@@ -120,7 +125,7 @@ class TestSimilarity:
         # Score = (1.0 + 1.0 + 0.0) / 3 = 0.66
         # Wait, if "J." is a prefix of nothing, it's 0.
         # matched_count = 2.0. len(long_words) = 3.
-        # 2/3 = 0.66. But if we consider J. as a typo? 
+        # 2/3 = 0.66. But if we consider J. as a typo?
         # Actually, "Renato" matches "Renato", "Alegre" matches "Alegre".
         # matched_count = 2.0.
         # len(long_words) = 3.
@@ -166,6 +171,7 @@ class TestSimilarity:
 
 # ── Similar name detection ────────────────────────────────────────────────────
 
+
 def _create_test_notion_player(nombre: str, **kwargs: Any) -> NotionPlayerDict:
     """Helper to create a minimal NotionPlayerDict for testing."""
     defaults: dict[str, Any] = {
@@ -185,11 +191,12 @@ def _create_test_notion_player(nombre: str, **kwargs: Any) -> NotionPlayerDict:
     defaults["nombre"] = nombre
     return cast("NotionPlayerDict", defaults)
 
+
 class TestDetectSimilarNames:
     def test_no_similar_names(self):
         notion_players = {
             "john doe": _create_test_notion_player("John Doe"),
-            "jane smith": _create_test_notion_player("Jane Smith")
+            "jane smith": _create_test_notion_player("Jane Smith"),
         }
         snapshot_names = ["John Doe", "Jane Smith"]
         result = detect_similar_names(notion_players, snapshot_names)
@@ -200,7 +207,7 @@ class TestDetectSimilarNames:
         snapshot_names = ["John D."]
         result = detect_similar_names(notion_players, snapshot_names)
         assert len(result) == 1
-        assert result[0]["notion"] == "John Doe"
+        assert result[0]["notion_name"] == "John Doe"
         assert result[0]["snapshot"] == "John D."
         assert result[0]["similarity"] >= 0.75
 
@@ -236,7 +243,7 @@ class TestDetectSimilarNames:
         # Let's use names with same word count
         notion_players = {
             "john doe": _create_test_notion_player("John Doe"),
-            "jane smith": _create_test_notion_player("Jane Smith")
+            "jane smith": _create_test_notion_player("Jane Smith"),
         }
         snapshot_names = ["John D.", "Jane S."]
         result = detect_similar_names(notion_players, snapshot_names)
@@ -245,7 +252,7 @@ class TestDetectSimilarNames:
     def test_sorted_by_similarity(self):
         notion_players = {
             "john doe": _create_test_notion_player("John Doe"),
-            "jane smith": _create_test_notion_player("Jane Smith")
+            "jane smith": _create_test_notion_player("Jane Smith"),
         }
         snapshot_names = ["John D.", "Jane S."]
         result = detect_similar_names(notion_players, snapshot_names)
@@ -265,23 +272,26 @@ class TestDetectSimilarNames:
         assert result == []
 
     def test_detects_alias_similarity(self):
-         notion_players = {
-             "renato alegre": _create_test_notion_player("Renato Alegre", alias=["ren"])
-         }
-         snapshot_names = ["re"] # Prefix of "ren"
-         result = detect_similar_names(notion_players, snapshot_names, threshold=0.5)
-         assert len(result) == 1
-         assert result[0]["notion"] == "Renato Alegre"
-         assert result[0]["snapshot"] == "re"
-         assert result[0]["similarity"] == 0.8
+        notion_players = {
+            "renato alegre": _create_test_notion_player("Renato Alegre", alias=["ren"])
+        }
+        snapshot_names = ["re"]  # Prefix of "ren"
+        result = detect_similar_names(notion_players, snapshot_names, threshold=0.5)
+        assert len(result) == 1
+        assert result[0]["notion_name"] == "Renato Alegre"
+        assert result[0]["snapshot"] == "re"
+        assert result[0]["similarity"] == 0.8
 
     def test_alias_exact_match_skips_similarity(self):
         notion_players = {
             "renato alegre": _create_test_notion_player("Renato Alegre", alias=["ren"])
         }
-        snapshot_names = ["ren"] # Exact match with alias
+        snapshot_names = ["ren"]  # Exact match with alias
         result = detect_similar_names(notion_players, snapshot_names)
-        assert result == [] # Should be skipped because it's an exact match with alias
+        assert len(result) == 1
+        assert result[0]["match_method"] == "alias_exact"
+        assert result[0]["matched_alias"] == "ren"
+        assert result[0]["notion_name"] == "Renato Alegre"
 
     def test_handles_list_input(self):
         # The function should handle both dict and list inputs for notion_players
@@ -289,19 +299,19 @@ class TestDetectSimilarNames:
         snapshot_names = ["John D."]
         result = detect_similar_names(notion_players, snapshot_names)
         assert len(result) == 1
-        assert result[0]["notion"] == "John Doe"
+        assert result[0]["notion_name"] == "John Doe"
 
     def test_detects_1_to_many_conflict(self):
         # Snapshot has "Renato", Notion has "Renato Alegre" and "Renato Garcia"
         # Both should match
         notion_players = [
             _create_test_notion_player("Renato Alegre"),
-            _create_test_notion_player("Renato Garcia")
+            _create_test_notion_player("Renato Garcia"),
         ]
         snapshot_names = ["Renato"]
         result = detect_similar_names(notion_players, snapshot_names)
         assert len(result) == 2
-        notion_names = {r["notion"] for r in result}
+        notion_names = {r["notion_name"] for r in result}
         assert "Renato Alegre" in notion_names
         assert "Renato Garcia" in notion_names
 
@@ -319,6 +329,7 @@ class TestDetectSimilarNames:
 
 # ── find_notion_player tests ─────────────────────────────────────────────────────
 
+
 def test_find_notion_player():
     """Test find_notion_player function for exact matches, alias matching, and normalization."""
     # Construct mock notion players dictionary
@@ -332,43 +343,43 @@ def test_find_notion_player():
             c_italy=4,
             c_austria=5,
             c_russia=6,
-            c_turkey=7
+            c_turkey=7,
         )
     }
-    
+
     # Test exact match
     result = find_notion_player("DaniVonKlaus", mock_notion_players)
     assert result is not None
     assert result["nombre"] == "DaniVonKlaus"
     assert result["alias"] == ["daniel eiler", "dani"]
-    
+
     # Test alias match
     result = find_notion_player("Daniel Eiler", mock_notion_players)
     assert result is not None
     assert result["nombre"] == "DaniVonKlaus"
     assert result["alias"] == ["daniel eiler", "dani"]
-    
+
     # Test alias match with different alias
     result = find_notion_player("Dani", mock_notion_players)
     assert result is not None
     assert result["nombre"] == "DaniVonKlaus"
     assert result["alias"] == ["daniel eiler", "dani"]
-    
+
     # Test case/whitespace insensitivity for alias
     result = find_notion_player("  DANIEL   EILER  ", mock_notion_players)
     assert result is not None
     assert result["nombre"] == "DaniVonKlaus"
     assert result["alias"] == ["daniel eiler", "dani"]
-    
+
     # Test case/whitespace insensitivity for exact name
     result = find_notion_player("  DANIVONKLAUS  ", mock_notion_players)
     assert result is not None
     assert result["nombre"] == "DaniVonKlaus"
-    
+
     # Test no match
     result = find_notion_player("Unknown Player", mock_notion_players)
     assert result is None
-    
+
     # Test empty dictionary
     empty_players: dict[str, NotionPlayerDict] = {}
     result = find_notion_player("DaniVonKlaus", empty_players)
@@ -376,6 +387,7 @@ def test_find_notion_player():
 
 
 # ── Sync behavior tests ──────────────────────────────────────────────────────
+
 
 class TestSyncBehavior:
     """Tests for the sync behavior to ensure players are preserved, merged, and filtered correctly."""
@@ -386,7 +398,7 @@ class TestSyncBehavior:
         notion_players: dict[str, Any],
         merges: dict[str, Any] | None = None,
         *,
-        is_first_sync: bool = False
+        is_first_sync: bool = False,
     ) -> list[dict[str, Any]]:
         """Helper to simulate the exact row-building logic from notion_sync.py"""
         from .notion_sync import (
@@ -395,13 +407,14 @@ class TestSyncBehavior:
             find_notion_player,
             normalize_name,
         )
+
         if merges is None:
             merges = {}
-        
+
         filas: list[dict[str, Any]] = []
         if not is_first_sync:
             merged_notion_normalized = {normalize_name(v["to"]) for v in merges.values()}
-            
+
             for nombre, existente in existentes.items():
                 # 1. Merged players
                 if nombre in merges:
@@ -412,95 +425,151 @@ class TestSyncBehavior:
                     if notion_norm in notion_players:
                         nd: dict[str, Any] = notion_players[notion_norm]
                         assert nd is not None
-                        filas.append({
-                            "Nombre":            nd["nombre"] if action == "merge_notion" else nombre,
-                            "Experiencia":       nd["experiencia"],
-                            "Juegos_Este_Ano":   nd["juegos_este_ano"],
-                            "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
-                            "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
-                            "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
-                            **{c: nd.get(c, 0) for c in COUNTRY_PROPS},
-                        })
+                        filas.append(
+                            {
+                                "Nombre": nd["nombre"] if action == "merge_notion" else nombre,
+                                "Experiencia": nd["experiencia"],
+                                "Juegos_Este_Ano": nd["juegos_este_ano"],
+                                "prioridad": int(
+                                    existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
+                                ),
+                                "partidas_deseadas": int(
+                                    existente.get(
+                                        "partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"]
+                                    )
+                                ),
+                                "partidas_gm": int(
+                                    existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
+                                ),
+                                **{c: nd.get(c, 0) for c in COUNTRY_PROPS},
+                            }
+                        )
                         continue
-                
+
                 # 2. Notion players (exact match or alias)
                 notion_data: NotionPlayerDict | None = find_notion_player(nombre, notion_players)
                 if notion_data:
                     assert notion_data is not None
                     if normalize_name(notion_data["nombre"]) not in merged_notion_normalized:
-                        filas.append({
-                            "Nombre":            nombre, # Keep local name
-                            "Experiencia":       notion_data["experiencia"],
-                            "Juegos_Este_Ano":   notion_data["juegos_este_ano"],
-                            "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
-                            "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
-                            "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
-                            **{c: notion_data.get(c, 0) for c in COUNTRY_PROPS},
-                        })
+                        filas.append(
+                            {
+                                "Nombre": nombre,  # Keep local name
+                                "Experiencia": notion_data["experiencia"],
+                                "Juegos_Este_Ano": notion_data["juegos_este_ano"],
+                                "prioridad": int(
+                                    existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
+                                ),
+                                "partidas_deseadas": int(
+                                    existente.get(
+                                        "partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"]
+                                    )
+                                ),
+                                "partidas_gm": int(
+                                    existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
+                                ),
+                                **{c: notion_data.get(c, 0) for c in COUNTRY_PROPS},
+                            }
+                        )
                 # 3. Not in Notion (Preserved locally)
                 elif nombre not in merges:
-                    filas.append({
-                        "Nombre":            nombre,
-                        "Experiencia":       existente.get("experiencia", "Nuevo"),
-                        "Juegos_Este_Ano":   int(existente.get("juegos_este_ano", 0)),
-                        "prioridad":         int(existente.get("prioridad",         FIELD_DEFAULTS["prioridad"])),
-                        "partidas_deseadas": int(existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])),
-                        "partidas_gm":       int(existente.get("partidas_gm",       FIELD_DEFAULTS["partidas_gm"])),
-                        **{c: existente.get(c, 0) for c in COUNTRY_PROPS},
-                    })
+                    filas.append(
+                        {
+                            "Nombre": nombre,
+                            "Experiencia": existente.get("experiencia", "Nuevo"),
+                            "Juegos_Este_Ano": int(existente.get("juegos_este_ano", 0)),
+                            "prioridad": int(
+                                existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
+                            ),
+                            "partidas_deseadas": int(
+                                existente.get(
+                                    "partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"]
+                                )
+                            ),
+                            "partidas_gm": int(
+                                existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
+                            ),
+                            **{c: existente.get(c, 0) for c in COUNTRY_PROPS},
+                        }
+                    )
         else:
             # First ever sync
             for _, nd in notion_players.items():
                 assert isinstance(nd, dict)
-                filas.append({
-                    "Nombre":            nd["nombre"],
-                    "Experiencia":       nd["experiencia"],
-                    "Juegos_Este_Ano":   nd["juegos_este_ano"],
-                    "prioridad":         FIELD_DEFAULTS["prioridad"],
-                    "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
-                    "partidas_gm":       FIELD_DEFAULTS["partidas_gm"],
-                    **{c: nd.get(c, 0) for c in COUNTRY_PROPS},
-                })
+                filas.append(
+                    {
+                        "Nombre": nd["nombre"],
+                        "Experiencia": nd["experiencia"],
+                        "Juegos_Este_Ano": nd["juegos_este_ano"],
+                        "prioridad": FIELD_DEFAULTS["prioridad"],
+                        "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
+                        "partidas_gm": FIELD_DEFAULTS["partidas_gm"],
+                        **{c: nd.get(c, 0) for c in COUNTRY_PROPS},
+                    }
+                )
         return filas
 
     def test_players_not_in_notion_are_preserved(self):
         """Regression test: Local players not in Notion must not be deleted."""
         existentes = {
-            "Andy": {"nombre": "Andy", "experiencia": "Antiguo", "juegos_este_ano": 2, "prioridad": 0, "partidas_deseadas": 2, "partidas_gm": 1, "c_england": 1},
-            "Charlie": {"nombre": "Charlie", "experiencia": "Antiguo", "juegos_este_ano": 0, "prioridad": 0, "partidas_deseadas": 2, "partidas_gm": 0},
+            "Andy": {
+                "nombre": "Andy",
+                "experiencia": "Antiguo",
+                "juegos_este_ano": 2,
+                "prioridad": 0,
+                "partidas_deseadas": 2,
+                "partidas_gm": 1,
+                "c_england": 1,
+            },
+            "Charlie": {
+                "nombre": "Charlie",
+                "experiencia": "Antiguo",
+                "juegos_este_ano": 0,
+                "prioridad": 0,
+                "partidas_deseadas": 2,
+                "partidas_gm": 0,
+            },
         }
         notion_players = {
-            "andy": {"nombre": "Andy", "experiencia": "Antiguo", "juegos_este_ano": 1, "c_england": 2},
+            "andy": {
+                "nombre": "Andy",
+                "experiencia": "Antiguo",
+                "juegos_este_ano": 1,
+                "c_england": 2,
+            },
         }
-        
+
         filas = self._simulate_sync_logic(existentes, notion_players)
-        
+
         assert len(filas) == 2
         nombres = [f["Nombre"] for f in filas]
         assert "Andy" in nombres
         assert "Charlie" in nombres
-        
+
         andy_row = next(f for f in filas if f["Nombre"] == "Andy")
-        assert andy_row["Juegos_Este_Ano"] == 1 # Updated from Notion
-        assert andy_row["c_england"] == 2 # Updated from Notion
-        
+        assert andy_row["Juegos_Este_Ano"] == 1  # Updated from Notion
+        assert andy_row["c_england"] == 2  # Updated from Notion
+
         charlie_row = next(f for f in filas if f["Nombre"] == "Charlie")
-        assert charlie_row["Juegos_Este_Ano"] == 0 # Preserved from local
+        assert charlie_row["Juegos_Este_Ano"] == 0  # Preserved from local
 
     def test_country_stats_extraction(self):
         """Test that country stats are correctly extracted and updated."""
-        from .notion_sync import extraer_numero
-        
+        from .notion_sync import NotionProperty, extract_number
+
         # Mock property with number
-        prop_num = {"type": "number", "number": 5}
-        assert extraer_numero(prop_num) == 5
-        
+        prop_num: NotionProperty = {"type": "number", "number": 5}
+        assert extract_number(prop_num) == 5
+
         # Mock property with formula
-        prop_formula = {"type": "formula", "formula": {"type": "number", "number": 3}}
-        assert extraer_numero(prop_formula) == 3
-        
+        prop_formula: NotionProperty = {
+            "type": "formula",
+            "formula": {"type": "number", "number": 3},
+        }
+        assert extract_number(prop_formula) == 3
+
         # Mock empty or invalid
-        assert extraer_numero({}) == 0
+        prop_empty: NotionProperty = {}
+        assert extract_number(prop_empty) == 0
 
     def test_new_notion_players_are_ignored(self):
         """Regression test: New players in Notion must NOT be added to an existing snapshot."""
@@ -509,46 +578,62 @@ class TestSyncBehavior:
         }
         notion_players = {
             "kur": {"nombre": "Kur", "experiencia": "Antiguo", "juegos_este_ano": 2},
-            "nuevo_jugador": {"nombre": "Nuevo Jugador", "experiencia": "Nuevo", "juegos_este_ano": 0},
+            "nuevo_jugador": {
+                "nombre": "Nuevo Jugador",
+                "experiencia": "Nuevo",
+                "juegos_este_ano": 0,
+            },
         }
-        
+
         filas = self._simulate_sync_logic(existentes, notion_players)
-        
+
         assert len(filas) == 1
         assert filas[0]["Nombre"] == "Kur"
-        assert filas[0]["Juegos_Este_Ano"] == 2 # Updated
+        assert filas[0]["Juegos_Este_Ano"] == 2  # Updated
 
     def test_player_merged_adopt_notion_name(self):
         """Test that merging a player and choosing to adopt Notion name works."""
         existentes = {
-            "Kur": {"nombre": "Kur", "experiencia": "Antiguo", "juegos_este_ano": 1, "prioridad": 1, "partidas_deseadas": 3},
+            "Kur": {
+                "nombre": "Kur",
+                "experiencia": "Antiguo",
+                "juegos_este_ano": 1,
+                "prioridad": 1,
+                "partidas_deseadas": 3,
+            },
         }
         notion_players = {
             "kurt": {"nombre": "Kurt", "experiencia": "Antiguo", "juegos_este_ano": 5},
         }
         merges = {"Kur": {"to": "Kurt", "action": "merge_notion"}}
-        
+
         filas = self._simulate_sync_logic(existentes, notion_players, merges)
-        
+
         assert len(filas) == 1
-        assert filas[0]["Nombre"] == "Kurt" # Adopted new name
-        assert filas[0]["Juegos_Este_Ano"] == 5 # Updated from Notion
+        assert filas[0]["Nombre"] == "Kurt"  # Adopted new name
+        assert filas[0]["Juegos_Este_Ano"] == 5  # Updated from Notion
 
     def test_player_merged_keep_local_name(self):
         """Test that merging a player and choosing to keep local name works."""
         existentes = {
-            "Kur": {"nombre": "Kur", "experiencia": "Antiguo", "juegos_este_ano": 1, "prioridad": 1, "partidas_deseadas": 3},
+            "Kur": {
+                "nombre": "Kur",
+                "experiencia": "Antiguo",
+                "juegos_este_ano": 1,
+                "prioridad": 1,
+                "partidas_deseadas": 3,
+            },
         }
         notion_players = {
             "kurt": {"nombre": "Kurt", "experiencia": "Antiguo", "juegos_este_ano": 5},
         }
         merges = {"Kur": {"to": "Kurt", "action": "merge_local"}}
-        
+
         filas = self._simulate_sync_logic(existentes, notion_players, merges)
-        
+
         assert len(filas) == 1
-        assert filas[0]["Nombre"] == "Kur" # Kept local name
-        assert filas[0]["Juegos_Este_Ano"] == 5 # Updated from Notion
+        assert filas[0]["Nombre"] == "Kur"  # Kept local name
+        assert filas[0]["Juegos_Este_Ano"] == 5  # Updated from Notion
 
     def test_player_merge_skipped(self):
         """Test that skipping a merge preserves the local player and ignores the new Notion player."""
@@ -559,18 +644,23 @@ class TestSyncBehavior:
             "kurt": {"nombre": "Kurt", "experiencia": "Antiguo", "juegos_este_ano": 5},
         }
         merges: dict[str, Any] = {}  # User skipped
-        
+
         filas = self._simulate_sync_logic(existentes, notion_players, merges)
-        
+
         assert len(filas) == 1
-        assert filas[0]["Nombre"] == "Kur" # Local preserved
-        assert filas[0]["Juegos_Este_Ano"] == 1 # Local stats preserved (Kurt was ignored)
+        assert filas[0]["Nombre"] == "Kur"  # Local preserved
+        assert filas[0]["Juegos_Este_Ano"] == 1  # Local stats preserved (Kurt was ignored)
 
     def test_player_matched_via_alias_regression(self):
         """Regression: Match via alias must keep local name even without explicit merge."""
         existentes = {"Jean": {"nombre": "Jean", "experiencia": "Nuevo"}}
         notion_players = {
-            "jean carlos": {"nombre": "Jean Carlos", "experiencia": "Antiguo", "juegos_este_ano": 5, "alias": ["jean"]}
+            "jean carlos": {
+                "nombre": "Jean Carlos",
+                "experiencia": "Antiguo",
+                "juegos_este_ano": 5,
+                "alias": ["jean"],
+            }
         }
         filas = self._simulate_sync_logic(existentes, notion_players)
         assert filas[0]["Nombre"] == "Jean"
@@ -595,3 +685,30 @@ class TestSyncBehavior:
         merges = {"Jean": {"to": "Jean Carlos", "action": "merge_local"}}
         filas = self._simulate_sync_logic(existentes, notion_players, merges)
         assert filas[0]["Nombre"] == "Jean"
+
+
+# Alias casing preservation tests
+
+
+def test_build_notion_players_lookup_preserves_alias_casing() -> None:
+    mock_pages: list[NotionPage] = [
+        {
+            "id": "test-id-123",
+            "properties": {
+                "Nombre": {"type": "title", "title": [{"plain_text": "Juan"}]},
+                "Alias": {
+                    "type": "rich_text",
+                    "rich_text": [{"plain_text": "CamelCase Alias, UPPERCASE"}],
+                },
+                "Participaciones": {"type": "relation", "relation": []},
+            },
+        }
+    ]
+
+    result = build_notion_players_lookup(mock_pages, {})
+
+    player = result["juan"]
+    assert "CamelCase Alias" in player["alias"]
+    assert "UPPERCASE" in player["alias"]
+    # Ensure it did NOT aggressively lowercase
+    assert "camelcase alias" not in player["alias"]

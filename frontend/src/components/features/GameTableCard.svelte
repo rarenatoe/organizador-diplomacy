@@ -34,6 +34,10 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-8);
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden; /* Hard boundary to prevent visual bleed */
   }
   .card-header {
     display: flex;

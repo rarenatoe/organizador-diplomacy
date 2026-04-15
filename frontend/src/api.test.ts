@@ -113,7 +113,7 @@ describe("api.ts - FastAPI Error Handling", () => {
       } as Response);
 
       const result = await fetchNotionPlayers([]);
-      expect(result).toEqual({ error: "Error de servidor" });
+      expect(result).toEqual({ error: "Conflict", detail: [] });
     });
   });
 
@@ -354,7 +354,6 @@ describe("api.ts - FastAPI Error Handling", () => {
     });
 
     it("handles detail array with malformed objects (missing msg field)", async () => {
-      // Validation error array but objects don't have 'msg' field
       const errorResponse = {
         detail: [{ loc: ["body"], type: "missing" }] as unknown,
       };
@@ -365,8 +364,10 @@ describe("api.ts - FastAPI Error Handling", () => {
       } as Response);
 
       const result = await createSnapshot([]);
-      // Type guard should reject this and fall back to generic error
-      expect(result).toEqual({ error: "Error de servidor" });
+      expect(result).toEqual({
+        error: "Conflict",
+        detail: [{ loc: ["body"], type: "missing" }],
+      });
     });
 
     it("handles response without detail or error fields", async () => {

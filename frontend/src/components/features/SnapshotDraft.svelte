@@ -1,11 +1,48 @@
 <script lang="ts">
   import { onMount, tick, untrack } from "svelte";
+  import { SvelteSet } from "svelte/reactivity";
   import type {
     EditPlayerRow,
     SimilarName,
     MergePair,
     NotionPlayer,
+    AutocompletePlayer,
   } from "../../types";
+
+  type CsvPlayerRow = {
+    nombre: string;
+    experiencia?: string;
+    juegos_este_ano?: number;
+    prioridad?: number;
+    partidas_deseadas?: number;
+    partidas_gm?: number;
+    notion_id?: string | null;
+    notion_name?: string | null;
+    notion_alias?: string[] | null;
+  };
+
+  function buildPlayerRow(
+    base: Partial<EditPlayerRow> & { nombre: string },
+    history: Partial<
+      EditPlayerRow & { source: "history" | "notion" | "default" }
+    >,
+  ): EditPlayerRow {
+    return {
+      nombre: base.nombre,
+      original_nombre: base.nombre,
+      experiencia: base.experiencia ?? history.experiencia ?? "Nuevo",
+      juegos_este_ano: base.juegos_este_ano ?? history.juegos_este_ano ?? 0,
+      prioridad: base.prioridad ?? history.prioridad ?? 0,
+      partidas_deseadas:
+        base.partidas_deseadas ?? history.partidas_deseadas ?? 1,
+      partidas_gm: base.partidas_gm ?? history.partidas_gm ?? 0,
+      notion_id: base.notion_id ?? history.notion_id ?? null,
+      notion_name: base.notion_name ?? history.notion_name ?? null,
+      historyRestored: history.source === "history",
+    };
+  }
+
+  import PlayerName from "../ui/PlayerName.svelte";
   import {
     saveSnapshot,
     fetchNotionPlayers,
@@ -15,6 +52,7 @@
   } from "../../api";
   import { parsePlayersCsv, normalizeName } from "../../utils";
   import { setActiveNodeId } from "../../stores.svelte";
+  import { applySyncMerges } from "../../syncUtils";
   import { clickOutside } from "../../clickOutside";
   import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
   import CsvImportModal from "../modals/CsvImportModal.svelte";
@@ -24,6 +62,8 @@
   import Tooltip from "../ui/Tooltip.svelte";
   import DataTable, { type ColumnDef } from "../layout/DataTable.svelte";
   import SectionTitle from "../ui/SectionTitle.svelte";
+
+  let resolutionModal: ReturnType<typeof SyncResolutionModal>;
 
   interface Props {
     parentId: number | null;
@@ -49,7 +89,7 @@
     onShowError,
   }: Props = $props();
 
-  let draftPlayers = $state(
+  let draftPlayers: EditPlayerRow[] = $state(
     untrack(() =>
       initialPlayers.map((p) => ({
         nombre: p.nombre,
@@ -60,20 +100,42 @@
         partidas_deseadas: p.partidas_deseadas,
         partidas_gm: p.partidas_gm,
         historyRestored: false, // Default for existing players
+        notion_id: p.notion_id ?? null,
+        notion_name: p.notion_name ?? null,
       })),
     ),
   );
   let eventType = $state(untrack(() => defaultEventType));
-  let knownPlayers: string[] = $state([]);
+  let knownPlayers: AutocompletePlayer[] = $state([]);
+  let activeSuggestionIndex = $state(-1);
   let isAddingPlayer = $state(false);
   let newPlayerSearchQuery = $state("");
-  let pendingCsvPlayers: any[] = $state([]);
+  let pendingCsvPlayers: CsvPlayerRow[] = $state([]);
+  let pendingInlinePlayer: string | null = $state(null);
   let showCsvModal = $state(false);
   let saving = $state(false);
   let isImporting = $state(false);
   let resolutionVisible = $state(false);
   let resolutionPairs = $state<SimilarName[]>([]);
   let fetchedNotionPlayers = $state<NotionPlayer[]>([]);
+
+  // Derived state for the autocomplete dropdown. Automatically filters by text and hides already-linked identities.
+  let suggestedPlayers = $derived.by(() => {
+    const query = newPlayerSearchQuery.trim().toLowerCase();
+    if (!query) return [];
+
+    return knownPlayers
+      .filter((player) => {
+        if (!player.display.toLowerCase().includes(query)) return false;
+
+        return !draftPlayers.some(
+          (p) =>
+            p.nombre === player.nombre ||
+            (player.notion_id && p.notion_id === player.notion_id), // Fixed
+        );
+      })
+      .slice(0, 10);
+  });
 
   // Derived state for editing vs creating context
   let isEditing = $derived(parentId !== null);
@@ -108,7 +170,7 @@
   onMount(() => {
     getAllPlayers()
       .then((res) => {
-        knownPlayers = res.names;
+        knownPlayers = res.players;
       })
       .catch(console.error);
   });
@@ -125,52 +187,104 @@
     node.focus();
   }
 
-  async function confirmAddPlayer(nombre: string): Promise<void> {
-    if (!nombre.trim()) {
+  function enrichSimilaritiesWithDraft(
+    similarities: SimilarName[],
+  ): SimilarName[] {
+    return similarities.map((sim) => {
+      if (sim.notion_id) {
+        const draftMatch = draftPlayers.find(
+          (p) => p.notion_id === sim.notion_id,
+        );
+        if (draftMatch) {
+          return { ...sim, existing_local_name: draftMatch.nombre };
+        }
+      }
+      return sim;
+    });
+  }
+
+  async function confirmAddPlayer(
+    input: string | AutocompletePlayer,
+    skipSimilarity: boolean = false,
+    silentDuplicate: boolean = false,
+  ): Promise<void> {
+    // 1. Normalize input (Handle both string and rich objects)
+    const isRawString = typeof input === "string";
+    const name = isRawString ? input : input.nombre;
+
+    if (!name.trim()) {
       isAddingPlayer = false;
       return;
     }
 
-    let historyRestored = false;
-    let experiencia = "Nuevo";
-    let juegos_este_ano = 0;
-    let prioridad = 0;
-    let partidas_deseadas = 1;
-    let partidas_gm = 0;
+    // 2. Prevent Duplicates
+    if (
+      draftPlayers.some((p) => normalizeName(p.nombre) === normalizeName(name))
+    ) {
+      if (!silentDuplicate) {
+        onShowError(
+          "Jugador duplicado",
+          `El jugador '${name}' ya está en la lista.`,
+        );
+      }
+      isAddingPlayer = false;
+      newPlayerSearchQuery = "";
+      activeSuggestionIndex = -1;
+      return;
+    }
+
+    // 3. Similarity Check (Only for raw strings)
+    if (isRawString && !skipSimilarity) {
+      try {
+        const checkRes = await checkPlayerSimilarity([name]);
+        if (checkRes.similarities && checkRes.similarities.length > 0) {
+          pendingInlinePlayer = name;
+          resolutionPairs = enrichSimilaritiesWithDraft(checkRes.similarities);
+          resolutionVisible = true;
+          return; // Stop here; the modal will call handleResolutionComplete
+        }
+      } catch (e) {
+        console.error("Similarity check failed", e);
+      }
+    }
+
+    // 4. Fetch History (Wait for data to prevent UI flickering)
+    let historyData: Partial<
+      EditPlayerRow & { source: "history" | "notion" | "default" }
+    > = {};
+    const notionId = isRawString ? undefined : input.notion_id;
 
     try {
       const response = await lookupPlayerHistory(
-        [nombre],
+        name,
+        notionId,
         parentId || undefined,
       );
-      const playerData = response.players[nombre];
-      if (playerData) {
-        experiencia = playerData.experiencia;
-        juegos_este_ano = playerData.juegos_este_ano;
-        prioridad = playerData.prioridad;
-        partidas_deseadas = playerData.partidas_deseadas;
-        partidas_gm = playerData.partidas_gm;
-        historyRestored = playerData.source === "history";
+      if (response.player) {
+        historyData = response.player;
       }
     } catch (e) {
       console.warn("Failed to lookup player history:", e);
     }
 
-    draftPlayers = [
-      ...draftPlayers,
-      {
-        nombre,
-        original_nombre: nombre,
-        experiencia,
-        juegos_este_ano,
-        prioridad,
-        partidas_deseadas,
-        partidas_gm,
-        historyRestored,
-      },
-    ];
+    // 5. Construct the perfect, fully-populated row
+    const baseInput = isRawString
+      ? { nombre: name }
+      : {
+          nombre: name,
+          notion_id: input.notion_id,
+          notion_name: input.notion_name,
+        };
+
+    const newPlayer = buildPlayerRow(baseInput, historyData);
+
+    // 6. Push to Svelte State
+    draftPlayers = [...draftPlayers, newPlayer];
+
+    // 7. Reset UI
     isAddingPlayer = false;
     newPlayerSearchQuery = "";
+    activeSuggestionIndex = -1;
   }
 
   function handleDeletePlayer(index: number): void {
@@ -194,7 +308,7 @@
       const checkRes = await checkPlayerSimilarity(playerNames);
       if (checkRes.similarities && checkRes.similarities.length > 0) {
         pendingCsvPlayers = parsed;
-        resolutionPairs = checkRes.similarities;
+        resolutionPairs = enrichSimilaritiesWithDraft(checkRes.similarities);
         resolutionVisible = true;
         return;
       }
@@ -205,46 +319,46 @@
     await applyFinalCsvPlayers(parsed);
   }
 
-  async function applyFinalCsvPlayers(parsedRows: any[]) {
-    const playerNames = parsedRows.map((p) => p.nombre);
-    let enhancedPlayers = parsedRows.map((p) => ({
-      ...p,
-      original_nombre: p.nombre,
-      historyRestored: false,
-    }));
-
-    try {
-      const response = await lookupPlayerHistory(
-        playerNames,
-        parentId || undefined,
-      );
-      enhancedPlayers = parsedRows.map((p) => {
-        const playerData = response.players[p.nombre];
-        if (playerData) {
-          return {
-            ...p,
-            original_nombre: p.nombre,
-            experiencia: playerData.experiencia,
-            juegos_este_ano: playerData.juegos_este_ano,
-            prioridad: playerData.prioridad,
-            partidas_deseadas: playerData.partidas_deseadas,
-            partidas_gm: playerData.partidas_gm,
-            historyRestored: playerData.source === "history",
-          };
-        }
-        return {
-          ...p,
-          original_nombre: p.nombre,
-          partidas_deseadas: 1,
-          partidas_gm: 0,
-          historyRestored: false,
-        };
-      });
-    } catch (e) {
-      console.warn("Failed to lookup player history for CSV import:", e);
+  async function applyFinalCsvPlayers(parsedRows: CsvPlayerRow[]) {
+    const uniqueRows: CsvPlayerRow[] = [];
+    const seenNames = new SvelteSet(
+      draftPlayers.map((p) => normalizeName(p.nombre)),
+    );
+    for (const row of parsedRows) {
+      const normName = normalizeName(row.nombre);
+      if (!seenNames.has(normName)) {
+        uniqueRows.push(row);
+        seenNames.add(normName);
+      }
     }
 
+    if (uniqueRows.length === 0) {
+      showCsvModal = false;
+      isImporting = false;
+      return;
+    }
+
+    const playerPromises = uniqueRows.map(async (p) => {
+      let historyData: Partial<
+        EditPlayerRow & { source: "history" | "notion" | "default" }
+      > = {};
+      try {
+        const response = await lookupPlayerHistory(
+          p.nombre,
+          p.notion_id ?? undefined,
+          parentId || undefined,
+        );
+        if (response.player) historyData = response.player;
+      } catch (e) {
+        console.warn(`Failed to lookup player ${p.nombre}:`, e);
+      }
+      return buildPlayerRow(p, historyData);
+    });
+
+    const enhancedPlayers = await Promise.all(playerPromises);
     draftPlayers = [...draftPlayers, ...enhancedPlayers];
+    showCsvModal = false;
+    isImporting = false;
   }
 
   function handleCancelCsv(): void {
@@ -254,8 +368,10 @@
   async function handleImportNotion(): Promise<void> {
     isImporting = true;
     try {
-      const draftNames = draftPlayers.map((p) => p.nombre);
-      const response = await fetchNotionPlayers(draftNames);
+      const unlinkedNames = draftPlayers
+        .filter((p) => !p.notion_id)
+        .map((p) => p.nombre);
+      const response = await fetchNotionPlayers(unlinkedNames);
 
       if (response.error) {
         onShowError("Aviso / Error", `Error: ${response.error}`);
@@ -280,56 +396,37 @@
   }
 
   function mergeNotionPlayers(merges: MergePair[]): void {
-    const mergeMap = new Map(merges.map((m) => [m.from, m]));
+    // 1. Apply merges and deduplicate existing draft players
+    draftPlayers = applySyncMerges(draftPlayers, merges, fetchedNotionPlayers);
 
-    // Update existing players with Notion data
-    const updatedPlayers = draftPlayers.map((player) => {
-      const mergeInfo = mergeMap.get(player.nombre);
-      const notionName = mergeInfo ? mergeInfo.to : player.nombre;
-      const normName = normalizeName(notionName);
-
-      const notionPlayer = fetchedNotionPlayers.find(
-        (p) =>
-          normalizeName(p.nombre) === normName ||
-          p.alias?.some((a) => normalizeName(a) === normName),
-      );
-
-      if (notionPlayer) {
-        return {
-          ...player,
-          nombre:
-            mergeInfo?.action === "merge_notion"
-              ? notionPlayer.nombre
-              : player.nombre,
-          experiencia: notionPlayer.experiencia,
-          juegos_este_ano: notionPlayer.juegos_este_ano,
-        };
-      }
-      return player;
-    });
-
-    // Strict Roster Rule: Only add new players if creating from scratch (parentId === null)
+    // 2. Strict Roster Rule: Add new players only if creating from scratch
     if (parentId === null) {
       const existingNames = new Set(
-        updatedPlayers.map((p) => normalizeName(p.nombre)),
+        draftPlayers.map((p) => normalizeName(p.nombre)),
       );
+      const linkedNotionIds = new Set(
+        draftPlayers.map((p) => p.notion_id).filter(Boolean),
+      );
+
       const newPlayers = fetchedNotionPlayers
-        .filter((p) => !existingNames.has(normalizeName(p.nombre)))
+        .filter(
+          (p) =>
+            !linkedNotionIds.has(p.notion_id) &&
+            !existingNames.has(normalizeName(p.nombre)),
+        )
         .map((p) => ({
-          nombre: p.nombre,
+          ...p, // Spread Notion stats (experiencia, juegos_este_ano)
           original_nombre: p.nombre,
-          experiencia: p.experiencia,
-          juegos_este_ano: p.juegos_este_ano,
           prioridad: 0,
           partidas_deseadas: 1,
           partidas_gm: 0,
-          historyRestored: false, // Notion sync doesn't use history restoration
+          notion_id: p.notion_id || null,
+          notion_name: p.nombre || null,
+          notion_alias: p.alias || null,
+          historyRestored: false,
         }));
 
-      draftPlayers = [...updatedPlayers, ...newPlayers];
-    } else {
-      // When updating existing list, only update existing players
-      draftPlayers = updatedPlayers;
+      draftPlayers.push(...newPlayers);
     }
 
     eventType = "sync";
@@ -339,23 +436,55 @@
   }
 
   async function handleResolutionComplete(merges: MergePair[]): Promise<void> {
-    const resolvedMerges = merges;
     resolutionVisible = false;
-
     if (pendingCsvPlayers.length > 0) {
-      // It's a CSV import resolution
+      const renameActions = ["link_rename", "merge_notion", "use_existing"];
       const resolvedRows = pendingCsvPlayers.map((row) => {
-        const mergeTarget = resolvedMerges[row.nombre];
+        const mergeTarget = merges.find((m) => m.from === row.nombre);
         if (mergeTarget) {
-          return { ...row, nombre: mergeTarget.to };
+          const shouldRename = renameActions.includes(mergeTarget.action);
+          return {
+            ...row,
+            nombre: shouldRename ? mergeTarget.to : row.nombre,
+            notion_name: mergeTarget.to,
+            notion_id: mergeTarget.notion_id,
+          };
         }
         return row;
       });
       pendingCsvPlayers = [];
       await applyFinalCsvPlayers(resolvedRows);
+    } else if (pendingInlinePlayer) {
+      const originalName = pendingInlinePlayer;
+      pendingInlinePlayer = null;
+
+      const mergeTarget = merges.find((m) => m.from === originalName);
+
+      if (!mergeTarget) {
+        // Action was "skip" - add as new distinct player
+        await confirmAddPlayer(originalName, true);
+      } else {
+        // They chose a resolution ("use_existing", "link_rename", "link_only")
+        const renameActions = ["link_rename", "merge_notion", "use_existing"];
+        const shouldRename = renameActions.includes(mergeTarget.action);
+        const isUseExisting = mergeTarget.action === "use_existing";
+
+        const finalName = shouldRename ? mergeTarget.to : originalName;
+
+        const playerObj = {
+          display: finalName,
+          nombre: finalName,
+          notion_id: mergeTarget.notion_id,
+          notion_name: isUseExisting ? undefined : mergeTarget.to,
+          is_local: true,
+          is_alias: false,
+        } as AutocompletePlayer;
+
+        await confirmAddPlayer(playerObj, true, isUseExisting);
+      }
     } else {
-      // It's a Notion Sync resolution (existing logic)
-      await handleImportNotion();
+      // It's a Notion Sync resolution
+      mergeNotionPlayers(merges);
     }
   }
 
@@ -363,6 +492,8 @@
     resolutionVisible = false;
     resolutionPairs = [];
     fetchedNotionPlayers = [];
+    pendingInlinePlayer = null;
+    pendingCsvPlayers = [];
   }
 
   async function handleSave(): Promise<void> {
@@ -378,11 +509,16 @@
     try {
       // Calculate manual renames by comparing current name to original
       const manualRenames = draftPlayers
-        .filter((p) => p.original_nombre && p.original_nombre !== p.nombre)
+        .filter(
+          (p): p is EditPlayerRow & { original_nombre: string } =>
+            p.original_nombre !== undefined && p.original_nombre !== p.nombre,
+        )
         .map((p) => ({ from: p.original_nombre, to: p.nombre }));
 
       const players: EditPlayerRow[] = draftPlayers.map((p) => ({
         nombre: p.nombre,
+        notion_id: p.notion_id,
+        notion_name: p.notion_name,
         experiencia: p.experiencia,
         juegos_este_ano: p.juegos_este_ano,
         prioridad: p.prioridad,
@@ -471,16 +607,16 @@
   {/snippet}
 
   {#snippet body()}
-    {#if draftPlayers.length > 0}
+    {#if draftPlayers.length > 0 || isAddingPlayer}
       {#snippet nameInput(row: EditPlayerRow, i: number)}
         <div class="name-input-wrapper">
-          <input
-            type="text"
-            class="table-input table-input-ghost text-strong"
-            bind:value={row.nombre}
-            placeholder="Nombre del jugador"
+          <PlayerName
+            bind:player={draftPlayers[i]!}
+            editable={true}
+            showNotionIndicator={true}
           />
-          {#if row.historyRestored}
+
+          {#if draftPlayers[i]?.historyRestored}
             <Tooltip
               text="Perfil histórico cargado desde la base de datos"
               icon="📚"
@@ -578,24 +714,59 @@
                   placeholder="Escribe para buscar o agregar..."
                   use:focusOnMount
                   onkeydown={(e) => {
-                    if (e.key === "Enter")
-                      confirmAddPlayer(newPlayerSearchQuery);
-                    if (e.key === "Escape") isAddingPlayer = false;
+                    if (e.key === "Enter") {
+                      if (
+                        activeSuggestionIndex >= 0 &&
+                        activeSuggestionIndex < suggestedPlayers.length
+                      ) {
+                        const selectedPlayer =
+                          suggestedPlayers[activeSuggestionIndex];
+                        if (selectedPlayer) {
+                          confirmAddPlayer(selectedPlayer, true);
+                        } else {
+                          confirmAddPlayer(newPlayerSearchQuery);
+                        }
+                      } else {
+                        confirmAddPlayer(newPlayerSearchQuery);
+                      }
+                    }
+                    if (e.key === "Escape") {
+                      isAddingPlayer = false;
+                      activeSuggestionIndex = -1;
+                    }
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      if (suggestedPlayers.length > 0) {
+                        activeSuggestionIndex =
+                          (activeSuggestionIndex + 1) % suggestedPlayers.length;
+                      }
+                    }
+                    if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      if (suggestedPlayers.length > 0) {
+                        activeSuggestionIndex =
+                          activeSuggestionIndex <= 0
+                            ? suggestedPlayers.length - 1
+                            : activeSuggestionIndex - 1;
+                      }
+                    }
                   }}
                 />
                 {#if newPlayerSearchQuery.trim().length > 0}
                   <div class="autocomplete-dropdown">
-                    {#each knownPlayers
-                      .filter((n) => n
-                          .toLowerCase()
-                          .includes(newPlayerSearchQuery.toLowerCase()))
-                      .slice(0, 10) as suggestedName (suggestedName)}
+                    {#each suggestedPlayers as suggestion, index (suggestion.display)}
                       <button
                         type="button"
                         class="autocomplete-item"
-                        onclick={() => confirmAddPlayer(suggestedName)}
+                        class:active={activeSuggestionIndex === index}
+                        onclick={() => confirmAddPlayer(suggestion, true)}
                       >
-                        {suggestedName}
+                        {suggestion.display}
+                        {#if suggestion.is_alias && suggestion.notion_name}
+                          <span class="alias-text text-gray-400">
+                            ↪ {suggestion.notion_name}</span
+                          >
+                        {/if}
                       </button>
                     {/each}
                   </div>
@@ -641,6 +812,7 @@
 {/if}
 
 <SyncResolutionModal
+  bind:this={resolutionModal}
   visible={resolutionVisible}
   pairs={resolutionPairs}
   onComplete={handleResolutionComplete}
@@ -663,6 +835,13 @@
     display: flex;
     align-items: center;
     gap: var(--space-4);
+    min-width: 0; /* CRITICAL: Allows the grid column to squish this container */
+  }
+
+  /* CRITICAL: Forces the PlayerName flex child to shrink so the input doesn't stretch the grid */
+  .name-input-wrapper :global(.player-name-wrapper) {
+    flex: 1;
+    min-width: 0;
   }
 
   :global(.compact-title) {
@@ -716,6 +895,19 @@
   .autocomplete-item:focus {
     background: var(--bg-tertiary);
     outline: none;
+  }
+
+  .autocomplete-item.active {
+    background: var(--bg-tertiary);
+    outline: 2px solid var(--accent-primary);
+    outline-offset: -2px;
+  }
+
+  .alias-text {
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-left: var(--space-8);
+    font-style: italic;
   }
 
   .empty-draft p {

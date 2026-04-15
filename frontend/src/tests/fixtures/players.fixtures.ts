@@ -5,6 +5,8 @@ export const createMockEditPlayerRow = (
 ): EditPlayerRow => {
   const baseEditPlayerRow: EditPlayerRow = {
     nombre: "Test Player",
+    notion_id: null,
+    notion_name: null,
     experiencia: "Nuevo",
     juegos_este_ano: 0,
     prioridad: 0,

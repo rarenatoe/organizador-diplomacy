@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { SimilarName, ResolutionAction, MergePair } from "../../types";
+  import Badge from "../ui/Badge.svelte";
   import Button from "../ui/Button.svelte";
 
   interface Props {
@@ -29,11 +30,18 @@
     } else {
       const merges: MergePair[] = decisions
         .filter((d) => d.action !== "skip")
-        .map((d) => ({
-          from: d.pair.snapshot,
-          to: d.pair.notion,
-          action: d.action,
-        }));
+        .map((d) => {
+          let toName = d.pair.notion_name;
+          if (d.action === "use_existing" && d.pair.existing_local_name) {
+            toName = d.pair.existing_local_name;
+          }
+          return {
+            from: d.pair.snapshot,
+            to: toName,
+            action: d.action,
+            notion_id: d.pair.notion_id,
+          };
+        });
       onComplete(merges);
     }
   }
@@ -42,7 +50,6 @@
     onCancel();
   }
 
-  // Reset state when modal becomes visible
   $effect(() => {
     if (visible) {
       currentIndex = 0;
@@ -55,54 +62,110 @@
   <div class="resolution-overlay visible">
     <div class="resolution-card">
       <div class="resolution-header">
-        <span class="resolution-icon">🔍</span>
-        <span class="resolution-title">Nombres similares</span>
-      </div>
-      <div class="resolution-counter">
-        Conflicto {currentIndex + 1} de {total}
+        <span class="resolution-icon">⚠️</span>
+        <span class="resolution-title">Resolver Conflictos</span>
+        <span class="resolution-counter">
+          Conflicto {currentIndex + 1} de {total}
+        </span>
       </div>
       {#if currentPair}
-        <div class="resolution-pair">
-          <div class="resolution-side">
-            <span class="resolution-label">Notion</span>
-            <span class="resolution-name resolution-name-notion"
-              >{currentPair.notion}</span
+        <div class="comparison-card">
+          <span class="side-label notion-label">Notion</span>
+          <div class="vs-divider">VS</div>
+          <span class="side-label snapshot-label">Snapshot</span>
+
+          <span
+            class="side-name highlight-notion notion-name"
+            title={currentPair.notion_name}>{currentPair.notion_name}</span
+          >
+          <span
+            class="side-name highlight-snapshot snapshot-name"
+            title={currentPair.snapshot}>{currentPair.snapshot}</span
+          >
+
+          {#if currentPair.matched_alias}
+            <span
+              class="alias-text notion-alias"
+              title={`(vía alias: ${currentPair.matched_alias})`}
+            >
+              (vía alias: {currentPair.matched_alias})</span
+            >
+          {/if}
+        </div>
+
+        <div class="resolution-similarity">
+          <Badge
+            variant="warning"
+            text={`${similarity}% similar`}
+            pill={true}
+          />
+        </div>
+
+        {#if currentPair.existing_local_name}
+          <div class="resolution-message">
+            Jugador existente detectado. ¿Deseas usar <span
+              class="highlight-snapshot">{currentPair.existing_local_name}</span
+            >?
+          </div>
+          <div class="resolution-actions">
+            <Button
+              variant="primary"
+              title={`Usar el jugador existente: ${currentPair.existing_local_name}`}
+              onclick={() => handleAction("use_existing")}
+              icon="✨">Usar {currentPair.existing_local_name}</Button
+            >
+            <Button
+              variant="ghost"
+              title="No realizar ninguna acción"
+              onclick={() => handleAction("skip")}
+              icon="⏭">Omitir</Button
             >
           </div>
-          <div class="resolution-vs">vs</div>
-          <div class="resolution-side">
-            <span class="resolution-label">Snapshot</span>
-            <span class="resolution-name resolution-name-snapshot"
+          <div class="compact-hint">
+            <span class="hint-icon">💡</span>
+            <div class="hint-text">
+              <strong>Autocorrección:</strong> Evita duplicados usando el jugador
+              que ya está en la lista.
+            </div>
+          </div>
+        {:else}
+          <div class="resolution-message">
+            Encontramos a <span class="highlight-snapshot"
               >{currentPair.snapshot}</span
+            >. Coincide con el jugador de Notion
+            <span class="highlight-notion">{currentPair.notion_name}</span>
+            {#if currentPair.matched_alias}<span class="alias-text"
+                >(vía alias: {currentPair.matched_alias})</span
+              >{/if}
+          </div>
+          <div class="resolution-actions">
+            <Button
+              variant="primary"
+              title="Vincular y actualizar el nombre local al de Notion"
+              onclick={() => handleAction("link_rename")}
+              icon="📋">Vincular & Renombrar</Button
+            >
+            <Button
+              variant="secondary"
+              title="Vincular manteniendo el nombre local actual"
+              onclick={() => handleAction("link_only")}
+              icon="🔗">Vincular Solo</Button
+            >
+            <Button
+              variant="ghost"
+              title="No realizar ninguna acción"
+              onclick={() => handleAction("skip")}
+              icon="⏭">Omitir</Button
             >
           </div>
-        </div>
-        <div class="resolution-similarity">{similarity}% similar</div>
-        <div class="resolution-actions">
-          <Button
-            variant="primary"
-            title="Fusionar y adoptar el nombre principal de Notion"
-            onclick={() => handleAction("merge_notion")}
-            icon="📋">Usar nombre Notion</Button
-          >
-          <Button
-            variant="secondary"
-            title="Fusionar manteniendo el nombre local actual"
-            onclick={() => handleAction("merge_local")}
-            icon="📱">Mantener local</Button
-          >
-          <Button
-            variant="ghost"
-            title="No realizar ninguna acción de fusión"
-            onclick={() => handleAction("skip")}
-            icon="⏭">Omitir</Button
-          >
-        </div>
-        <p class="resolution-hint">
-          💡 <strong>Mantener local</strong> vincula los datos pero conserva el nombre
-          del snapshot. Recuerda actualizar el nombre o añadir el alias en Notion
-          para futuras sincronizaciones.
-        </p>
+          <div class="compact-hint">
+            <span class="hint-icon">💡</span>
+            <div class="hint-text">
+              <strong>Vincular Solo</strong> conserva tu nombre local.<br />
+              <strong>Renombrar</strong> usa el nombre de Notion.
+            </div>
+          </div>
+        {/if}
       {/if}
       <div class="resolution-footer">
         <Button variant="ghost" onclick={handleStop}>Detener resolución</Button>
@@ -119,7 +182,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 150;
+    z-index: 1000;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.2s;
@@ -139,7 +202,8 @@
     box-shadow: var(--shadow-xl);
     display: flex;
     flex-direction: column;
-    gap: var(--space-16);
+    gap: var(--space-12);
+    border: 1px solid var(--border-subtle);
   }
 
   .resolution-header {
@@ -149,88 +213,124 @@
   }
 
   .resolution-icon {
-    font-size: 20px;
+    font-size: 1.5em;
   }
 
   .resolution-title {
-    font-size: 15px;
     font-weight: 700;
-    color: var(--text-primary);
+    font-size: 1.1em;
+    flex: 1;
   }
 
   .resolution-counter {
-    font-size: 12px;
+    color: var(--text-subtle);
+    font-size: 0.9em;
     font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
   }
 
-  .resolution-pair {
+  .comparison-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    row-gap: 2px;
+    align-items: center;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--space-8);
+    padding: var(--space-12) var(--space-16);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .notion-label {
+    grid-column: 1;
+    grid-row: 1;
+    text-align: right;
+  }
+
+  .snapshot-label {
+    grid-column: 3;
+    grid-row: 1;
+    text-align: left;
+  }
+
+  .vs-divider {
+    grid-column: 2;
+    grid-row: 2;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--text-muted);
+    padding: 0 var(--space-16);
+    text-transform: uppercase;
     display: flex;
     align-items: center;
-    gap: var(--space-16);
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-default);
-    box-shadow: var(--shadow-sm);
-    border-radius: var(--space-8);
-    padding: var(--space-16);
+    justify-content: center;
   }
 
-  .resolution-side {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-8);
+  .notion-name {
+    grid-column: 1;
+    grid-row: 2;
+    text-align: right;
   }
 
-  .resolution-label {
+  .snapshot-name {
+    grid-column: 3;
+    grid-row: 2;
+    text-align: left;
+  }
+
+  .notion-alias {
+    grid-column: 1;
+    grid-row: 3;
+    text-align: right;
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .side-label {
     font-size: 10px;
     font-weight: 700;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--text-muted);
   }
 
-  .resolution-name {
-    font-size: 14px;
+  .side-name {
+    font-size: 15px;
     font-weight: 600;
-    color: var(--text-primary);
-    word-break: break-word;
-  }
-
-  .resolution-name-notion {
-    color: var(--info-text-subtle);
-  }
-
-  .resolution-name-snapshot {
-    color: var(--success-text-subtle);
-  }
-
-  .resolution-vs {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    flex-shrink: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .resolution-similarity {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--warning-text-subtle);
+    display: flex;
+    justify-content: center;
+    margin-bottom: var(--space-4);
+  }
+
+  .resolution-message {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-secondary);
     text-align: center;
   }
 
-  .resolution-hint {
-    font-size: 11px;
-    line-height: var(--line-height-16);
+  .highlight-snapshot {
+    font-weight: 600;
+    color: var(--success-text-subtle);
+  }
+
+  .highlight-notion {
+    font-weight: 600;
+    color: var(--info-text-subtle);
+  }
+
+  .alias-text {
     color: var(--text-muted);
-    background: var(--bg-tertiary);
-    padding: var(--space-8) var(--space-16);
-    border-radius: var(--space-8);
-    margin: 0;
-    border-left: var(--space-4) solid var(--warning-border);
+    font-style: italic;
   }
 
   .resolution-actions {
@@ -239,8 +339,31 @@
     gap: var(--space-8);
   }
 
+  .compact-hint {
+    display: flex;
+    align-items: center;
+    gap: var(--space-8);
+    background: var(--info-bg-subtle);
+    border: 1px solid var(--info-border-subtle);
+    padding: var(--space-8) var(--space-12);
+    border-radius: var(--space-8);
+  }
+
+  .hint-icon {
+    font-size: 14px;
+    line-height: 1.2;
+  }
+
+  .hint-text {
+    font-size: 11px;
+    color: var(--info-text-subtle);
+    line-height: 1.4;
+  }
+
   .resolution-footer {
     display: flex;
     justify-content: center;
+    padding-top: var(--space-12);
+    border-top: 1px solid var(--border-subtle);
   }
 </style>

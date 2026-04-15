@@ -7,6 +7,15 @@ This module provides async functions for use with FastAPI background tasks.
 
 from __future__ import annotations
 
+__all__ = [
+    "fetch_notion_data",
+    "build_notion_players_lookup",
+    "notion_cache_to_db",
+    "daemon_loop",
+    "start_background_sync",
+]
+
+
 import asyncio
 import concurrent.futures
 import difflib
@@ -40,18 +49,49 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# ── Player field defaults for first-time Notion players ──────────────────────
+# TypedDict definitions for Notion API responses
 
-FIELD_DEFAULTS: dict[str, int] = {
-    "prioridad": 0,
-    "partidas_deseadas": 1,
-    "partidas_gm": 0,
-}
+
+class NotionTextItem(TypedDict, total=False):
+    plain_text: str
+
+
+class NotionRelationItem(TypedDict, total=False):
+    id: str
+
+
+class NotionFormula(TypedDict, total=False):
+    type: str
+    number: int | float | None
+
+
+class NotionProperty(TypedDict, total=False):
+    id: str
+    type: str
+    title: list[NotionTextItem]
+    rich_text: list[NotionTextItem]
+    number: int | float | None
+    formula: NotionFormula
+    relation: list[NotionRelationItem]
+
+
+class NotionPage(TypedDict):
+    id: str
+    properties: dict[str, NotionProperty]
+
+
+class NotionQueryResponse(TypedDict, total=False):
+    results: list[NotionPage]
+    has_more: bool
+    next_cursor: str | None
+
 
 # ── TypedDict for Notion player data ───────────────────────────────────────────
 
+
 class NotionPlayerDict(TypedDict):
     """TypedDict for Notion player data with strict type safety."""
+
     notion_id: str
     nombre: str
     experiencia: str
@@ -65,6 +105,14 @@ class NotionPlayerDict(TypedDict):
     c_russia: int
     c_turkey: int
 
+
+# Player field defaults for first-time Notion players
+
+FIELD_DEFAULTS: dict[str, int] = {
+    "prioridad": 0,
+    "partidas_deseadas": 1,
+    "partidas_gm": 0,
+}
 
 # ── Country property mapping ──────────────────────────────────────────────────
 
@@ -81,7 +129,7 @@ COUNTRY_PROPS: dict[str, str] = {
 # ── Helpers de extracción ─────────────────────────────────────────────────────
 
 
-def extraer_numero(prop: dict[str, Any]) -> int:
+def extract_number(prop: NotionProperty | None) -> int:
     """Extrae un número de una propiedad number o formula."""
     if not prop:
         return 0
@@ -92,13 +140,17 @@ def extraer_numero(prop: dict[str, Any]) -> int:
     return 0
 
 
-def extraer_nombre(prop: dict[str, Any]) -> str:
+def extract_name(prop: NotionProperty | None) -> str:
     """Extrae texto plano de una propiedad title."""
+    if not prop:
+        return ""
     return "".join(p.get("plain_text", "") for p in prop.get("title", [])).strip()
 
 
-def experiencia(participaciones_prop: dict[str, Any]) -> str:
+def calculate_experience(participaciones_prop: NotionProperty | None) -> str:
     """'Antiguo' si el jugador tiene ≥1 participación histórica, 'Nuevo' si no."""
+    if not participaciones_prop:
+        return "Nuevo"
     return "Antiguo" if participaciones_prop.get("relation") else "Nuevo"
 
 
@@ -195,6 +247,7 @@ def detect_similar_names(
     """
     Detect similar names between Notion (including aliases) and snapshot
     using a 4-step waterfall algorithm.
+    Returns detailed match information including matching method.
     """
     # Normalize notion_players input to list of dicts if it's a map
     players_list = (
@@ -214,8 +267,8 @@ def detect_similar_names(
 
     for player_data in players_list:
         notion_main_name = player_data["nombre"]
+        notion_id = player_data["notion_id"]
         norm_notion_main = normalize_name(notion_main_name)
-        notion_aliases = [normalize_name(a) for a in player_data.get("alias", [])]
 
         for snap_name in snapshot_names:
             norm_snap = norm_snapshots[snap_name]
@@ -225,16 +278,12 @@ def detect_similar_names(
                 exact_matches_snapshot.add(snap_name)
                 continue
 
-            # Step 2: Explicit Alias Match
-            if norm_snap in notion_aliases:
-                exact_matches_snapshot.add(snap_name)
-                continue
-
     # Step 3: Hybrid Fuzzy Matching
     # Only compare snapshots that didn't have an exact match with ANY notion player
     # and notion players that didn't have an exact match with THIS snapshot
     for player_data in players_list:
         notion_main_name = player_data["nombre"]
+        notion_id = player_data["notion_id"]
         notion_variations = [notion_main_name] + player_data.get("alias", [])
 
         for snap_name in snapshot_names:
@@ -243,19 +292,34 @@ def detect_similar_names(
 
             # Check similarity against all variations, keep best
             best_sim = 0.0
+            best_match_method = "fuzzy"
+            matched_alias = None
+
             for var in notion_variations:
-                sim = similarity(var, snap_name)
+                # Compare normalized strings to guarantee case/accent insensitivity
+                sim = similarity(normalize_name(var), norm_snapshots[snap_name])
                 if sim > best_sim:
                     best_sim = sim
+                    if var != notion_main_name:
+                        # This variation is an alias
+                        matched_alias = var
+                        best_match_method = "alias_exact" if sim == 1.0 else "alias_fuzzy"
+                    else:
+                        best_match_method = "name_fuzzy"
 
             if best_sim >= threshold:
-                potential_matches.append(
-                    {
-                        "notion": notion_main_name,
-                        "snapshot": snap_name,
-                        "similarity": round(best_sim, 3),
-                    }
-                )
+                match_data = {
+                    "notion_id": notion_id,
+                    "notion_name": notion_main_name,
+                    "snapshot": snap_name,
+                    "similarity": round(best_sim, 3),
+                    "match_method": best_match_method,
+                }
+
+                if matched_alias:
+                    match_data["matched_alias"] = matched_alias
+
+                potential_matches.append(match_data)
 
     # Step 4: Bi-Directional Ambiguity Detection (1-to-Many)
     # If a name maps to multiple candidates, they are all conflicts.
@@ -264,8 +328,8 @@ def detect_similar_names(
     snap_to_notions: defaultdict[str, set[str]] = defaultdict(set)
 
     for m in potential_matches:
-        notion_to_snaps[m["notion"]].add(m["snapshot"])
-        snap_to_notions[m["snapshot"]].add(m["notion"])
+        notion_to_snaps[m["notion_name"]].add(m["snapshot"])
+        snap_to_notions[m["snapshot"]].add(m["notion_name"])
 
     # All potential matches found in Step 3 are technically conflicts
     # since they are not exact matches but are above threshold.
@@ -275,7 +339,7 @@ def detect_similar_names(
     unique_matches: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     for m in potential_matches:
-        key = (m["notion"], m["snapshot"])
+        key = (m["notion_name"], m["snapshot"])
         if key not in seen:
             unique_matches.append(m)
             seen.add(key)
@@ -287,10 +351,10 @@ def detect_similar_names(
 # ── Descarga desde Notion ─────────────────────────────────────────────────────
 
 
-def descargar_todos(
+def download_all_pages(
     client: Client,
     database_id: str,
-) -> list[dict[str, Any]]:
+) -> list[NotionPage]:
     """
     Descarga todas las páginas de la DB paginando automáticamente.
 
@@ -316,7 +380,7 @@ def descargar_todos(
         if name in props:
             prop_ids.append(props[name]["id"])
 
-    pages: list[dict[str, Any]] = []
+    pages: list[NotionPage] = []
     cursor: str | None = None
     while True:
         kwargs: dict[str, Any] = {
@@ -327,15 +391,17 @@ def descargar_todos(
             kwargs["filter_properties"] = prop_ids
         if cursor:
             kwargs["start_cursor"] = cursor
-        response: dict[str, Any] = cast("dict[str, Any]", client.data_sources.query(**kwargs))
+        response = cast("NotionQueryResponse", client.data_sources.query(**kwargs))
+
         pages.extend(response.get("results", []))
+
         if not response.get("has_more"):
             break
         cursor = response.get("next_cursor")
     return pages
 
 
-def conteo_partidas_este_ano(
+def count_games_this_year(
     client: Client,
     participaciones_db_id: str,
     año: int,
@@ -431,10 +497,10 @@ def find_notion_player(
 # ── Core sync logic ──────────────────────────────────────────────────────────
 
 
-async def _fetch_notion_data() -> tuple[list[dict[str, Any]], dict[str, int], Client]:
+async def fetch_notion_data() -> tuple[list[NotionPage], dict[str, int], Client]:
     """
     Fetch player data from Notion API.
-    Returns (pages, conteo_por_jugador, client).
+    Returns (pages, games_played_map, client).
     """
     load_dotenv()
     token = os.getenv("NOTION_TOKEN")
@@ -454,23 +520,23 @@ async def _fetch_notion_data() -> tuple[list[dict[str, Any]], dict[str, int], Cl
     # Run Notion API calls in thread pool (they're blocking I/O)
     loop = asyncio.get_event_loop()
     with concurrent.futures.ThreadPoolExecutor() as executor:
-        future_pages = executor.submit(descargar_todos, client, db_id)
-        future_conteo = executor.submit(conteo_partidas_este_ano, client, part_db_id, año_actual)
+        future_pages = executor.submit(download_all_pages, client, db_id)
+        future_conteo = executor.submit(count_games_this_year, client, part_db_id, año_actual)
 
         pages = await loop.run_in_executor(None, future_pages.result)
-        conteo_por_jugador = await loop.run_in_executor(None, future_conteo.result)
+        games_played_map = await loop.run_in_executor(None, future_conteo.result)
 
     logger.info(
         f"Notion sync: {len(pages)} jugador(es), "
-        f"{sum(conteo_por_jugador.values())} partida(s) en {año_actual}."
+        f"{sum(games_played_map.values())} partida(s) en {año_actual}."
     )
 
-    return pages, conteo_por_jugador, client
+    return pages, games_played_map, client
 
 
-def _build_notion_players_lookup(
-    pages: list[dict[str, Any]],
-    conteo_por_jugador: dict[str, int],
+def build_notion_players_lookup(
+    pages: list[NotionPage],
+    games_played_map: dict[str, int],
 ) -> dict[str, NotionPlayerDict]:
     """Build a lookup dict of Notion players by normalized name."""
     notion_players: dict[str, NotionPlayerDict] = {}
@@ -480,17 +546,17 @@ def _build_notion_players_lookup(
         nombre_prop = props.get("Nombre")
         if not nombre_prop:
             continue
-        nombre = extraer_nombre(nombre_prop)
+        nombre = extract_name(nombre_prop)
         if not nombre:
             continue
 
-        # Experiencia ← total histórico de Participaciones
+        # Experiencia
         part_prop = props.get("Participaciones")
-        experiencia_val = experiencia(part_prop) if part_prop else "Nuevo"
+        experience_val = calculate_experience(part_prop)
 
-        # Juegos_Este_Ano ← conteo filtrado por año (indexado por page ID del jugador)
+        # Juegos_Este_Ano
         player_id = page["id"].replace("-", "")
-        juegos = conteo_por_jugador.get(player_id, 0)
+        games_count = games_played_map.get(player_id, 0)
 
         # Alias extraction
         alias_prop = props.get("Alias")
@@ -499,28 +565,30 @@ def _build_notion_players_lookup(
             if alias_prop
             else ""
         )
-        alias_list = [a.strip().lower() for a in alias_text.split(",") if a.strip()]
+        alias_list = [a.strip() for a in alias_text.split(",") if a.strip()]
 
         # Country history extraction
         countries_data = {
-            key: extraer_numero(props.get(notion_name, {}))
+            key: extract_number(props.get(notion_name))
             for key, notion_name in COUNTRY_PROPS.items()
         }
 
-        notion_players[normalize_name(nombre)] = NotionPlayerDict({
-            "notion_id": page["id"],
-            "nombre": nombre,
-            "experiencia": experiencia_val,
-            "juegos_este_ano": juegos,
-            "alias": alias_list,
-            "c_england": countries_data["c_england"],
-            "c_france": countries_data["c_france"],
-            "c_germany": countries_data["c_germany"],
-            "c_italy": countries_data["c_italy"],
-            "c_austria": countries_data["c_austria"],
-            "c_russia": countries_data["c_russia"],
-            "c_turkey": countries_data["c_turkey"],
-        })
+        notion_players[normalize_name(nombre)] = NotionPlayerDict(
+            {
+                "notion_id": page["id"],
+                "nombre": nombre,
+                "experiencia": experience_val,
+                "juegos_este_ano": games_count,
+                "alias": alias_list,
+                "c_england": countries_data["c_england"],
+                "c_france": countries_data["c_france"],
+                "c_germany": countries_data["c_germany"],
+                "c_italy": countries_data["c_italy"],
+                "c_austria": countries_data["c_austria"],
+                "c_russia": countries_data["c_russia"],
+                "c_turkey": countries_data["c_turkey"],
+            }
+        )
 
     return notion_players
 
@@ -540,7 +608,7 @@ async def _check_snapshot_has_children(session: AsyncSession, snapshot_id: int) 
 async def _update_snapshot_in_place(
     session: AsyncSession,
     snapshot_id: int,
-    filas: list[dict[str, Any]],
+    rows: list[dict[str, Any]],
     renames: list[RenameDict],
 ) -> None:
     """Update an existing snapshot in-place with new player data."""
@@ -555,7 +623,8 @@ async def _update_snapshot_in_place(
     from sqlalchemy import select
 
     from backend.db.models import Player
-    for r in (renames or []):
+
+    for r in renames or []:
         target_exists = await session.execute(select(Player).where(Player.name == r["to"]))
         if not target_exists.scalar_one_or_none():
             await session.execute(
@@ -571,33 +640,41 @@ async def _update_snapshot_in_place(
     await session.execute(delete(SnapshotPlayer).where(SnapshotPlayer.snapshot_id == snapshot_id))
 
     # Insert new players
-    for fila in filas:
-        pid = await get_or_create_player(session, fila["nombre"])
+    for row in rows:
+        pid = await get_or_create_player(session, row["nombre"], row.get("notion_id"))
         await add_player_to_snapshot(
             session,
             snapshot_id,
             pid,
-            fila["experiencia"],
-            fila["juegos_este_ano"],
-            fila["prioridad"],
-            fila["partidas_deseadas"],
-            fila["partidas_gm"],
+            row["experiencia"],
+            row["juegos_este_ano"],
+            row["prioridad"],
+            row["partidas_deseadas"],
+            row["partidas_gm"],
         )
 
     # Calculate dynamic diff for history logging
     from backend.crud.snapshots import generate_deep_diff
-    roster_fields = {"nombre", "experiencia", "juegos_este_ano", "prioridad", "partidas_deseadas", "partidas_gm"}
+
+    roster_fields = {
+        "nombre",
+        "experiencia",
+        "juegos_este_ano",
+        "prioridad",
+        "partidas_deseadas",
+        "partidas_gm",
+    }
     prev_roster = [{k: v for k, v in p.items() if k in roster_fields} for p in previous_players]
     new_roster = [
         {
-            "nombre": f["nombre"],
-            "experiencia": f["experiencia"],
-            "juegos_este_ano": f["juegos_este_ano"],
-            "prioridad": f.get("prioridad", 0),
-            "partidas_deseadas": f.get("partidas_deseadas", 1),
-            "partidas_gm": f.get("partidas_gm", 0),
+            "nombre": r["nombre"],
+            "experiencia": r["experiencia"],
+            "juegos_este_ano": r["juegos_este_ano"],
+            "prioridad": r.get("prioridad", 0),
+            "partidas_deseadas": r.get("partidas_deseadas", 1),
+            "partidas_gm": r.get("partidas_gm", 0),
         }
-        for f in filas
+        for r in rows
     ]
     diff = generate_deep_diff(prev_roster, new_roster, renames)
 
@@ -610,56 +687,76 @@ async def _update_snapshot_in_place(
         previous_state={"players": previous_players},
     )
 
-    logger.info(f"Snapshot #{snapshot_id} updated in-place with {len(filas)} jugador(es).")
+    logger.info(f"Snapshot #{snapshot_id} updated in-place with {len(rows)} jugador(es).")
 
 
 async def _create_new_snapshot(
     session: AsyncSession,
     source_snapshot_id: int | None,
-    filas: list[dict[str, Any]],
+    rows: list[dict[str, Any]],
 ) -> int:
     """Create a new snapshot with player data and sync event."""
     snap_id = await create_snapshot(session, "notion_sync")
 
-    for fila in filas:
-        pid = await get_or_create_player(session, fila["nombre"])
+    for row in rows:
+        pid = await get_or_create_player(session, row["nombre"], row.get("notion_id"))
         await add_player_to_snapshot(
             session,
             snap_id,
             pid,
-            fila["experiencia"],
-            fila["juegos_este_ano"],
-            fila["prioridad"],
-            fila["partidas_deseadas"],
-            fila["partidas_gm"],
+            row["experiencia"],
+            row["juegos_este_ano"],
+            row["prioridad"],
+            row["partidas_deseadas"],
+            row["partidas_gm"],
         )
-
-    # Update Notion cache with country data (required for get_snapshot_players)
-    cache_rows = [
-        {
-            "notion_id": f"sync_{fila['nombre']}",  # Placeholder notion_id
-            "nombre": fila["nombre"],
-            "experiencia": fila["experiencia"],
-            "juegos_este_ano": fila["juegos_este_ano"],
-            "c_england": fila.get("c_england", 0),
-            "c_france": fila.get("c_france", 0),
-            "c_germany": fila.get("c_germany", 0),
-            "c_italy": fila.get("c_italy", 0),
-            "c_austria": fila.get("c_austria", 0),
-            "c_russia": fila.get("c_russia", 0),
-            "c_turkey": fila.get("c_turkey", 0),
-            "alias": fila.get("alias", []),
-        }
-        for fila in filas
-    ]
-    await update_notion_cache(session, cache_rows)
 
     # Create sync event only if we have a source snapshot
     if source_snapshot_id is not None:
         await create_branch_edge(session, source_snapshot_id, snap_id)
 
-    logger.info(f"Snapshot #{snap_id} created with {len(filas)} jugador(es).")
+    logger.info(f"Snapshot #{snap_id} created with {len(rows)} jugador(es).")
     return snap_id
+
+
+# ── Daemon Functions ────────────────────────────────────────────────────────
+
+
+async def daemon_loop() -> None:
+    """Async daemon loop that runs indefinitely, syncing Notion every 15 minutes."""
+    load_dotenv()
+    token = os.getenv("NOTION_TOKEN")
+    db_id = os.getenv("NOTION_DATABASE_ID")
+    part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
+
+    if not token or not db_id or not part_db_id or token.startswith("secret_XXX"):
+        logger.info(" [Cache Daemon] Skipping background sync: Missing Notion credentials.")
+        return
+
+    while True:
+        logger.info(" [Cache Daemon] Starting sync at %s", datetime.now())
+        try:
+            # 1. Fetch and parse data from Notion
+            pages, games_played_map, _client = await fetch_notion_data()
+            notion_players = build_notion_players_lookup(pages, games_played_map)
+
+            # 2. Save it to database
+            from sqlalchemy.ext.asyncio.session import AsyncSession
+
+            async with AsyncSession(async_engine) as session:
+                await notion_cache_to_db(session, notion_players)
+                await session.commit()
+
+            logger.info(" [Cache Daemon] Sync complete. Sleeping for 15 minutes.")
+        except Exception as e:
+            logger.error(" [Cache Daemon] Error during sync: %s", e, exc_info=True)
+
+        await asyncio.sleep(900)  # 15 minutes
+
+
+async def start_background_sync() -> None:
+    """Starts async background daemon."""
+    asyncio.create_task(daemon_loop())
 
 
 async def _build_snapshot_rows(
@@ -672,13 +769,13 @@ async def _build_snapshot_rows(
     Build the list of player rows for the new snapshot.
     Combines existing snapshot data with Notion updates.
     """
-    filas: list[dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     merges = merges or {}
 
     if source_snapshot_id is not None:
         # Get existing players from source snapshot
-        existentes_list = await get_snapshot_players(session, source_snapshot_id)
-        existentes = {p["nombre"]: p for p in existentes_list}
+        existing_list = await get_snapshot_players(session, source_snapshot_id)
+        existing_map = {p["nombre"]: p for p in existing_list}
 
         merged_notion_normalized = {normalize_name(v["to"]) for v in merges.values()}
 
@@ -686,7 +783,7 @@ async def _build_snapshot_rows(
         reverse_merges = {v["to"]: {"from": k, **v} for k, v in merges.items()}
 
         # Start with all players from the existing snapshot
-        for nombre, existente in existentes.items():
+        for nombre, existente in existing_map.items():
             # 1. Check if this player was explicitly merged via the UI dialog
             if nombre in merges:
                 merge_info = merges[nombre]
@@ -696,7 +793,7 @@ async def _build_snapshot_rows(
 
                 if notion_norm in notion_players:
                     notion_data = notion_players[notion_norm]
-                    filas.append(
+                    rows.append(
                         {
                             "nombre": notion_data["nombre"] if action == "merge_notion" else nombre,
                             "experiencia": notion_data["experiencia"],
@@ -713,6 +810,7 @@ async def _build_snapshot_rows(
                                 existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
                             ),
                             "alias": notion_data.get("alias", []),
+                            "notion_id": notion_data["notion_id"],
                             **{c: notion_data[c] for c in COUNTRY_PROPS},
                         }
                     )
@@ -726,7 +824,7 @@ async def _build_snapshot_rows(
 
                 if notion_norm in notion_players:
                     notion_data = notion_players[notion_norm]
-                    filas.append(
+                    rows.append(
                         {
                             "nombre": notion_data["nombre"],
                             "experiencia": notion_data["experiencia"],
@@ -743,6 +841,7 @@ async def _build_snapshot_rows(
                                 existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
                             ),
                             "alias": notion_data.get("alias", []),
+                            "notion_id": notion_data["notion_id"],
                             **{c: notion_data[c] for c in COUNTRY_PROPS},
                         }
                     )
@@ -754,7 +853,7 @@ async def _build_snapshot_rows(
                 notion_data
                 and normalize_name(notion_data["nombre"]) not in merged_notion_normalized
             ):
-                filas.append(
+                rows.append(
                     {
                         "nombre": nombre,  # Keep local name
                         "experiencia": notion_data["experiencia"],
@@ -767,12 +866,13 @@ async def _build_snapshot_rows(
                             existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
                         ),
                         "alias": notion_data.get("alias", []),
+                        "notion_id": notion_data["notion_id"],
                         **{c: notion_data[c] for c in COUNTRY_PROPS},
                     }
                 )
             else:
                 # 3. Keep existing data (player not in Notion and not merged)
-                filas.append(
+                rows.append(
                     {
                         "nombre": nombre,
                         "experiencia": existente.get("experiencia", "Nuevo"),
@@ -791,7 +891,7 @@ async def _build_snapshot_rows(
     else:
         # No existing snapshot - use all Notion players directly from our lookup
         for _, notion_data in notion_players.items():
-            filas.append(
+            rows.append(
                 {
                     "nombre": notion_data["nombre"],
                     "experiencia": notion_data["experiencia"],
@@ -800,11 +900,38 @@ async def _build_snapshot_rows(
                     "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
                     "partidas_gm": FIELD_DEFAULTS["partidas_gm"],
                     "alias": notion_data.get("alias", []),
+                    "notion_id": notion_data["notion_id"],
                     **{c: notion_data[c] for c in COUNTRY_PROPS},
                 }
             )
 
-    return filas
+    return rows
+
+
+async def notion_cache_to_db(
+    session: AsyncSession, notion_players: dict[str, NotionPlayerDict]
+) -> None:
+    """Transforms parsed Notion data and bulk updates local SQLite cache."""
+
+    cache_rows: list[dict[str, Any]] = []
+    for nd in notion_players.values():
+        cache_rows.append(
+            {
+                "notion_id": nd["notion_id"],
+                "nombre": nd["nombre"],
+                "experiencia": nd["experiencia"],
+                "juegos_este_ano": nd["juegos_este_ano"],
+                "alias": nd.get("alias", []),
+                "c_england": nd.get("c_england", 0),
+                "c_france": nd.get("c_france", 0),
+                "c_germany": nd.get("c_germany", 0),
+                "c_italy": nd.get("c_italy", 0),
+                "c_austria": nd.get("c_austria", 0),
+                "c_russia": nd.get("c_russia", 0),
+                "c_turkey": nd.get("c_turkey", 0),
+            }
+        )
+    await update_notion_cache(session, cache_rows)
 
 
 # ── Public API ───────────────────────────────────────────────────────────────
@@ -834,10 +961,10 @@ async def run_notion_sync_background(
 
     try:
         # Fetch data from Notion
-        pages, conteo_por_jugador, _client = await _fetch_notion_data()
+        pages, games_played_map, _client = await fetch_notion_data()
 
         # Build Notion players lookup
-        notion_players = _build_notion_players_lookup(pages, conteo_por_jugador)
+        notion_players = build_notion_players_lookup(pages, games_played_map)
 
         async with AsyncSession(async_engine) as session:
             try:
@@ -846,6 +973,10 @@ async def run_notion_sync_background(
                     for old_name, merge_info in merges.items():
                         if merge_info.get("action") == "merge_notion":
                             await rename_player(session, old_name, merge_info["to"])
+
+                # 1. ALWAYS update global NotionCache first with true identities
+                await notion_cache_to_db(session, notion_players)
+                await session.flush()
 
                 # Check if database has existing snapshots
                 latest_id = await get_latest_snapshot_id(session)
@@ -856,24 +987,24 @@ async def run_notion_sync_background(
                     return None
 
                 # Build snapshot rows combining existing and Notion data
-                filas = await _build_snapshot_rows(session, snapshot_id, notion_players, merges)
+                rows = await _build_snapshot_rows(session, snapshot_id, notion_players, merges)
 
                 existing_names: set[str] = (
                     {p["nombre"] for p in await get_snapshot_players(session, snapshot_id)}
                     if snapshot_id is not None
                     else set()
                 )
-                nuevos = [f["nombre"] for f in filas if f["nombre"] not in existing_names]
+                new_players = [f["nombre"] for f in rows if f["nombre"] not in existing_names]
 
-                logger.info(f"{len(filas)} jugador(es) procesados ({len(nuevos)} nuevo(s)).")
-                if nuevos:
-                    logger.info(f"Nuevos: {', '.join(nuevos)}")
+                logger.info(f"{len(rows)} jugador(es) procesados ({len(new_players)} nuevo(s)).")
+                if new_players:
+                    logger.info(f"Nuevos: {', '.join(new_players)}")
 
                 # Content-addressed guard: skip if data hasn't changed
                 if (
                     snapshot_id is not None
                     and not force
-                    and await snapshots_have_same_roster(session, snapshot_id, filas)
+                    and await snapshots_have_same_roster(session, snapshot_id, rows)
                 ):
                     logger.info(
                         "Los datos de Notion coinciden con el último snapshot — sin cambios."
@@ -884,16 +1015,20 @@ async def run_notion_sync_background(
                     has_children = await _check_snapshot_has_children(session, snapshot_id)
 
                     # Extract renames for merge_notion actions
-                    renames_list: list[RenameDict] = [{"from": k, "to": v["to"]} for k, v in (merges or {}).items() if v.get("action") == "merge_notion"]
+                    renames_list: list[RenameDict] = [
+                        {"from": k, "to": v["to"]}
+                        for k, v in (merges or {}).items()
+                        if v.get("action") == "merge_notion"
+                    ]
 
                     if not has_children:
                         # Leaf node: update in place
-                        await _update_snapshot_in_place(session, snapshot_id, filas, renames_list)
+                        await _update_snapshot_in_place(session, snapshot_id, rows, renames_list)
                         await session.commit()
                         return snapshot_id
 
                 # Create new snapshot for internal nodes or initial sync
-                new_snap_id = await _create_new_snapshot(session, snapshot_id, filas)
+                new_snap_id = await _create_new_snapshot(session, snapshot_id, rows)
                 await session.commit()
                 return new_snap_id
 

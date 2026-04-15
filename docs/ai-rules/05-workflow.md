@@ -20,3 +20,8 @@ priority: 50
 - **Pre-Commit Validation:** ALWAYS validate with `bun run build && bun run lint && bun run typecheck`. NEVER commit without proper validation.
 - **Local Syntax Checking:** ALWAYS check Svelte syntax problems locally. NEVER rely on CI/CD to catch syntax issues.
 - **Commit Format:** Use conventional prefixes: `feat:`, `fix:`, `refactor:`, `test:`. NEVER use non-standard formats that break changelog generation.
+
+## AI Prompt Engineering & Constraint Management
+
+- **Atomize Prompts:** When fixing cascading architectural changes, break instructions down into atomized, file-specific prompts. Monolithic prompts cause agents to gloss over critical lines of code.
+- **Absolute Constraints:** ALWAYS use absolute constraints ("MUST", "NEVER", "ALWAYS"). Do not use "prefer" or "avoid" to prevent LLM hallucinations.

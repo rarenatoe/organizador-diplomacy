@@ -26,7 +26,8 @@ class RenameRequest(BaseModel):
 
 
 class LookupRequest(BaseModel):
-    names: list[str]
+    name: str
+    notion_id: str | None = None
     snapshot_id: int | None = None
 
 
@@ -81,41 +82,75 @@ async def api_player_rename(
 async def api_player_get_all(
     session: AsyncSession = Depends(get_session),  # noqa: B008
 ) -> dict[str, Any]:
-    """
-    Get all known player names from database and Notion cache.
-    Returns: {"names": [...]}
-    """
+    """Get all known players. Returns rich, unformatted objects to power UI autocomplete."""
     try:
-        # Import NotionCache locally to avoid circular import issues
         from backend.db.models import NotionCache
 
-        # Get all player names from Player table
-        player_result = await session.execute(select(Player.name))
-        player_names: list[str] = [row[0] for row in player_result.fetchall()]
+        player_result = await session.execute(select(Player.name, Player.notion_id))
+        local_players = player_result.fetchall()
 
-        # Get all names and aliases from Notion cache
-        notion_result = await session.execute(select(NotionCache.name, NotionCache.alias))
-        notion_rows = notion_result.fetchall()
+        results: list[dict[str, Any]] = []
+        local_notion_ids: set[str] = set()
 
-        # Extend with Notion cache names and aliases
-        for row in notion_rows:
-            player_names.append(row[0])  # name
-            if row[1] and isinstance(row[1], list):
-                player_names.extend(row[1])  # alias is JSON array
-
-        # Remove whitespace and deduplicate
-        all_names: set[str] = set()
-        for name in player_names:
-            clean_name = name.strip()
+        # 1. Local Players (No deduplication needed; SQLite UNIQUE constraint guarantees local name uniqueness)
+        for player_name, notion_id in local_players:
+            clean_name = player_name.strip() if player_name else ""
             if clean_name:
-                all_names.add(clean_name)
+                results.append(
+                    {
+                        "display": clean_name,
+                        "nombre": clean_name,
+                        "notion_id": notion_id,
+                        "notion_name": None,
+                        "is_local": True,
+                        "is_alias": False,
+                    }
+                )
+                if notion_id:
+                    local_notion_ids.add(notion_id)
 
-        # Return sorted list
-        sorted_names: list[str] = sorted(list(all_names))
-        await session.commit()
-        return {"names": sorted_names}
+        # 2. Notion Players & Aliases (Only if not handled locally)
+        notion_result = await session.execute(select(NotionCache))
+        notion_rows = notion_result.scalars().all()
+
+        for notion_data in notion_rows:
+            if notion_data.notion_id not in local_notion_ids:
+                canonical_name = notion_data.name.strip() if notion_data.name else ""
+
+                if canonical_name:
+                    results.append(
+                        {
+                            "display": canonical_name,
+                            "nombre": canonical_name,
+                            "notion_id": notion_data.notion_id,
+                            "notion_name": canonical_name,
+                            "is_local": False,
+                            "is_alias": False,
+                        }
+                    )
+
+                # Deduplicate aliases ONLY within this specific person's profile
+                if notion_data.alias:
+                    seen_aliases_for_person = {canonical_name.lower()}
+                    for alias in notion_data.alias:
+                        clean_alias = alias.strip()
+                        if clean_alias and clean_alias.lower() not in seen_aliases_for_person:
+                            results.append(
+                                {
+                                    "display": clean_alias,  # Raw alias string, preserving case
+                                    "nombre": clean_alias,
+                                    "notion_id": notion_data.notion_id,
+                                    "notion_name": canonical_name,
+                                    "is_local": False,
+                                    "is_alias": True,
+                                }
+                            )
+                            seen_aliases_for_person.add(clean_alias.lower())
+
+        # Sort alphabetically by lowercased display name, but return the preserved case
+        results.sort(key=lambda x: x["display"].lower())
+        return {"players": results}
     except Exception as exc:
-        await session.rollback()
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
@@ -124,20 +159,12 @@ async def api_player_lookup(
     request: LookupRequest,
     session: AsyncSession = Depends(get_session),  # noqa: B008
 ) -> dict[str, Any]:
-    """
-    Deep history lookup for player stats.
-    Walks backward through timeline to find historical player data.
-    """
+    """Targeted deep history lookup. Prioritizes notion_id if provided."""
     try:
-        if not request.names:
-            raise HTTPException(status_code=400, detail="names list cannot be empty")
-
-        # Call the lookup function
-        result = await lookup_player_history(session, request.names, request.snapshot_id)
-
-        return {"players": result}
-    except HTTPException:
-        raise
+        result = await lookup_player_history(
+            session, request.name, request.notion_id, request.snapshot_id
+        )
+        return {"player": result}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -172,6 +199,19 @@ async def api_player_check_similarity(
             )
 
         matches = detect_similar_names(notion_players_list, request.names)
+
+        # Cross-reference matches with existing local players
+        if matches:
+            notion_ids = [m["notion_id"] for m in matches if "notion_id" in m]
+            if notion_ids:
+                existing_players = await session.execute(
+                    select(Player.notion_id, Player.name).where(Player.notion_id.in_(notion_ids))
+                )
+                existing_map = {row[0]: row[1] for row in existing_players.fetchall()}
+                for m in matches:
+                    if m.get("notion_id") in existing_map:
+                        m["existing_local_name"] = existing_map[m["notion_id"]]
+
         return {"similarities": matches}
     except Exception as exc:
         await session.rollback()

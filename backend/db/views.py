@@ -13,10 +13,11 @@ from sqlalchemy import select, text
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.crud.snapshots import get_deduped_notion_cache_subquery, get_snapshot_players
+from backend.crud.snapshots import get_snapshot_players
 from backend.db.models import (
     GameDetail,
     GameTable,
+    NotionCache,
     Player,
     Snapshot,
     SnapshotHistory,
@@ -186,17 +187,14 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[st
     result = await session.execute(
         select(TimelineEdge, GameDetail)
         .join(GameDetail)
-        .where(TimelineEdge.id == event_id, TimelineEdge.edge_type == 'game')
+        .where(TimelineEdge.id == event_id, TimelineEdge.edge_type == "game")
     )
     row = result.first()
     if not row:
         return None
-    
+
     timeline_edge, game_detail = row
     input_sid = timeline_edge.source_snapshot_id
-
-    # Get the deduplicated Notion cache subquery
-    deduped_cache = get_deduped_notion_cache_subquery(_session=session)
 
     # Get mesas data using ORM
     mesas_result = await session.execute(
@@ -216,38 +214,59 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[st
             )
             gm_name = gm_result.scalar_one_or_none()
 
-        # Get players for this mesa using deduplicated cache
+        # Get players for this mesa using NotionCache directly
         players_result = await session.execute(
             select(
                 Player,
                 SnapshotPlayer,
-                deduped_cache.c.c_england,
-                deduped_cache.c.c_france,
-                deduped_cache.c.c_germany,
-                deduped_cache.c.c_italy,
-                deduped_cache.c.c_austria,
-                deduped_cache.c.c_russia,
-                deduped_cache.c.c_turkey,
+                NotionCache.notion_id,
+                NotionCache.name.label("notion_name"),
+                NotionCache.alias,
+                NotionCache.c_england,
+                NotionCache.c_france,
+                NotionCache.c_germany,
+                NotionCache.c_italy,
+                NotionCache.c_austria,
+                NotionCache.c_russia,
+                NotionCache.c_turkey,
                 TablePlayer.country,
                 TablePlayer.country_reason,
             )
             .join(TablePlayer, Player.id == TablePlayer.player_id)
-            .join(SnapshotPlayer, (SnapshotPlayer.player_id == Player.id) & (SnapshotPlayer.snapshot_id == input_sid))
-            .outerjoin(deduped_cache, Player.name == deduped_cache.c.name)
+            .join(
+                SnapshotPlayer,
+                (SnapshotPlayer.player_id == Player.id) & (SnapshotPlayer.snapshot_id == input_sid),
+            )
+            .outerjoin(NotionCache, Player.notion_id == NotionCache.notion_id)
             .where(TablePlayer.table_id == mesa.id)
             .order_by(TablePlayer.seat_order)
         )
 
         jugadores: list[dict[str, Any]] = []
         for p in players_result.all():
-            player, sp, c_england, c_france, c_germany, c_italy, c_austria, c_russia, c_turkey, country, country_reason = p
-            etiqueta = "Nuevo" if sp.experience == "Nuevo" else f"Antiguo ({sp.games_this_year} juegos)"
+            (
+                player,
+                sp,
+                notion_id,
+                notion_name,
+                alias,
+                c_england,
+                c_france,
+                c_germany,
+                c_italy,
+                c_austria,
+                c_russia,
+                c_turkey,
+                country,
+                country_reason,
+            ) = p
             jugadores.append(
                 {
                     "nombre": player.name,
-                    "etiqueta": etiqueta,
-                    "pais": country or "",  # Convert None to empty string
-                    "pais_reason": country_reason,
+                    "notion_id": notion_id,
+                    "notion_name": notion_name,
+                    "notion_alias": alias,
+                    "country": {"name": country, "reason": country_reason} if country else None,
                     "es_nuevo": sp.experience == "Nuevo",
                     "experiencia": sp.experience,
                     "juegos_este_ano": sp.games_this_year,
@@ -273,34 +292,54 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[st
             }
         )
 
-    # Get waiting list using deduplicated cache
+    # Get waiting list using NotionCache directly
     waiting_result = await session.execute(
         select(
             Player,
-            WaitingList,
             SnapshotPlayer,
-            deduped_cache.c.c_england,
-            deduped_cache.c.c_france,
-            deduped_cache.c.c_germany,
-            deduped_cache.c.c_italy,
-            deduped_cache.c.c_austria,
-            deduped_cache.c.c_russia,
-            deduped_cache.c.c_turkey,
+            NotionCache.notion_id,
+            NotionCache.name.label("notion_name"),
+            NotionCache.alias,
+            NotionCache.c_england,
+            NotionCache.c_france,
+            NotionCache.c_germany,
+            NotionCache.c_italy,
+            NotionCache.c_austria,
+            NotionCache.c_russia,
+            NotionCache.c_turkey,
         )
         .join(WaitingList, Player.id == WaitingList.player_id)
-        .join(SnapshotPlayer, (SnapshotPlayer.player_id == Player.id) & (SnapshotPlayer.snapshot_id == input_sid))
-        .outerjoin(deduped_cache, Player.name == deduped_cache.c.name)
+        .join(
+            SnapshotPlayer,
+            (SnapshotPlayer.player_id == Player.id) & (SnapshotPlayer.snapshot_id == input_sid),
+        )
+        .outerjoin(NotionCache, Player.notion_id == NotionCache.notion_id)
         .where(WaitingList.timeline_edge_id == event_id)
         .order_by(WaitingList.list_order)
     )
 
     waiting: list[dict[str, Any]] = []
     for row in waiting_result.all():
-        player, wl, sp, c_england, c_france, c_germany, c_italy, c_austria, c_russia, c_turkey = row
+        (
+            player,
+            sp,
+            notion_id,
+            notion_name,
+            alias,
+            c_england,
+            c_france,
+            c_germany,
+            c_italy,
+            c_austria,
+            c_russia,
+            c_turkey,
+        ) = row
         waiting.append(
             {
                 "nombre": player.name,
-                "cupos": f"{wl.missing_spots} cupo(s) sin asignar",
+                "notion_id": notion_id,
+                "notion_name": notion_name,
+                "notion_alias": alias,
                 "es_nuevo": sp.experience == "Nuevo",
                 "experiencia": sp.experience,
                 "juegos_este_ano": sp.games_this_year,
