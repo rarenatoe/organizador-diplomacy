@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { cx } from "../../utils/css";
 
   interface Props {
     variant?: "primary" | "secondary" | "success" | "warning" | "ghost";
@@ -41,26 +42,24 @@
     ghost: "btn-ghost",
   };
 
-  let finalClass = $derived.by(() => {
-    const sizeClassMap = {
-      sm: "btn-sm",
-      md: "btn",
-      xs: "btn-xs",
-    } as const;
-    let sizeClass = sizeClassMap[size];
+  const sizeClassMap = {
+    sm: "btn-sm",
+    md: "btn",
+    xs: "btn-xs",
+  } as const;
 
-    return [
+  // Uses cx() to safely assemble active modifier classes, ignoring falsy values
+  let finalClass = $derived(
+    cx(
       "btn",
       variantClasses[variant],
-      sizeClass,
-      fill ? "flex-fill" : "",
-      iconOnly ? "btn-icon-only" : "",
-      destructive ? "btn-destructive" : "",
+      sizeClassMap[size],
+      fill && "flex-fill",
+      iconOnly && "btn-icon-only",
+      destructive && "btn-destructive",
       className,
-    ]
-      .filter(Boolean)
-      .join(" ");
-  });
+    ),
+  );
 
   function handleClick(e: MouseEvent) {
     if (!disabled && onclick) {

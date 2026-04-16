@@ -65,7 +65,7 @@ describe("GameDetail", () => {
     const { container } = render(GameDetail, {
       props: {
         id: 1,
-        openGameDraft: vi.fn(),
+        onOpenGameDraft: vi.fn(),
       },
     });
 
@@ -108,7 +108,7 @@ describe("GameDetail", () => {
     render(GameDetail, {
       props: {
         id: 1,
-        openGameDraft: vi.fn(),
+        onOpenGameDraft: vi.fn(),
       },
     });
 
@@ -157,7 +157,7 @@ describe("GameDetail", () => {
     render(GameDetail, {
       props: {
         id: 1,
-        openGameDraft: vi.fn(),
+        onOpenGameDraft: vi.fn(),
       },
     });
 
@@ -199,7 +199,7 @@ describe("GameDetail", () => {
     render(GameDetail, {
       props: {
         id: 1,
-        openGameDraft: vi.fn(),
+        onOpenGameDraft: vi.fn(),
       },
     });
 
@@ -235,13 +235,13 @@ describe("GameDetail", () => {
     });
   });
 
-  it("calls openGameDraft with mapped DraftResponse when Edit button is clicked", async () => {
-    const mockOpenGameDraft = vi.fn();
+  it("calls onOpenGameDraft with mapped DraftResponse when Edit button is clicked", async () => {
+    const mockonOpenGameDraft = vi.fn();
 
     render(GameDetail, {
       props: {
         id: 1,
-        openGameDraft: mockOpenGameDraft,
+        onOpenGameDraft: mockonOpenGameDraft,
       },
     });
 
@@ -263,8 +263,8 @@ describe("GameDetail", () => {
     const editButton = screen.getByRole("button", { name: /Editar Jornada/i });
     await fireEvent.click(editButton);
 
-    // Verify openGameDraft was called with correct parameters
-    expect(mockOpenGameDraft).toHaveBeenCalledWith(
+    // Verify onOpenGameDraft was called with correct parameters
+    expect(mockonOpenGameDraft).toHaveBeenCalledWith(
       10, // input_snapshot_id
       expect.objectContaining({
         mesas: expect.arrayContaining([
@@ -295,7 +295,7 @@ describe("GameDetail", () => {
     render(GameDetail, {
       props: {
         id: 1,
-        openGameDraft: vi.fn(),
+        onOpenGameDraft: vi.fn(),
       },
     });
 
@@ -330,7 +330,7 @@ describe("GameDetail", () => {
       render(GameDetail, {
         props: {
           id: 1,
-          openGameDraft: vi.fn(),
+          onOpenGameDraft: vi.fn(),
         },
       });
 
@@ -365,7 +365,7 @@ describe("GameDetail", () => {
       render(GameDetail, {
         props: {
           id: 1,
-          openGameDraft: vi.fn(),
+          onOpenGameDraft: vi.fn(),
         },
       });
 
@@ -398,7 +398,7 @@ describe("GameDetail", () => {
       render(GameDetail, {
         props: {
           id: 1,
-          openGameDraft: vi.fn(),
+          onOpenGameDraft: vi.fn(),
         },
       });
 
@@ -447,7 +447,7 @@ describe("GameDetail", () => {
       render(GameDetail, {
         props: {
           id: 1,
-          openGameDraft: vi.fn(),
+          onOpenGameDraft: vi.fn(),
         },
       });
 
@@ -516,7 +516,7 @@ describe("GameDetail", () => {
       render(GameDetail, {
         props: {
           id: 2,
-          openGameDraft: vi.fn(),
+          onOpenGameDraft: vi.fn(),
         },
       });
 

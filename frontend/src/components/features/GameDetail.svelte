@@ -39,14 +39,14 @@
 
   interface Props {
     id: number;
-    openGameDraft: (
+    onOpenGameDraft: (
       snapshotId: number,
       draft: DraftResponse,
       gameId: number,
     ) => void;
   }
 
-  let { id, openGameDraft }: Props = $props();
+  let { id, onOpenGameDraft }: Props = $props();
 
   let data = $state<GameDetail | null>(null);
   let loading = $state(true);
@@ -197,7 +197,7 @@
       if (!data) {
         throw new Error("Game data is required for editing");
       }
-      openGameDraft(data.input_snapshot_id, draft, id);
+      onOpenGameDraft(data.input_snapshot_id, draft, id);
     }}>Editar Jornada</Button
   >
 {/snippet}

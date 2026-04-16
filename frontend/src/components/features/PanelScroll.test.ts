@@ -146,7 +146,7 @@ describe("Panel Scroll Pattern", () => {
   describe("GameDetail", () => {
     it("should have panel-scroll wrapper around all content", async () => {
       const { container } = render(GameDetail, {
-        props: { id: 1, openGameDraft: vi.fn() },
+        props: { id: 1, onOpenGameDraft: vi.fn() },
       });
 
       await vi.waitFor(() => {
@@ -165,7 +165,7 @@ describe("Panel Scroll Pattern", () => {
       const { container } = render(GameDetail, {
         props: {
           id: 1,
-          openGameDraft: () => {},
+          onOpenGameDraft: () => {},
         },
       });
 

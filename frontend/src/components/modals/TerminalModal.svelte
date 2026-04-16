@@ -1,23 +1,37 @@
+<script lang="ts" module>
+  // Export the union type so orchestrators can strongly-type their state
+  export type TerminalState =
+    | { status: "hidden" }
+    | { status: "loading"; title: string }
+    | { status: "success"; title: string; output: string }
+    | { status: "error"; title: string; output: string };
+</script>
+
 <script lang="ts">
   import Button from "../ui/Button.svelte";
 
   interface Props {
-    visible: boolean;
-    title: string;
-    output: string;
-    isError: boolean;
-    loading: boolean;
+    state: TerminalState;
     onClose: () => void;
   }
 
-  let { visible, title, output, isError, loading, onClose }: Props = $props();
+  let { state, onClose }: Props = $props();
+
+  // Derived state bindings to simplify the template
+  let isVisible = $derived(state.status !== "hidden");
+  let isError = $derived(state.status === "error");
+  let isLoading = $derived(state.status === "loading");
+
+  // Safely narrow properties based on state types
+  let title = $derived(state.status !== "hidden" ? state.title : "");
+  let output = $derived("output" in state ? state.output : "");
 </script>
 
-{#if visible}
+{#if isVisible}
   <div class="modal-overlay open">
     <div class="modal-box">
       <div class="modal-title">
-        {#if loading}
+        {#if isLoading}
           <span class="spinner"></span>
         {:else if isError}
           <span>❌</span>
@@ -26,9 +40,11 @@
         {/if}
         <span id="modal-title-text">{title}</span>
       </div>
+
       <div class="modal-out" class:err={isError} id="modal-out">{output}</div>
+
       <div class="modal-foot">
-        <Button variant="secondary" onclick={onClose} disabled={loading}>
+        <Button variant="secondary" onclick={onClose} disabled={isLoading}>
           Cerrar
         </Button>
       </div>
@@ -37,6 +53,7 @@
 {/if}
 
 <style>
+  /* Existing styles preserved */
   .modal-overlay {
     position: fixed;
     inset: 0;
@@ -49,12 +66,10 @@
     pointer-events: none;
     transition: opacity 0.2s;
   }
-
   .modal-overlay.open {
     opacity: 1;
     pointer-events: all;
   }
-
   .modal-box {
     background: var(--bg-inverse);
     border-radius: var(--space-16);
@@ -66,7 +81,6 @@
     gap: var(--space-16);
     box-shadow: var(--shadow-xl);
   }
-
   .modal-title {
     font-size: 14px;
     font-weight: 700;
@@ -75,7 +89,6 @@
     align-items: center;
     gap: var(--space-8);
   }
-
   .modal-out {
     font-family: "SF Mono", "Fira Code", Menlo, monospace;
     font-size: 12px;
@@ -89,16 +102,13 @@
     white-space: pre-wrap;
     flex-grow: 1;
   }
-
   .modal-out.err {
     color: var(--danger-text);
   }
-
   .modal-foot {
     display: flex;
     justify-content: flex-end;
   }
-
   .spinner {
     display: inline-block;
     width: var(--space-16);
@@ -108,7 +118,6 @@
     border-radius: 50%;
     animation: spin 0.65s linear infinite;
   }
-
   @keyframes spin {
     to {
       transform: rotate(360deg);
