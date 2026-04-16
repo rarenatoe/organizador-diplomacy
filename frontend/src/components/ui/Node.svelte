@@ -114,34 +114,36 @@
   }
 
   .node.active {
-    box-shadow: 0 0 var(--space-16) 0 var(--node-accent);
     z-index: 45;
+    /* Box-shadow removed from here and moved to the variants below */
   }
 
+  /* --- GAME NODE --- */
   .node-game {
     background: var(--bg-secondary);
     border-color: var(--border-subtle);
-    border-left-color: var(--green-400);
-    --node-accent: var(--green-400);
+    border-left-color: var(--success-border-subtle);
   }
 
   .node-game.active {
-    background: var(--green-50);
-    border-color: var(--green-500);
-    border-left-color: var(--green-600);
+    background: var(--success-bg-active);
+    border-color: var(--success-border-subtle);
+    border-left-color: var(--success-border);
+    box-shadow: 0 0 var(--space-16) 0 var(--success-border-subtle);
   }
 
+  /* --- SNAPSHOT NODE --- */
   .node-snapshot {
     background: var(--bg-secondary);
     border-color: var(--border-subtle);
-    border-left-color: var(--blue-400);
-    --node-accent: var(--blue-400);
+    border-left-color: var(--info-border-subtle);
   }
 
   .node-snapshot.active {
-    background: var(--blue-50);
-    border-color: var(--blue-500);
-    border-left-color: var(--blue-600);
+    background: var(--info-bg-active);
+    border-color: var(--info-border-subtle);
+    border-left-color: var(--info-border);
+    box-shadow: 0 0 var(--space-16) 0 var(--info-border-subtle);
   }
 
   /* Node children styling */

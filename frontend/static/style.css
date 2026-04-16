@@ -1,83 +1,158 @@
 /* ── Design System Variables */
 :root {
-  /* Base Color Palette */
+  /* ========================================================
+     1. BASE PRIMITIVES (RGB Channels for Alpha Derivation) 
+     ======================================================== */
   /* Grays */
-  --gray-50: #f9fafb;
-  --gray-100: #f3f4f6;
-  --gray-200: #e5e7eb;
-  --gray-300: #d1d5db;
-  --gray-400: #9ca3af;
-  --gray-500: #6b7280;
-  --gray-600: #4b5563;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
+  --rgb-gray-50: 249, 250, 251;
+  --rgb-gray-100: 243, 244, 246;
+  --rgb-gray-200: 229, 231, 235;
+  --rgb-gray-300: 209, 213, 219;
+  --rgb-gray-400: 156, 163, 175;
+  --rgb-gray-500: 107, 114, 128;
+  --rgb-gray-600: 75, 85, 99;
+  --rgb-gray-700: 55, 65, 81;
+  --rgb-gray-800: 31, 41, 55;
+  --rgb-gray-900: 17, 24, 39;
 
   /* Blue (Info/Primary) */
-  --blue-50: #eff6ff;
-  --blue-100: #dbeafe;
-  --blue-200: #bfdbfe;
-  --blue-300: #93c5fd;
-  --blue-400: #60a5fa;
-  --blue-500: #3b82f6;
-  --blue-600: #2563eb;
-  --blue-700: #1d4ed8;
-  --blue-800: #1e40af;
+  --rgb-blue-50: 239, 246, 255;
+  --rgb-blue-100: 219, 234, 254;
+  --rgb-blue-200: 191, 219, 254;
+  --rgb-blue-300: 147, 197, 253;
+  --rgb-blue-400: 96, 165, 250;
+  --rgb-blue-500: 59, 130, 246;
+  --rgb-blue-600: 37, 99, 235;
+  --rgb-blue-700: 29, 78, 216;
+  --rgb-blue-800: 30, 64, 175;
 
   /* Green (Success) */
-  --green-50: #f0fdf4;
-  --green-100: #dcfce7;
-  --green-200: #bbf7d0;
-  --green-300: #86efac;
-  --green-400: #4ade80;
-  --green-500: #22c55e;
-  --green-600: #16a34a;
-  --green-700: #15803d;
-  --green-800: #166534;
+  --rgb-green-50: 240, 253, 244;
+  --rgb-green-100: 220, 252, 231;
+  --rgb-green-200: 187, 247, 208;
+  --rgb-green-300: 134, 239, 172;
+  --rgb-green-400: 74, 222, 128;
+  --rgb-green-500: 34, 197, 94;
+  --rgb-green-600: 22, 163, 74;
+  --rgb-green-700: 21, 128, 61;
+  --rgb-green-800: 22, 101, 52;
 
   /* Red (Danger) */
-  --red-50: #fef2f2;
-  --red-100: #fee2e2;
-  --red-200: #fecaca;
-  --red-300: #fca5a5;
-  --red-400: #f87171;
-  --red-500: #ef4444;
-  --red-600: #dc2626;
-  --red-700: #b91c1c;
-  --red-800: #991b1b;
+  --rgb-red-50: 254, 242, 242;
+  --rgb-red-100: 254, 226, 226;
+  --rgb-red-200: 254, 202, 202;
+  --rgb-red-300: 252, 165, 165;
+  --rgb-red-400: 248, 113, 113;
+  --rgb-red-500: 239, 68, 68;
+  --rgb-red-600: 220, 38, 38;
+  --rgb-red-700: 185, 28, 28;
+  --rgb-red-800: 153, 27, 27;
 
   /* Yellow/Amber (Warning) */
-  --yellow-50: #fffbeb;
-  --yellow-100: #fef3c7;
-  --yellow-200: #fde68a;
-  --yellow-300: #fcd34d;
-  --yellow-400: #fbbf24;
-  --yellow-500: #f59e0b;
-  --yellow-600: #d97706;
-  --yellow-700: #b45309;
-  --yellow-800: #92400e;
+  --rgb-yellow-50: 255, 251, 235;
+  --rgb-yellow-100: 254, 243, 199;
+  --rgb-yellow-200: 253, 230, 138;
+  --rgb-yellow-300: 252, 211, 77;
+  --rgb-yellow-400: 251, 191, 36;
+  --rgb-yellow-500: 245, 158, 11;
+  --rgb-yellow-600: 217, 119, 6;
+  --rgb-yellow-700: 180, 83, 9;
+  --rgb-yellow-800: 146, 64, 14;
 
   /* Purple (Tertiary/Sync) */
-  --purple-50: #faf5ff;
-  --purple-100: #f3e8ff;
-  --purple-200: #e9d5ff;
-  --purple-300: #d8b4fe;
-  --purple-400: #c084fc;
-  --purple-500: #a855f7;
-  --purple-600: #9333ea;
-  --purple-700: #7e22ce;
-  --purple-800: #6b21a8;
+  --rgb-purple-50: 250, 245, 255;
+  --rgb-purple-100: 243, 232, 255;
+  --rgb-purple-200: 233, 213, 255;
+  --rgb-purple-300: 216, 180, 254;
+  --rgb-purple-400: 192, 132, 252;
+  --rgb-purple-500: 168, 85, 247;
+  --rgb-purple-600: 147, 51, 234;
+  --rgb-purple-700: 126, 34, 206;
+  --rgb-purple-800: 107, 33, 168;
 
   /* Pink (Accent/Edit) */
-  --pink-50: #fdf2f8;
-  --pink-100: #fce7f3;
-  --pink-500: #ec4899;
+  --rgb-pink-50: 253, 242, 248;
+  --rgb-pink-100: 252, 231, 243;
+  --rgb-pink-500: 236, 72, 153;
 
   /* Absolute Base Colors */
-  --white: #ffffff;
-  --black: #000000;
+  --rgb-white: 255, 255, 255;
+  --rgb-black: 0, 0, 0;
 
-  /* Semantic Variables */
+  /* ========================================================
+     2. SOLID PALETTE MAPPING (For Svelte Components) 
+     ======================================================== */
+  --gray-50: rgb(var(--rgb-gray-50));
+  --gray-100: rgb(var(--rgb-gray-100));
+  --gray-200: rgb(var(--rgb-gray-200));
+  --gray-300: rgb(var(--rgb-gray-300));
+  --gray-400: rgb(var(--rgb-gray-400));
+  --gray-500: rgb(var(--rgb-gray-500));
+  --gray-600: rgb(var(--rgb-gray-600));
+  --gray-700: rgb(var(--rgb-gray-700));
+  --gray-800: rgb(var(--rgb-gray-800));
+  --gray-900: rgb(var(--rgb-gray-900));
+
+  --blue-50: rgb(var(--rgb-blue-50));
+  --blue-100: rgb(var(--rgb-blue-100));
+  --blue-200: rgb(var(--rgb-blue-200));
+  --blue-300: rgb(var(--rgb-blue-300));
+  --blue-400: rgb(var(--rgb-blue-400));
+  --blue-500: rgb(var(--rgb-blue-500));
+  --blue-600: rgb(var(--rgb-blue-600));
+  --blue-700: rgb(var(--rgb-blue-700));
+  --blue-800: rgb(var(--rgb-blue-800));
+
+  --green-50: rgb(var(--rgb-green-50));
+  --green-100: rgb(var(--rgb-green-100));
+  --green-200: rgb(var(--rgb-green-200));
+  --green-300: rgb(var(--rgb-green-300));
+  --green-400: rgb(var(--rgb-green-400));
+  --green-500: rgb(var(--rgb-green-500));
+  --green-600: rgb(var(--rgb-green-600));
+  --green-700: rgb(var(--rgb-green-700));
+  --green-800: rgb(var(--rgb-green-800));
+
+  --red-50: rgb(var(--rgb-red-50));
+  --red-100: rgb(var(--rgb-red-100));
+  --red-200: rgb(var(--rgb-red-200));
+  --red-300: rgb(var(--rgb-red-300));
+  --red-400: rgb(var(--rgb-red-400));
+  --red-500: rgb(var(--rgb-red-500));
+  --red-600: rgb(var(--rgb-red-600));
+  --red-700: rgb(var(--rgb-red-700));
+  --red-800: rgb(var(--rgb-red-800));
+
+  --yellow-50: rgb(var(--rgb-yellow-50));
+  --yellow-100: rgb(var(--rgb-yellow-100));
+  --yellow-200: rgb(var(--rgb-yellow-200));
+  --yellow-300: rgb(var(--rgb-yellow-300));
+  --yellow-400: rgb(var(--rgb-yellow-400));
+  --yellow-500: rgb(var(--rgb-yellow-500));
+  --yellow-600: rgb(var(--rgb-yellow-600));
+  --yellow-700: rgb(var(--rgb-yellow-700));
+  --yellow-800: rgb(var(--rgb-yellow-800));
+
+  --purple-50: rgb(var(--rgb-purple-50));
+  --purple-100: rgb(var(--rgb-purple-100));
+  --purple-200: rgb(var(--rgb-purple-200));
+  --purple-300: rgb(var(--rgb-purple-300));
+  --purple-400: rgb(var(--rgb-purple-400));
+  --purple-500: rgb(var(--rgb-purple-500));
+  --purple-600: rgb(var(--rgb-purple-600));
+  --purple-700: rgb(var(--rgb-purple-700));
+  --purple-800: rgb(var(--rgb-purple-800));
+
+  --pink-50: rgb(var(--rgb-pink-50));
+  --pink-100: rgb(var(--rgb-pink-100));
+  --pink-500: rgb(var(--rgb-pink-500));
+
+  --white: rgb(var(--rgb-white));
+  --black: rgb(var(--rgb-black));
+
+  /* ========================================================
+     3. SEMANTIC INTENTS
+     ======================================================== */
   /* Backgrounds */
   --bg-primary: var(--gray-100);
   --bg-secondary: var(--white);
@@ -142,16 +217,24 @@
   --info-border-subtle: var(--blue-200);
   --info-text-subtle: var(--blue-800);
 
+  /* Intents - Active (Medium Emphasis: Selected Cards, Nodes) */
+  --primary-bg-active: var(--blue-100);
+  --success-bg-active: var(--green-100);
+  --danger-bg-active: var(--red-100);
+  --warning-bg-active: var(--yellow-100);
+  --info-bg-active: var(--blue-100);
+
   /* Utility Variables */
   --transition-fast: 0.15s ease-in-out;
   --transition-normal: 0.2s ease-in-out;
   --arrow-color: var(--gray-400);
-  --active-glow: rgba(37, 99, 235, 0.35);
 
-  /* Overlays & Alpha Channels */
-  --overlay-hover: rgba(0, 0, 0, 0.06);
-  --overlay-destructive: rgba(220, 38, 38, 0.12);
-  --ring-primary: rgba(37, 99, 235, 0.3);
+  /* Overlays & Alpha Channels uniformly using Semantic Derivation */
+  --overlay-hover: rgba(var(--rgb-black), 0.06);
+  --overlay-destructive: rgba(var(--rgb-red-600), 0.12);
+  --ring-primary: rgba(var(--rgb-blue-600), 0.3);
+  --active-glow: rgba(var(--rgb-blue-600), 0.35);
+
   --badge-latest-bg: var(--info-bg);
   --badge-latest-text: var(--info-text);
   --badge-latest-border: var(--blue-100);
@@ -161,7 +244,7 @@
   --tooltip-text: var(--text-inverse);
 
   /* Modal & Overlay Elements */
-  --modal-backdrop: rgba(0, 0, 0, 0.45);
+  --modal-backdrop: rgba(var(--rgb-black), 0.45);
 
   /* Structural Variables */
   --panel-width: max(460px, 45vw);
@@ -361,7 +444,9 @@ body {
   box-shadow: inset 0 0 0 1px var(--border-focus);
 }
 
-/* --- DARK MODE --- */
+/* ========================================================
+   4. DARK MODE (Derives Alphas Mathematically)
+   ======================================================== */
 @media (prefers-color-scheme: dark) {
   :root {
     /* Backgrounds */
@@ -380,29 +465,36 @@ body {
     --border-subtle: var(--gray-700);
     --border-default: var(--gray-600);
 
-    /* Overlays */
-    --overlay-hover: rgba(255, 255, 255, 0.1);
-    --modal-backdrop: rgba(0, 0, 0, 0.7);
+    /* Overlays using unified alpha math */
+    --overlay-hover: rgba(var(--rgb-white), 0.1);
+    --modal-backdrop: rgba(var(--rgb-black), 0.7);
 
     /* Subtle Intents */
-    --primary-bg-subtle: rgba(59, 130, 246, 0.15);
-    --primary-border-subtle: rgba(59, 130, 246, 0.3);
+    --primary-bg-subtle: rgba(var(--rgb-blue-500), 0.15);
+    --primary-border-subtle: rgba(var(--rgb-blue-500), 0.3);
     --primary-text-subtle: var(--blue-300);
 
-    --success-bg-subtle: rgba(34, 197, 94, 0.15);
-    --success-border-subtle: rgba(34, 197, 94, 0.3);
+    --success-bg-subtle: rgba(var(--rgb-green-500), 0.15);
+    --success-border-subtle: rgba(var(--rgb-green-500), 0.3);
     --success-text-subtle: var(--green-300);
 
-    --danger-bg-subtle: rgba(239, 68, 68, 0.15);
-    --danger-border-subtle: rgba(239, 68, 68, 0.3);
+    --danger-bg-subtle: rgba(var(--rgb-red-500), 0.15);
+    --danger-border-subtle: rgba(var(--rgb-red-500), 0.3);
     --danger-text-subtle: var(--red-300);
 
-    --warning-bg-subtle: rgba(245, 158, 11, 0.15);
-    --warning-border-subtle: rgba(245, 158, 11, 0.3);
+    --warning-bg-subtle: rgba(var(--rgb-yellow-500), 0.15);
+    --warning-border-subtle: rgba(var(--rgb-yellow-500), 0.3);
     --warning-text-subtle: var(--yellow-300);
 
-    --info-bg-subtle: rgba(59, 130, 246, 0.15);
-    --info-border-subtle: rgba(59, 130, 246, 0.3);
+    --info-bg-subtle: rgba(var(--rgb-blue-500), 0.15);
+    --info-border-subtle: rgba(var(--rgb-blue-500), 0.3);
     --info-text-subtle: var(--blue-300);
+
+    /* Active Intents */
+    --primary-bg-active: rgba(var(--rgb-blue-500), 0.25);
+    --success-bg-active: rgba(var(--rgb-green-500), 0.25);
+    --danger-bg-active: rgba(var(--rgb-red-500), 0.25);
+    --warning-bg-active: rgba(var(--rgb-yellow-500), 0.25);
+    --info-bg-active: rgba(var(--rgb-blue-500), 0.25);
   }
 }
