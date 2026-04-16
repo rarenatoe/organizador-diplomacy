@@ -29,7 +29,9 @@ async def make_snapshot_with_players(db_session: Any, count: int = 14) -> int:
     snap_id = await create_snapshot(db_session, "manual")
     for i in range(count):
         pid = await get_or_create_player(db_session, f"Jugador_{i:02d}")
-        await add_player_to_snapshot(db_session, snap_id, pid, "Antiguo", i % 3, 0, 2, 0)
+        await add_player_to_snapshot(
+            db_session, snap_id, pid, "Antiguo", i % 3, 2, 0, has_priority=False
+        )
     await db_session.commit()
     return snap_id
 
@@ -69,7 +71,9 @@ class TestApiGameDraft:
         snap_id = await create_snapshot(db_session, "manual")
         for i in range(3):
             pid = await get_or_create_player(db_session, f"Few_{i}")
-            await add_player_to_snapshot(db_session, snap_id, pid, "Antiguo", 0, 0, 1, 0)
+            await add_player_to_snapshot(
+                db_session, snap_id, pid, "Antiguo", 0, 1, 0, has_priority=False
+            )
         await db_session.commit()
         resp = await client.post("/api/game/draft", json={"snapshot_id": snap_id})
         assert resp.status_code in (400, 500)  # Error expected, specific code may vary
@@ -87,7 +91,7 @@ class TestApiGameDraft:
         if "mesas" not in data or not data["mesas"]:
             return
         first_player = data["mesas"][0]["jugadores"][0]
-        for key in ("nombre", "es_nuevo", "juegos_este_ano", "tiene_prioridad"):
+        for key in ("nombre", "es_nuevo", "juegos_este_ano", "has_priority"):
             assert key in first_player, f"Missing key '{key}' in player dict"
 
     async def test_unhashable_draftplayer_regression(self, client: Any, db_session: Any) -> None:
@@ -101,9 +105,9 @@ class TestApiGameDraft:
             name="DuplicatePlayer",
             experience="Veterano",
             games_this_year=5,
-            priority="False",
             desired_games=1,
             gm_games=0,
+            has_priority=False,
         )
 
         mock_result = DraftResult(
@@ -115,9 +119,9 @@ class TestApiGameDraft:
                             name="OtherPlayer",
                             experience="Nuevo",
                             games_this_year=0,
-                            priority="False",
                             desired_games=1,
                             gm_games=0,
+                            has_priority=False,
                         )
                     ],
                     gm=None,
@@ -500,7 +504,9 @@ class TestApiGameDelete:
             snap_id = await create_snapshot(db_session, source)
             for i in range(n):
                 pid = await get_or_create_player(db_session, f"P{snap_id}_{i}")
-                await add_player_to_snapshot(db_session, snap_id, pid, "Antiguo", 0, 1, 2, 0)
+                await add_player_to_snapshot(
+                    db_session, snap_id, pid, "Antiguo", 0, 2, 0, has_priority=True
+                )
             await db_session.commit()
             return snap_id
 
@@ -513,8 +519,12 @@ class TestApiGameDelete:
         # Add different players to C to verify squashing
         pid_c1 = await get_or_create_player(db_session, "PlayerC1")
         pid_c2 = await get_or_create_player(db_session, "PlayerC2")
-        await add_player_to_snapshot(db_session, snap_c, pid_c1, "Antiguo", 5, 1, 2, 0)
-        await add_player_to_snapshot(db_session, snap_c, pid_c2, "Nuevo", 2, 1, 1, 0)
+        await add_player_to_snapshot(
+            db_session, snap_c, pid_c1, "Antiguo", 5, 2, 0, has_priority=True
+        )
+        await add_player_to_snapshot(
+            db_session, snap_c, pid_c2, "Nuevo", 2, 1, 0, has_priority=True
+        )
 
         # Create edges: A -> game -> B and A -> branch -> C
         game_edge_id = await create_game_edge(db_session, snap_a, snap_b, 1)

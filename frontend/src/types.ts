@@ -22,7 +22,7 @@ export interface PlayerData {
   country?: CountryAssignment | null;
   es_nuevo?: boolean;
   juegos_este_ano?: number;
-  prioridad?: number;
+  has_priority?: boolean;
   partidas_deseadas?: number;
   partidas_gm?: number;
   c_england?: number;
@@ -50,7 +50,7 @@ export interface WaitingItem {
   country?: CountryAssignment | null;
   es_nuevo?: boolean;
   juegos_este_ano?: number;
-  prioridad?: number;
+  has_priority?: boolean;
   partidas_deseadas?: number;
   partidas_gm?: number;
   c_england?: number;
@@ -163,7 +163,7 @@ export interface EditPlayerRow {
   original_nombre?: string;
   experiencia?: string;
   juegos_este_ano?: number;
-  prioridad: number;
+  has_priority: boolean;
   partidas_deseadas: number;
   partidas_gm: number;
   historyRestored?: boolean;
@@ -274,7 +274,7 @@ export interface DraftPlayer {
   notion_alias?: string[] | null;
   es_nuevo: boolean;
   juegos_ano: number;
-  tiene_prioridad: boolean;
+  has_priority: boolean;
   partidas_deseadas: number;
   partidas_gm: number;
   c_england: number;

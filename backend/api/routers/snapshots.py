@@ -55,9 +55,9 @@ async def _insert_snapshot_players(
             player_id,
             player.experiencia,
             player.juegos_este_ano,
-            player.prioridad,
             player.partidas_deseadas,
             player.partidas_gm,
+            has_priority=player.has_priority,
         )
 
 
@@ -70,7 +70,7 @@ class PlayerCreate(BaseModel):
     notion_name: str | None = None
     experiencia: str = "Nuevo"
     juegos_este_ano: int = 0
-    prioridad: int = 0
+    has_priority: bool = False
     partidas_deseadas: int = 1
     partidas_gm: int = 0
 
@@ -98,7 +98,7 @@ class AddPlayerRequest(BaseModel):
     notion_name: str | None = None
     experiencia: str = "Nuevo"
     juegos_este_ano: int = 0
-    prioridad: int = 0
+    has_priority: bool = False
     partidas_deseadas: int = 1
     partidas_gm: int = 0
 
@@ -240,7 +240,7 @@ async def api_create_snapshot(
                 "notion_id": p.notion_id,
                 "experiencia": p.experiencia,
                 "juegos_este_ano": p.juegos_este_ano,
-                "prioridad": p.prioridad,
+                "has_priority": p.has_priority,
                 "partidas_deseadas": p.partidas_deseadas,
                 "partidas_gm": p.partidas_gm,
             }
@@ -332,7 +332,7 @@ async def api_snapshot_save(
                 "nombre",
                 "experiencia",
                 "juegos_este_ano",
-                "prioridad",
+                "has_priority",
                 "partidas_deseadas",
                 "partidas_gm",
             }
@@ -346,7 +346,7 @@ async def api_snapshot_save(
                     "nombre": p.nombre,
                     "experiencia": p.experiencia,
                     "juegos_este_ano": p.juegos_este_ano,
-                    "prioridad": p.prioridad,
+                    "has_priority": p.has_priority,
                     "partidas_deseadas": p.partidas_deseadas,
                     "partidas_gm": p.partidas_gm,
                 }
@@ -470,9 +470,9 @@ async def api_add_player(
             player_id,
             request.experiencia,
             request.juegos_este_ano,
-            request.prioridad,
             request.partidas_deseadas,
             request.partidas_gm,
+            has_priority=request.has_priority,
         )
         await session.commit()
         return {"player_id": player_id}

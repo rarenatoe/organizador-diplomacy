@@ -37,9 +37,9 @@ async def make_snapshot_with_player(
         pid,
         experience,
         games_this_year=0,
-        priority=1,
         desired_games=2,
         gm_games=0,
+        has_priority=True,
     )
     await db_session.commit()
     return snap_id, pid
@@ -96,8 +96,12 @@ class TestApiPlayerRename:
         # Add two players to the same snapshot
         carol_id = await get_or_create_player(db_session, "Carol")
         diana_id = await get_or_create_player(db_session, "Diana")
-        await add_player_to_snapshot(db_session, snap_id, carol_id, "Antiguo", 0, 1, 2, 0)
-        await add_player_to_snapshot(db_session, snap_id, diana_id, "Antiguo", 0, 1, 2, 0)
+        await add_player_to_snapshot(
+            db_session, snap_id, carol_id, "Antiguo", 0, 2, 0, has_priority=True
+        )
+        await add_player_to_snapshot(
+            db_session, snap_id, diana_id, "Antiguo", 0, 2, 0, has_priority=True
+        )
         await db_session.commit()
         # Try to merge them - should fail
         resp = await client.post(
@@ -124,9 +128,9 @@ class TestApiPlayerRename:
             pid,
             experience="Antiguo",
             games_this_year=0,
-            priority=1,
             desired_games=2,
             gm_games=0,
+            has_priority=True,
         )
         await db_session.commit()
         # The old snapshot still has the old name
@@ -149,9 +153,9 @@ class TestApiPlayerRename:
             pid,
             experience="Antiguo",
             games_this_year=0,
-            priority=1,
             desired_games=2,
             gm_games=0,
+            has_priority=True,
         )
         await db_session.commit()
         # Rename the player
@@ -190,7 +194,7 @@ class TestApiSnapshotAddPlayer:
                 "nombre": "Grace",
                 "experiencia": "Antiguo",
                 "juegos_este_ano": 1,
-                "prioridad": 1,
+                "has_priority": True,
                 "partidas_deseadas": 2,
                 "partidas_gm": 0,
             },
@@ -211,7 +215,7 @@ class TestApiSnapshotAddPlayer:
                 "nombre": "Helen",
                 "experiencia": "Nuevo",
                 "juegos_este_ano": 5,
-                "prioridad": 0,
+                "has_priority": False,
                 "partidas_deseadas": 1,
                 "partidas_gm": 1,
             },
@@ -243,7 +247,7 @@ class TestPlayerLookup:
         player = data["player"]
 
         assert player["source"] == "default"
-        assert player["prioridad"] == 0
+        assert not player["has_priority"]
         assert player["experiencia"] == "Nuevo"
         assert player["juegos_este_ano"] == 0
 
@@ -262,9 +266,9 @@ class TestPlayerLookup:
             player_id=player_id,
             experience="Veterano",
             games_this_year=0,
-            priority=1,
             desired_games=1,
             gm_games=0,
+            has_priority=True,
         )
         await db_session.commit()
 
@@ -279,7 +283,7 @@ class TestPlayerLookup:
         player = resp.json()["player"]
 
         assert player["source"] == "history"
-        assert player["prioridad"] == 1
+        assert player["has_priority"]
         assert player["experiencia"] == "Veterano"
         assert player["juegos_este_ano"] == 0
 
@@ -297,9 +301,9 @@ class TestPlayerLookup:
             player_id=player_id,
             experience="Veterano",
             games_this_year=1,
-            priority=1,
             desired_games=1,
             gm_games=1,
+            has_priority=True,
         )
         await db_session.commit()
 
@@ -310,7 +314,7 @@ class TestPlayerLookup:
         player = resp.json()["player"]
 
         assert player["source"] == "history"
-        assert player["prioridad"] == 1
+        assert player["has_priority"]
         assert player["experiencia"] == "Veterano"
         assert player["juegos_este_ano"] == 1
 
@@ -329,7 +333,9 @@ class TestPlayerLookup:
 
         player_id = await get_or_create_player(db_session, "Eve")
         snap_id = await create_snapshot(db_session, "manual")
-        await add_player_to_snapshot(db_session, snap_id, player_id, "Veterano", 1, 2, 1, 1)
+        await add_player_to_snapshot(
+            db_session, snap_id, player_id, "Veterano", 1, 1, 1, has_priority=True
+        )
         await db_session.commit()
 
         result = await db_session.execute(
@@ -347,7 +353,7 @@ class TestPlayerLookup:
                     "nombre": "Eve",
                     "experiencia": "Veterano",
                     "juegos_este_ano": 1,
-                    "prioridad": 1,
+                    "has_priority": True,
                     "partidas_deseadas": 2,
                     "partidas_gm": 1,
                 }
@@ -369,7 +375,7 @@ class TestPlayerLookup:
         player = resp.json()["player"]
 
         assert player["source"] == "history"
-        assert player["prioridad"] == 1
+        assert player["has_priority"]
         assert player["experiencia"] == "Veterano"
         assert player["juegos_este_ano"] == 1
 
@@ -400,7 +406,7 @@ class TestPlayerLookup:
         player = resp.json()["player"]
 
         assert player["source"] == "notion"
-        assert player["prioridad"] == 0
+        assert not player["has_priority"]
         assert player["partidas_deseadas"] == 1
         assert player["experiencia"] == "Veterano"
         assert player["juegos_este_ano"] == 3
@@ -412,7 +418,7 @@ class TestPlayerLookup:
         player = resp.json()["player"]
 
         assert player["source"] == "default"
-        assert player["prioridad"] == 0
+        assert not player["has_priority"]
         assert player["experiencia"] == "Nuevo"
         assert player["juegos_este_ano"] == 0
 
@@ -440,9 +446,9 @@ class TestPlayerLookup:
             player_id=player_id,
             experience="Veterano",
             games_this_year=1,
-            priority=1,
             desired_games=1,
             gm_games=1,
+            has_priority=True,
         )
         await db_session.commit()
 
@@ -453,7 +459,7 @@ class TestPlayerLookup:
         player = resp.json()["player"]
 
         assert player["source"] == "history"
-        assert player["prioridad"] == 1
+        assert player["has_priority"]
         assert player["experiencia"] == "Veterano"
 
 

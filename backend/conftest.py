@@ -71,6 +71,8 @@ async def add_snapshot(
     snap_id = await create_snapshot(db_session, source)
     for i in range(players):
         pid = await get_or_create_player(db_session, f"Jugador_{snap_id}_{i}")
-        await add_player_to_snapshot(db_session, snap_id, pid, "Antiguo", i, 0, 1, 0)
+        await add_player_to_snapshot(
+            db_session, snap_id, pid, "Antiguo", i, 1, 0, has_priority=False
+        )
     await db_session.commit()
     return snap_id

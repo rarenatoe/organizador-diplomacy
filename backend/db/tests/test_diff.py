@@ -12,6 +12,7 @@ from backend.crud.snapshots import generate_deep_diff
 if TYPE_CHECKING:
     from backend.db.models import RenameDict
 
+
 class TestGenerateDeepDiff:
     """Unit tests for generate_deep_diff function."""
 
@@ -77,10 +78,15 @@ class TestGenerateDeepDiff:
     def test_multiple_field_changes(self) -> None:
         """Multiple field changes should all be reported."""
         old_players = [
-            {"nombre": "Pablo", "experiencia": "Nuevo", "juegos_este_ano": 2, "prioridad": 0}
+            {"nombre": "Pablo", "experiencia": "Nuevo", "juegos_este_ano": 2, "has_priority": False}
         ]
         new_players = [
-            {"nombre": "Pablo", "experiencia": "Antiguo", "juegos_este_ano": 3, "prioridad": 5}
+            {
+                "nombre": "Pablo",
+                "experiencia": "Antiguo",
+                "juegos_este_ano": 3,
+                "has_priority": True,
+            }
         ]
 
         result = generate_deep_diff(old_players, new_players, [])
@@ -92,7 +98,7 @@ class TestGenerateDeepDiff:
         assert len(mod["changes"]) == 3
         assert mod["changes"]["experiencia"] == {"old": "Nuevo", "new": "Antiguo"}
         assert mod["changes"]["juegos_este_ano"] == {"old": 2, "new": 3}
-        assert mod["changes"]["prioridad"] == {"old": 0, "new": 5}
+        assert mod["changes"]["has_priority"] == {"old": False, "new": True}
 
     def test_no_changes_empty_result(self) -> None:
         """Identical player lists should produce empty changes."""

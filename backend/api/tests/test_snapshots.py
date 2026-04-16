@@ -40,9 +40,9 @@ async def make_snapshot_with_players(
             pid,
             experience="Antiguo",
             games_this_year=0,
-            priority=1,
             desired_games=2,
             gm_games=0,
+            has_priority=True,
         )
     await db_session.commit()
     return snap_id
@@ -178,8 +178,12 @@ class TestApiSnapshotDelete:
         # Add different players to C to verify squashing
         pid_c1 = await get_or_create_player(db_session, "PlayerC1")
         pid_c2 = await get_or_create_player(db_session, "PlayerC2")
-        await add_player_to_snapshot(db_session, snap_c, pid_c1, "Antiguo", 5, 1, 2, 0)
-        await add_player_to_snapshot(db_session, snap_c, pid_c2, "Nuevo", 2, 1, 1, 0)
+        await add_player_to_snapshot(
+            db_session, snap_c, pid_c1, "Antiguo", 5, 2, 0, has_priority=True
+        )
+        await add_player_to_snapshot(
+            db_session, snap_c, pid_c2, "Nuevo", 2, 1, 0, has_priority=True
+        )
 
         # Create edges: A -> game -> B and A -> branch -> C
         _game_edge_id = await create_game_edge(db_session, snap_a, snap_b, 1)
@@ -253,10 +257,12 @@ class TestApiSnapshotCreate:
             get_snapshot_players,
         )
 
-        # Create parent snapshot with historical player having prioridad=1
+        # Create parent snapshot with historical player having has_priority=True
         parent_id = await create_snapshot(db_session, "manual")
         player_id = await get_or_create_player(db_session, "HistoricalPlayer")
-        await add_player_to_snapshot(db_session, parent_id, player_id, "Veterano", 5, 1, 2, 1)
+        await add_player_to_snapshot(
+            db_session, parent_id, player_id, "Veterano", 5, 2, 1, has_priority=True
+        )
         await db_session.commit()
 
         # Create save payload with completely different values
@@ -268,7 +274,7 @@ class TestApiSnapshotCreate:
                     "nombre": "HistoricalPlayer",
                     "experiencia": "Antiguo",  # Different from historical
                     "juegos_este_ano": 88,  # Different from historical
-                    "prioridad": 0,  # Different from historical
+                    "has_priority": False,  # Different from historical
                     "partidas_deseadas": 4,  # Different from historical
                     "partidas_gm": 0,  # Different from historical
                 }
@@ -288,7 +294,7 @@ class TestApiSnapshotCreate:
         assert player["nombre"] == "HistoricalPlayer"
         assert player["experiencia"] == "Antiguo"
         assert player["juegos_este_ano"] == 88
-        assert player["prioridad"] == 0
+        assert not player["has_priority"]
         assert player["partidas_deseadas"] == 4
         assert player["partidas_gm"] == 0
 
@@ -349,7 +355,7 @@ class TestApiSnapshotCreate:
                 "notion_id": f"notion_{i}",
                 "experiencia": "Antiguo",
                 "juegos_este_ano": i,
-                "prioridad": 1,
+                "has_priority": True,
                 "partidas_deseadas": 2,
                 "partidas_gm": 0,
             }
@@ -393,7 +399,7 @@ class TestApiSnapshotSave:
                 "notion_id": f"new_notion_{i}",
                 "experiencia": "Nuevo",
                 "juegos_este_ano": 0,
-                "prioridad": 1,
+                "has_priority": True,
                 "partidas_deseadas": 1,
                 "partidas_gm": 0,
             }
@@ -450,7 +456,7 @@ class TestApiSnapshotSave:
                 "nombre": f"ModifiedPlayer{i}",
                 "experiencia": "Antiguo",
                 "juegos_este_ano": i,
-                "prioridad": 1,
+                "has_priority": True,
                 "partidas_deseadas": 2,
                 "partidas_gm": 0,
             }
@@ -496,7 +502,7 @@ class TestApiSnapshotSave:
                     "nombre": "Juan",
                     "experiencia": "Nuevo",
                     "juegos_este_ano": 0,
-                    "prioridad": 0,
+                    "has_priority": False,
                     "partidas_deseadas": 1,
                     "partidas_gm": 0,
                 }
@@ -521,7 +527,7 @@ class TestApiSnapshotSave:
                         "nombre": "Juan",
                         "experiencia": "Nuevo",
                         "juegos_este_ano": 0,
-                        "prioridad": 0,
+                        "has_priority": False,
                         "partidas_deseadas": 1,
                         "partidas_gm": 0,
                         # These algorithm fields should be ignored

@@ -164,6 +164,8 @@
   }
 
   function handleClickOutside() {
+    if (resolutionState.status === "resolving") return;
+
     isActive = false; // Add this line
     if (onClickOutside) {
       onClickOutside();

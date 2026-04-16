@@ -343,7 +343,9 @@ class TestNotionSyncBackground:
         async with AsyncSession(test_engine) as session:
             snap_id = await create_snapshot(session, "test_source")
             player_id = await get_or_create_player(session, "AliceOld")
-            await add_player_to_snapshot(session, snap_id, player_id, "Nuevo", 0, 0, 1, 0)
+            await add_player_to_snapshot(
+                session, snap_id, player_id, "Nuevo", 0, 1, 0, has_priority=False
+            )
             await session.commit()
 
         # Step 2: Mock Notion API to return "AliceNew" with games=10
@@ -437,8 +439,12 @@ class TestNotionSyncBackground:
             snap_id = await create_snapshot(session, "notion_sync")
             player1_id = await get_or_create_player(session, "Alice")
             player2_id = await get_or_create_player(session, "Bob")
-            await add_player_to_snapshot(session, snap_id, player1_id, "Nuevo", 0, 0, 1, 0)
-            await add_player_to_snapshot(session, snap_id, player2_id, "Nuevo", 0, 0, 1, 0)
+            await add_player_to_snapshot(
+                session, snap_id, player1_id, "Nuevo", 0, 1, 0, has_priority=False
+            )
+            await add_player_to_snapshot(
+                session, snap_id, player2_id, "Nuevo", 0, 1, 0, has_priority=False
+            )
             await session.commit()
 
         # Step 2: Verify no history exists yet

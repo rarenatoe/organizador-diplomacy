@@ -37,7 +37,7 @@
     <textarea
       use:autofocus
       bind:value={csvText}
-      placeholder="nombre,experiencia,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm&#10;Alice,Nuevo,0,0,1,0&#10;Bob,Antiguo,3,1,2,1"
+      placeholder="nombre,experiencia,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm&#10;Alice,Nuevo,0,false,1,0&#10;Bob,Antiguo,3,true,2,1"
       rows="10"
     ></textarea>
     <div class="modal-actions">

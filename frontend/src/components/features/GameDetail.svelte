@@ -6,7 +6,7 @@
     experiencia?: string;
     es_nuevo?: boolean;
     juegos_este_ano?: number;
-    prioridad?: number;
+    has_priority?: boolean;
     partidas_deseadas?: number;
     partidas_gm?: number;
     c_england?: number;
@@ -74,7 +74,7 @@
       nombre: player.nombre,
       es_nuevo: player.es_nuevo ?? false,
       juegos_ano: player.juegos_este_ano ?? 0,
-      tiene_prioridad: player.prioridad === 1,
+      has_priority: player.has_priority ?? false,
       partidas_deseadas: player.partidas_deseadas ?? 1,
       partidas_gm: player.partidas_gm ?? 0,
       c_england: player.c_england ?? 0,

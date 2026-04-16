@@ -12,7 +12,7 @@ export const createMockDraftPlayer = (
     nombre: "Test Player",
     es_nuevo: false,
     juegos_ano: 0,
-    tiene_prioridad: false,
+    has_priority: false,
     partidas_deseadas: 1,
     partidas_gm: 0,
     c_england: 0,

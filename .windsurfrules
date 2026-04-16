@@ -108,7 +108,6 @@
 
 - **Snapshot Save:** `/api/snapshot/save` MUST blindly trust frontend payload. NEVER merge historical weights or apply corrections.
 - **Player Lookup:** `/api/player/lookup` MUST use 4-tier fallback: Timeline -> Global Snapshot -> JSON Logs -> Notion Cache. NEVER skip tiers.
-- **Priority Field:** Treat `priority` as semantically boolean (strictly `0` or `1`). NEVER use non-boolean values.
 - **Game Generation:** Execute two-phase algorithm: distribution loop first, country assignment second. NEVER interleave phases.
 - **Hashing Keys:** ALWAYS hash by primitive attributes (`.name`) when using `Counter()` or dict keys. NEVER pass Pydantic models as keys.
 

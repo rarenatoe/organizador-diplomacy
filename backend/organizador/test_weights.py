@@ -13,7 +13,7 @@ def _j(name: str, d: int = 1, g: int = 0, exp: str = "Antiguo", j: int = 0):
         name=name,
         experience=exp,
         games_this_year=j,
-        priority="False",
+        has_priority=False,
         desired_games=d,
         gm_games=g,
     )

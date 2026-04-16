@@ -109,7 +109,7 @@ async def api_game_draft(
                 name=r["nombre"],
                 experience=r["experiencia"],
                 games_this_year=r["juegos_este_ano"],
-                priority=str(bool(r["prioridad"])),
+                has_priority=r["has_priority"],
                 desired_games=r["partidas_deseadas"],
                 gm_games=r["partidas_gm"],
                 c_england=r.get("c_england", 0),
@@ -151,7 +151,6 @@ async def api_game_draft(
                         "nombre": table.gm.name,
                         "experiencia": table.gm.experience,
                         "juegos_este_ano": table.gm.games_this_year,
-                        "prioridad": table.gm.priority,
                         "partidas_deseadas": table.gm.desired_games,
                         "partidas_gm": table.gm.gm_games,
                         "c_england": table.gm.c_england,
@@ -165,7 +164,7 @@ async def api_game_draft(
                         if table.gm.country
                         else None,
                         "es_nuevo": table.gm.is_new,
-                        "tiene_prioridad": table.gm.has_priority,
+                        "has_priority": table.gm.has_priority,
                     }
                     if table.gm
                     else None,
@@ -174,7 +173,6 @@ async def api_game_draft(
                             "nombre": player.name,
                             "experiencia": player.experience,
                             "juegos_este_ano": player.games_this_year,
-                            "prioridad": player.priority,
                             "partidas_deseadas": player.desired_games,
                             "partidas_gm": player.gm_games,
                             "c_england": player.c_england,
@@ -188,7 +186,7 @@ async def api_game_draft(
                             if player.country
                             else None,
                             "es_nuevo": player.is_new,
-                            "tiene_prioridad": player.has_priority,
+                            "has_priority": player.has_priority,
                         }
                         for player in table.players
                     ],
@@ -200,7 +198,6 @@ async def api_game_draft(
                     "nombre": player.name,
                     "experiencia": player.experience,
                     "juegos_este_ano": player.games_this_year,
-                    "prioridad": player.priority,
                     "partidas_deseadas": player.desired_games,
                     "partidas_gm": player.gm_games,
                     "c_england": player.c_england,
@@ -214,7 +211,7 @@ async def api_game_draft(
                     if player.country
                     else None,
                     "es_nuevo": player.is_new,
-                    "tiene_prioridad": player.has_priority,
+                    "has_priority": player.has_priority,
                     "cupos_faltantes": waitlist_counts[player.name],
                 }
                 for player in unique_waitlist

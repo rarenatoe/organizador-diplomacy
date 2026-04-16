@@ -242,7 +242,7 @@ async def lookup_player_history(
             if snapshot_player:
                 # Found player in history
                 return {
-                    "prioridad": snapshot_player.priority,
+                    "has_priority": snapshot_player.has_priority,
                     "experiencia": snapshot_player.experience,
                     "juegos_este_ano": snapshot_player.games_this_year,
                     "partidas_deseadas": snapshot_player.desired_games,
@@ -271,7 +271,7 @@ async def lookup_player_history(
         if global_snapshot_player:
             # Found in global search
             return {
-                "prioridad": global_snapshot_player.priority,
+                "has_priority": global_snapshot_player.has_priority,
                 "experiencia": global_snapshot_player.experience,
                 "juegos_este_ano": global_snapshot_player.games_this_year,
                 "partidas_deseadas": global_snapshot_player.desired_games,
@@ -293,7 +293,7 @@ async def lookup_player_history(
                 if logged_player.get("nombre") == name:
                     # Found in JSON logs - TypedDict provides type safety
                     return {
-                        "prioridad": logged_player.get("prioridad", 0),
+                        "has_priority": logged_player.get("has_priority", False),
                         "experiencia": logged_player.get("experiencia", "Nuevo"),
                         "juegos_este_ano": logged_player.get("juegos_este_ano", 0),
                         "partidas_deseadas": logged_player.get("partidas_deseadas", 1),
@@ -307,7 +307,7 @@ async def lookup_player_history(
     if nc:
         # Found in Notion cache, force priority to 0
         return {
-            "prioridad": 0,
+            "has_priority": False,
             "experiencia": nc.experience,
             "juegos_este_ano": nc.games_this_year,
             "partidas_deseadas": 1,
@@ -318,7 +318,7 @@ async def lookup_player_history(
     else:
         # Not found anywhere, return defaults
         return {
-            "prioridad": 0,
+            "has_priority": False,
             "experiencia": "Nuevo",
             "juegos_este_ano": 0,
             "partidas_deseadas": 1,

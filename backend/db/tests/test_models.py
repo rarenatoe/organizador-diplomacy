@@ -78,7 +78,7 @@ class TestModelInstantiation:
             player_id=player.id,
             experience="Antiguo",
             games_this_year=0,
-            priority=1,
+            has_priority=True,
             desired_games=2,
             gm_games=0,
         )
@@ -332,7 +332,7 @@ class TestRelationshipConfiguration:
             player_id=player.id,
             experience="Antiguo",
             games_this_year=0,
-            priority=1,
+            has_priority=True,
             desired_games=2,
             gm_games=0,
         )

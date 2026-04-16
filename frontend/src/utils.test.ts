@@ -15,7 +15,7 @@ Bob,Antiguo,3,1,2,1`;
       nombre: "Alice",
       experiencia: "Nuevo",
       juegos_este_ano: 0,
-      prioridad: 0,
+      has_priority: false,
       partidas_deseadas: 1,
       partidas_gm: 0,
     });
@@ -23,7 +23,7 @@ Bob,Antiguo,3,1,2,1`;
       nombre: "Bob",
       experiencia: "Antiguo",
       juegos_este_ano: 3,
-      prioridad: 1,
+      has_priority: true,
       partidas_deseadas: 2,
       partidas_gm: 1,
     });
@@ -38,7 +38,7 @@ Charlie`;
       nombre: "Charlie",
       experiencia: "Nuevo",
       juegos_este_ano: 0,
-      prioridad: 0,
+      has_priority: false,
       partidas_deseadas: 1,
       partidas_gm: 0,
     });
@@ -88,7 +88,7 @@ Antiguo,Bob,1`;
     expect(result).toHaveLength(1);
     expect(result[0]?.nombre).toBe("Bob");
     expect(result[0]?.experiencia).toBe("Antiguo");
-    expect(result[0]?.prioridad).toBe(1);
+    expect(result[0]?.has_priority).toBe(true);
   });
 
   it("parses numeric values correctly", () => {
@@ -97,7 +97,7 @@ Alice,5,1,3,2`;
     const result = parsePlayersCsv(csv);
     expect(result).toHaveLength(1);
     expect(result[0]?.juegos_este_ano).toBe(5);
-    expect(result[0]?.prioridad).toBe(1);
+    expect(result[0]?.has_priority).toBe(true);
     expect(result[0]?.partidas_deseadas).toBe(3);
     expect(result[0]?.partidas_gm).toBe(2);
   });
@@ -108,6 +108,6 @@ Alice,abc,xyz`;
     const result = parsePlayersCsv(csv);
     expect(result).toHaveLength(1);
     expect(result[0]?.juegos_este_ano).toBe(0);
-    expect(result[0]?.prioridad).toBe(0);
+    expect(result[0]?.has_priority).toBe(false);
   });
 });

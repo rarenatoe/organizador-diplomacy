@@ -161,9 +161,9 @@ async def _create_output_snapshot_from_draft(
             player_id=pid,
             experience="Antiguo" if was_promoted else p["experiencia"],
             games_this_year=p["juegos_este_ano"] + played,
-            priority=1 if name in names_in_waitlist else 0,
             desired_games=p["partidas_deseadas"],
             gm_games=0,  # partidas_gm reset
+            has_priority=name in names_in_waitlist,
         )
 
     return snap_id
@@ -234,9 +234,9 @@ async def update_game_draft(
             player_id=pid,
             experience="Antiguo" if was_promoted else p["experiencia"],
             games_this_year=p["juegos_este_ano"] + played,
-            priority=1 if name in names_in_waitlist else 0,
             desired_games=p["partidas_deseadas"],
             gm_games=0,  # partidas_gm reset
+            has_priority=name in names_in_waitlist,
         )
 
     # 4. Re-insert tables and waiting_list

@@ -52,7 +52,7 @@ describe("api.ts - FastAPI Error Handling", () => {
         {
           nombre: "Test",
           experiencia: "Antiguo",
-          prioridad: 1,
+          has_priority: true,
           partidas_deseadas: 2,
           partidas_gm: 0,
         },
@@ -428,7 +428,7 @@ describe("api.ts - FastAPI Error Handling", () => {
         {
           nombre: "Test",
           experiencia: "Antiguo",
-          prioridad: 1,
+          has_priority: true,
           partidas_deseadas: 2,
           partidas_gm: 0,
         },

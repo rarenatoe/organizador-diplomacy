@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { SvelteSet } from "svelte/reactivity";
   import type {
     SnapshotDetail,
     EditPlayerRow,
@@ -11,7 +10,6 @@
   import { fetchSnapshot, fetchNotionPlayers, saveSnapshot } from "../../api";
   import { setActiveNodeId } from "../../stores.svelte";
   import { validateOrganizar, applySyncMerges } from "../../syncUtils";
-  import { normalizeName } from "../../utils";
   import OrganizarConfirmModal from "../modals/OrganizarConfirmModal.svelte";
   import Button from "../ui/Button.svelte";
   import PanelLayout from "../layout/PanelLayout.svelte";
@@ -22,8 +20,6 @@
   import SnapshotHistory from "./SnapshotHistory.svelte";
   import { logger } from "../../utils/logger";
   import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
-  import Tooltip from "../ui/Tooltip.svelte";
-
   let resolutionModal: ReturnType<typeof SyncResolutionModal>;
 
   interface Props {
@@ -65,14 +61,14 @@
   let fetchedNotionPlayers = $state<NotionPlayer[]>([]);
   let validation = $state<OrganizarValidation | null>(null);
 
-  const CSV_COLS = [
-    "nombre",
-    "experiencia",
-    "juegos_este_ano",
-    "prioridad",
-    "partidas_deseadas",
-    "partidas_gm",
-  ] as const;
+  const CSV_COLS = {
+    nombre: "nombre",
+    experiencia: "experiencia",
+    juegos_este_ano: "juegos_este_ano",
+    prioridad: "has_priority",
+    partidas_deseadas: "partidas_deseadas",
+    partidas_gm: "partidas_gm",
+  } as const;
 
   function sourceLabel(source: string | undefined): string {
     if (source === "notion_sync") return "☁️ Notion Sync";
@@ -84,8 +80,12 @@
     if (!data?.players) return "";
     const rows = data.players;
     return [
-      CSV_COLS.join(","),
-      ...rows.map((r) => CSV_COLS.map((c) => String(r[c] ?? "")).join(",")),
+      Object.keys(CSV_COLS).join(","),
+      ...rows.map((r) =>
+        Object.values(CSV_COLS)
+          .map((c) => String(r[c] ?? ""))
+          .join(","),
+      ),
     ].join("\n");
   });
 
@@ -94,7 +94,7 @@
       nombre: p.nombre,
       experiencia: p.experiencia ?? "Nuevo",
       juegos_este_ano: p.juegos_este_ano ?? 0,
-      prioridad: p.prioridad ?? 0,
+      has_priority: p.has_priority ?? false,
       partidas_deseadas: p.partidas_deseadas ?? 1,
       partidas_gm: p.partidas_gm ?? 0,
       notion_id: p.notion_id ?? null,
@@ -321,7 +321,7 @@
       {/snippet}
 
       {#snippet priorCell(row: EditPlayerRow, index: number)}
-        {row.prioridad === 1 ? "✓" : ""}
+        {row.has_priority ? "✓" : ""}
       {/snippet}
 
       {#snippet gmCell(row: EditPlayerRow, index: number)}

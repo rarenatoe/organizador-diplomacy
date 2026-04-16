@@ -48,10 +48,18 @@ class TestGameDraftOperations:
         pid4 = await get_or_create_player(db_session, "David")
 
         # Add players to input snapshot
-        await add_player_to_snapshot(db_session, input_snap, pid1, "Antiguo", 5, 1, 2, 0)
-        await add_player_to_snapshot(db_session, input_snap, pid2, "Nuevo", 0, 1, 1, 0)
-        await add_player_to_snapshot(db_session, input_snap, pid3, "Antiguo", 3, 1, 2, 0)
-        await add_player_to_snapshot(db_session, input_snap, pid4, "Nuevo", 0, 1, 1, 0)
+        await add_player_to_snapshot(
+            db_session, input_snap, pid1, "Antiguo", 5, 2, 0, has_priority=True
+        )
+        await add_player_to_snapshot(
+            db_session, input_snap, pid2, "Nuevo", 0, 1, 0, has_priority=True
+        )
+        await add_player_to_snapshot(
+            db_session, input_snap, pid3, "Antiguo", 3, 2, 0, has_priority=True
+        )
+        await add_player_to_snapshot(
+            db_session, input_snap, pid4, "Nuevo", 0, 1, 0, has_priority=True
+        )
         await db_session.commit()
 
         # Draft data: 2 tables, 2 waiting list spots
@@ -110,7 +118,9 @@ class TestGameDraftOperations:
         # Setup
         input_snap = await create_snapshot(db_session, "manual")
         pid = await get_or_create_player(db_session, "Alice")
-        await add_player_to_snapshot(db_session, input_snap, pid, "Antiguo", 5, 1, 2, 0)
+        await add_player_to_snapshot(
+            db_session, input_snap, pid, "Antiguo", 5, 2, 0, has_priority=True
+        )
         await db_session.commit()
 
         # Empty draft
@@ -140,13 +150,17 @@ class TestGameDraftOperations:
         pid1 = await get_or_create_player(db_session, "Alice")
         pid2 = await get_or_create_player(db_session, "Bob")
 
-        await add_player_to_snapshot(db_session, input_snap, pid1, "Antiguo", 5, 1, 2, 0)
-        await add_player_to_snapshot(db_session, input_snap, pid2, "Nuevo", 0, 1, 1, 0)
         await add_player_to_snapshot(
-            db_session, output_snap, pid1, "Antiguo", 6, 0, 2, 0
+            db_session, input_snap, pid1, "Antiguo", 5, 2, 0, has_priority=True
+        )
+        await add_player_to_snapshot(
+            db_session, input_snap, pid2, "Nuevo", 0, 1, 0, has_priority=True
+        )
+        await add_player_to_snapshot(
+            db_session, output_snap, pid1, "Antiguo", 6, 2, 0, has_priority=False
         )  # Played 1 game
         await add_player_to_snapshot(
-            db_session, output_snap, pid2, "Antiguo", 1, 0, 1, 0
+            db_session, output_snap, pid2, "Antiguo", 1, 1, 0, has_priority=False
         )  # Played 1 game
         await db_session.commit()
 
@@ -209,13 +223,25 @@ class TestGameDraftOperations:
         pid3 = await get_or_create_player(db_session, "Charlie")
 
         # Add players to snapshots
-        await add_player_to_snapshot(db_session, input_snap, pid1, "Antiguo", 5, 1, 2, 0)
-        await add_player_to_snapshot(db_session, input_snap, pid2, "Nuevo", 0, 1, 1, 0)
-        await add_player_to_snapshot(db_session, input_snap, pid3, "Antiguo", 3, 1, 2, 0)
+        await add_player_to_snapshot(
+            db_session, input_snap, pid1, "Antiguo", 5, 2, 0, has_priority=True
+        )
+        await add_player_to_snapshot(
+            db_session, input_snap, pid2, "Nuevo", 0, 1, 0, has_priority=True
+        )
+        await add_player_to_snapshot(
+            db_session, input_snap, pid3, "Antiguo", 3, 2, 0, has_priority=True
+        )
 
-        await add_player_to_snapshot(db_session, output_snap, pid1, "Antiguo", 6, 0, 2, 0)
-        await add_player_to_snapshot(db_session, output_snap, pid2, "Antiguo", 1, 0, 1, 0)
-        await add_player_to_snapshot(db_session, output_snap, pid3, "Antiguo", 4, 0, 2, 0)
+        await add_player_to_snapshot(
+            db_session, output_snap, pid1, "Antiguo", 6, 2, 0, has_priority=False
+        )
+        await add_player_to_snapshot(
+            db_session, output_snap, pid2, "Antiguo", 1, 1, 0, has_priority=False
+        )
+        await add_player_to_snapshot(
+            db_session, output_snap, pid3, "Antiguo", 4, 2, 0, has_priority=False
+        )
         await db_session.commit()
 
         game_id = await create_game_edge(db_session, input_snap, output_snap, 1)
@@ -276,9 +302,15 @@ class TestGameDraftOperations:
         pid_antiguo = await get_or_create_player(db_session, "OldPlayer")
         pid_not_playing = await get_or_create_player(db_session, "IdlePlayer")
 
-        await add_player_to_snapshot(db_session, input_snap, pid_nuevo, "Nuevo", 0, 1, 1, 0)
-        await add_player_to_snapshot(db_session, input_snap, pid_antiguo, "Antiguo", 5, 1, 2, 0)
-        await add_player_to_snapshot(db_session, input_snap, pid_not_playing, "Nuevo", 0, 1, 1, 0)
+        await add_player_to_snapshot(
+            db_session, input_snap, pid_nuevo, "Nuevo", 0, 1, 0, has_priority=True
+        )
+        await add_player_to_snapshot(
+            db_session, input_snap, pid_antiguo, "Antiguo", 5, 2, 0, has_priority=True
+        )
+        await add_player_to_snapshot(
+            db_session, input_snap, pid_not_playing, "Nuevo", 0, 1, 0, has_priority=True
+        )
         await db_session.commit()
 
         # Draft where Nuevo player plays, becomes Antiguo
@@ -318,4 +350,4 @@ class TestGameDraftOperations:
         # Verify: IdlePlayer remains Nuevo, didn't play, in waitlist
         assert output_player_data["IdlePlayer"]["experiencia"] == "Nuevo"
         assert output_player_data["IdlePlayer"]["juegos_este_ano"] == 0
-        assert output_player_data["IdlePlayer"]["prioridad"] == 1  # In waitlist
+        assert output_player_data["IdlePlayer"]["has_priority"]  # In waitlist

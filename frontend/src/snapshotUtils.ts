@@ -74,7 +74,7 @@ export function buildPlayerRow(
     original_nombre: base.nombre,
     experiencia: base.experiencia ?? history.experiencia ?? "Nuevo",
     juegos_este_ano: base.juegos_este_ano ?? history.juegos_este_ano ?? 0,
-    prioridad: base.prioridad ?? history.prioridad ?? 0,
+    has_priority: base.has_priority ?? history.has_priority ?? false,
     partidas_deseadas: base.partidas_deseadas ?? history.partidas_deseadas ?? 1,
     partidas_gm: base.partidas_gm ?? history.partidas_gm ?? 0,
     notion_id: base.notion_id ?? history.notion_id ?? null,

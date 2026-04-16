@@ -22,7 +22,7 @@ class DraftPlayer(BaseModel):
     name: str
     experience: str
     games_this_year: int
-    priority: str
+    has_priority: bool = False
     desired_games: int
     gm_games: int = 0
     c_england: int = 0
@@ -37,7 +37,6 @@ class DraftPlayer(BaseModel):
 
     # Computed fields (set during initialization)
     is_new: bool = Field(default=False)
-    has_priority: bool = Field(default=False)
 
     @field_validator("games_this_year", "desired_games", "gm_games", mode="before")
     @classmethod
@@ -49,9 +48,6 @@ class DraftPlayer(BaseModel):
         """Compute derived fields after initialization."""
         # Parse string inputs to proper types
         object.__setattr__(self, "is_new", self.experience.strip().lower() == "nuevo")
-        object.__setattr__(
-            self, "has_priority", str(self.priority).strip().lower() in ("true", "1")
-        )
 
     @property
     def priority_score(self) -> float:

@@ -430,8 +430,8 @@ class TestSyncBehavior:
                                 "Nombre": nd["nombre"] if action == "merge_notion" else nombre,
                                 "Experiencia": nd["experiencia"],
                                 "Juegos_Este_Ano": nd["juegos_este_ano"],
-                                "prioridad": int(
-                                    existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
+                                "has_priority": int(
+                                    existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
                                 ),
                                 "partidas_deseadas": int(
                                     existente.get(
@@ -456,8 +456,8 @@ class TestSyncBehavior:
                                 "Nombre": nombre,  # Keep local name
                                 "Experiencia": notion_data["experiencia"],
                                 "Juegos_Este_Ano": notion_data["juegos_este_ano"],
-                                "prioridad": int(
-                                    existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
+                                "has_priority": int(
+                                    existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
                                 ),
                                 "partidas_deseadas": int(
                                     existente.get(
@@ -477,8 +477,8 @@ class TestSyncBehavior:
                             "Nombre": nombre,
                             "Experiencia": existente.get("experiencia", "Nuevo"),
                             "Juegos_Este_Ano": int(existente.get("juegos_este_ano", 0)),
-                            "prioridad": int(
-                                existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
+                            "has_priority": int(
+                                existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
                             ),
                             "partidas_deseadas": int(
                                 existente.get(
@@ -500,7 +500,7 @@ class TestSyncBehavior:
                         "Nombre": nd["nombre"],
                         "Experiencia": nd["experiencia"],
                         "Juegos_Este_Ano": nd["juegos_este_ano"],
-                        "prioridad": FIELD_DEFAULTS["prioridad"],
+                        "has_priority": FIELD_DEFAULTS["has_priority"],
                         "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
                         "partidas_gm": FIELD_DEFAULTS["partidas_gm"],
                         **{c: nd.get(c, 0) for c in COUNTRY_PROPS},
@@ -515,7 +515,7 @@ class TestSyncBehavior:
                 "nombre": "Andy",
                 "experiencia": "Antiguo",
                 "juegos_este_ano": 2,
-                "prioridad": 0,
+                "has_priority": False,
                 "partidas_deseadas": 2,
                 "partidas_gm": 1,
                 "c_england": 1,
@@ -524,7 +524,7 @@ class TestSyncBehavior:
                 "nombre": "Charlie",
                 "experiencia": "Antiguo",
                 "juegos_este_ano": 0,
-                "prioridad": 0,
+                "has_priority": False,
                 "partidas_deseadas": 2,
                 "partidas_gm": 0,
             },
@@ -598,7 +598,7 @@ class TestSyncBehavior:
                 "nombre": "Kur",
                 "experiencia": "Antiguo",
                 "juegos_este_ano": 1,
-                "prioridad": 1,
+                "has_priority": True,
                 "partidas_deseadas": 3,
             },
         }
@@ -620,7 +620,7 @@ class TestSyncBehavior:
                 "nombre": "Kur",
                 "experiencia": "Antiguo",
                 "juegos_este_ano": 1,
-                "prioridad": 1,
+                "has_priority": True,
                 "partidas_deseadas": 3,
             },
         }

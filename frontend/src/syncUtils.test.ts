@@ -21,7 +21,7 @@ describe("applySyncMerges", () => {
           nombre: "Duplicate Name",
           experiencia: "Nuevo",
           juegos_este_ano: 0,
-          prioridad: 1,
+          has_priority: true,
           partidas_deseadas: 1,
           partidas_gm: 0,
           notion_id: null,
@@ -31,7 +31,7 @@ describe("applySyncMerges", () => {
           nombre: "Duplicate Name",
           experiencia: "Antiguo",
           juegos_este_ano: 3,
-          prioridad: 0,
+          has_priority: false,
           partidas_deseadas: 2,
           partidas_gm: 1,
           notion_id: null,
@@ -60,7 +60,7 @@ describe("applySyncMerges", () => {
           nombre: "Typo Name",
           experiencia: "Nuevo",
           juegos_este_ano: 0,
-          prioridad: 1,
+          has_priority: true,
           partidas_deseadas: 1,
           partidas_gm: 0,
           notion_id: null,
@@ -93,7 +93,7 @@ describe("applySyncMerges", () => {
           nombre: "Local",
           experiencia: "Nuevo",
           juegos_este_ano: 0,
-          prioridad: 1,
+          has_priority: true,
           partidas_deseadas: 1,
           partidas_gm: 0,
           notion_id: null,
@@ -128,7 +128,7 @@ describe("applySyncMerges", () => {
           nombre: "Local Name",
           experiencia: "Nuevo",
           juegos_este_ano: 0,
-          prioridad: 1,
+          has_priority: true,
           partidas_deseadas: 1,
           partidas_gm: 0,
           notion_id: null,
@@ -163,7 +163,7 @@ describe("applySyncMerges", () => {
           nombre: "Unmatched Player",
           experiencia: "Nuevo",
           juegos_este_ano: 0,
-          prioridad: 1,
+          has_priority: true,
           partidas_deseadas: 1,
           partidas_gm: 0,
           notion_id: null,
@@ -181,7 +181,7 @@ describe("applySyncMerges", () => {
       expect(result[0]?.nombre).toBe("Unmatched Player");
       expect(result[0]?.experiencia).toBe("Nuevo");
       expect(result[0]?.juegos_este_ano).toBe(0);
-      expect(result[0]?.prioridad).toBe(1);
+      expect(result[0]?.has_priority).toBe(true);
       expect(result[0]?.partidas_deseadas).toBe(1);
       expect(result[0]?.partidas_gm).toBe(0);
       expect(result[0]?.notion_id).toBe(null);

@@ -11,7 +11,7 @@ export function parsePlayersCsv(csvText: string): Array<{
   nombre: string;
   experiencia: string;
   juegos_este_ano: number;
-  prioridad: number;
+  has_priority: boolean;
   partidas_deseadas: number;
   partidas_gm: number;
 }> {
@@ -27,7 +27,7 @@ export function parsePlayersCsv(csvText: string): Array<{
   const nombreIdx = header.indexOf("nombre");
   const experienciaIdx = header.indexOf("experiencia");
   const juegosIdx = header.indexOf("juegos_este_ano");
-  const prioridadIdx = header.indexOf("prioridad");
+  const hasPriorityIdx = header.indexOf("prioridad");
   const deseadasIdx = header.indexOf("partidas_deseadas");
   const gmIdx = header.indexOf("partidas_gm");
 
@@ -35,7 +35,7 @@ export function parsePlayersCsv(csvText: string): Array<{
     nombre: string;
     experiencia: string;
     juegos_este_ano: number;
-    prioridad: number;
+    has_priority: boolean;
     partidas_deseadas: number;
     partidas_gm: number;
   }> = [];
@@ -57,8 +57,13 @@ export function parsePlayersCsv(csvText: string): Array<{
         experienciaIdx >= 0 ? (cols[experienciaIdx] ?? "Nuevo") : "Nuevo",
       juegos_este_ano:
         juegosIdx >= 0 ? parseInt(cols[juegosIdx] ?? "0", 10) || 0 : 0,
-      prioridad:
-        prioridadIdx >= 0 ? parseInt(cols[prioridadIdx] ?? "0", 10) || 0 : 0,
+      has_priority:
+        hasPriorityIdx >= 0 && cols[hasPriorityIdx]
+          ? parseInt(cols[hasPriorityIdx], 10) > 0 ||
+            ["true", "t", "si", "yes"].includes(
+              cols[hasPriorityIdx].toLowerCase(),
+            )
+          : false,
       partidas_deseadas:
         deseadasIdx >= 0 ? parseInt(cols[deseadasIdx] ?? "1", 10) || 1 : 1,
       partidas_gm: gmIdx >= 0 ? parseInt(cols[gmIdx] ?? "0", 10) || 0 : 0,

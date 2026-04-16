@@ -25,8 +25,19 @@
     if (!currentPair) return;
     decisions = [...decisions, { pair: currentPair, action }];
 
-    if (currentIndex < pairs.length - 1) {
-      currentIndex++;
+    let nextIndex = currentIndex + 1;
+
+    if (action !== "skip") {
+      while (
+        nextIndex < pairs.length &&
+        pairs[nextIndex]?.snapshot === currentPair.snapshot
+      ) {
+        nextIndex++;
+      }
+    }
+
+    if (nextIndex < pairs.length) {
+      currentIndex = nextIndex;
     } else {
       const merges: MergePair[] = decisions
         .filter((d) => d.action !== "skip")

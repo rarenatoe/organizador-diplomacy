@@ -53,8 +53,8 @@ class TestGetGameEventDetailCountryRegression:
         await db_session.commit()
 
         # Add players to snapshot
-        await add_player_to_snapshot(db_session, snap1, pid1, "Antiguo", 5, 1, 2, 0)
-        await add_player_to_snapshot(db_session, snap1, pid2, "Antiguo", 0, 1, 2, 0)
+        await add_player_to_snapshot(db_session, snap1, pid1, "Antiguo", 5, 2, 0, has_priority=True)
+        await add_player_to_snapshot(db_session, snap1, pid2, "Antiguo", 0, 2, 0, has_priority=True)
         await db_session.commit()
 
         # Insert NotionCache with different c_turkey values
@@ -147,7 +147,9 @@ class TestGetGameEventDetailCountryRegression:
             pid = await get_or_create_player(db_session, f"Player{i}_{country}")
             player_ids.append(pid)
 
-            await add_player_to_snapshot(db_session, snap1, pid, "Antiguo", i, 1, 2, 0)
+            await add_player_to_snapshot(
+                db_session, snap1, pid, "Antiguo", i, 2, 0, has_priority=True
+            )
         await db_session.commit()
 
         snap2 = await create_snapshot(db_session, "organizar")
@@ -198,7 +200,7 @@ class TestGetGameEventDetailCountryRegression:
         pid = await get_or_create_player(db_session, "PlayerNoCountry")
         await db_session.commit()
 
-        await add_player_to_snapshot(db_session, snap1, pid, "Antiguo", 0, 1, 2, 0)
+        await add_player_to_snapshot(db_session, snap1, pid, "Antiguo", 0, 2, 0, has_priority=True)
         await db_session.commit()
 
         snap2 = await create_snapshot(db_session, "organizar")
@@ -240,8 +242,12 @@ async def test_view_returns_country_reason(db_session: Any) -> None:
     output_snap = await create_snapshot(db_session, "organizar")
 
     # Add player to both snapshots so they appear in the view
-    await add_player_to_snapshot(db_session, input_snap, player, "Antiguo", 5, 1, 2, 0)
-    await add_player_to_snapshot(db_session, output_snap, player, "Antiguo", 6, 0, 2, 0)
+    await add_player_to_snapshot(
+        db_session, input_snap, player, "Antiguo", 5, 2, 0, has_priority=True
+    )
+    await add_player_to_snapshot(
+        db_session, output_snap, player, "Antiguo", 6, 2, 0, has_priority=False
+    )
 
     game_id = await create_game_edge(db_session, input_snap, output_snap, 1)
 
@@ -289,7 +295,9 @@ class TestSnapshotHistoryInDetail:
         # Create snapshot
         snap_id = await create_snapshot(db_session, "manual")
         pid = await get_or_create_player(db_session, "Player1")
-        await add_player_to_snapshot(db_session, snap_id, pid, "Antiguo", 5, 1, 2, 0)
+        await add_player_to_snapshot(
+            db_session, snap_id, pid, "Antiguo", 5, 2, 0, has_priority=True
+        )
         await db_session.commit()
 
         # Log a history entry
@@ -304,7 +312,7 @@ class TestSnapshotHistoryInDetail:
                         "nombre": "OldPlayer",
                         "experiencia": "Nuevo",
                         "juegos_este_ano": 0,
-                        "prioridad": 1,
+                        "has_priority": True,
                         "partidas_deseadas": 1,
                         "partidas_gm": 0,
                     }
@@ -390,7 +398,9 @@ class TestGetSnapshotDetailFanOutRegression:
         player_id = await get_or_create_player(db_session, "VeteranPlayer")
 
         # Add player to snapshot
-        await add_player_to_snapshot(db_session, snap_id, player_id, "Antiguo", 5, 10, 3, 1)
+        await add_player_to_snapshot(
+            db_session, snap_id, player_id, "Antiguo", 5, 3, 1, has_priority=True
+        )
         await db_session.commit()
 
         # Create multiple NotionCache entries for the same player (historical data)
@@ -436,7 +446,9 @@ class TestGetSnapshotDetailFanOutRegression:
         snap_id = await create_snapshot(db_session, "manual")
         player_id = await get_or_create_player(db_session, "MultiCachePlayer")
 
-        await add_player_to_snapshot(db_session, snap_id, player_id, "Nuevo", 0, 0, 1, 0)
+        await add_player_to_snapshot(
+            db_session, snap_id, player_id, "Nuevo", 0, 1, 0, has_priority=False
+        )
         await db_session.commit()
 
         # Add multiple NotionCache entries to create fan-out potential

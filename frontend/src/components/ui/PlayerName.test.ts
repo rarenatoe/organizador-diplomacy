@@ -8,7 +8,7 @@ describe("PlayerName.svelte", () => {
     nombre: "Local Name",
     experiencia: "Nuevo",
     juegos_este_ano: 0,
-    prioridad: 0,
+    has_priority: false,
     partidas_deseadas: 1,
     partidas_gm: 0,
   };

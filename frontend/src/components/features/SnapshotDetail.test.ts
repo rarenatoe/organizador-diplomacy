@@ -84,7 +84,7 @@ describe("SnapshotDetail", () => {
             nombre: "P2",
             experiencia: "Antiguo",
             juegos_este_ano: 3,
-            prioridad: 1,
+            has_priority: true,
             partidas_deseadas: 2,
             partidas_gm: 1,
           }),
@@ -134,7 +134,7 @@ describe("SnapshotDetail", () => {
         nombre: "P2",
         experiencia: "Antiguo",
         juegos_este_ano: 3,
-        prioridad: 1,
+        has_priority: true,
         partidas_deseadas: 2,
         partidas_gm: 1,
       }),
@@ -200,13 +200,13 @@ describe("SnapshotDetail", () => {
     expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
     expect(mockClipboard.writeText).toHaveBeenCalledWith(
       "nombre,experiencia,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm\n" +
-        "P1,Nuevo,0,0,1,0\n" +
-        "P2,Antiguo,3,1,2,1\n" +
-        "P3,Nuevo,0,0,1,0\n" +
-        "P4,Nuevo,0,0,1,0\n" +
-        "P5,Nuevo,0,0,1,0\n" +
-        "P6,Nuevo,0,0,1,0\n" +
-        "P7,Nuevo,0,0,1,0",
+        "P1,Nuevo,0,false,1,0\n" +
+        "P2,Antiguo,3,true,2,1\n" +
+        "P3,Nuevo,0,false,1,0\n" +
+        "P4,Nuevo,0,false,1,0\n" +
+        "P5,Nuevo,0,false,1,0\n" +
+        "P6,Nuevo,0,false,1,0\n" +
+        "P7,Nuevo,0,false,1,0",
     );
 
     // Verify button changes to "Copiado"
@@ -420,7 +420,7 @@ describe("SnapshotDetail", () => {
           nombre: `P${i}`,
           partidas_deseadas: 1,
           partidas_gm: 0,
-          prioridad: 0,
+          has_priority: false,
           experiencia: "Nuevo",
           juegos_este_ano: 0,
         }),

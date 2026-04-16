@@ -109,7 +109,7 @@ class NotionPlayerDict(TypedDict):
 # Player field defaults for first-time Notion players
 
 FIELD_DEFAULTS: dict[str, int] = {
-    "prioridad": 0,
+    "has_priority": False,
     "partidas_deseadas": 1,
     "partidas_gm": 0,
 }
@@ -648,9 +648,9 @@ async def _update_snapshot_in_place(
             pid,
             row["experiencia"],
             row["juegos_este_ano"],
-            row["prioridad"],
             row["partidas_deseadas"],
             row["partidas_gm"],
+            has_priority=row["has_priority"],
         )
 
     # Calculate dynamic diff for history logging
@@ -660,7 +660,7 @@ async def _update_snapshot_in_place(
         "nombre",
         "experiencia",
         "juegos_este_ano",
-        "prioridad",
+        "has_priority",
         "partidas_deseadas",
         "partidas_gm",
     }
@@ -670,7 +670,7 @@ async def _update_snapshot_in_place(
             "nombre": r["nombre"],
             "experiencia": r["experiencia"],
             "juegos_este_ano": r["juegos_este_ano"],
-            "prioridad": r.get("prioridad", 0),
+            "has_priority": r.get("has_priority", False),
             "partidas_deseadas": r.get("partidas_deseadas", 1),
             "partidas_gm": r.get("partidas_gm", 0),
         }
@@ -706,9 +706,9 @@ async def _create_new_snapshot(
             pid,
             row["experiencia"],
             row["juegos_este_ano"],
-            row["prioridad"],
             row["partidas_deseadas"],
             row["partidas_gm"],
+            has_priority=row["has_priority"],
         )
 
     # Create sync event only if we have a source snapshot
@@ -798,8 +798,8 @@ async def _build_snapshot_rows(
                             "nombre": notion_data["nombre"] if action == "merge_notion" else nombre,
                             "experiencia": notion_data["experiencia"],
                             "juegos_este_ano": notion_data["juegos_este_ano"],
-                            "prioridad": int(
-                                existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
+                            "has_priority": int(
+                                existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
                             ),
                             "partidas_deseadas": int(
                                 existente.get(
@@ -829,8 +829,8 @@ async def _build_snapshot_rows(
                             "nombre": notion_data["nombre"],
                             "experiencia": notion_data["experiencia"],
                             "juegos_este_ano": notion_data["juegos_este_ano"],
-                            "prioridad": int(
-                                existente.get("prioridad", FIELD_DEFAULTS["prioridad"])
+                            "has_priority": int(
+                                existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
                             ),
                             "partidas_deseadas": int(
                                 existente.get(
@@ -858,7 +858,9 @@ async def _build_snapshot_rows(
                         "nombre": nombre,  # Keep local name
                         "experiencia": notion_data["experiencia"],
                         "juegos_este_ano": notion_data["juegos_este_ano"],
-                        "prioridad": int(existente.get("prioridad", FIELD_DEFAULTS["prioridad"])),
+                        "has_priority": int(
+                            existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
+                        ),
                         "partidas_deseadas": int(
                             existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])
                         ),
@@ -877,7 +879,9 @@ async def _build_snapshot_rows(
                         "nombre": nombre,
                         "experiencia": existente.get("experiencia", "Nuevo"),
                         "juegos_este_ano": int(existente.get("juegos_este_ano", 0)),
-                        "prioridad": int(existente.get("prioridad", FIELD_DEFAULTS["prioridad"])),
+                        "has_priority": int(
+                            existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
+                        ),
                         "partidas_deseadas": int(
                             existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])
                         ),
@@ -896,7 +900,7 @@ async def _build_snapshot_rows(
                     "nombre": notion_data["nombre"],
                     "experiencia": notion_data["experiencia"],
                     "juegos_este_ano": notion_data["juegos_este_ano"],
-                    "prioridad": FIELD_DEFAULTS["prioridad"],
+                    "has_priority": FIELD_DEFAULTS["has_priority"],
                     "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
                     "partidas_gm": FIELD_DEFAULTS["partidas_gm"],
                     "alias": notion_data.get("alias", []),

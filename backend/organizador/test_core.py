@@ -27,18 +27,19 @@ def _j(
     name: str,
     experience: str = "Veteran",
     games_this_year: int = 0,
-    priority: str = "False",
     desired_games: int = 1,
     gm_games: int = 0,
+    *,
+    has_priority: bool = False,
 ) -> DraftPlayer:
     """Creates a DraftPlayer with sensible default values."""
     return DraftPlayer(
         name=name,
         experience=experience,
         games_this_year=games_this_year,
-        priority=priority,
         desired_games=desired_games,
         gm_games=gm_games,
+        has_priority=has_priority,
     )
 
 
@@ -61,10 +62,10 @@ class TestJugador(unittest.TestCase):
         self.assertTrue(_j("A", experience="NUEVO").is_new)
 
     def test_has_priority_true(self):
-        self.assertTrue(_j("A", priority="True").has_priority)
+        self.assertTrue(_j("A", has_priority=True).has_priority)
 
     def test_has_priority_false(self):
-        self.assertFalse(_j("A", priority="False").has_priority)
+        self.assertFalse(_j("A", has_priority=False).has_priority)
 
     def test_puntaje_nuevo_es_cero(self):
         # Un jugador nuevo siempre tiene la máxima prioridad (0)
@@ -72,7 +73,7 @@ class TestJugador(unittest.TestCase):
 
     def test_priority_score_flag_es_cero(self):
         # El flag de prioridad también produce puntaje 0
-        self.assertEqual(_j("A", priority="True", games_this_year=10).priority_score, 0)
+        self.assertEqual(_j("A", has_priority=True, games_this_year=10).priority_score, 0)
 
     def test_puntaje_antiguo_sin_juegos_este_ano(self):
         # Antiguo con 0 juegos: penalización mínima (0.05) para distinguirlo del nuevo.
@@ -231,7 +232,7 @@ class TestCalcularPartidas(unittest.TestCase):
                             name=f"Player{i}",
                             experience="Veterano",
                             games_this_year=0,
-                            priority="False",
+                            has_priority=False,
                             desired_games=1,
                             gm_games=0,
                         )

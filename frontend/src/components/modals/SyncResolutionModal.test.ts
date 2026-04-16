@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, fireEvent, screen } from "@testing-library/svelte";
 import SyncResolutionModal from "./SyncResolutionModal.svelte";
 
-describe("SyncResolutionModal.svelte", () => {
+describe("SyncResolutionModal", () => {
   const mockPairs = [
     {
       notion_id: "notion-1",
@@ -262,5 +262,65 @@ describe("SyncResolutionModal.svelte", () => {
       expect(container.textContent).toContain("Vincular Solo");
       expect(container.querySelector(".comparison-card")).toBeTruthy();
     });
+  });
+
+  it("skips remaining matches for the same player if linked", async () => {
+    const onComplete = vi.fn();
+    const pairs = [
+      {
+        snapshot: "aor",
+        notion_id: "notion-1",
+        notion_name: "Aortheru",
+        similarity: 0.9,
+        match_method: "fuzzy",
+      },
+      {
+        snapshot: "aor",
+        notion_id: "notion-2",
+        notion_name: "Aitor",
+        similarity: 0.8,
+        match_method: "fuzzy",
+      },
+      {
+        snapshot: "bob",
+        notion_id: "notion-3",
+        notion_name: "Bobby",
+        similarity: 0.9,
+        match_method: "fuzzy",
+      },
+    ];
+
+    render(SyncResolutionModal, {
+      props: {
+        visible: true,
+        pairs,
+        onComplete,
+        onCancel: vi.fn(),
+      },
+    });
+
+    // 1st pair: 'aor' vs 'Aortheru'. Select Link -> This MUST skip 'aor' vs 'Aitor'
+    await fireEvent.click(screen.getByText("Vincular & Renombrar"));
+
+    // Ensure it immediately jumped to 'bob' vs 'Bobby'
+    expect(screen.getAllByText("bob").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Bobby").length).toBeGreaterThan(0);
+
+    // 2nd pair: 'bob' vs 'Bobby'. Select Link
+    await fireEvent.click(screen.getByText("Vincular & Renombrar"));
+
+    // It should complete with exactly 2 merges, successfully dropping 'Aitor'
+    expect(onComplete).toHaveBeenCalledWith([
+      expect.objectContaining({
+        from: "aor",
+        to: "Aortheru",
+        action: "link_rename",
+      }),
+      expect.objectContaining({
+        from: "bob",
+        to: "Bobby",
+        action: "link_rename",
+      }),
+    ]);
   });
 });

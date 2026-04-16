@@ -10,6 +10,7 @@ Cubre reglas complejas de ordenación y prioridad:
 
 Los tests básicos de corrección viven en test_organizador.py.
 """
+
 from __future__ import annotations
 
 import random
@@ -21,22 +22,24 @@ from .models import DraftPlayer
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _j(
     name: str,
     experience: str = "Antiguo",
     games_this_year: int = 0,
-    priority: str = "False",
     desired_games: int = 1,
     gm_games: int = 0,
+    *,
+    has_priority: bool = False,
 ) -> DraftPlayer:
     """Crea un DraftPlayer con valores por defecto sensatos."""
     return DraftPlayer(
         name=name,
         experience=experience,
         games_this_year=games_this_year,
-        priority=priority,
         desired_games=desired_games,
         gm_games=gm_games,
+        has_priority=has_priority,
     )
 
 
@@ -47,8 +50,8 @@ def _pool(n: int, prefix: str = "J", **kwargs: Any) -> list[DraftPlayer]:
 
 # ── Prioridad de selección ────────────────────────────────────────────────────
 
-class TestCalcularPartidasPrioridad(unittest.TestCase):
 
+class TestCalcularPartidasPrioridad(unittest.TestCase):
     def setUp(self) -> None:
         random.seed(0)
 
@@ -72,7 +75,7 @@ class TestCalcularPartidasPrioridad(unittest.TestCase):
             random.seed(seed)
             jugadores = (
                 [_j(f"Vet{i}", games_this_year=5) for i in range(13)]
-                + [_j("Prior", priority="True", games_this_year=5)]
+                + [_j("Prior", has_priority=True, games_this_year=5)]
                 + [_j("Extra", games_this_year=5)]
             )
             res = calculate_matches(jugadores)
@@ -97,8 +100,8 @@ class TestCalcularPartidasPrioridad(unittest.TestCase):
 
 # ── Reglas de Game Master ─────────────────────────────────────────────────────
 
-class TestCalcularPartidasGM(unittest.TestCase):
 
+class TestCalcularPartidasGM(unittest.TestCase):
     def setUp(self) -> None:
         random.seed(0)
 
@@ -112,8 +115,11 @@ class TestCalcularPartidasGM(unittest.TestCase):
                 continue
             for table in res.tables:
                 if table.gm and table.gm.name == "GM1":
-                    self.assertNotIn("GM1", [j.name for j in table.players],
-                                     f"GM1 juega en su propia mesa (seed={seed})")
+                    self.assertNotIn(
+                        "GM1",
+                        [j.name for j in table.players],
+                        f"GM1 juega en su propia mesa (seed={seed})",
+                    )
 
     def test_gm_puede_jugar_en_mesa_que_no_arbitra(self):
         """Un GM puede aparecer como jugador en una mesa distinta a la que arbitra."""
@@ -128,8 +134,10 @@ class TestCalcularPartidasGM(unittest.TestCase):
         jugadores = _pool(13) + [_j("GM1", desired_games=2, gm_games=1)]
         res = calculate_matches(jugadores)
         assert res is not None
-        self.assertTrue(any(m.gm and m.gm.name == "GM1" for m in res.tables),
-                        "GM1 no aparece como árbitro en ninguna mesa")
+        self.assertTrue(
+            any(m.gm and m.gm.name == "GM1" for m in res.tables),
+            "GM1 no aparece como árbitro en ninguna mesa",
+        )
 
     def test_solo_un_gm_por_mesa(self):
         """Cada mesa tiene como máximo un GM árbitro."""
@@ -155,8 +163,9 @@ class TestCalcularPartidasGM(unittest.TestCase):
             mesas_gm1 = {i for i, m in enumerate(res.tables) if m.gm and m.gm.name == "GM1"}
             mesas_gm2 = {i for i, m in enumerate(res.tables) if m.gm and m.gm.name == "GM2"}
             self.assertEqual(
-                len(mesas_gm1 & mesas_gm2), 0,
-                f"GM1 y GM2 comparten mesa como árbitros (seed={seed})"
+                len(mesas_gm1 & mesas_gm2),
+                0,
+                f"GM1 y GM2 comparten mesa como árbitros (seed={seed})",
             )
 
     def test_gm_reduce_partidas_jugables_correctamente(self):
@@ -193,20 +202,19 @@ class TestCalcularPartidasGM(unittest.TestCase):
         for seed in range(50):
             random.seed(seed)
             jugadores = _pool(12) + [
-                _j("Multi", desired_games=2),                 # weights 1.0, 2.0
-                _j("GM1", desired_games=2, gm_games=1),   # weight 1.5 como jugador
+                _j("Multi", desired_games=2),  # weights 1.0, 2.0
+                _j("GM1", desired_games=2, gm_games=1),  # weight 1.5 como jugador
             ]
             res = calculate_matches(jugadores)
             assert res is not None
             todos = {j.name for table in res.tables for j in table.players}
             sobrantes = {j.name for j in res.waitlist_players}
 
-            self.assertIn("GM1", todos,
-                          f"GM1 no obtuvo cupo de jugador (seed={seed})")
-            self.assertIn("Multi", todos,
-                          f"Multi quedó con 0 cupos (seed={seed})")
-            self.assertNotIn("GM1", sobrantes,
-                             f"GM1 está en lista de espera en lugar de Multi (seed={seed})")
+            self.assertIn("GM1", todos, f"GM1 no obtuvo cupo de jugador (seed={seed})")
+            self.assertIn("Multi", todos, f"Multi quedó con 0 cupos (seed={seed})")
+            self.assertNotIn(
+                "GM1", sobrantes, f"GM1 está en lista de espera en lugar de Multi (seed={seed})"
+            )
 
     def test_jugador_sin_gm_no_es_reducido_como_gm(self):
         """Para un no-GM con partidas_deseadas=2 el algoritmo genera ambos tickets.
@@ -219,7 +227,9 @@ class TestCalcularPartidasGM(unittest.TestCase):
         """
         for seed in range(20):
             random.seed(seed)
-            jugadores = _pool(12, games_this_year=0) + [_j("X", games_this_year=10, desired_games=2)]
+            jugadores = _pool(12, games_this_year=0) + [
+                _j("X", games_this_year=10, desired_games=2)
+            ]
             res = calculate_matches(jugadores)
             assert res is not None
             mesas_de_x = sum(1 for m in res.tables if any(j.name == "X" for j in m.players))
@@ -228,8 +238,8 @@ class TestCalcularPartidasGM(unittest.TestCase):
 
 # ── Balanceo de liga y peso de participación ──────────────────────────────────
 
-class TestCalcularPartidasBalance(unittest.TestCase):
 
+class TestCalcularPartidasBalance(unittest.TestCase):
     def setUp(self) -> None:
         random.seed(0)
 
@@ -244,8 +254,9 @@ class TestCalcularPartidasBalance(unittest.TestCase):
             sobrantes = {j.name for j in res.waitlist_players}
             for i in range(14):
                 self.assertIn(f"J{i}", todos, f"J{i} no entró (seed={seed})")
-            self.assertNotIn("Veterano", todos,
-                             f"Veterano ocupó un cupo que debía ser de otro (seed={seed})")
+            self.assertNotIn(
+                "Veterano", todos, f"Veterano ocupó un cupo que debía ser de otro (seed={seed})"
+            )
             self.assertIn("Veterano", sobrantes, f"Veterano no está en espera (seed={seed})")
 
     def test_todos_obtienen_primer_cupo_antes_de_segundos_cupos_con_historial(self):
@@ -254,7 +265,7 @@ class TestCalcularPartidasBalance(unittest.TestCase):
         for seed in range(40):
             random.seed(seed)
             jugadores = _pool(12, games_this_year=0) + [
-                _j("DanielV",    games_this_year=0, desired_games=2),
+                _j("DanielV", games_this_year=0, desired_games=2),
                 _j("JeanCarlos", games_this_year=3, desired_games=2),
             ]
             res = calculate_matches(jugadores)
@@ -262,7 +273,8 @@ class TestCalcularPartidasBalance(unittest.TestCase):
             todos = {j.name for table in res.tables for j in table.players}
             for j in jugadores:
                 self.assertIn(
-                    j.name, todos,
+                    j.name,
+                    todos,
                     f"{j.name} quedó con 0 cupos (seed={seed})",
                 )
 
@@ -285,7 +297,8 @@ class TestCalcularPartidasBalance(unittest.TestCase):
             todos = {j.name for table in res.tables for j in table.players}
             for j in jugadores:
                 self.assertIn(
-                    j.name, todos,
+                    j.name,
+                    todos,
                     f"{j.name} quedó con 0 cupos (seed={seed})",
                 )
 

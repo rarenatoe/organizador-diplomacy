@@ -107,9 +107,10 @@ async def add_player_to_snapshot(
     player_id: int,
     experience: str,
     games_this_year: int,
-    priority: int,
     desired_games: int,
     gm_games: int,
+    *,
+    has_priority: bool,
 ) -> None:
     """Link a player to a snapshot with game data."""
     sp = SnapshotPlayer(
@@ -117,7 +118,7 @@ async def add_player_to_snapshot(
         player_id=player_id,
         experience=experience,
         games_this_year=games_this_year,
-        priority=priority,
+        has_priority=has_priority,
         desired_games=desired_games,
         gm_games=gm_games,
     )
@@ -169,7 +170,7 @@ async def snapshots_have_same_roster(
         player.name: {
             "experiencia": sp.experience,
             "juegos_este_ano": sp.games_this_year,
-            "prioridad": sp.priority,
+            "has_priority": sp.has_priority,
             "partidas_deseadas": sp.desired_games,
             "partidas_gm": sp.gm_games,
         }
@@ -181,7 +182,7 @@ async def snapshots_have_same_roster(
         r["nombre"]: {
             "experiencia": r["experiencia"],
             "juegos_este_ano": int(r["juegos_este_ano"]),
-            "prioridad": int(r.get("prioridad", 0)),
+            "has_priority": bool(r.get("has_priority", False)),
             "partidas_deseadas": int(r.get("partidas_deseadas", 1)),
             "partidas_gm": int(r.get("partidas_gm", 0)),
         }
@@ -209,7 +210,7 @@ async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[
         .join(Player)
         .outerjoin(NotionCache, NotionCache.notion_id == Player.notion_id)
         .where(SnapshotPlayer.snapshot_id == snapshot_id)
-        .order_by(SnapshotPlayer.priority.desc(), Player.name)
+        .order_by(SnapshotPlayer.has_priority.desc(), Player.name)
     )
     rows = result.all()
 
@@ -220,7 +221,7 @@ async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[
             "notion_name": notion_name,
             "experiencia": sp.experience,
             "juegos_este_ano": sp.games_this_year,
-            "prioridad": sp.priority,
+            "has_priority": sp.has_priority,
             "partidas_deseadas": sp.desired_games,
             "partidas_gm": sp.gm_games,
             "c_england": c_england or 0,
@@ -339,9 +340,9 @@ async def create_root_manual_snapshot(
             player_id,
             p["experiencia"],
             int(p["juegos_este_ano"]),
-            int(p.get("prioridad", 0)),
             int(p.get("partidas_deseadas", 1)),
             int(p.get("partidas_gm", 0)),
+            has_priority=p.get("has_priority", False),
         )
 
     return snap_id

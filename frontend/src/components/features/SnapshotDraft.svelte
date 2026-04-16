@@ -13,7 +13,7 @@
     nombre: string;
     experiencia?: string;
     juegos_este_ano?: number;
-    prioridad?: number;
+    has_priority?: boolean;
     partidas_deseadas?: number;
     partidas_gm?: number;
     notion_id?: string | null;
@@ -77,7 +77,7 @@
         original_nombre: p.nombre, // Track original name for rename detection
         experiencia: p.experiencia ?? "Nuevo",
         juegos_este_ano: p.juegos_este_ano ?? 0,
-        prioridad: p.prioridad,
+        has_priority: p.has_priority,
         partidas_deseadas: p.partidas_deseadas,
         partidas_gm: p.partidas_gm,
         historyRestored: false, // Default for existing players
@@ -91,7 +91,6 @@
   let isAddingPlayer = $state(false);
   let newPlayerSearchQuery = $state("");
   let pendingCsvPlayers: CsvPlayerRow[] = $state([]);
-  let pendingInlinePlayer: string | null = $state(null);
   let showCsvModal = $state(false);
   let saving = $state(false);
   let isImporting = $state(false);
@@ -106,7 +105,7 @@
   );
   let headerSubtitle = $derived(
     isEditing
-      ? "Modifica los jugadores, su experiencia o prioridad para esta versión."
+      ? "Modifica los jugadores, su experiencia o has_priority para esta versión."
       : "Crea una nueva versión desde cero o importa jugadores desde CSV.",
   );
   let saveButtonText = $derived.by(() => {
@@ -358,7 +357,7 @@
         .map((p) => ({
           ...p, // Spread Notion stats (experiencia, juegos_este_ano)
           original_nombre: p.nombre,
-          prioridad: 0,
+          has_priority: false,
           partidas_deseadas: 1,
           partidas_gm: 0,
           notion_id: p.notion_id || null,
@@ -395,34 +394,6 @@
       });
       pendingCsvPlayers = [];
       await applyFinalCsvPlayers(resolvedRows);
-    } else if (pendingInlinePlayer) {
-      const originalName = pendingInlinePlayer;
-      pendingInlinePlayer = null;
-
-      const mergeTarget = merges.find((m) => m.from === originalName);
-
-      if (!mergeTarget) {
-        // Action was "skip" - add as new distinct player
-        await confirmAddPlayer(originalName, true);
-      } else {
-        // They chose a resolution ("use_existing", "link_rename", "link_only")
-        const renameActions = ["link_rename", "merge_notion", "use_existing"];
-        const shouldRename = renameActions.includes(mergeTarget.action);
-        const isUseExisting = mergeTarget.action === "use_existing";
-
-        const finalName = shouldRename ? mergeTarget.to : originalName;
-
-        const playerObj = {
-          display: finalName,
-          nombre: finalName,
-          notion_id: mergeTarget.notion_id,
-          notion_name: isUseExisting ? undefined : mergeTarget.to,
-          is_local: true,
-          is_alias: false,
-        } as AutocompletePlayer;
-
-        await confirmAddPlayer(playerObj, isUseExisting);
-      }
     } else {
       // It's a Notion Sync resolution
       mergeNotionPlayers(merges);
@@ -433,7 +404,6 @@
     resolutionVisible = false;
     resolutionPairs = [];
     fetchedNotionPlayers = [];
-    pendingInlinePlayer = null;
     pendingCsvPlayers = [];
   }
 
@@ -462,7 +432,7 @@
         notion_name: p.notion_name,
         experiencia: p.experiencia,
         juegos_este_ano: p.juegos_este_ano,
-        prioridad: p.prioridad,
+        has_priority: p.has_priority,
         partidas_deseadas: p.partidas_deseadas,
         partidas_gm: p.partidas_gm,
       }));
@@ -495,12 +465,16 @@
   function handleCheckboxChange(
     e: Event,
     index: number,
-    field: "prioridad" | "partidas_gm",
+    field: "has_priority" | "partidas_gm",
   ): void {
     const cb = e.target as HTMLInputElement;
     const player = draftPlayers[index];
     if (player) {
-      player[field] = cb.checked ? 1 : 0;
+      if (field === "has_priority") {
+        player.has_priority = cb.checked;
+      } else {
+        player.partidas_gm = cb.checked ? 1 : 0;
+      }
     }
   }
 
@@ -596,8 +570,8 @@
       <input
         type="checkbox"
         class="table-checkbox"
-        checked={row.prioridad === 1}
-        onchange={(e) => handleCheckboxChange(e, i, "prioridad")}
+        checked={row.has_priority}
+        onchange={(e) => handleCheckboxChange(e, i, "has_priority")}
       />
     {/snippet}
 
