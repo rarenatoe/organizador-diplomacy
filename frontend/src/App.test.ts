@@ -6,7 +6,7 @@ describe("App Integration - Draft State Reset", () => {
   const mockExistingPlayers: EditPlayerRow[] = [
     {
       nombre: "Alice",
-      experiencia: "Nuevo",
+      is_new: true,
       juegos_este_ano: 0,
       has_priority: false,
       partidas_deseadas: 1,
@@ -16,7 +16,7 @@ describe("App Integration - Draft State Reset", () => {
     },
     {
       nombre: "Bob",
-      experiencia: "Antiguo",
+      is_new: false,
       juegos_este_ano: 3,
       has_priority: true,
       partidas_deseadas: 2,

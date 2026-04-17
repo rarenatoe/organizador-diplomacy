@@ -20,7 +20,7 @@ export interface PlayerData {
   notion_name?: string | null;
   notion_alias?: string[] | null;
   country?: CountryAssignment | null;
-  es_nuevo?: boolean;
+  is_new?: boolean;
   juegos_este_ano?: number;
   has_priority?: boolean;
   partidas_deseadas?: number;
@@ -48,7 +48,7 @@ export interface WaitingItem {
   notion_alias?: string[] | null;
   cupos_faltantes: number;
   country?: CountryAssignment | null;
-  es_nuevo?: boolean;
+  is_new?: boolean;
   juegos_este_ano?: number;
   has_priority?: boolean;
   partidas_deseadas?: number;
@@ -161,7 +161,7 @@ export interface EditPlayerRow {
   notion_id?: string | null;
   notion_name?: string | null;
   original_nombre?: string;
-  experiencia?: string;
+  is_new?: boolean;
   juegos_este_ano?: number;
   has_priority: boolean;
   partidas_deseadas: number;
@@ -182,7 +182,7 @@ export interface NotionFetchResponse {
 
 export interface NotionPlayer {
   nombre: string;
-  experiencia: string;
+  is_new: boolean;
   juegos_este_ano: number;
   alias?: string[];
   notion_id?: string | null;
@@ -272,7 +272,7 @@ export interface DraftPlayer {
   notion_id?: string | null;
   notion_name?: string | null;
   notion_alias?: string[] | null;
-  es_nuevo: boolean;
+  is_new: boolean;
   juegos_ano: number;
   has_priority: boolean;
   partidas_deseadas: number;

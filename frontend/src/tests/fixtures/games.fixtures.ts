@@ -10,7 +10,7 @@ export const createMockDraftPlayer = (
 ): DraftPlayer => {
   const baseDraftPlayer: DraftPlayer = {
     nombre: "Test Player",
-    es_nuevo: false,
+    is_new: false,
     juegos_ano: 0,
     has_priority: false,
     partidas_deseadas: 1,

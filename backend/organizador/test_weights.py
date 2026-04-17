@@ -8,10 +8,10 @@ from .models import DraftPlayer
 from .weights import build_weighted_tickets
 
 
-def _j(name: str, d: int = 1, g: int = 0, exp: str = "Antiguo", j: int = 0):
+def _j(name: str, d: int = 1, g: int = 0, j: int = 0, *, is_new: bool = False):
     return DraftPlayer(
         name=name,
-        experience=exp,
+        is_new=is_new,
         games_this_year=j,
         has_priority=False,
         desired_games=d,
@@ -75,8 +75,8 @@ class TestWeights(unittest.TestCase):
 
     def test_weight_calculation_logic(self):
         # Verify weights: new player (0.0) vs veteran (0.9)
-        j_new = _j("New", exp="Nuevo")
-        j_vet = _j("Vet", exp="Veteran", j=10)
+        j_new = _j("New", is_new=True)
+        j_vet = _j("Vet", is_new=False, j=10)
 
         _, _, _, _, tickets = build_weighted_tickets([j_new, j_vet] * 7)  # 14 tickets
 

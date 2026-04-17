@@ -49,16 +49,16 @@ class TestGameDraftOperations:
 
         # Add players to input snapshot
         await add_player_to_snapshot(
-            db_session, input_snap, pid1, "Antiguo", 5, 2, 0, has_priority=True
+            db_session, input_snap, pid1, 5, 2, 0, has_priority=True, is_new=False
         )
         await add_player_to_snapshot(
-            db_session, input_snap, pid2, "Nuevo", 0, 1, 0, has_priority=True
+            db_session, input_snap, pid2, 0, 1, 0, has_priority=True, is_new=True
         )
         await add_player_to_snapshot(
-            db_session, input_snap, pid3, "Antiguo", 3, 2, 0, has_priority=True
+            db_session, input_snap, pid3, 3, 2, 0, has_priority=True, is_new=False
         )
         await add_player_to_snapshot(
-            db_session, input_snap, pid4, "Nuevo", 0, 1, 0, has_priority=True
+            db_session, input_snap, pid4, 0, 1, 0, has_priority=True, is_new=True
         )
         await db_session.commit()
 
@@ -119,7 +119,7 @@ class TestGameDraftOperations:
         input_snap = await create_snapshot(db_session, "manual")
         pid = await get_or_create_player(db_session, "Alice")
         await add_player_to_snapshot(
-            db_session, input_snap, pid, "Antiguo", 5, 2, 0, has_priority=True
+            db_session, input_snap, pid, 5, 2, 0, has_priority=True, is_new=False
         )
         await db_session.commit()
 
@@ -136,7 +136,7 @@ class TestGameDraftOperations:
         game_event = result.scalar_one()
         assert game_event.edge_type == "game"
 
-        # Verify: Output snapshot created with updated player experience
+        # Verify: Output snapshot created with updated player is_new
         output_players = await get_snapshot_players(db_session, game_event.output_snapshot_id)
         assert len(output_players) == 1
         assert output_players[0]["juegos_este_ano"] == 5  # No games played, should remain same
@@ -151,16 +151,16 @@ class TestGameDraftOperations:
         pid2 = await get_or_create_player(db_session, "Bob")
 
         await add_player_to_snapshot(
-            db_session, input_snap, pid1, "Antiguo", 5, 2, 0, has_priority=True
+            db_session, input_snap, pid1, 5, 2, 0, has_priority=True, is_new=False
         )
         await add_player_to_snapshot(
-            db_session, input_snap, pid2, "Nuevo", 0, 1, 0, has_priority=True
+            db_session, input_snap, pid2, 0, 1, 0, has_priority=True, is_new=True
         )
         await add_player_to_snapshot(
-            db_session, output_snap, pid1, "Antiguo", 6, 2, 0, has_priority=False
+            db_session, output_snap, pid1, 6, 2, 0, has_priority=False, is_new=False
         )  # Played 1 game
         await add_player_to_snapshot(
-            db_session, output_snap, pid2, "Antiguo", 1, 1, 0, has_priority=False
+            db_session, output_snap, pid2, 1, 1, 0, has_priority=False, is_new=False
         )  # Played 1 game
         await db_session.commit()
 
@@ -224,23 +224,23 @@ class TestGameDraftOperations:
 
         # Add players to snapshots
         await add_player_to_snapshot(
-            db_session, input_snap, pid1, "Antiguo", 5, 2, 0, has_priority=True
+            db_session, input_snap, pid1, 5, 2, 0, has_priority=True, is_new=False
         )
         await add_player_to_snapshot(
-            db_session, input_snap, pid2, "Nuevo", 0, 1, 0, has_priority=True
+            db_session, input_snap, pid2, 0, 1, 0, has_priority=True, is_new=True
         )
         await add_player_to_snapshot(
-            db_session, input_snap, pid3, "Antiguo", 3, 2, 0, has_priority=True
+            db_session, input_snap, pid3, 3, 2, 0, has_priority=True, is_new=False
         )
 
         await add_player_to_snapshot(
-            db_session, output_snap, pid1, "Antiguo", 6, 2, 0, has_priority=False
+            db_session, output_snap, pid1, 6, 2, 0, has_priority=False, is_new=False
         )
         await add_player_to_snapshot(
-            db_session, output_snap, pid2, "Antiguo", 1, 1, 0, has_priority=False
+            db_session, output_snap, pid2, 1, 1, 0, has_priority=False, is_new=False
         )
         await add_player_to_snapshot(
-            db_session, output_snap, pid3, "Antiguo", 4, 2, 0, has_priority=False
+            db_session, output_snap, pid3, 4, 2, 0, has_priority=False, is_new=False
         )
         await db_session.commit()
 
@@ -303,13 +303,13 @@ class TestGameDraftOperations:
         pid_not_playing = await get_or_create_player(db_session, "IdlePlayer")
 
         await add_player_to_snapshot(
-            db_session, input_snap, pid_nuevo, "Nuevo", 0, 1, 0, has_priority=True
+            db_session, input_snap, pid_nuevo, 0, 1, 0, has_priority=True, is_new=True
         )
         await add_player_to_snapshot(
-            db_session, input_snap, pid_antiguo, "Antiguo", 5, 2, 0, has_priority=True
+            db_session, input_snap, pid_antiguo, 5, 2, 0, has_priority=True, is_new=False
         )
         await add_player_to_snapshot(
-            db_session, input_snap, pid_not_playing, "Nuevo", 0, 1, 0, has_priority=True
+            db_session, input_snap, pid_not_playing, 0, 1, 0, has_priority=True, is_new=True
         )
         await db_session.commit()
 
@@ -340,14 +340,14 @@ class TestGameDraftOperations:
         output_player_data = {p["nombre"]: p for p in output_players}
 
         # Verify: NewPlayer promoted to Antiguo, played 1 game
-        assert output_player_data["NewPlayer"]["experiencia"] == "Antiguo"
+        assert not output_player_data["NewPlayer"]["is_new"]
         assert output_player_data["NewPlayer"]["juegos_este_ano"] == 1
 
         # Verify: OldPlayer remains Antiguo, played 1 more game
-        assert output_player_data["OldPlayer"]["experiencia"] == "Antiguo"
+        assert not output_player_data["OldPlayer"]["is_new"]
         assert output_player_data["OldPlayer"]["juegos_este_ano"] == 6
 
         # Verify: IdlePlayer remains Nuevo, didn't play, in waitlist
-        assert output_player_data["IdlePlayer"]["experiencia"] == "Nuevo"
+        assert output_player_data["IdlePlayer"]["is_new"]
         assert output_player_data["IdlePlayer"]["juegos_este_ano"] == 0
         assert output_player_data["IdlePlayer"]["has_priority"]  # In waitlist

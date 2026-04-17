@@ -150,7 +150,6 @@ async def _create_output_snapshot_from_draft(
     for p in rows:
         name = p["nombre"]
         played = slots_played[name]
-        was_promoted = p["experiencia"] == "Nuevo" and played > 0
 
         # Get or create player
         pid = await get_or_create_player(session, name)
@@ -159,7 +158,7 @@ async def _create_output_snapshot_from_draft(
             session=session,
             snapshot_id=snap_id,
             player_id=pid,
-            experience="Antiguo" if was_promoted else p["experiencia"],
+            is_new=p["is_new"] and played == 0,
             games_this_year=p["juegos_este_ano"] + played,
             desired_games=p["partidas_deseadas"],
             gm_games=0,  # partidas_gm reset
@@ -225,14 +224,13 @@ async def update_game_draft(
     for p in rows:
         name = p["nombre"]
         played = slots_played[name]
-        was_promoted = p["experiencia"] == "Nuevo" and played > 0
         pid = await get_or_create_player(session, name)
 
         await add_player_to_snapshot(
             session=session,
             snapshot_id=output_snapshot_id,
             player_id=pid,
-            experience="Antiguo" if was_promoted else p["experiencia"],
+            is_new=p["is_new"] and played == 0,
             games_this_year=p["juegos_este_ano"] + played,
             desired_games=p["partidas_deseadas"],
             gm_games=0,  # partidas_gm reset

@@ -36,7 +36,7 @@ priority: 30
 - **Gestalt Proximity (Wrapper Tooltips):** Do not force standalone icons (`ℹ️`) next to elements if the data relates directly to the element. `<Tooltip>` components MUST accept Svelte Snippets (`children`) to invisibly wrap components, turning the element itself into the hover surface.
 - **Zero-Delay Data Discovery:** NEVER rely on the native HTML `title` attribute for critical data discovery (it has an OS-forced 500ms delay). ALWAYS use custom JS/Svelte popover components.
 - **Contextual Metadata:** Hide administrative metadata (like Notion link indicators) in read-only domain summaries. Expose props (e.g., `showNotionIndicator={false}`) to keep layouts focused on domain output.
-- **Concise Badges:** Keep badge text categorical (`"Antiguo"`). Push verbose supplementary data (`"15 juegos"`) into Wrapper Tooltips.
+- **Concise Badges:** Keep badge text categorical (`False`). Push verbose supplementary data (`"15 juegos"`) into Wrapper Tooltips.
 
 ## 5. State & Data Flow
 

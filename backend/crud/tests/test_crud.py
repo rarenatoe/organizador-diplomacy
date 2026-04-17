@@ -95,7 +95,7 @@ class TestSnapshotOperations:
         pid = await get_or_create_player(db_session, "Charlie")
         await db_session.commit()
         await add_player_to_snapshot(
-            db_session, snap_id, pid, "Antiguo", 0, 2, 0, has_priority=True
+            db_session, snap_id, pid, 0, 2, 0, has_priority=True, is_new=False
         )
         await db_session.commit()
         # Verify
@@ -107,7 +107,7 @@ class TestSnapshotOperations:
         )
         sp = result.scalar_one()
         assert sp is not None
-        assert sp.experience == "Antiguo"
+        assert not sp.is_new
 
     async def test_get_snapshot_players(self, db_session: Any) -> None:
         """Getting snapshot players should return all players in the snapshot."""
@@ -115,7 +115,7 @@ class TestSnapshotOperations:
         for i in range(3):
             pid = await get_or_create_player(db_session, f"Player{i}")
             await add_player_to_snapshot(
-                db_session, snap_id, pid, "Antiguo", i, 1, 0, has_priority=False
+                db_session, snap_id, pid, i, 1, 0, has_priority=False, is_new=False
             )
         await db_session.commit()
         players = await get_snapshot_players(db_session, snap_id)
@@ -205,14 +205,14 @@ class TestRosterComparison:
         for name in ["Alice", "Bob", "Charlie"]:
             pid = await get_or_create_player(db_session, name)
             await add_player_to_snapshot(
-                db_session, snap_id, pid, "Antiguo", 0, 2, 0, has_priority=True
+                db_session, snap_id, pid, 0, 2, 0, has_priority=True, is_new=False
             )
         await db_session.commit()
         # Build matching notion rows
         notion_rows = [
             {
                 "nombre": "Alice",
-                "experiencia": "Antiguo",
+                "is_new": False,
                 "juegos_este_ano": 0,
                 "has_priority": True,
                 "partidas_deseadas": 2,
@@ -220,7 +220,7 @@ class TestRosterComparison:
             },
             {
                 "nombre": "Bob",
-                "experiencia": "Antiguo",
+                "is_new": False,
                 "juegos_este_ano": 0,
                 "has_priority": True,
                 "partidas_deseadas": 2,
@@ -228,7 +228,7 @@ class TestRosterComparison:
             },
             {
                 "nombre": "Charlie",
-                "experiencia": "Antiguo",
+                "is_new": False,
                 "juegos_este_ano": 0,
                 "has_priority": True,
                 "partidas_deseadas": 2,
@@ -244,14 +244,14 @@ class TestRosterComparison:
         snap_id = await create_snapshot(db_session, "manual")
         pid = await get_or_create_player(db_session, "Alice")
         await add_player_to_snapshot(
-            db_session, snap_id, pid, "Antiguo", 0, 2, 0, has_priority=True
+            db_session, snap_id, pid, 0, 2, 0, has_priority=True, is_new=False
         )
         await db_session.commit()
         # Different notion rows
         notion_rows = [
             {
                 "nombre": "Bob",
-                "experiencia": "Antiguo",
+                "is_new": False,
                 "juegos_este_ano": 0,
                 "has_priority": True,
                 "partidas_deseadas": 2,
@@ -272,7 +272,7 @@ class TestCascadeDelete:
         snap_id = await create_snapshot(db_session, "manual")
         pid = await get_or_create_player(db_session, "Test")
         await add_player_to_snapshot(
-            db_session, snap_id, pid, "Antiguo", 0, 2, 0, has_priority=True
+            db_session, snap_id, pid, 0, 2, 0, has_priority=True, is_new=False
         )
         await db_session.commit()
         # Delete
@@ -301,16 +301,16 @@ class TestLinearBranchSquashing:
         # Add players to both snapshots
         pid_a = await get_or_create_player(db_session, "PlayerA")
         await add_player_to_snapshot(
-            db_session, snap_a, pid_a, "Antiguo", 5, 2, 0, has_priority=True
+            db_session, snap_a, pid_a, 5, 2, 0, has_priority=True, is_new=False
         )
 
         pid_b1 = await get_or_create_player(db_session, "PlayerB1")
         pid_b2 = await get_or_create_player(db_session, "PlayerB2")
         await add_player_to_snapshot(
-            db_session, snap_b, pid_b1, "Nuevo", 2, 1, 0, has_priority=True
+            db_session, snap_b, pid_b1, 2, 1, 0, has_priority=True, is_new=True
         )
         await add_player_to_snapshot(
-            db_session, snap_b, pid_b2, "Antiguo", 3, 2, 0, has_priority=True
+            db_session, snap_b, pid_b2, 3, 2, 0, has_priority=True, is_new=False
         )
 
         # Create branch edge A -> B
@@ -360,9 +360,11 @@ class TestLinearBranchSquashing:
         snap_b = await create_snapshot(db_session, "organizar")
 
         pid = await get_or_create_player(db_session, "Test")
-        await add_player_to_snapshot(db_session, snap_a, pid, "Antiguo", 0, 2, 0, has_priority=True)
         await add_player_to_snapshot(
-            db_session, snap_b, pid, "Antiguo", 1, 2, 0, has_priority=False
+            db_session, snap_a, pid, 0, 2, 0, has_priority=True, is_new=False
+        )
+        await add_player_to_snapshot(
+            db_session, snap_b, pid, 1, 2, 0, has_priority=False, is_new=False
         )
 
         # Create game edge A -> B
@@ -389,12 +391,14 @@ class TestLinearBranchSquashing:
         snap_c = await create_snapshot(db_session, "manual")
 
         pid = await get_or_create_player(db_session, "Test")
-        await add_player_to_snapshot(db_session, snap_a, pid, "Antiguo", 0, 2, 0, has_priority=True)
         await add_player_to_snapshot(
-            db_session, snap_b, pid, "Antiguo", 1, 2, 0, has_priority=False
+            db_session, snap_a, pid, 0, 2, 0, has_priority=True, is_new=False
         )
         await add_player_to_snapshot(
-            db_session, snap_c, pid, "Antiguo", 2, 2, 0, has_priority=False
+            db_session, snap_b, pid, 1, 2, 0, has_priority=False, is_new=False
+        )
+        await add_player_to_snapshot(
+            db_session, snap_c, pid, 2, 2, 0, has_priority=False, is_new=False
         )
 
         # Create two branch edges from A
@@ -425,12 +429,14 @@ class TestLinearBranchSquashing:
 
         # Only add players to C (final state)
         pid = await get_or_create_player(db_session, "FinalPlayer")
-        await add_player_to_snapshot(db_session, snap_a, pid, "Antiguo", 0, 2, 0, has_priority=True)
         await add_player_to_snapshot(
-            db_session, snap_b, pid, "Antiguo", 1, 2, 0, has_priority=False
+            db_session, snap_a, pid, 0, 2, 0, has_priority=True, is_new=False
         )
         await add_player_to_snapshot(
-            db_session, snap_c, pid, "Antiguo", 2, 2, 0, has_priority=False
+            db_session, snap_b, pid, 1, 2, 0, has_priority=False, is_new=False
+        )
+        await add_player_to_snapshot(
+            db_session, snap_c, pid, 2, 2, 0, has_priority=False, is_new=False
         )
 
         # Create chain A -> B -> C

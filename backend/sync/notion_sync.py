@@ -94,7 +94,7 @@ class NotionPlayerDict(TypedDict):
 
     notion_id: str
     nombre: str
-    experiencia: str
+    is_new: bool
     juegos_este_ano: int
     alias: list[str]
     c_england: int
@@ -147,11 +147,11 @@ def extract_name(prop: NotionProperty | None) -> str:
     return "".join(p.get("plain_text", "") for p in prop.get("title", [])).strip()
 
 
-def calculate_experience(participaciones_prop: NotionProperty | None) -> str:
-    """'Antiguo' si el jugador tiene ≥1 participación histórica, 'Nuevo' si no."""
+def calculate_experience(participaciones_prop: NotionProperty | None) -> bool:
+    """True if player is new (no participations), False if experienced."""
     if not participaciones_prop:
-        return "Nuevo"
-    return "Antiguo" if participaciones_prop.get("relation") else "Nuevo"
+        return True
+    return not bool(participaciones_prop.get("relation"))
 
 
 # ── Name similarity detection ────────────────────────────────────────────────
@@ -550,7 +550,7 @@ def build_notion_players_lookup(
         if not nombre:
             continue
 
-        # Experiencia
+        # is_new
         part_prop = props.get("Participaciones")
         experience_val = calculate_experience(part_prop)
 
@@ -577,7 +577,7 @@ def build_notion_players_lookup(
             {
                 "notion_id": page["id"],
                 "nombre": nombre,
-                "experiencia": experience_val,
+                "is_new": experience_val,
                 "juegos_este_ano": games_count,
                 "alias": alias_list,
                 "c_england": countries_data["c_england"],
@@ -646,11 +646,11 @@ async def _update_snapshot_in_place(
             session,
             snapshot_id,
             pid,
-            row["experiencia"],
             row["juegos_este_ano"],
             row["partidas_deseadas"],
             row["partidas_gm"],
             has_priority=row["has_priority"],
+            is_new=row["is_new"],
         )
 
     # Calculate dynamic diff for history logging
@@ -658,7 +658,7 @@ async def _update_snapshot_in_place(
 
     roster_fields = {
         "nombre",
-        "experiencia",
+        "is_new",
         "juegos_este_ano",
         "has_priority",
         "partidas_deseadas",
@@ -668,7 +668,7 @@ async def _update_snapshot_in_place(
     new_roster = [
         {
             "nombre": r["nombre"],
-            "experiencia": r["experiencia"],
+            "is_new": r["is_new"],
             "juegos_este_ano": r["juegos_este_ano"],
             "has_priority": r.get("has_priority", False),
             "partidas_deseadas": r.get("partidas_deseadas", 1),
@@ -704,11 +704,11 @@ async def _create_new_snapshot(
             session,
             snap_id,
             pid,
-            row["experiencia"],
             row["juegos_este_ano"],
             row["partidas_deseadas"],
             row["partidas_gm"],
             has_priority=row["has_priority"],
+            is_new=row["is_new"],
         )
 
     # Create sync event only if we have a source snapshot
@@ -796,7 +796,7 @@ async def _build_snapshot_rows(
                     rows.append(
                         {
                             "nombre": notion_data["nombre"] if action == "merge_notion" else nombre,
-                            "experiencia": notion_data["experiencia"],
+                            "is_new": notion_data["is_new"],
                             "juegos_este_ano": notion_data["juegos_este_ano"],
                             "has_priority": int(
                                 existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
@@ -827,7 +827,7 @@ async def _build_snapshot_rows(
                     rows.append(
                         {
                             "nombre": notion_data["nombre"],
-                            "experiencia": notion_data["experiencia"],
+                            "is_new": notion_data["is_new"],
                             "juegos_este_ano": notion_data["juegos_este_ano"],
                             "has_priority": int(
                                 existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
@@ -856,7 +856,7 @@ async def _build_snapshot_rows(
                 rows.append(
                     {
                         "nombre": nombre,  # Keep local name
-                        "experiencia": notion_data["experiencia"],
+                        "is_new": notion_data["is_new"],
                         "juegos_este_ano": notion_data["juegos_este_ano"],
                         "has_priority": int(
                             existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
@@ -877,7 +877,7 @@ async def _build_snapshot_rows(
                 rows.append(
                     {
                         "nombre": nombre,
-                        "experiencia": existente.get("experiencia", "Nuevo"),
+                        "is_new": existente.get("is_new", True),
                         "juegos_este_ano": int(existente.get("juegos_este_ano", 0)),
                         "has_priority": int(
                             existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
@@ -898,7 +898,7 @@ async def _build_snapshot_rows(
             rows.append(
                 {
                     "nombre": notion_data["nombre"],
-                    "experiencia": notion_data["experiencia"],
+                    "is_new": notion_data["is_new"],
                     "juegos_este_ano": notion_data["juegos_este_ano"],
                     "has_priority": FIELD_DEFAULTS["has_priority"],
                     "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
@@ -923,7 +923,7 @@ async def notion_cache_to_db(
             {
                 "notion_id": nd["notion_id"],
                 "nombre": nd["nombre"],
-                "experiencia": nd["experiencia"],
+                "is_new": nd["is_new"],
                 "juegos_este_ano": nd["juegos_este_ano"],
                 "alias": nd.get("alias", []),
                 "c_england": nd.get("c_england", 0),

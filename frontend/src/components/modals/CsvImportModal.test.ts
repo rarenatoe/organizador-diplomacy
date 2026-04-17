@@ -19,7 +19,7 @@ describe("CsvImportModal.svelte", () => {
     expect(
       screen.getByText(/Pega el contenido CSV con las columnas:/),
     ).toBeTruthy();
-    expect(screen.getByText(/nombre, experiencia/)).toBeTruthy();
+    expect(screen.getByText(/nombre, is_new/)).toBeTruthy();
   });
 
   it("autofocuses textarea on mount", () => {
@@ -34,7 +34,7 @@ describe("CsvImportModal.svelte", () => {
     });
 
     // Verify textarea is focused
-    const textarea = screen.getByPlaceholderText(/nombre,experiencia/);
+    const textarea = screen.getByPlaceholderText(/nombre,is_new/);
     expect(document.activeElement).toBe(textarea);
   });
 
@@ -89,10 +89,10 @@ describe("CsvImportModal.svelte", () => {
     });
 
     const testCsv =
-      "nombre,experiencia,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm\nAlice,Nuevo,0,0,1,0";
+      "nombre,is_new,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm\nAlice,Nuevo,0,0,1,0";
 
     // Type in textarea
-    const textarea = screen.getByPlaceholderText(/nombre,experiencia/);
+    const textarea = screen.getByPlaceholderText(/nombre,is_new/);
     await fireEvent.input(textarea, { target: { value: testCsv } });
 
     // Click import button
@@ -114,7 +114,7 @@ describe("CsvImportModal.svelte", () => {
       },
     });
 
-    const textarea = screen.getByPlaceholderText(/nombre,experiencia/);
+    const textarea = screen.getByPlaceholderText(/nombre,is_new/);
     const testCsv = "test,csv,content";
 
     // Type and import

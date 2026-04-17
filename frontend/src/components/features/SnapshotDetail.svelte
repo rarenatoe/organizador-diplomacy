@@ -63,7 +63,7 @@
 
   const CSV_COLS = {
     nombre: "nombre",
-    experiencia: "experiencia",
+    is_new: "is_new",
     juegos_este_ano: "juegos_este_ano",
     prioridad: "has_priority",
     partidas_deseadas: "partidas_deseadas",
@@ -83,7 +83,13 @@
       Object.keys(CSV_COLS).join(","),
       ...rows.map((r) =>
         Object.values(CSV_COLS)
-          .map((c) => String(r[c] ?? ""))
+          .map((c) => {
+            const value = r[c];
+            if (c === "is_new") {
+              return value ? "Nuevo" : "Antiguo";
+            }
+            return String(value ?? "");
+          })
           .join(","),
       ),
     ].join("\n");
@@ -92,7 +98,7 @@
   const playersForDraft = $derived(() => {
     return (data?.players || []).map((p) => ({
       nombre: p.nombre,
-      experiencia: p.experiencia ?? "Nuevo",
+      is_new: p.is_new ?? true,
       juegos_este_ano: p.juegos_este_ano ?? 0,
       has_priority: p.has_priority ?? false,
       partidas_deseadas: p.partidas_deseadas ?? 1,
@@ -311,10 +317,10 @@
       {/snippet}
 
       {#snippet expCell(row: EditPlayerRow, index: number)}
-        {#if row.experiencia}
+        {#if row.is_new !== undefined}
           <Badge
-            variant={row.experiencia === "Nuevo" ? "warning" : "success"}
-            text={row.experiencia}
+            variant={row.is_new ? "warning" : "success"}
+            text={row.is_new ? "Nuevo" : "Antiguo"}
             fixedWidth={true}
           />
         {/if}

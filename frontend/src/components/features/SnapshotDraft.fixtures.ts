@@ -3,7 +3,7 @@ import { vi } from "vitest";
 export const mockInitialPlayers = [
   {
     nombre: "Test Player",
-    experiencia: "Nuevo",
+    is_new: true,
     juegos_este_ano: 0,
     has_priority: false,
     partidas_deseadas: 1,

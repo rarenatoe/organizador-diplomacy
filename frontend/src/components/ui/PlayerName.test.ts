@@ -6,7 +6,7 @@ import PlayerNameTestWrapper from "./PlayerNameTestWrapper.svelte";
 describe("PlayerName.svelte", () => {
   const basePlayer: EditPlayerRow = {
     nombre: "Local Name",
-    experiencia: "Nuevo",
+    is_new: true,
     juegos_este_ano: 0,
     has_priority: false,
     partidas_deseadas: 1,

@@ -10,10 +10,10 @@ from .distribution import distribute_tickets, run_distribution_loop
 from .models import DraftPlayer
 
 
-def _j(name: str, d: int = 1, g: int = 0, exp: str = "Antiguo", j: int = 0) -> DraftPlayer:
+def _j(name: str, d: int = 1, g: int = 0, j: int = 0) -> DraftPlayer:
     return DraftPlayer(
         name=name,
-        experience=exp,
+        is_new=False,
         games_this_year=j,
         has_priority=False,
         desired_games=d,

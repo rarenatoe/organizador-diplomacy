@@ -4,12 +4,12 @@
 
 /**
  * Parses CSV text into an array of player objects.
- * Expected columns: nombre, experiencia, juegos_este_ano, prioridad, partidas_deseadas, partidas_gm
+ * Expected columns: nombre, is_new, juegos_este_ano, prioridad, partidas_deseadas, partidas_gm
  * Missing columns use sensible defaults.
  */
 export function parsePlayersCsv(csvText: string): Array<{
   nombre: string;
-  experiencia: string;
+  is_new: boolean;
   juegos_este_ano: number;
   has_priority: boolean;
   partidas_deseadas: number;
@@ -33,7 +33,7 @@ export function parsePlayersCsv(csvText: string): Array<{
 
   const result: Array<{
     nombre: string;
-    experiencia: string;
+    is_new: boolean;
     juegos_este_ano: number;
     has_priority: boolean;
     partidas_deseadas: number;
@@ -53,10 +53,16 @@ export function parsePlayersCsv(csvText: string): Array<{
 
     result.push({
       nombre,
-      experiencia:
-        experienciaIdx >= 0 ? (cols[experienciaIdx] ?? "Nuevo") : "Nuevo",
+      is_new:
+        experienciaIdx >= 0 && cols[experienciaIdx]
+          ? ["nuevo", "new", "principiante", "novato", "novice"].includes(
+              cols[experienciaIdx].toLocaleLowerCase(),
+            )
+          : true,
       juegos_este_ano:
-        juegosIdx >= 0 ? parseInt(cols[juegosIdx] ?? "0", 10) || 0 : 0,
+        juegosIdx >= 0 && cols[juegosIdx]
+          ? parseInt(cols[juegosIdx], 10) || 0
+          : 0,
       has_priority:
         hasPriorityIdx >= 0 && cols[hasPriorityIdx]
           ? parseInt(cols[hasPriorityIdx], 10) > 0 ||
@@ -65,8 +71,11 @@ export function parsePlayersCsv(csvText: string): Array<{
             )
           : false,
       partidas_deseadas:
-        deseadasIdx >= 0 ? parseInt(cols[deseadasIdx] ?? "1", 10) || 1 : 1,
-      partidas_gm: gmIdx >= 0 ? parseInt(cols[gmIdx] ?? "0", 10) || 0 : 0,
+        deseadasIdx >= 0 && cols[deseadasIdx]
+          ? parseInt(cols[deseadasIdx], 10) || 1
+          : 1,
+      partidas_gm:
+        gmIdx >= 0 && cols[gmIdx] ? parseInt(cols[gmIdx], 10) || 0 : 0,
     });
   }
 

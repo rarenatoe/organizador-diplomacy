@@ -45,7 +45,7 @@ class PlayerStateDict(TypedDict):
     nombre: str
     notion_id: NotRequired[str | None]
     notion_name: NotRequired[str | None]
-    experiencia: str
+    is_new: bool
     juegos_este_ano: int
     has_priority: bool
     partidas_deseadas: int
@@ -132,7 +132,7 @@ class SnapshotPlayer(Base, kw_only=True):
 
     snapshot_id: Mapped[int] = mapped_column(ForeignKey("snapshots.id"), primary_key=True)
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), primary_key=True)
-    experience: Mapped[str] = mapped_column()
+    is_new: Mapped[bool] = mapped_column(default=False)
     games_this_year: Mapped[int] = mapped_column(default=0)
     has_priority: Mapped[bool] = mapped_column(default=False)
     desired_games: Mapped[int] = mapped_column(default=1)
@@ -225,7 +225,7 @@ class NotionCache(Base, kw_only=True):
 
     notion_id: Mapped[str] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column()
-    experience: Mapped[str] = mapped_column()
+    is_new: Mapped[bool] = mapped_column(default=False)
     games_this_year: Mapped[int] = mapped_column(default=0)
     c_england: Mapped[int] = mapped_column(default=0)
     c_france: Mapped[int] = mapped_column(default=0)

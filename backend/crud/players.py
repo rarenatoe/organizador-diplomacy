@@ -243,7 +243,7 @@ async def lookup_player_history(
                 # Found player in history
                 return {
                     "has_priority": snapshot_player.has_priority,
-                    "experiencia": snapshot_player.experience,
+                    "is_new": snapshot_player.is_new,
                     "juegos_este_ano": snapshot_player.games_this_year,
                     "partidas_deseadas": snapshot_player.desired_games,
                     "partidas_gm": snapshot_player.gm_games,
@@ -272,7 +272,7 @@ async def lookup_player_history(
             # Found in global search
             return {
                 "has_priority": global_snapshot_player.has_priority,
-                "experiencia": global_snapshot_player.experience,
+                "is_new": global_snapshot_player.is_new,
                 "juegos_este_ano": global_snapshot_player.games_this_year,
                 "partidas_deseadas": global_snapshot_player.desired_games,
                 "partidas_gm": global_snapshot_player.gm_games,
@@ -294,7 +294,7 @@ async def lookup_player_history(
                     # Found in JSON logs - TypedDict provides type safety
                     return {
                         "has_priority": logged_player.get("has_priority", False),
-                        "experiencia": logged_player.get("experiencia", "Nuevo"),
+                        "is_new": logged_player.get("is_new", True),
                         "juegos_este_ano": logged_player.get("juegos_este_ano", 0),
                         "partidas_deseadas": logged_player.get("partidas_deseadas", 1),
                         "partidas_gm": logged_player.get("partidas_gm", 0),
@@ -308,7 +308,7 @@ async def lookup_player_history(
         # Found in Notion cache, force priority to 0
         return {
             "has_priority": False,
-            "experiencia": nc.experience,
+            "is_new": nc.is_new,
             "juegos_este_ano": nc.games_this_year,
             "partidas_deseadas": 1,
             "partidas_gm": 0,
@@ -319,7 +319,7 @@ async def lookup_player_history(
         # Not found anywhere, return defaults
         return {
             "has_priority": False,
-            "experiencia": "Nuevo",
+            "is_new": True,
             "juegos_este_ano": 0,
             "partidas_deseadas": 1,
             "partidas_gm": 0,

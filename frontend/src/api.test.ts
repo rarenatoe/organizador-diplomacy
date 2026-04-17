@@ -51,7 +51,7 @@ describe("api.ts - FastAPI Error Handling", () => {
       const result = await createSnapshot([
         {
           nombre: "Test",
-          experiencia: "Antiguo",
+          is_new: false,
           has_priority: true,
           partidas_deseadas: 2,
           partidas_gm: 0,
@@ -427,7 +427,7 @@ describe("api.ts - FastAPI Error Handling", () => {
       const players: EditPlayerRow[] = [
         {
           nombre: "Test",
-          experiencia: "Antiguo",
+          is_new: false,
           has_priority: true,
           partidas_deseadas: 2,
           partidas_gm: 0,

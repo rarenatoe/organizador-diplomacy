@@ -7,7 +7,7 @@ export const createMockEditPlayerRow = (
     nombre: "Test Player",
     notion_id: null,
     notion_name: null,
-    experiencia: "Nuevo",
+    is_new: true,
     juegos_este_ano: 0,
     has_priority: false,
     partidas_deseadas: 1,

@@ -72,7 +72,7 @@ export function buildPlayerRow(
   return {
     nombre: base.nombre,
     original_nombre: base.nombre,
-    experiencia: base.experiencia ?? history.experiencia ?? "Nuevo",
+    is_new: base.is_new ?? history.is_new ?? true,
     juegos_este_ano: base.juegos_este_ano ?? history.juegos_este_ano ?? 0,
     has_priority: base.has_priority ?? history.has_priority ?? false,
     partidas_deseadas: base.partidas_deseadas ?? history.partidas_deseadas ?? 1,

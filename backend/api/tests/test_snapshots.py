@@ -38,11 +38,11 @@ async def make_snapshot_with_players(
             db_session,
             snap_id,
             pid,
-            experience="Antiguo",
             games_this_year=0,
             desired_games=2,
             gm_games=0,
             has_priority=True,
+            is_new=False,
         )
     await db_session.commit()
     return snap_id
@@ -67,7 +67,7 @@ class TestApiSnapshotDetail:
         # Check player data structure
         if data["players"]:
             p = data["players"][0]
-            for key in ("nombre", "experiencia", "juegos_este_ano"):
+            for key in ("nombre", "is_new", "juegos_este_ano"):
                 assert key in p
 
     async def test_snapshot_includes_source(self, client: Any, db_session: Any) -> None:
@@ -179,10 +179,10 @@ class TestApiSnapshotDelete:
         pid_c1 = await get_or_create_player(db_session, "PlayerC1")
         pid_c2 = await get_or_create_player(db_session, "PlayerC2")
         await add_player_to_snapshot(
-            db_session, snap_c, pid_c1, "Antiguo", 5, 2, 0, has_priority=True
+            db_session, snap_c, pid_c1, 5, 2, 0, has_priority=True, is_new=False
         )
         await add_player_to_snapshot(
-            db_session, snap_c, pid_c2, "Nuevo", 2, 1, 0, has_priority=True
+            db_session, snap_c, pid_c2, 2, 1, 0, has_priority=True, is_new=True
         )
 
         # Create edges: A -> game -> B and A -> branch -> C
@@ -261,7 +261,7 @@ class TestApiSnapshotCreate:
         parent_id = await create_snapshot(db_session, "manual")
         player_id = await get_or_create_player(db_session, "HistoricalPlayer")
         await add_player_to_snapshot(
-            db_session, parent_id, player_id, "Veterano", 5, 2, 1, has_priority=True
+            db_session, parent_id, player_id, 5, 2, 1, has_priority=True, is_new=False
         )
         await db_session.commit()
 
@@ -272,7 +272,7 @@ class TestApiSnapshotCreate:
             "players": [
                 {
                     "nombre": "HistoricalPlayer",
-                    "experiencia": "Antiguo",  # Different from historical
+                    "is_new": False,  # Different from historical
                     "juegos_este_ano": 88,  # Different from historical
                     "has_priority": False,  # Different from historical
                     "partidas_deseadas": 4,  # Different from historical
@@ -292,7 +292,7 @@ class TestApiSnapshotCreate:
         assert len(players) == 1
         player = players[0]
         assert player["nombre"] == "HistoricalPlayer"
-        assert player["experiencia"] == "Antiguo"
+        assert not player["is_new"]
         assert player["juegos_este_ano"] == 88
         assert not player["has_priority"]
         assert player["partidas_deseadas"] == 4
@@ -353,7 +353,7 @@ class TestApiSnapshotCreate:
             {
                 "nombre": f"Player{i}",
                 "notion_id": f"notion_{i}",
-                "experiencia": "Antiguo",
+                "is_new": False,
                 "juegos_este_ano": i,
                 "has_priority": True,
                 "partidas_deseadas": 2,
@@ -397,7 +397,7 @@ class TestApiSnapshotSave:
             {
                 "nombre": f"NewPlayer{i}",
                 "notion_id": f"new_notion_{i}",
-                "experiencia": "Nuevo",
+                "is_new": True,
                 "juegos_este_ano": 0,
                 "has_priority": True,
                 "partidas_deseadas": 1,
@@ -454,7 +454,7 @@ class TestApiSnapshotSave:
         new_players = [
             {
                 "nombre": f"ModifiedPlayer{i}",
-                "experiencia": "Antiguo",
+                "is_new": False,
                 "juegos_este_ano": i,
                 "has_priority": True,
                 "partidas_deseadas": 2,
@@ -500,7 +500,7 @@ class TestApiSnapshotSave:
             players=[
                 {
                     "nombre": "Juan",
-                    "experiencia": "Nuevo",
+                    "is_new": True,
                     "juegos_este_ano": 0,
                     "has_priority": False,
                     "partidas_deseadas": 1,
@@ -525,7 +525,7 @@ class TestApiSnapshotSave:
                 "players": [
                     {
                         "nombre": "Juan",
-                        "experiencia": "Nuevo",
+                        "is_new": True,
                         "juegos_este_ano": 0,
                         "has_priority": False,
                         "partidas_deseadas": 1,

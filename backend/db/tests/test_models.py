@@ -76,7 +76,7 @@ class TestModelInstantiation:
         sp = SnapshotPlayer(
             snapshot_id=snapshot.id,
             player_id=player.id,
-            experience="Antiguo",
+            is_new=False,
             games_this_year=0,
             has_priority=True,
             desired_games=2,
@@ -330,7 +330,7 @@ class TestRelationshipConfiguration:
         sp = SnapshotPlayer(
             snapshot_id=snapshot.id,
             player_id=player.id,
-            experience="Antiguo",
+            is_new=False,
             games_this_year=0,
             has_priority=True,
             desired_games=2,

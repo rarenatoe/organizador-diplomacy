@@ -3,8 +3,7 @@
 
   type GamePlayerData = {
     nombre: string;
-    experiencia?: string;
-    es_nuevo?: boolean;
+    is_new?: boolean;
     juegos_este_ano?: number;
     has_priority?: boolean;
     partidas_deseadas?: number;
@@ -72,7 +71,7 @@
   function mapToDraftPlayer(player: GamePlayerData): DraftPlayer {
     return {
       nombre: player.nombre,
-      es_nuevo: player.es_nuevo ?? false,
+      is_new: player.is_new ?? false,
       juegos_ano: player.juegos_este_ano ?? 0,
       has_priority: player.has_priority ?? false,
       partidas_deseadas: player.partidas_deseadas ?? 1,
@@ -184,9 +183,7 @@
         mesas:
           (data?.mesas ?? []).map((m) => ({
             numero: m.numero,
-            gm: m.gm
-              ? mapToDraftPlayer({ nombre: m.gm, experiencia: "Antiguo" })
-              : null,
+            gm: m.gm ? mapToDraftPlayer({ nombre: m.gm, is_new: false }) : null,
             jugadores: m.jugadores.map(mapToDraftPlayer),
           })) || [],
         tickets_sobrantes:
@@ -269,13 +266,13 @@
                         </div>
                         <div class="tag-wrapper">
                           <Tooltip
-                            text={player.es_nuevo
+                            text={player.is_new
                               ? "Sin partidas previas"
                               : `${player.juegos_este_ano} juegos este año`}
                           >
                             <Badge
-                              variant={player.es_nuevo ? "warning" : "success"}
-                              text={player.es_nuevo ? "Nuevo" : "Antiguo"}
+                              variant={player.is_new ? "warning" : "success"}
+                              text={player.is_new ? "Nuevo" : "Antiguo"}
                               fixedWidth={true}
                             />
                           </Tooltip>

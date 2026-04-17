@@ -11,7 +11,7 @@
 
   type CsvPlayerRow = {
     nombre: string;
-    experiencia?: string;
+    is_new?: boolean;
     juegos_este_ano?: number;
     has_priority?: boolean;
     partidas_deseadas?: number;
@@ -75,7 +75,7 @@
       initialPlayers.map((p) => ({
         nombre: p.nombre,
         original_nombre: p.nombre, // Track original name for rename detection
-        experiencia: p.experiencia ?? "Nuevo",
+        is_new: p.is_new ?? true,
         juegos_este_ano: p.juegos_este_ano ?? 0,
         has_priority: p.has_priority,
         partidas_deseadas: p.partidas_deseadas,
@@ -105,7 +105,7 @@
   );
   let headerSubtitle = $derived(
     isEditing
-      ? "Modifica los jugadores, su experiencia o has_priority para esta versión."
+      ? "Modifica los jugadores, su is_new o has_priority para esta versión."
       : "Crea una nueva versión desde cero o importa jugadores desde CSV.",
   );
   let saveButtonText = $derived.by(() => {
@@ -355,7 +355,7 @@
             !existingNames.has(normalizeName(p.nombre)),
         )
         .map((p) => ({
-          ...p, // Spread Notion stats (experiencia, juegos_este_ano)
+          ...p, // Spread Notion stats (is_new, juegos_este_ano)
           original_nombre: p.nombre,
           has_priority: false,
           partidas_deseadas: 1,
@@ -430,7 +430,7 @@
         nombre: p.nombre,
         notion_id: p.notion_id,
         notion_name: p.notion_name,
-        experiencia: p.experiencia,
+        is_new: p.is_new,
         juegos_este_ano: p.juegos_este_ano,
         has_priority: p.has_priority,
         partidas_deseadas: p.partidas_deseadas,
@@ -546,10 +546,10 @@
     {/snippet}
 
     {#snippet expCell(row: EditPlayerRow)}
-      {#if row.experiencia}
+      {#if row.is_new}
         <Badge
-          variant={row.experiencia === "Nuevo" ? "warning" : "success"}
-          text={row.experiencia}
+          variant={row.is_new ? "warning" : "success"}
+          text={row.is_new ? "Nuevo" : "Antiguo"}
           fixedWidth={true}
         />
       {/if}

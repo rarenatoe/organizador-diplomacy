@@ -29,7 +29,7 @@ vi.mock("../../utils", () => ({
   parsePlayersCsv: vi.fn().mockReturnValue([
     {
       nombre: "Alice",
-      experiencia: "Nuevo",
+      is_new: true,
       juegos_este_ano: 0,
       has_priority: false,
       partidas_deseadas: 1,
@@ -37,7 +37,7 @@ vi.mock("../../utils", () => ({
     },
     {
       nombre: "Bob",
-      experiencia: "Antiguo",
+      is_new: false,
       juegos_este_ano: 3,
       has_priority: true,
       partidas_deseadas: 2,
@@ -137,7 +137,7 @@ describe("SnapshotDraft", () => {
       initialPlayers: [
         {
           nombre: "Alice",
-          experiencia: "Nuevo",
+          is_new: true,
           juegos_este_ano: 0,
           has_priority: false,
           partidas_deseadas: 1,
@@ -145,7 +145,7 @@ describe("SnapshotDraft", () => {
         },
         {
           nombre: "Bob",
-          experiencia: "Antiguo",
+          is_new: false,
           juegos_este_ano: 3,
           has_priority: true,
           partidas_deseadas: 2,
@@ -221,7 +221,7 @@ describe("SnapshotDraft", () => {
       players: {
         // eslint-disable-next-line @typescript-eslint/naming-convention
         "Daniel Eiler": {
-          experiencia: "Veterano",
+          is_new: false,
           juegos_este_ano: 5,
           has_priority: true,
           partidas_deseadas: 2,
@@ -270,7 +270,7 @@ describe("SnapshotDraft", () => {
     await fireEvent.click(csvButton);
 
     expect(screen.getByText("Pegar CSV")).toBeTruthy();
-    expect(screen.getByPlaceholderText(/nombre,experiencia/)).toBeTruthy();
+    expect(screen.getByPlaceholderText(/nombre,is_new/)).toBeTruthy();
   });
 
   it("pauses CSV import and shows sync modal when similarities are found", async () => {
@@ -294,9 +294,9 @@ describe("SnapshotDraft", () => {
 
     await fireEvent.click(screen.getByText("📥 Pegar CSV"));
     await tick(); // <--- Flush modal open
-    const textarea = screen.getByPlaceholderText(/nombre,experiencia/);
+    const textarea = screen.getByPlaceholderText(/nombre,is_new/);
     await fireEvent.input(textarea, {
-      target: { value: "nombre,experiencia\nDaniel Ei,Nuevo" },
+      target: { value: "nombre,is_new\nDaniel Ei,Nuevo" },
     });
     await fireEvent.click(screen.getByText("Importar"));
 
@@ -330,7 +330,7 @@ describe("SnapshotDraft", () => {
     const csvButton = screen.getByText("📥 Pegar CSV");
     await fireEvent.click(csvButton);
 
-    const textarea = screen.getByPlaceholderText(/nombre,experiencia/);
+    const textarea = screen.getByPlaceholderText(/nombre,is_new/);
     expect(document.activeElement).toBe(textarea);
   });
 
@@ -356,9 +356,9 @@ describe("SnapshotDraft", () => {
     await tick(); // Flush modal open
 
     // Type in textarea
-    const textarea = screen.getByPlaceholderText(/nombre,experiencia/);
+    const textarea = screen.getByPlaceholderText(/nombre,is_new/);
     await fireEvent.input(textarea, {
-      target: { value: "nombre,experiencia\nAlice,Nuevo\nBob,Antiguo" },
+      target: { value: "nombre,is_new\nAlice,Nuevo\nBob,Antiguo" },
     });
 
     // Click import
@@ -462,7 +462,7 @@ describe("SnapshotDraft", () => {
         initialPlayers: [
           {
             nombre: "Alice",
-            experiencia: "Nuevo",
+            is_new: true,
             juegos_este_ano: 0,
             has_priority: false,
             partidas_deseadas: 1,
@@ -470,7 +470,7 @@ describe("SnapshotDraft", () => {
           },
           {
             nombre: "Bob",
-            experiencia: "Antiguo",
+            is_new: false,
             juegos_este_ano: 3,
             has_priority: true,
             partidas_deseadas: 2,
@@ -512,7 +512,7 @@ describe("SnapshotDraft", () => {
     });
 
     await fireEvent.click(screen.getByText("📥 Pegar CSV"));
-    const textarea = screen.getByPlaceholderText(/nombre,experiencia/);
+    const textarea = screen.getByPlaceholderText(/nombre,is_new/);
     await fireEvent.input(textarea, {
       target: { value: "bad,csv" },
     });
@@ -538,7 +538,7 @@ describe("SnapshotDraft", () => {
     (parsePlayersCsv as ReturnType<typeof vi.fn>).mockReturnValueOnce([
       {
         nombre: "Andy",
-        experiencia: "Antiguo",
+        is_new: false,
         juegos_este_ano: 5,
         has_priority: true,
         partidas_deseadas: 3,
@@ -550,7 +550,7 @@ describe("SnapshotDraft", () => {
     vi.mocked(api.lookupPlayerHistory).mockResolvedValueOnce({
       player: {
         nombre: "Andy",
-        experiencia: "Nuevo",
+        is_new: true,
         juegos_este_ano: 0,
         has_priority: false,
         partidas_deseadas: 1,
@@ -564,7 +564,7 @@ describe("SnapshotDraft", () => {
     // Trigger CSV Import
     await fireEvent.click(screen.getByText(/Pegar CSV/));
     await tick();
-    const textarea = screen.getByPlaceholderText(/nombre,experiencia/);
+    const textarea = screen.getByPlaceholderText(/nombre,is_new/);
     await fireEvent.input(textarea, {
       target: { value: "Andy,Antiguo,5,1,3,1" },
     });
@@ -584,7 +584,7 @@ describe("SnapshotDraft", () => {
         players: expect.arrayContaining([
           expect.objectContaining({
             nombre: "Andy",
-            experiencia: "Antiguo",
+            is_new: false,
             juegos_este_ano: 5,
             has_priority: true,
             partidas_deseadas: 3,
@@ -632,7 +632,7 @@ describe("SnapshotDraft", () => {
         initialPlayers: [
           {
             nombre: "Daniel V.",
-            experiencia: "Antiguo",
+            is_new: false,
             juegos_este_ano: 5,
             has_priority: true,
             partidas_deseadas: 2,
@@ -674,7 +674,7 @@ describe("SnapshotDraft", () => {
       players: [
         {
           nombre: "Daniel Villafranca",
-          experiencia: "Antiguo",
+          is_new: false,
           juegos_este_ano: 5,
           has_priority: true,
           partidas_deseadas: 2,
@@ -694,7 +694,7 @@ describe("SnapshotDraft", () => {
         initialPlayers: [
           {
             nombre: "Jugador Existente",
-            experiencia: "Antiguo",
+            is_new: false,
             juegos_este_ano: 5,
             has_priority: true,
             partidas_deseadas: 2,
@@ -726,7 +726,7 @@ describe("SnapshotDraft", () => {
         initialPlayers: [
           {
             nombre: "Jugador Existente",
-            experiencia: "Antiguo",
+            is_new: false,
             juegos_este_ano: 5,
             has_priority: true,
             partidas_deseadas: 2,
@@ -855,7 +855,7 @@ describe("SnapshotDraft", () => {
           {
             nombre: "Main Identity",
             notion_id: "shared-id-123", // Already linked!
-            experiencia: "Nuevo",
+            is_new: true,
             juegos_este_ano: 0,
             has_priority: false,
             partidas_deseadas: 1,
@@ -905,9 +905,9 @@ describe("SnapshotDraft", () => {
 
       await fireEvent.click(screen.getByText("📥 Pegar CSV"));
       await tick();
-      const textarea = screen.getByPlaceholderText(/nombre,experiencia/);
+      const textarea = screen.getByPlaceholderText(/nombre,is_new/);
       await fireEvent.input(textarea, {
-        target: { value: "nombre,experiencia\nJon Doe,Nuevo" },
+        target: { value: "nombre,is_new\nJon Doe,Nuevo" },
       });
       await fireEvent.click(screen.getByText("Importar"));
 
@@ -929,7 +929,7 @@ describe("SnapshotDraft", () => {
         initialPlayers: [
           {
             nombre: "Daniel E",
-            experiencia: "Nuevo",
+            is_new: true,
             juegos_este_ano: 0,
             has_priority: true,
             partidas_deseadas: 1,
@@ -1102,7 +1102,7 @@ describe("SnapshotDraft", () => {
         initialPlayers: [
           {
             nombre: "Local Name",
-            experiencia: "Nuevo",
+            is_new: true,
             juegos_este_ano: 0,
             has_priority: false,
             partidas_deseadas: 1,
@@ -1117,7 +1117,7 @@ describe("SnapshotDraft", () => {
           {
             notion_id: "notion-123",
             nombre: "Notion Name",
-            experiencia: "Antiguo",
+            is_new: false,
             juegos_este_ano: 5,
           },
         ],
@@ -1173,7 +1173,7 @@ describe("SnapshotDraft", () => {
       (parsePlayersCsv as ReturnType<typeof vi.fn>).mockReturnValueOnce([
         {
           nombre: "Local Typo",
-          experiencia: "Nuevo",
+          is_new: true,
           juegos_este_ano: 0,
           has_priority: false,
           partidas_deseadas: 1,
@@ -1196,7 +1196,7 @@ describe("SnapshotDraft", () => {
       vi.mocked(api.lookupPlayerHistory).mockResolvedValue({
         player: {
           nombre: "Local Typo",
-          experiencia: "Antiguo",
+          is_new: false,
           juegos_este_ano: 5,
           has_priority: false,
           partidas_deseadas: 1,
@@ -1212,9 +1212,9 @@ describe("SnapshotDraft", () => {
       // 2. Trigger CSV Import
       await fireEvent.click(screen.getByText("📥 Pegar CSV"));
       await tick();
-      const textarea = screen.getByPlaceholderText(/nombre,experiencia/);
+      const textarea = screen.getByPlaceholderText(/nombre,is_new/);
       await fireEvent.input(textarea, {
-        target: { value: "nombre,experiencia\nLocal Typo,Nuevo" },
+        target: { value: "nombre,is_new\nLocal Typo,Nuevo" },
       });
       await fireEvent.click(screen.getByText("Importar"));
 
@@ -1252,7 +1252,7 @@ describe("SnapshotDraft", () => {
               nombre: "Local Typo",
               notion_id: "notion-999",
               notion_name: "Real Notion Name",
-              experiencia: "Nuevo", // Overridden by CSV input!
+              is_new: true, // Overridden by CSV input!
               juegos_este_ano: 0, // Overridden by CSV input!
             }),
           ]),
@@ -1333,7 +1333,7 @@ describe("SnapshotDraft", () => {
         initialPlayers: [
           {
             nombre: "Existing Player",
-            experiencia: "Nuevo",
+            is_new: true,
             juegos_este_ano: 0,
             has_priority: true,
             partidas_deseadas: 1,
@@ -1376,7 +1376,7 @@ describe("SnapshotDraft", () => {
         initialPlayers: [
           {
             nombre: "Silent Duplicate",
-            experiencia: "Nuevo",
+            is_new: true,
             juegos_este_ano: 0,
             has_priority: true,
             partidas_deseadas: 1,

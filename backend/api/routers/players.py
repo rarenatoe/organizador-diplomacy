@@ -185,7 +185,7 @@ async def api_player_check_similarity(
                 {
                     "notion_id": r.notion_id,
                     "nombre": r.name,
-                    "experiencia": r.experience,
+                    "is_new": r.is_new,
                     "juegos_este_ano": r.games_this_year,
                     "alias": r.alias or [],
                     "c_england": r.c_england,

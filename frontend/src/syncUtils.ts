@@ -98,7 +98,7 @@ export function applySyncMerges(
       deduplicatedPlayers.push({
         ...row,
         nombre: newName,
-        experiencia: notionPlayer.experiencia,
+        is_new: notionPlayer.is_new,
         juegos_este_ano: notionPlayer.juegos_este_ano,
         notion_id: notionPlayer.notion_id || null,
         notion_name: notionPlayer.nombre || null,

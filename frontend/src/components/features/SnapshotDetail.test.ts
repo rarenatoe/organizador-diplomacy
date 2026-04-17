@@ -82,7 +82,7 @@ describe("SnapshotDetail", () => {
           createMockEditPlayerRow({ nombre: "P1" }),
           createMockEditPlayerRow({
             nombre: "P2",
-            experiencia: "Antiguo",
+            is_new: false,
             juegos_este_ano: 3,
             has_priority: true,
             partidas_deseadas: 2,
@@ -132,7 +132,7 @@ describe("SnapshotDetail", () => {
       createMockEditPlayerRow({ nombre: "P1" }),
       createMockEditPlayerRow({
         nombre: "P2",
-        experiencia: "Antiguo",
+        is_new: false,
         juegos_este_ano: 3,
         has_priority: true,
         partidas_deseadas: 2,
@@ -199,7 +199,7 @@ describe("SnapshotDetail", () => {
     // Verify clipboard.writeText was called with exact payload
     expect(mockClipboard.writeText).toHaveBeenCalledTimes(1);
     expect(mockClipboard.writeText).toHaveBeenCalledWith(
-      "nombre,experiencia,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm\n" +
+      "nombre,is_new,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm\n" +
         "P1,Nuevo,0,false,1,0\n" +
         "P2,Antiguo,3,true,2,1\n" +
         "P3,Nuevo,0,false,1,0\n" +
@@ -421,7 +421,7 @@ describe("SnapshotDetail", () => {
           partidas_deseadas: 1,
           partidas_gm: 0,
           has_priority: false,
-          experiencia: "Nuevo",
+          is_new: true,
           juegos_este_ano: 0,
         }),
       );
@@ -504,7 +504,7 @@ describe("SnapshotDetail", () => {
             players: [
               createMockEditPlayerRow({
                 nombre: "Renato Alegre",
-                experiencia: "Antiguo",
+                is_new: false,
                 juegos_este_ano: 5,
               }),
             ],
@@ -516,7 +516,7 @@ describe("SnapshotDetail", () => {
         players: [
           createMockEditPlayerRow({
             nombre: "Renato Alegre",
-            experiencia: "Antiguo",
+            is_new: false,
             juegos_este_ano: 5,
           }),
         ],

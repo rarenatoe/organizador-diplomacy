@@ -18,12 +18,12 @@ vi.mock("../../api", () => ({
         jugadores: [
           {
             nombre: "Alice",
-            es_nuevo: true,
+            is_new: true,
             country: { name: "England", reason: "Algorithm says so" },
           },
           {
             nombre: "Bob",
-            es_nuevo: false,
+            is_new: false,
             country: { name: "France" },
           },
         ],
@@ -94,7 +94,7 @@ describe("GameDetail", () => {
     expect(screen.getByText("Charlie")).toBeTruthy();
     expect(screen.getByText("Diana")).toBeTruthy();
 
-    // Verify that experience badges are rendered correctly
+    // Verify that is_new badges are rendered correctly
     const nuevoTag = screen.getByText("Nuevo");
     const antiguoTag = screen.getByText("Antiguo");
 
@@ -273,12 +273,12 @@ describe("GameDetail", () => {
             jugadores: expect.arrayContaining([
               expect.objectContaining({
                 nombre: "Alice",
-                es_nuevo: true,
+                is_new: true,
                 country: { name: "England", reason: "Algorithm says so" },
               }),
               expect.objectContaining({
                 nombre: "Bob",
-                es_nuevo: false,
+                is_new: false,
                 country: { name: "France" },
               }),
             ]),
@@ -291,7 +291,7 @@ describe("GameDetail", () => {
     );
   });
 
-  it("verifies badge structure for all experience tags", async () => {
+  it("verifies badge structure for all is_new tags", async () => {
     render(GameDetail, {
       props: {
         id: 1,
@@ -304,7 +304,7 @@ describe("GameDetail", () => {
       expect(screen.queryByText("Cargando…")).toBeNull();
     });
 
-    // Check that all experience tags are rendered as Badge components
+    // Check that all is_new tags are rendered as Badge components
     const nuevoTags = screen.getAllByText("Nuevo");
     const antiguoTags = screen.getAllByText("Antiguo");
 
@@ -493,16 +493,16 @@ describe("GameDetail", () => {
             numero: 1,
             gm: "GameMaster1",
             jugadores: [
-              { nombre: "Alice", es_nuevo: true, country: { name: "England" } },
-              { nombre: "Bob", es_nuevo: false, country: { name: "France" } },
+              { nombre: "Alice", is_new: true, country: { name: "England" } },
+              { nombre: "Bob", is_new: false, country: { name: "France" } },
             ],
           },
           {
             numero: 2, // CRITICAL: Changed from 1 to 2 to prevent Svelte crash
             gm: "GameMaster1",
             jugadores: [
-              { nombre: "Alice", es_nuevo: true, country: { name: "England" } },
-              { nombre: "Bob", es_nuevo: false, country: { name: "France" } },
+              { nombre: "Alice", is_new: true, country: { name: "England" } },
+              { nombre: "Bob", is_new: false, country: { name: "France" } },
             ],
           },
         ],

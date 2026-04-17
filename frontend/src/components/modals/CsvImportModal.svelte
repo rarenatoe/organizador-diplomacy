@@ -31,13 +31,13 @@
   <div class="modal-content" onclick={(e) => e.stopPropagation()}>
     <div class="modal-title">Pegar CSV</div>
     <p class="modal-description">
-      Pega el contenido CSV con las columnas: nombre, experiencia,
-      juegos_este_ano, prioridad, partidas_deseadas, partidas_gm
+      Pega el contenido CSV con las columnas: nombre, is_new, juegos_este_ano,
+      prioridad, partidas_deseadas, partidas_gm
     </p>
     <textarea
       use:autofocus
       bind:value={csvText}
-      placeholder="nombre,experiencia,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm&#10;Alice,Nuevo,0,false,1,0&#10;Bob,Antiguo,3,true,2,1"
+      placeholder="nombre,is_new,juegos_este_ano,prioridad,partidas_deseadas,partidas_gm&#10;Alice,Nuevo,0,false,1,0&#10;Bob,Antiguo,3,true,2,1"
       rows="10"
     ></textarea>
     <div class="modal-actions">

@@ -105,18 +105,18 @@ async def add_player_to_snapshot(
     session: AsyncSession,
     snapshot_id: int,
     player_id: int,
-    experience: str,
     games_this_year: int,
     desired_games: int,
     gm_games: int,
     *,
     has_priority: bool,
+    is_new: bool,
 ) -> None:
     """Link a player to a snapshot with game data."""
     sp = SnapshotPlayer(
         snapshot_id=snapshot_id,
         player_id=player_id,
-        experience=experience,
+        is_new=is_new,
         games_this_year=games_this_year,
         has_priority=has_priority,
         desired_games=desired_games,
@@ -168,7 +168,7 @@ async def snapshots_have_same_roster(
     # Build comparison dict
     snap_dict: dict[str, dict[str, Any]] = {
         player.name: {
-            "experiencia": sp.experience,
+            "is_new": sp.is_new,
             "juegos_este_ano": sp.games_this_year,
             "has_priority": sp.has_priority,
             "partidas_deseadas": sp.desired_games,
@@ -180,7 +180,7 @@ async def snapshots_have_same_roster(
     # Build notion dict
     notion_dict: dict[str, dict[str, Any]] = {
         r["nombre"]: {
-            "experiencia": r["experiencia"],
+            "is_new": r["is_new"],
             "juegos_este_ano": int(r["juegos_este_ano"]),
             "has_priority": bool(r.get("has_priority", False)),
             "partidas_deseadas": int(r.get("partidas_deseadas", 1)),
@@ -219,7 +219,7 @@ async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[
             "nombre": player.name,
             "notion_id": player.notion_id,
             "notion_name": notion_name,
-            "experiencia": sp.experience,
+            "is_new": sp.is_new,
             "juegos_este_ano": sp.games_this_year,
             "has_priority": sp.has_priority,
             "partidas_deseadas": sp.desired_games,
@@ -338,11 +338,11 @@ async def create_root_manual_snapshot(
             session,
             snap_id,
             player_id,
-            p["experiencia"],
             int(p["juegos_este_ano"]),
             int(p.get("partidas_deseadas", 1)),
             int(p.get("partidas_gm", 0)),
             has_priority=p.get("has_priority", False),
+            is_new=p["is_new"],
         )
 
     return snap_id
@@ -361,7 +361,7 @@ async def update_notion_cache(session: AsyncSession, rows: list[dict[str, Any]])
         cache = NotionCache(
             notion_id=r["notion_id"],
             name=r["nombre"],
-            experience=r["experiencia"],
+            is_new=r["is_new"],
             games_this_year=int(r["juegos_este_ano"]),
             c_england=int(r.get("c_england", 0)),
             c_france=int(r.get("c_france", 0)),
@@ -385,7 +385,7 @@ async def get_notion_cache(session: AsyncSession) -> list[dict[str, Any]]:
         {
             "notion_id": r.notion_id,
             "nombre": r.name,
-            "experiencia": r.experience,
+            "is_new": r.is_new,
             "juegos_este_ano": r.games_this_year,
             "c_england": r.c_england,
             "c_france": r.c_france,

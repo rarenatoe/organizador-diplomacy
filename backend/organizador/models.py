@@ -10,17 +10,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
 
 # ── CSV column reference ───────────────────────────────────────────────────────
-# Columns: Nombre, Experiencia, Juegos_Este_Ano, Prioridad, Partidas_Deseadas, Partidas_GM
+# Columns: Nombre, is_new, Juegos_Este_Ano, Prioridad, Partidas_Deseadas, Partidas_GM
 
 
 class DraftPlayer(BaseModel):
     """A player with priority score logic."""
 
     name: str
-    experience: str
+    is_new: bool = False
     games_this_year: int
     has_priority: bool = False
     desired_games: int
@@ -35,19 +35,11 @@ class DraftPlayer(BaseModel):
     country: str = ""
     country_reason: str | None = None
 
-    # Computed fields (set during initialization)
-    is_new: bool = Field(default=False)
-
     @field_validator("games_this_year", "desired_games", "gm_games", mode="before")
     @classmethod
     def coerce_to_int(_cls, v: Any) -> int:
         """Coerce string or int values to int."""
         return int(v)
-
-    def model_post_init(self, __context: Any) -> None:  # noqa: ARG002  # vulture: ignore
-        """Compute derived fields after initialization."""
-        # Parse string inputs to proper types
-        object.__setattr__(self, "is_new", self.experience.strip().lower() == "nuevo")
 
     @property
     def priority_score(self) -> float:

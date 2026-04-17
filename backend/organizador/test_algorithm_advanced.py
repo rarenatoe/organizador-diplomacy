@@ -25,17 +25,17 @@ from .models import DraftPlayer
 
 def _j(
     name: str,
-    experience: str = "Antiguo",
     games_this_year: int = 0,
     desired_games: int = 1,
     gm_games: int = 0,
     *,
     has_priority: bool = False,
+    is_new: bool = False,
 ) -> DraftPlayer:
     """Crea un DraftPlayer con valores por defecto sensatos."""
     return DraftPlayer(
         name=name,
-        experience=experience,
+        is_new=is_new,
         games_this_year=games_this_year,
         desired_games=desired_games,
         gm_games=gm_games,
@@ -61,7 +61,7 @@ class TestCalcularPartidasPrioridad(unittest.TestCase):
             random.seed(seed)
             jugadores = (
                 [_j(f"Vet{i}", games_this_year=5) for i in range(13)]
-                + [_j("Nuevo1", experience="Nuevo")]
+                + [_j("Nuevo1", is_new=True)]
                 + [_j("Extra", games_this_year=5)]
             )
             res = calculate_matches(jugadores)
@@ -247,7 +247,9 @@ class TestCalcularPartidasBalance(unittest.TestCase):
         """Con más candidatos que cupos, el jugador con más juegos_ano queda fuera."""
         for seed in range(40):
             random.seed(seed)
-            jugadores = _pool(14, games_this_year=0) + [_j("Veterano", games_this_year=8)]
+            jugadores = _pool(14, games_this_year=0) + [
+                _j("PVeterano", games_this_year=8, is_new=False)
+            ]
             res = calculate_matches(jugadores)
             assert res is not None
             todos = {j.name for table in res.tables for j in table.players}
@@ -255,9 +257,9 @@ class TestCalcularPartidasBalance(unittest.TestCase):
             for i in range(14):
                 self.assertIn(f"J{i}", todos, f"J{i} no entró (seed={seed})")
             self.assertNotIn(
-                "Veterano", todos, f"Veterano ocupó un cupo que debía ser de otro (seed={seed})"
+                "PVeterano", todos, f"Veterano ocupó un cupo que debía ser de otro (seed={seed})"
             )
-            self.assertIn("Veterano", sobrantes, f"Veterano no está en espera (seed={seed})")
+            self.assertIn("PVeterano", sobrantes, f"Veterano no está en espera (seed={seed})")
 
     def test_todos_obtienen_primer_cupo_antes_de_segundos_cupos_con_historial(self):
         """Reproducción del caso Jean Carlos: el segundo ticket de quien tiene

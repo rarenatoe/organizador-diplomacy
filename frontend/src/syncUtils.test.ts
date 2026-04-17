@@ -8,7 +8,7 @@ describe("applySyncMerges", () => {
     {
       notion_id: "notion_123",
       nombre: "Notion Name",
-      experiencia: "Antiguo",
+      is_new: false,
       juegos_este_ano: 5,
       alias: ["alias1", "alias2"],
     },
@@ -19,7 +19,7 @@ describe("applySyncMerges", () => {
       const currentRows: EditPlayerRow[] = [
         {
           nombre: "Duplicate Name",
-          experiencia: "Nuevo",
+          is_new: true,
           juegos_este_ano: 0,
           has_priority: true,
           partidas_deseadas: 1,
@@ -29,7 +29,7 @@ describe("applySyncMerges", () => {
         },
         {
           nombre: "Duplicate Name",
-          experiencia: "Antiguo",
+          is_new: false,
           juegos_este_ano: 3,
           has_priority: false,
           partidas_deseadas: 2,
@@ -58,7 +58,7 @@ describe("applySyncMerges", () => {
       const currentRows: EditPlayerRow[] = [
         {
           nombre: "Typo Name",
-          experiencia: "Nuevo",
+          is_new: true,
           juegos_este_ano: 0,
           has_priority: true,
           partidas_deseadas: 1,
@@ -81,7 +81,7 @@ describe("applySyncMerges", () => {
       // Should rename to "Local Name"
       expect(result).toHaveLength(1);
       expect(result[0]?.nombre).toBe("Local Name");
-      expect(result[0]?.experiencia).toBe("Nuevo"); // Keep local data
+      expect(result[0]?.is_new).toBe(true); // Keep local data
       expect(result[0]?.juegos_este_ano).toBe(0);
     });
   });
@@ -91,7 +91,7 @@ describe("applySyncMerges", () => {
       const currentRows: EditPlayerRow[] = [
         {
           nombre: "Local",
-          experiencia: "Nuevo",
+          is_new: true,
           juegos_este_ano: 0,
           has_priority: true,
           partidas_deseadas: 1,
@@ -116,7 +116,7 @@ describe("applySyncMerges", () => {
       expect(result[0]?.nombre).toBe("Notion Name");
       expect(result[0]?.notion_id).toBe("notion_123");
       expect(result[0]?.notion_name).toBe("Notion Name");
-      expect(result[0]?.experiencia).toBe("Antiguo"); // Use Notion data
+      expect(result[0]?.is_new).toBe(false); // Use Notion data
       expect(result[0]?.juegos_este_ano).toBe(5); // Use Notion data
     });
   });
@@ -126,7 +126,7 @@ describe("applySyncMerges", () => {
       const currentRows: EditPlayerRow[] = [
         {
           nombre: "Local Name",
-          experiencia: "Nuevo",
+          is_new: true,
           juegos_este_ano: 0,
           has_priority: true,
           partidas_deseadas: 1,
@@ -151,7 +151,7 @@ describe("applySyncMerges", () => {
       expect(result[0]?.nombre).toBe("Local Name"); // Keep local name
       expect(result[0]?.notion_id).toBe("notion_123"); // But attach notion_id
       expect(result[0]?.notion_name).toBe("Notion Name");
-      expect(result[0]?.experiencia).toBe("Antiguo"); // Use Notion data
+      expect(result[0]?.is_new).toBe(false); // Use Notion data
       expect(result[0]?.juegos_este_ano).toBe(5); // Use Notion data
     });
   });
@@ -161,7 +161,7 @@ describe("applySyncMerges", () => {
       const currentRows: EditPlayerRow[] = [
         {
           nombre: "Unmatched Player",
-          experiencia: "Nuevo",
+          is_new: true,
           juegos_este_ano: 0,
           has_priority: true,
           partidas_deseadas: 1,
@@ -179,7 +179,7 @@ describe("applySyncMerges", () => {
       // Should pass through completely unmodified
       expect(result).toHaveLength(1);
       expect(result[0]?.nombre).toBe("Unmatched Player");
-      expect(result[0]?.experiencia).toBe("Nuevo");
+      expect(result[0]?.is_new).toBe(true);
       expect(result[0]?.juegos_este_ano).toBe(0);
       expect(result[0]?.has_priority).toBe(true);
       expect(result[0]?.partidas_deseadas).toBe(1);

@@ -176,7 +176,7 @@ def _create_test_notion_player(nombre: str, **kwargs: Any) -> NotionPlayerDict:
     """Helper to create a minimal NotionPlayerDict for testing."""
     defaults: dict[str, Any] = {
         "notion_id": "test_id",
-        "experiencia": "Nuevo",
+        "is_new": True,
         "juegos_este_ano": 0,
         "alias": [],
         "c_england": 0,
@@ -428,7 +428,7 @@ class TestSyncBehavior:
                         filas.append(
                             {
                                 "Nombre": nd["nombre"] if action == "merge_notion" else nombre,
-                                "Experiencia": nd["experiencia"],
+                                "is_new": nd["is_new"],
                                 "Juegos_Este_Ano": nd["juegos_este_ano"],
                                 "has_priority": int(
                                     existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
@@ -454,7 +454,7 @@ class TestSyncBehavior:
                         filas.append(
                             {
                                 "Nombre": nombre,  # Keep local name
-                                "Experiencia": notion_data["experiencia"],
+                                "is_new": notion_data["is_new"],
                                 "Juegos_Este_Ano": notion_data["juegos_este_ano"],
                                 "has_priority": int(
                                     existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
@@ -475,7 +475,7 @@ class TestSyncBehavior:
                     filas.append(
                         {
                             "Nombre": nombre,
-                            "Experiencia": existente.get("experiencia", "Nuevo"),
+                            "is_new": existente.get("is_new", True),
                             "Juegos_Este_Ano": int(existente.get("juegos_este_ano", 0)),
                             "has_priority": int(
                                 existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
@@ -498,7 +498,7 @@ class TestSyncBehavior:
                 filas.append(
                     {
                         "Nombre": nd["nombre"],
-                        "Experiencia": nd["experiencia"],
+                        "is_new": nd["is_new"],
                         "Juegos_Este_Ano": nd["juegos_este_ano"],
                         "has_priority": FIELD_DEFAULTS["has_priority"],
                         "partidas_deseadas": FIELD_DEFAULTS["partidas_deseadas"],
@@ -513,7 +513,7 @@ class TestSyncBehavior:
         existentes = {
             "Andy": {
                 "nombre": "Andy",
-                "experiencia": "Antiguo",
+                "is_new": False,
                 "juegos_este_ano": 2,
                 "has_priority": False,
                 "partidas_deseadas": 2,
@@ -522,7 +522,7 @@ class TestSyncBehavior:
             },
             "Charlie": {
                 "nombre": "Charlie",
-                "experiencia": "Antiguo",
+                "is_new": False,
                 "juegos_este_ano": 0,
                 "has_priority": False,
                 "partidas_deseadas": 2,
@@ -532,7 +532,7 @@ class TestSyncBehavior:
         notion_players = {
             "andy": {
                 "nombre": "Andy",
-                "experiencia": "Antiguo",
+                "is_new": False,
                 "juegos_este_ano": 1,
                 "c_england": 2,
             },
@@ -574,13 +574,13 @@ class TestSyncBehavior:
     def test_new_notion_players_are_ignored(self):
         """Regression test: New players in Notion must NOT be added to an existing snapshot."""
         existentes = {
-            "Kur": {"nombre": "Kur", "experiencia": "Antiguo", "juegos_este_ano": 1},
+            "Kur": {"nombre": "Kur", "is_new": False, "juegos_este_ano": 1},
         }
         notion_players = {
-            "kur": {"nombre": "Kur", "experiencia": "Antiguo", "juegos_este_ano": 2},
+            "kur": {"nombre": "Kur", "is_new": False, "juegos_este_ano": 2},
             "nuevo_jugador": {
                 "nombre": "Nuevo Jugador",
-                "experiencia": "Nuevo",
+                "is_new": True,
                 "juegos_este_ano": 0,
             },
         }
@@ -596,14 +596,14 @@ class TestSyncBehavior:
         existentes = {
             "Kur": {
                 "nombre": "Kur",
-                "experiencia": "Antiguo",
+                "is_new": False,
                 "juegos_este_ano": 1,
                 "has_priority": True,
                 "partidas_deseadas": 3,
             },
         }
         notion_players = {
-            "kurt": {"nombre": "Kurt", "experiencia": "Antiguo", "juegos_este_ano": 5},
+            "kurt": {"nombre": "Kurt", "is_new": False, "juegos_este_ano": 5},
         }
         merges = {"Kur": {"to": "Kurt", "action": "merge_notion"}}
 
@@ -618,14 +618,14 @@ class TestSyncBehavior:
         existentes = {
             "Kur": {
                 "nombre": "Kur",
-                "experiencia": "Antiguo",
+                "is_new": False,
                 "juegos_este_ano": 1,
                 "has_priority": True,
                 "partidas_deseadas": 3,
             },
         }
         notion_players = {
-            "kurt": {"nombre": "Kurt", "experiencia": "Antiguo", "juegos_este_ano": 5},
+            "kurt": {"nombre": "Kurt", "is_new": False, "juegos_este_ano": 5},
         }
         merges = {"Kur": {"to": "Kurt", "action": "merge_local"}}
 
@@ -638,10 +638,10 @@ class TestSyncBehavior:
     def test_player_merge_skipped(self):
         """Test that skipping a merge preserves the local player and ignores the new Notion player."""
         existentes = {
-            "Kur": {"nombre": "Kur", "experiencia": "Antiguo", "juegos_este_ano": 1},
+            "Kur": {"nombre": "Kur", "is_new": False, "juegos_este_ano": 1},
         }
         notion_players = {
-            "kurt": {"nombre": "Kurt", "experiencia": "Antiguo", "juegos_este_ano": 5},
+            "kurt": {"nombre": "Kurt", "is_new": False, "juegos_este_ano": 5},
         }
         merges: dict[str, Any] = {}  # User skipped
 
@@ -653,24 +653,24 @@ class TestSyncBehavior:
 
     def test_player_matched_via_alias_regression(self):
         """Regression: Match via alias must keep local name even without explicit merge."""
-        existentes = {"Jean": {"nombre": "Jean", "experiencia": "Nuevo"}}
+        existentes = {"Jean": {"nombre": "Jean", "is_new": True}}
         notion_players = {
             "jean carlos": {
                 "nombre": "Jean Carlos",
-                "experiencia": "Antiguo",
+                "is_new": False,
                 "juegos_este_ano": 5,
                 "alias": ["jean"],
             }
         }
         filas = self._simulate_sync_logic(existentes, notion_players)
         assert filas[0]["Nombre"] == "Jean"
-        assert filas[0]["Experiencia"] == "Antiguo"
+        assert not filas[0]["is_new"]
 
     def test_golden_rule_explicit_merge_notion(self):
         """Regression: Explicit merge 'merge_notion' must change name to Notion main name."""
-        existentes = {"Jean": {"nombre": "Jean", "experiencia": "Nuevo"}}
+        existentes = {"Jean": {"nombre": "Jean", "is_new": True}}
         notion_players = {
-            "jean carlos": {"nombre": "Jean Carlos", "experiencia": "Antiguo", "juegos_este_ano": 5}
+            "jean carlos": {"nombre": "Jean Carlos", "is_new": False, "juegos_este_ano": 5}
         }
         merges = {"Jean": {"to": "Jean Carlos", "action": "merge_notion"}}
         filas = self._simulate_sync_logic(existentes, notion_players, merges)
@@ -678,9 +678,9 @@ class TestSyncBehavior:
 
     def test_golden_rule_explicit_merge_local(self):
         """Regression: Explicit merge 'merge_local' must keep name as local name."""
-        existentes = {"Jean": {"nombre": "Jean", "experiencia": "Nuevo"}}
+        existentes = {"Jean": {"nombre": "Jean", "is_new": True}}
         notion_players = {
-            "jean carlos": {"nombre": "Jean Carlos", "experiencia": "Antiguo", "juegos_este_ano": 5}
+            "jean carlos": {"nombre": "Jean Carlos", "is_new": False, "juegos_este_ano": 5}
         }
         merges = {"Jean": {"to": "Jean Carlos", "action": "merge_local"}}
         filas = self._simulate_sync_logic(existentes, notion_players, merges)

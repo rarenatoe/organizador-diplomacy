@@ -440,8 +440,8 @@
 
                         <div class="tag-wrapper">
                           <Badge
-                            variant={j.es_nuevo ? "warning" : "success"}
-                            text={j.es_nuevo ? "Nuevo" : "Antiguo"}
+                            variant={j.is_new ? "warning" : "success"}
+                            text={j.is_new ? "Nuevo" : "Antiguo"}
                             fixedWidth={true}
                           />
                         </div>

@@ -14,7 +14,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
         players = [
             DraftPlayer(
                 name="Alice",
-                experience="Antiguo",
+                is_new=False,
                 games_this_year=5,
                 has_priority=False,
                 desired_games=1,
@@ -29,7 +29,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
             ),
             DraftPlayer(
                 name="Bob",
-                experience="Antiguo",
+                is_new=False,
                 games_this_year=3,
                 has_priority=False,
                 desired_games=1,
@@ -44,7 +44,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
             ),
             DraftPlayer(
                 name="Charlie",
-                experience="Antiguo",
+                is_new=False,
                 games_this_year=2,
                 has_priority=False,
                 desired_games=1,
@@ -70,7 +70,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
         players = [
             DraftPlayer(
                 name="Alice",
-                experience="Antiguo",
+                is_new=False,
                 games_this_year=5,
                 has_priority=False,
                 desired_games=1,
@@ -85,7 +85,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
             ),  # Cursed in England
             DraftPlayer(
                 name="Bob",
-                experience="Antiguo",
+                is_new=False,
                 games_this_year=1,
                 has_priority=False,
                 desired_games=1,
@@ -100,7 +100,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
             ),  # Clean history
             DraftPlayer(
                 name="Charlie",
-                experience="Antiguo",
+                is_new=False,
                 games_this_year=1,
                 has_priority=False,
                 desired_games=1,
@@ -128,7 +128,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
         players = [
             DraftPlayer(
                 name="Alice",
-                experience="Antiguo",
+                is_new=False,
                 games_this_year=5,
                 has_priority=False,
                 desired_games=1,
@@ -143,7 +143,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
             ),  # All countries 1 game
             DraftPlayer(
                 name="Bob",
-                experience="Antiguo",
+                is_new=False,
                 games_this_year=3,
                 has_priority=False,
                 desired_games=1,
@@ -158,7 +158,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
             ),  # All countries 0 games
             DraftPlayer(
                 name="Charlie",
-                experience="Antiguo",
+                is_new=False,
                 games_this_year=2,
                 has_priority=False,
                 desired_games=1,
@@ -187,7 +187,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
             # Alice is cursed in England (2 games).
             DraftPlayer(
                 name="Alice",
-                experience="Antiguo",
+                is_new=False,
                 games_this_year=5,
                 has_priority=False,
                 desired_games=1,
@@ -203,7 +203,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
             # Bob has played England once (1 game).
             DraftPlayer(
                 name="Bob",
-                experience="Antiguo",
+                is_new=False,
                 games_this_year=3,
                 has_priority=False,
                 desired_games=1,
@@ -219,7 +219,7 @@ class TestShieldingAlgorithm(unittest.TestCase):
             # Charlie has never played England (0 games).
             DraftPlayer(
                 name="Charlie",
-                experience="Antiguo",
+                is_new=False,
                 games_this_year=2,
                 has_priority=False,
                 desired_games=1,

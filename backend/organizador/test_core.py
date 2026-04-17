@@ -25,17 +25,17 @@ from .models import DraftPlayer, DraftResult
 
 def _j(
     name: str,
-    experience: str = "Veteran",
     games_this_year: int = 0,
     desired_games: int = 1,
     gm_games: int = 0,
     *,
     has_priority: bool = False,
+    is_new: bool = False,
 ) -> DraftPlayer:
     """Creates a DraftPlayer with sensible default values."""
     return DraftPlayer(
         name=name,
-        experience=experience,
+        is_new=is_new,
         games_this_year=games_this_year,
         desired_games=desired_games,
         gm_games=gm_games,
@@ -53,13 +53,13 @@ def _pool(n: int, prefix: str = "J", **kwargs: Any) -> list[DraftPlayer]:
 
 class TestJugador(unittest.TestCase):
     def test_is_new_true(self):
-        self.assertTrue(_j("A", experience="Nuevo").is_new)
+        self.assertTrue(_j("A", is_new=True).is_new)
 
     def test_is_new_false(self):
-        self.assertFalse(_j("A", experience="Antiguo").is_new)
+        self.assertFalse(_j("A", is_new=False).is_new)
 
     def test_is_new_case_insensitive(self):
-        self.assertTrue(_j("A", experience="NUEVO").is_new)
+        self.assertTrue(_j("A", is_new=True).is_new)
 
     def test_has_priority_true(self):
         self.assertTrue(_j("A", has_priority=True).has_priority)
@@ -69,7 +69,7 @@ class TestJugador(unittest.TestCase):
 
     def test_puntaje_nuevo_es_cero(self):
         # Un jugador nuevo siempre tiene la máxima prioridad (0)
-        self.assertEqual(_j("A", experience="Nuevo", games_this_year=10).priority_score, 0)
+        self.assertEqual(_j("A", is_new=True, games_this_year=10).priority_score, 0)
 
     def test_priority_score_flag_es_cero(self):
         # El flag de prioridad también produce puntaje 0
@@ -167,11 +167,11 @@ class TestCalcularPartidas(unittest.TestCase):
                 f"{name} aparece en la misma table más de una vez",
             )
 
-    # ── Balance de experiencia ────────────────────────────────────────────────
+    # ── Balance de is_new ────────────────────────────────────────────────
 
     def test_balance_nuevos_y_antiguos_por_table(self):
         """Con una mezcla suficiente, cada table debe tener nuevos y antiguos."""
-        players = _pool(6, prefix="N", experience="Nuevo") + _pool(8, prefix="A")
+        players = _pool(6, prefix="N", is_new=True) + _pool(8, prefix="A")
         res = calculate_matches(players)
         assert res is not None
         for table in res.tables:
@@ -230,7 +230,7 @@ class TestCalcularPartidas(unittest.TestCase):
                     players=[
                         DraftPlayer(
                             name=f"Player{i}",
-                            experience="Veterano",
+                            is_new=False,
                             games_this_year=0,
                             has_priority=False,
                             desired_games=1,

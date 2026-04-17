@@ -25,9 +25,7 @@ pytestmark = pytest.mark.asyncio
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
-async def make_snapshot_with_player(
-    db_session: Any, name: str = "Alice", experience: str = "Antiguo"
-) -> tuple[int, int]:
+async def make_snapshot_with_player(db_session: Any, name: str = "Alice") -> tuple[int, int]:
     """Creates a snapshot with one player; returns (snapshot_id, player_id)."""
     snap_id = await create_snapshot(db_session, "manual")
     pid = await get_or_create_player(db_session, name)
@@ -35,11 +33,11 @@ async def make_snapshot_with_player(
         db_session,
         snap_id,
         pid,
-        experience,
         games_this_year=0,
         desired_games=2,
         gm_games=0,
         has_priority=True,
+        is_new=False,
     )
     await db_session.commit()
     return snap_id, pid
@@ -97,10 +95,10 @@ class TestApiPlayerRename:
         carol_id = await get_or_create_player(db_session, "Carol")
         diana_id = await get_or_create_player(db_session, "Diana")
         await add_player_to_snapshot(
-            db_session, snap_id, carol_id, "Antiguo", 0, 2, 0, has_priority=True
+            db_session, snap_id, carol_id, 0, 2, 0, has_priority=True, is_new=False
         )
         await add_player_to_snapshot(
-            db_session, snap_id, diana_id, "Antiguo", 0, 2, 0, has_priority=True
+            db_session, snap_id, diana_id, 0, 2, 0, has_priority=True, is_new=False
         )
         await db_session.commit()
         # Try to merge them - should fail
@@ -126,11 +124,11 @@ class TestApiPlayerRename:
             db_session,
             snap_id2,
             pid,
-            experience="Antiguo",
             games_this_year=0,
             desired_games=2,
             gm_games=0,
             has_priority=True,
+            is_new=False,
         )
         await db_session.commit()
         # The old snapshot still has the old name
@@ -151,11 +149,11 @@ class TestApiPlayerRename:
             db_session,
             snap_id2,
             pid,
-            experience="Antiguo",
             games_this_year=0,
             desired_games=2,
             gm_games=0,
             has_priority=True,
+            is_new=False,
         )
         await db_session.commit()
         # Rename the player
@@ -192,7 +190,7 @@ class TestApiSnapshotAddPlayer:
             f"/api/snapshot/{snap_id}/add-player",
             json={
                 "nombre": "Grace",
-                "experiencia": "Antiguo",
+                "is_new": False,
                 "juegos_este_ano": 1,
                 "has_priority": True,
                 "partidas_deseadas": 2,
@@ -213,7 +211,7 @@ class TestApiSnapshotAddPlayer:
             f"/api/snapshot/{snap_id}/add-player",
             json={
                 "nombre": "Helen",
-                "experiencia": "Nuevo",
+                "is_new": True,
                 "juegos_este_ano": 5,
                 "has_priority": False,
                 "partidas_deseadas": 1,
@@ -248,7 +246,7 @@ class TestPlayerLookup:
 
         assert player["source"] == "default"
         assert not player["has_priority"]
-        assert player["experiencia"] == "Nuevo"
+        assert player["is_new"]
         assert player["juegos_este_ano"] == 0
 
     async def test_lookup_timeline_traversal_finds_history(
@@ -264,11 +262,11 @@ class TestPlayerLookup:
             session=db_session,
             snapshot_id=snap_id,
             player_id=player_id,
-            experience="Veterano",
             games_this_year=0,
             desired_games=1,
             gm_games=0,
             has_priority=True,
+            is_new=False,
         )
         await db_session.commit()
 
@@ -284,7 +282,7 @@ class TestPlayerLookup:
 
         assert player["source"] == "history"
         assert player["has_priority"]
-        assert player["experiencia"] == "Veterano"
+        assert not player["is_new"]
         assert player["juegos_este_ano"] == 0
 
     async def test_lookup_global_fallback_finds_snapshot_player(
@@ -299,11 +297,11 @@ class TestPlayerLookup:
             session=db_session,
             snapshot_id=snap_id,
             player_id=player_id,
-            experience="Veterano",
             games_this_year=1,
             desired_games=1,
             gm_games=1,
             has_priority=True,
+            is_new=False,
         )
         await db_session.commit()
 
@@ -315,7 +313,7 @@ class TestPlayerLookup:
 
         assert player["source"] == "history"
         assert player["has_priority"]
-        assert player["experiencia"] == "Veterano"
+        assert not player["is_new"]
         assert player["juegos_este_ano"] == 1
 
     async def test_lookup_json_rescue_finds_deleted_player(
@@ -334,7 +332,7 @@ class TestPlayerLookup:
         player_id = await get_or_create_player(db_session, "Eve")
         snap_id = await create_snapshot(db_session, "manual")
         await add_player_to_snapshot(
-            db_session, snap_id, player_id, "Veterano", 1, 1, 1, has_priority=True
+            db_session, snap_id, player_id, 1, 1, 1, has_priority=True, is_new=False
         )
         await db_session.commit()
 
@@ -351,7 +349,7 @@ class TestPlayerLookup:
             players=[
                 {
                     "nombre": "Eve",
-                    "experiencia": "Veterano",
+                    "is_new": False,
                     "juegos_este_ano": 1,
                     "has_priority": True,
                     "partidas_deseadas": 2,
@@ -376,7 +374,7 @@ class TestPlayerLookup:
 
         assert player["source"] == "history"
         assert player["has_priority"]
-        assert player["experiencia"] == "Veterano"
+        assert not player["is_new"]
         assert player["juegos_este_ano"] == 1
 
     async def test_lookup_notion_fallback_returns_notion_stats(
@@ -388,7 +386,7 @@ class TestPlayerLookup:
         notion_player = NotionCache(
             notion_id="test-notion-id",
             name="Frank",
-            experience="Veterano",
+            is_new=False,
             games_this_year=3,
             c_england=1,
             c_france=0,
@@ -408,7 +406,7 @@ class TestPlayerLookup:
         assert player["source"] == "notion"
         assert not player["has_priority"]
         assert player["partidas_deseadas"] == 1
-        assert player["experiencia"] == "Veterano"
+        assert not player["is_new"]
         assert player["juegos_este_ano"] == 3
 
     async def test_lookup_unknown_player_returns_defaults(self, client: Any) -> None:
@@ -419,7 +417,7 @@ class TestPlayerLookup:
 
         assert player["source"] == "default"
         assert not player["has_priority"]
-        assert player["experiencia"] == "Nuevo"
+        assert player["is_new"]
         assert player["juegos_este_ano"] == 0
 
     async def test_lookup_with_snapshot_id_prioritizes_history(
@@ -432,7 +430,7 @@ class TestPlayerLookup:
         notion_player = NotionCache(
             notion_id="global-charlie-id",
             name="Charlie",
-            experience="Novato",
+            is_new=True,
             last_updated=datetime.now(),
         )
         db_session.add(notion_player)
@@ -444,11 +442,11 @@ class TestPlayerLookup:
             session=db_session,
             snapshot_id=snap_id,
             player_id=player_id,
-            experience="Veterano",
             games_this_year=1,
             desired_games=1,
             gm_games=1,
             has_priority=True,
+            is_new=False,
         )
         await db_session.commit()
 
@@ -460,7 +458,7 @@ class TestPlayerLookup:
 
         assert player["source"] == "history"
         assert player["has_priority"]
-        assert player["experiencia"] == "Veterano"
+        assert not player["is_new"]
 
 
 class TestApiPlayerLookup:
@@ -472,7 +470,7 @@ class TestApiPlayerLookup:
         nc = NotionCache(
             notion_id="notion-999",
             name="Real Notion Name",
-            experience="Antiguo",
+            is_new=False,
             games_this_year=5,
             last_updated=datetime.now(),
         )
@@ -493,5 +491,5 @@ class TestApiPlayerLookup:
         assert player["notion_id"] == "notion-999"
         assert player["notion_name"] == "Real Notion Name"
         assert player["source"] == "notion"
-        assert player["experiencia"] == "Antiguo"
+        assert not player["is_new"]
         assert player["juegos_este_ano"] == 5

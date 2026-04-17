@@ -53,11 +53,11 @@ async def _insert_snapshot_players(
             session,
             snapshot_id,
             player_id,
-            player.experiencia,
             player.juegos_este_ano,
             player.partidas_deseadas,
             player.partidas_gm,
             has_priority=player.has_priority,
+            is_new=player.is_new,
         )
 
 
@@ -68,7 +68,7 @@ class PlayerCreate(BaseModel):
     nombre: str
     notion_id: str | None = None
     notion_name: str | None = None
-    experiencia: str = "Nuevo"
+    is_new: bool = True
     juegos_este_ano: int = 0
     has_priority: bool = False
     partidas_deseadas: int = 1
@@ -96,7 +96,7 @@ class AddPlayerRequest(BaseModel):
     nombre: str
     notion_id: str | None = None
     notion_name: str | None = None
-    experiencia: str = "Nuevo"
+    is_new: bool = True
     juegos_este_ano: int = 0
     has_priority: bool = False
     partidas_deseadas: int = 1
@@ -238,7 +238,7 @@ async def api_create_snapshot(
             {
                 "nombre": p.nombre,
                 "notion_id": p.notion_id,
-                "experiencia": p.experiencia,
+                "is_new": p.is_new,
                 "juegos_este_ano": p.juegos_este_ano,
                 "has_priority": p.has_priority,
                 "partidas_deseadas": p.partidas_deseadas,
@@ -330,7 +330,7 @@ async def api_snapshot_save(
             # These fields come from NotionCache but aren't part of the roster
             roster_fields = {
                 "nombre",
-                "experiencia",
+                "is_new",
                 "juegos_este_ano",
                 "has_priority",
                 "partidas_deseadas",
@@ -344,7 +344,7 @@ async def api_snapshot_save(
             new_players_dicts = [
                 {
                     "nombre": p.nombre,
-                    "experiencia": p.experiencia,
+                    "is_new": p.is_new,
                     "juegos_este_ano": p.juegos_este_ano,
                     "has_priority": p.has_priority,
                     "partidas_deseadas": p.partidas_deseadas,
@@ -468,11 +468,11 @@ async def api_add_player(
             session,
             snapshot_id,
             player_id,
-            request.experiencia,
             request.juegos_este_ano,
             request.partidas_deseadas,
             request.partidas_gm,
             has_priority=request.has_priority,
+            is_new=request.is_new,
         )
         await session.commit()
         return {"player_id": player_id}
@@ -511,7 +511,7 @@ async def api_notion_fetch(
                 {
                     "notion_id": r.notion_id,
                     "nombre": r.name,
-                    "experiencia": r.experience,
+                    "is_new": r.is_new,
                     "juegos_este_ano": r.games_this_year,
                     "c_england": r.c_england,
                     "c_france": r.c_france,

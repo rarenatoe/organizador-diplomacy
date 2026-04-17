@@ -53,15 +53,19 @@ class TestGetGameEventDetailCountryRegression:
         await db_session.commit()
 
         # Add players to snapshot
-        await add_player_to_snapshot(db_session, snap1, pid1, "Antiguo", 5, 2, 0, has_priority=True)
-        await add_player_to_snapshot(db_session, snap1, pid2, "Antiguo", 0, 2, 0, has_priority=True)
+        await add_player_to_snapshot(
+            db_session, snap1, pid1, 5, 2, 0, has_priority=True, is_new=False
+        )
+        await add_player_to_snapshot(
+            db_session, snap1, pid2, 0, 2, 0, has_priority=True, is_new=False
+        )
         await db_session.commit()
 
         # Insert NotionCache with different c_turkey values
         nc1 = NotionCache(
             notion_id="test1",
             name="PlayerWithHighTurkey",
-            experience="Antiguo",
+            is_new=False,
             games_this_year=5,
             c_england=0,
             c_france=0,
@@ -75,7 +79,7 @@ class TestGetGameEventDetailCountryRegression:
         nc2 = NotionCache(
             notion_id="test2",
             name="PlayerWithZeroTurkey",
-            experience="Antiguo",
+            is_new=False,
             games_this_year=0,
             c_england=0,
             c_france=0,
@@ -148,7 +152,7 @@ class TestGetGameEventDetailCountryRegression:
             player_ids.append(pid)
 
             await add_player_to_snapshot(
-                db_session, snap1, pid, "Antiguo", i, 2, 0, has_priority=True
+                db_session, snap1, pid, i, 2, 0, has_priority=True, is_new=False
             )
         await db_session.commit()
 
@@ -200,7 +204,9 @@ class TestGetGameEventDetailCountryRegression:
         pid = await get_or_create_player(db_session, "PlayerNoCountry")
         await db_session.commit()
 
-        await add_player_to_snapshot(db_session, snap1, pid, "Antiguo", 0, 2, 0, has_priority=True)
+        await add_player_to_snapshot(
+            db_session, snap1, pid, 0, 2, 0, has_priority=True, is_new=False
+        )
         await db_session.commit()
 
         snap2 = await create_snapshot(db_session, "organizar")
@@ -243,10 +249,10 @@ async def test_view_returns_country_reason(db_session: Any) -> None:
 
     # Add player to both snapshots so they appear in the view
     await add_player_to_snapshot(
-        db_session, input_snap, player, "Antiguo", 5, 2, 0, has_priority=True
+        db_session, input_snap, player, 5, 2, 0, has_priority=True, is_new=False
     )
     await add_player_to_snapshot(
-        db_session, output_snap, player, "Antiguo", 6, 2, 0, has_priority=False
+        db_session, output_snap, player, 6, 2, 0, has_priority=False, is_new=False
     )
 
     game_id = await create_game_edge(db_session, input_snap, output_snap, 1)
@@ -296,7 +302,7 @@ class TestSnapshotHistoryInDetail:
         snap_id = await create_snapshot(db_session, "manual")
         pid = await get_or_create_player(db_session, "Player1")
         await add_player_to_snapshot(
-            db_session, snap_id, pid, "Antiguo", 5, 2, 0, has_priority=True
+            db_session, snap_id, pid, 5, 2, 0, has_priority=True, is_new=False
         )
         await db_session.commit()
 
@@ -310,7 +316,7 @@ class TestSnapshotHistoryInDetail:
                 "players": [
                     {
                         "nombre": "OldPlayer",
-                        "experiencia": "Nuevo",
+                        "is_new": True,
                         "juegos_este_ano": 0,
                         "has_priority": True,
                         "partidas_deseadas": 1,
@@ -399,7 +405,7 @@ class TestGetSnapshotDetailFanOutRegression:
 
         # Add player to snapshot
         await add_player_to_snapshot(
-            db_session, snap_id, player_id, "Antiguo", 5, 3, 1, has_priority=True
+            db_session, snap_id, player_id, 5, 3, 1, has_priority=True, is_new=False
         )
         await db_session.commit()
 
@@ -409,7 +415,7 @@ class TestGetSnapshotDetailFanOutRegression:
             cache_entry = NotionCache(
                 name="VeteranPlayer",
                 notion_id=f"notion-id-{i}",
-                experience="Antiguo",
+                is_new=False,
                 last_updated=datetime.now(),
                 c_england=i,
                 c_france=i + 1,
@@ -433,7 +439,7 @@ class TestGetSnapshotDetailFanOutRegression:
 
         # Verify the single player has the correct data
         assert players[0]["nombre"] == "VeteranPlayer"
-        assert players[0]["experiencia"] == "Antiguo"
+        assert not players[0]["is_new"]
 
     async def test_get_snapshot_detail_no_duplicates_with_history(self, db_session: Any) -> None:
         """
@@ -447,7 +453,7 @@ class TestGetSnapshotDetailFanOutRegression:
         player_id = await get_or_create_player(db_session, "MultiCachePlayer")
 
         await add_player_to_snapshot(
-            db_session, snap_id, player_id, "Nuevo", 0, 1, 0, has_priority=False
+            db_session, snap_id, player_id, 0, 1, 0, has_priority=False, is_new=True
         )
         await db_session.commit()
 
@@ -456,7 +462,7 @@ class TestGetSnapshotDetailFanOutRegression:
             cache_entry = NotionCache(
                 name="MultiCachePlayer",
                 notion_id=f"id-{i}",
-                experience="Nuevo",
+                is_new=True,
                 last_updated=datetime.now(),
                 c_england=1,
                 c_france=2,

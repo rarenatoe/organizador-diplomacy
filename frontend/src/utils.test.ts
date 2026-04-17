@@ -13,7 +13,7 @@ Bob,Antiguo,3,1,2,1`;
     expect(result).toHaveLength(2);
     expect(result[0]).toEqual({
       nombre: "Alice",
-      experiencia: "Nuevo",
+      is_new: true,
       juegos_este_ano: 0,
       has_priority: false,
       partidas_deseadas: 1,
@@ -21,7 +21,7 @@ Bob,Antiguo,3,1,2,1`;
     });
     expect(result[1]).toEqual({
       nombre: "Bob",
-      experiencia: "Antiguo",
+      is_new: false,
       juegos_este_ano: 3,
       has_priority: true,
       partidas_deseadas: 2,
@@ -36,7 +36,7 @@ Charlie`;
     expect(result).toHaveLength(1);
     expect(result[0]).toEqual({
       nombre: "Charlie",
-      experiencia: "Nuevo",
+      is_new: true,
       juegos_este_ano: 0,
       has_priority: false,
       partidas_deseadas: 1,
@@ -73,12 +73,12 @@ Bob,Nuevo`;
   });
 
   it("handles case-insensitive headers", () => {
-    const csv = `Nombre,Experiencia
+    const csv = `Nombre,experiencia
 Alice,nuevo`;
     const result = parsePlayersCsv(csv);
     expect(result).toHaveLength(1);
     expect(result[0]?.nombre).toBe("Alice");
-    expect(result[0]?.experiencia).toBe("nuevo");
+    expect(result[0]?.is_new).toBe(true);
   });
 
   it("handles columns in different order", () => {
@@ -87,7 +87,7 @@ Antiguo,Bob,1`;
     const result = parsePlayersCsv(csv);
     expect(result).toHaveLength(1);
     expect(result[0]?.nombre).toBe("Bob");
-    expect(result[0]?.experiencia).toBe("Antiguo");
+    expect(result[0]?.is_new).toBe(false);
     expect(result[0]?.has_priority).toBe(true);
   });
 

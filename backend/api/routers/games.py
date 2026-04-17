@@ -107,7 +107,7 @@ async def api_game_draft(
         jugadores: list[DraftPlayer] = [
             DraftPlayer(
                 name=r["nombre"],
-                experience=r["experiencia"],
+                is_new=r["is_new"],
                 games_this_year=r["juegos_este_ano"],
                 has_priority=r["has_priority"],
                 desired_games=r["partidas_deseadas"],
@@ -149,7 +149,7 @@ async def api_game_draft(
                     "numero": table.table_number,
                     "gm": {
                         "nombre": table.gm.name,
-                        "experiencia": table.gm.experience,
+                        "is_new": table.gm.is_new,
                         "juegos_este_ano": table.gm.games_this_year,
                         "partidas_deseadas": table.gm.desired_games,
                         "partidas_gm": table.gm.gm_games,
@@ -163,7 +163,6 @@ async def api_game_draft(
                         "country": {"name": table.gm.country, "reason": table.gm.country_reason}
                         if table.gm.country
                         else None,
-                        "es_nuevo": table.gm.is_new,
                         "has_priority": table.gm.has_priority,
                     }
                     if table.gm
@@ -171,7 +170,7 @@ async def api_game_draft(
                     "jugadores": [
                         {
                             "nombre": player.name,
-                            "experiencia": player.experience,
+                            "is_new": player.is_new,
                             "juegos_este_ano": player.games_this_year,
                             "partidas_deseadas": player.desired_games,
                             "partidas_gm": player.gm_games,
@@ -185,7 +184,6 @@ async def api_game_draft(
                             "country": {"name": player.country, "reason": player.country_reason}
                             if player.country
                             else None,
-                            "es_nuevo": player.is_new,
                             "has_priority": player.has_priority,
                         }
                         for player in table.players
@@ -196,7 +194,7 @@ async def api_game_draft(
             "tickets_sobrantes": [
                 {
                     "nombre": player.name,
-                    "experiencia": player.experience,
+                    "is_new": player.is_new,
                     "juegos_este_ano": player.games_this_year,
                     "partidas_deseadas": player.desired_games,
                     "partidas_gm": player.gm_games,
@@ -210,7 +208,6 @@ async def api_game_draft(
                     "country": {"name": player.country, "reason": player.country_reason}
                     if player.country
                     else None,
-                    "es_nuevo": player.is_new,
                     "has_priority": player.has_priority,
                     "cupos_faltantes": waitlist_counts[player.name],
                 }

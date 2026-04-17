@@ -30,7 +30,7 @@ describe("GameDraft.svelte", () => {
         jugadores: [
           createMockDraftPlayer({
             nombre: "Alice",
-            es_nuevo: false,
+            is_new: false,
             juegos_ano: 5,
             has_priority: true,
             partidas_deseadas: 2,
@@ -38,7 +38,7 @@ describe("GameDraft.svelte", () => {
           }),
           createMockDraftPlayer({
             nombre: "Bob",
-            es_nuevo: true,
+            is_new: true,
             juegos_ano: 0,
             c_france: 1,
           }),
@@ -77,7 +77,7 @@ describe("GameDraft.svelte", () => {
     expect(screen.getByText("Bob")).toBeInTheDocument();
     expect(screen.getByText("David")).toBeInTheDocument();
 
-    // Verify that experience badges are rendered correctly
+    // Verify that is_new badges are rendered correctly
     const nuevoTag = screen.getByText("Nuevo");
     const antiguoTag = screen.getByText("Antiguo");
 
@@ -104,7 +104,7 @@ describe("GameDraft.svelte", () => {
       expect(swapButtons).toHaveLength(3); // 2 in mesa + 1 in espera
     });
 
-    // Verify that all experience tags are properly wrapped
+    // Verify that all is_new tags are properly wrapped
     const nuevoTags = screen.getAllByText("Nuevo");
     const antiguoTags = screen.getAllByText("Antiguo");
 
@@ -150,7 +150,7 @@ describe("GameDraft.svelte", () => {
           jugadores: [
             createMockDraftPlayer({
               nombre: "Alice",
-              es_nuevo: false,
+              is_new: false,
               juegos_ano: 5,
               has_priority: true,
               partidas_deseadas: 2,
@@ -293,7 +293,7 @@ describe("GameDraft.svelte", () => {
               jugadores: [
                 createMockDraftPlayer({
                   nombre: "Alice",
-                  es_nuevo: false,
+                  is_new: false,
                   juegos_ano: 5,
                   has_priority: true,
                   partidas_deseadas: 2,
@@ -301,7 +301,7 @@ describe("GameDraft.svelte", () => {
                 }),
                 createMockDraftPlayer({
                   nombre: "Bob",
-                  es_nuevo: true,
+                  is_new: true,
                   juegos_ano: 0,
                   c_france: 1,
                 }),
@@ -638,7 +638,7 @@ describe("GameDraft.svelte", () => {
       expect(screen.getByText("Partida 1")).toBeInTheDocument();
     });
 
-    // Check that all experience tags are rendered as Badge components
+    // Check that all is_new tags are rendered as Badge components
     const nuevoTags = screen.getAllByText("Nuevo");
     const antiguoTags = screen.getAllByText("Antiguo");
 

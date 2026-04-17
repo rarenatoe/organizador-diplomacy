@@ -64,16 +64,15 @@ class TestApiRunNotionSync:
     async def test_notion_sync_returns_error_on_exception(
         self,
         client: Any,
-        db_session: Any,  # noqa: ARG002
     ) -> None:
-        """Background tasks are added successfully even if they will fail later."""
+        """Endpoint returns 500 if it fails to enqueue the background task."""
         with patch(
-            "backend.sync.notion_sync.run_notion_sync_background",
-            side_effect=Exception("Sync failed"),
+            "fastapi.BackgroundTasks.add_task",
+            side_effect=Exception("Task queue failure"),
         ):
             resp = await client.post("/api/run/notion_sync", json={})
-            # Background task error is caught and logged, endpoint returns success
-            assert resp.status_code == 200
+            assert resp.status_code == 500
+            assert "Task queue failure" in resp.json()["detail"]
 
 
 # ── POST /api/snapshot/notion/fetch ───────────────────────────────────────────
@@ -90,7 +89,7 @@ class TestApiNotionPlayers:
         cache_entry = NotionCache(
             notion_id="test_id_1",
             name="Test Player",
-            experience="Antiguo",
+            is_new=False,
             games_this_year=5,
             c_england=1,
             c_france=0,
@@ -136,7 +135,7 @@ class TestApiNotionPlayers:
         cache_entry = NotionCache(
             notion_id="test_id_renato",
             name="Renato Alegre",
-            experience="Antiguo",
+            is_new=False,
             games_this_year=3,
             c_england=1,
             c_france=0,
@@ -306,7 +305,7 @@ class TestNotionSyncBackground:
             # Verify Alice data (Antiguo with 5 games)
             assert "Alice" in players_by_name
             alice = players_by_name["Alice"]
-            assert alice["experiencia"] == "Antiguo"
+            assert not alice["is_new"]
             assert alice["juegos_este_ano"] == 5
             assert alice.get("c_england", 0) == 0
             assert alice.get("c_france", 0) == 0
@@ -314,7 +313,7 @@ class TestNotionSyncBackground:
             # Verify Bob data (Nuevo with 2 games)
             assert "Bob" in players_by_name
             bob = players_by_name["Bob"]
-            assert bob["experiencia"] == "Nuevo"
+            assert bob["is_new"]
             assert bob["juegos_este_ano"] == 2
             assert bob.get("c_england", 0) == 1  # Has England preference
 
@@ -344,7 +343,7 @@ class TestNotionSyncBackground:
             snap_id = await create_snapshot(session, "test_source")
             player_id = await get_or_create_player(session, "AliceOld")
             await add_player_to_snapshot(
-                session, snap_id, player_id, "Nuevo", 0, 1, 0, has_priority=False
+                session, snap_id, player_id, 0, 1, 0, has_priority=False, is_new=True
             )
             await session.commit()
 
@@ -440,10 +439,10 @@ class TestNotionSyncBackground:
             player1_id = await get_or_create_player(session, "Alice")
             player2_id = await get_or_create_player(session, "Bob")
             await add_player_to_snapshot(
-                session, snap_id, player1_id, "Nuevo", 0, 1, 0, has_priority=False
+                session, snap_id, player1_id, 0, 1, 0, has_priority=False, is_new=True
             )
             await add_player_to_snapshot(
-                session, snap_id, player2_id, "Nuevo", 0, 1, 0, has_priority=False
+                session, snap_id, player2_id, 0, 1, 0, has_priority=False, is_new=True
             )
             await session.commit()
 
@@ -528,7 +527,7 @@ class TestNotionSyncBackground:
             # Verify history metadata
             assert history.action_type == "notion_sync"
             # With STRICT ROSTER RULE: sync only updates existing players, never adds/removes
-            # - Alice: modified (juegos_este_ano 0 -> 7, experiencia Nuevo -> Antiguo)
+            # - Alice: modified (juegos_este_ano 0 -> 7, is_new Nuevo -> Antiguo)
             # - Bob: remains (no changes)
             # - Charlie: ignored (new players not added to existing snapshots)
             assert history.changes["added"] == []
