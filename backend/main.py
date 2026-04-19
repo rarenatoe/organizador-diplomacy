@@ -6,6 +6,7 @@ import asyncio
 import contextlib
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
@@ -19,6 +20,9 @@ from backend.api.routers.sync import router as sync_router
 from backend.config import FRONTEND_DIR
 from backend.db.connection import init_db
 from backend.sync.notion_sync import daemon_loop
+
+if TYPE_CHECKING:
+    from fastapi.routing import APIRoute
 
 
 @asynccontextmanager
@@ -41,9 +45,15 @@ async def lifespan(_app: FastAPI):
         await daemon_task
 
 
+def custom_generate_unique_id(route: APIRoute):
+    # This ensures the generated name is strictly your Python function name
+    return f"{route.name}"
+
+
 # Initialize FastAPI app with lifespan
 app = FastAPI(
-    title="Organizador Diplomacy",
+    title="Organizador Diplomacy API",
+    generate_unique_id_function=custom_generate_unique_id,
     lifespan=lifespan,
 )
 

@@ -4,24 +4,19 @@ title: Pillar 5 - Workflow & Git Rules
 priority: 50
 ---
 
-## Meta-Prompting & AI Communication
+## 1. Meta-Prompting & AI Constraints
 
-- **ABSOLUTE CONSTRAINTS ONLY:** When writing or updating rules, ALWAYS use absolute constraints (MUST, NEVER, BANNED, STRICTLY). NEVER use polite/emotional language ("Please", "Try to", "Avoid") as it dilutes token weights and probabilistic constraints.
-- **LOGICAL GROUPING:** Group concepts with bullet points rather than repetitive "Rule / Anti-Pattern" boilerplate. Use clear headers and concise directives.
-- **TOKEN EFFICIENCY:** Every word MUST serve a constraint purpose. Eliminate filler language and maximize information density.
+- **ABSOLUTE CONSTRAINTS ONLY:** ALWAYS use absolute terms (MUST, NEVER, BANNED, STRICTLY). NEVER use polite/emotional language ("Please", "Try to", "Avoid") as it dilutes LLM token weights.
+- **ATOMIZE PROMPTS:** Break instructions down into atomized, file-specific prompts. Monolithic prompts cause agents to gloss over critical lines of code.
 
-## Rule Governance
+## 2. The OpenAPI SDK Pipeline
 
-- **Source of Truth:** Store AI rules in `docs/ai-rules/` directory. NEVER directly edit generated artifacts (`.clinerules`, `.windsurfrules`, `.github/copilot-instructions.md`).
-- **Compilation:** ALWAYS run `bun run scripts/generate-ai-instructions.ts` after editing any markdown files in `docs/ai-rules/`. NEVER skip compilation as it causes inconsistencies across AI instruction files.
+- **Backend Change Impact:** ANY backend change to a Pydantic model or FastAPI router REQUIRES running the generation pipeline to keep the frontend SDK in sync.
+- **Generation Workflow:** Run `uv run scripts/export_openapi.py`, then `cd frontend && bun run typegen` (Lefthook runs this pre-commit).
+- **Synchronization:** Backend and frontend MUST remain in sync strictly through the auto-generated SDK. Manual interface definitions are BANNED.
 
-## Verification & Commits
+## 3. Rule Governance & Verification
 
-- **Pre-Commit Validation:** ALWAYS validate with `bun run build && bun run lint && bun run typecheck`. NEVER commit without proper validation.
-- **Local Syntax Checking:** ALWAYS check Svelte syntax problems locally. NEVER rely on CI/CD to catch syntax issues.
-- **Commit Format:** Use conventional prefixes: `feat:`, `fix:`, `refactor:`, `test:`. NEVER use non-standard formats that break changelog generation.
-
-## AI Prompt Engineering & Constraint Management
-
-- **Atomize Prompts:** When fixing cascading architectural changes, break instructions down into atomized, file-specific prompts. Monolithic prompts cause agents to gloss over critical lines of code.
-- **Absolute Constraints:** ALWAYS use absolute constraints ("MUST", "NEVER", "ALWAYS"). Do not use "prefer" or "avoid" to prevent LLM hallucinations.
+- **Source of Truth:** Edit rules ONLY in the `docs/ai-rules/` directory. NEVER directly edit generated artifacts (`.clinerules`, `.windsurfrules`).
+- **Compilation:** ALWAYS run `bun run scripts/generate-ai-instructions.ts` after editing rules to propagate them to agent configs.
+- **Pre-Commit:** Validate with `bun run build && bun run lint && bun run typecheck`. NEVER rely on CI/CD to catch Svelte syntax or type errors.

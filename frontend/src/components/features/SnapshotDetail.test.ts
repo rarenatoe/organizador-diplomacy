@@ -485,7 +485,7 @@ describe("SnapshotDetail", () => {
       // Use real timers for this test to avoid async issues
       vi.useRealTimers();
 
-      const { fetchSnapshot, fetchNotionPlayers, saveSnapshot, renamePlayer } =
+      const { fetchSnapshot, fetchNotionPlayers, saveSnapshot } =
         await import("../../api");
       const onOpenSnapshot = vi.fn();
 
@@ -527,7 +527,6 @@ describe("SnapshotDetail", () => {
       });
 
       // Mock renamePlayer and saveSnapshot to succeed
-      (renamePlayer as ReturnType<typeof vi.fn>).mockResolvedValueOnce({});
       (saveSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         snapshot_id: 2,
       });

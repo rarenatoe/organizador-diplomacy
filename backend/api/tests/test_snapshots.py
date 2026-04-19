@@ -543,3 +543,34 @@ class TestApiSnapshotSave:
         data = resp.json()
         assert data["status"] == "no_changes"
         assert data["snapshot_id"] == parent_id
+
+        # ── POST /api/snapshot/notion/fetch ───────────────────────────────────────────
+
+
+class TestApiNotionFetch:
+    async def test_notion_fetch_with_snapshot_names(self, client: Any, db_session: Any) -> None:
+        """Regression test to ensure detect_similar_names doesn't throw KeyError on 'name'."""
+        from datetime import datetime
+
+        from backend.db.models import NotionCache
+
+        # Add a notion cache entry first so it processes the loop
+        nc = NotionCache(
+            notion_id="notion-123",
+            name="Real Notion Profile",
+            is_new=True,
+            last_updated=datetime.now(),
+        )
+        db_session.add(nc)
+        await db_session.commit()
+
+        resp = await client.post(
+            "/api/snapshot/notion/fetch",
+            json={"snapshot_names": ["Real Notion"]},
+        )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "players" in data
+        assert "similar_names" in data
+        assert len(data["similar_names"]) == 1

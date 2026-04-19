@@ -2,22 +2,26 @@
   lang="ts"
   generics="T extends { nombre: string; notion_id?: string | null; notion_name?: string | null }"
 >
-  import type { AutocompletePlayer, SimilarName, MergePair } from "../../types";
+  import type { MergePair } from "../../types";
   import { createAutocompleteState } from "./playerAutocompleteState.svelte.ts";
   import { clickOutside } from "../../clickOutside";
-  import { checkPlayerSimilarity } from "../../api";
   import { normalizeName } from "../../utils";
   import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
   import { cx } from "../../utils/css.ts";
+  import type {
+    PlayerAutocompleteItem,
+    PlayerSimilarityItem,
+  } from "../../generated-api";
+  import { apiPlayerCheckSimilarity } from "../../generated-api";
 
   interface Props {
     value: string;
     onConfirm: (
-      input: string | AutocompletePlayer,
+      input: string | PlayerAutocompleteItem,
       silentDuplicate?: boolean,
     ) => void;
     placeholder?: string;
-    knownPlayers?: AutocompletePlayer[];
+    knownPlayers?: PlayerAutocompleteItem[];
     existingPlayers?: T[];
     currentPlayer?: T;
     onClickOutside?: () => void;
@@ -54,21 +58,35 @@
 
   type ResolutionState =
     | { status: "idle" }
-    | { status: "resolving"; input: string; pairs: SimilarName[] };
+    | {
+        status: "resolving";
+        input: string;
+        pairs: Array<PlayerSimilarityItem>;
+      };
 
   let resolutionState = $state<ResolutionState>({ status: "idle" });
 
-  // Check if dropdown is open
+  // Check if dropdown is open.
+  // We explicitly close it if the resolution modal is open to prevent
+  // the `active-dropdown` class from elevating the z-index above the modal.
   let isDropdownOpen = $derived(
     isActive &&
+      resolutionState.status !== "resolving" &&
       autocompleteState.searchQuery.trim().length > 0 &&
       autocompleteState.suggestions.length > 0,
   );
 
   function executeConfirm(
-    input: string | AutocompletePlayer,
+    input: string | PlayerAutocompleteItem,
     silentDuplicate: boolean = false,
   ) {
+    if (
+      typeof document !== "undefined" &&
+      document.activeElement instanceof HTMLElement
+    ) {
+      document.activeElement.blur();
+    }
+
     isActive = false; // Add this line
     onConfirm(input, silentDuplicate);
     if (clearOnConfirm) value = "";
@@ -94,14 +112,16 @@
     }
 
     try {
-      const result = await checkPlayerSimilarity([input]);
+      const result = await apiPlayerCheckSimilarity({
+        body: { names: [input] },
+      });
 
-      if (result.similarities && result.similarities.length > 0) {
+      if (result.data && result.data.similarities.length > 0) {
         // Set the unified resolving state (this replaces all three old variables)
         resolutionState = {
           status: "resolving",
           input,
-          pairs: enrichSimilaritiesWithDraft(result.similarities),
+          pairs: enrichSimilaritiesWithDraft(result.data.similarities),
         };
       } else {
         // No similarities found, proceed with original input
@@ -132,7 +152,7 @@
           notion_id: mergeTarget.notion_id,
           is_local: true,
           is_alias: false,
-        } as AutocompletePlayer,
+        },
         true,
       );
     }
@@ -148,7 +168,7 @@
       notion_name: mergeTarget.to,
       is_local: true,
       is_alias: false,
-    } as AutocompletePlayer);
+    });
   }
 
   function handleResolutionCancel() {
@@ -173,8 +193,8 @@
   }
 
   function enrichSimilaritiesWithDraft(
-    similarities: SimilarName[],
-  ): SimilarName[] {
+    similarities: Array<PlayerSimilarityItem>,
+  ): Array<PlayerSimilarityItem> {
     return similarities.map((sim) => {
       if (sim.notion_id) {
         const draftMatch = existingPlayers.find(
@@ -213,8 +233,19 @@
             executeConfirm(input),
           );
         } else if (currentVal) {
-          value = currentVal; // Force bind update
-          handleSimilarityCheck(currentVal);
+          value = currentVal;
+          const exactMatch = knownPlayers.find(
+            (s) =>
+              normalizeName(s.display) === normalizeName(currentVal) ||
+              normalizeName(s.nombre) === normalizeName(currentVal),
+          );
+
+          if (exactMatch) {
+            executeConfirm(exactMatch); // Links the Notion ID automatically!
+          } else {
+            // It's not a known player, run the typo similarity check
+            handleSimilarityCheck(currentVal);
+          }
         }
       } else {
         autocompleteState.handleKeydown(e, (input) => executeConfirm(input));

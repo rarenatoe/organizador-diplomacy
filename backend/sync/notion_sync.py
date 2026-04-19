@@ -21,9 +21,9 @@ import concurrent.futures
 import difflib
 import logging
 import os
-from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, TypedDict, cast
+from typing import TYPE_CHECKING, Any, NotRequired, TypedDict, cast
 
 from dotenv import load_dotenv
 from notion_client import Client
@@ -84,6 +84,12 @@ class NotionQueryResponse(TypedDict, total=False):
     results: list[NotionPage]
     has_more: bool
     next_cursor: str | None
+
+
+class PlayerNameData(TypedDict):
+    notion_id: str
+    name: str
+    alias: list[str]
 
 
 # ── TypedDict for Notion player data ───────────────────────────────────────────
@@ -239,11 +245,21 @@ def similarity(a: str, b: str) -> float:
     return score
 
 
+class PlayerSimilarityDict(TypedDict):
+    notion_id: str
+    notion_name: str
+    snapshot: str
+    similarity: float
+    match_method: str
+    matched_alias: NotRequired[str | None]
+    existing_local_name: NotRequired[str | None]
+
+
 def detect_similar_names(
-    notion_players: dict[str, NotionPlayerDict] | list[NotionPlayerDict],
+    notion_players: Mapping[str, PlayerNameData] | Sequence[PlayerNameData],
     snapshot_names: list[str],
     threshold: float = 0.75,
-) -> list[dict[str, Any]]:
+) -> list[PlayerSimilarityDict]:
     """
     Detect similar names between Notion (including aliases) and snapshot
     using a 4-step waterfall algorithm.
@@ -251,38 +267,31 @@ def detect_similar_names(
     """
     # Normalize notion_players input to list of dicts if it's a map
     players_list = (
-        list(notion_players.values()) if isinstance(notion_players, dict) else notion_players
+        list(notion_players.values()) if isinstance(notion_players, Mapping) else notion_players
     )
 
     # Pre-normalize all snapshot names for Step 1 & 2
     norm_snapshots = {name: normalize_name(name) for name in snapshot_names}
 
-    potential_matches: list[dict[str, Any]] = []
-
-    # Step 1 & 2: Exact & Alias Matches (Filter them out)
-    # We want to find names that DON'T match exactly but are similar
+    potential_matches: list[PlayerSimilarityDict] = []
 
     # Track exact matches to avoid comparing them for similarity
     exact_matches_snapshot: set[str] = set()
 
     for player_data in players_list:
-        notion_main_name = player_data["nombre"]
-        notion_id = player_data["notion_id"]
+        notion_main_name = player_data["name"]
         norm_notion_main = normalize_name(notion_main_name)
 
         for snap_name in snapshot_names:
             norm_snap = norm_snapshots[snap_name]
-
             # Step 1: Exact Match
             if norm_notion_main == norm_snap:
                 exact_matches_snapshot.add(snap_name)
                 continue
 
     # Step 3: Hybrid Fuzzy Matching
-    # Only compare snapshots that didn't have an exact match with ANY notion player
-    # and notion players that didn't have an exact match with THIS snapshot
     for player_data in players_list:
-        notion_main_name = player_data["nombre"]
+        notion_main_name = player_data["name"]
         notion_id = player_data["notion_id"]
         notion_variations = [notion_main_name] + player_data.get("alias", [])
 
@@ -290,25 +299,23 @@ def detect_similar_names(
             if snap_name in exact_matches_snapshot:
                 continue
 
-            # Check similarity against all variations, keep best
             best_sim = 0.0
             best_match_method = "fuzzy"
-            matched_alias = None
+            matched_alias: str | None = None
 
             for var in notion_variations:
-                # Compare normalized strings to guarantee case/accent insensitivity
                 sim = similarity(normalize_name(var), norm_snapshots[snap_name])
                 if sim > best_sim:
                     best_sim = sim
                     if var != notion_main_name:
-                        # This variation is an alias
                         matched_alias = var
                         best_match_method = "alias_exact" if sim == 1.0 else "alias_fuzzy"
                     else:
                         best_match_method = "name_fuzzy"
 
             if best_sim >= threshold:
-                match_data = {
+                # Type-safe builder
+                match_data: PlayerSimilarityDict = {
                     "notion_id": notion_id,
                     "notion_name": notion_main_name,
                     "snapshot": snap_name,
@@ -321,22 +328,7 @@ def detect_similar_names(
 
                 potential_matches.append(match_data)
 
-    # Step 4: Bi-Directional Ambiguity Detection (1-to-Many)
-    # If a name maps to multiple candidates, they are all conflicts.
-    # Group by notion and by snapshot to detect 1-to-Many in both directions.
-    notion_to_snaps: defaultdict[str, set[str]] = defaultdict(set)
-    snap_to_notions: defaultdict[str, set[str]] = defaultdict(set)
-
-    for m in potential_matches:
-        notion_to_snaps[m["notion_name"]].add(m["snapshot"])
-        snap_to_notions[m["snapshot"]].add(m["notion_name"])
-
-    # All potential matches found in Step 3 are technically conflicts
-    # since they are not exact matches but are above threshold.
-    # The ambiguity detection is already implicit if we return all matches.
-    # We just need to make sure they are unique and sorted.
-
-    unique_matches: list[dict[str, Any]] = []
+    unique_matches: list[PlayerSimilarityDict] = []
     seen: set[tuple[str, str]] = set()
     for m in potential_matches:
         key = (m["notion_name"], m["snapshot"])

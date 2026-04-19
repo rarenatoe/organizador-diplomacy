@@ -4,65 +4,37 @@ title: Pillar 4 - Testing & Validation
 priority: 40
 ---
 
-## 1. Testing Execution
+## 1. Execution & Strategy
 
-- **Frontend Tests:** ALWAYS use `bun run test` for Vitest suite. NEVER use `bun test` (incompatible with Vitest/Svelte 5).
-- **Type Checking:** ALWAYS run `bun run typecheck` after directory restructuring or prop changes. NEVER skip after structural changes.
-- **Backend Tests:** Use `uv run python -m pytest -q`. NEVER use alternative Python test runners.
+- **Runners:** Frontend: `bun run test` (Vitest). Backend: `uv run python -m pytest -q`.
+- **Backend Mocking:** Use `unittest.mock` for external dependencies (e.g., Notion API). Use `:memory:` SQLite. NEVER hit real external APIs.
+- **Frontend Querying:** Use semantic queries (`getByRole`, `getByPlaceholderText`). NEVER test implementation details or use fragile DOM traversal.
 
-## 2. Backend Testing Strategy
+## 2. Svelte & DOM Testing Rules
 
-- **Framework:** Use pytest with `test_*.py` files co-located with implementation. NEVER separate test files or use incompatible frameworks.
-- **Database:** Use in-memory SQLite (`:memory:`) exclusively. NEVER use persistent databases or external services.
-- **Mocking:** Use `unittest.mock` for external dependencies, ALWAYS mock Notion API calls. NEVER hit real external APIs.
-- **Test Structure:** Unit tests for pure functions, integration tests for database operations, end-to-end tests for API endpoints. NEVER mix types or miss integration coverage.
-
-## 3. Frontend Testing Strategy
-
-- **Framework:** Use Vitest with `@testing-library/svelte`. NEVER use incompatible frameworks.
-- **Component Structure:** Unit tests for pure UI, integration tests for stateful components, accessibility tests for interactive elements. NEVER focus only on visual testing.
-- **Query Selection:** Use `screen.getByRole('button', { name: /Text/i })` for buttons, `screen.getByLabelText()` or `screen.getByPlaceholderText()` for forms. NEVER use `getByText()` for emoji-separated buttons.
-- **State Testing:** Use integration-style testing for `.svelte.ts` files with `$state` runes. NEVER use `vi.mock()` on these files.
-- **Prop Testing:** Test visibility changes based on props (`editing`, `viewMode`, `hasPermission`). NEVER test only static states.
-- **Factory Pattern:** Use fixtures in `frontend/src/tests/fixtures/` (e.g., `createMockPlayer()`). NEVER create giant inline JSON objects.
-- **Helper Extraction:** Extract `render` calls and `waitFor` into shared helpers for complex components. NEVER duplicate render setup.
-
-## 4. Frontend Test Maintenance
-
+- **State Module Testing:** Logic extracted to `.svelte.ts` files MUST be tested in isolation as pure TypeScript. NEVER use DOM mounting for pure logic.
+- **Singleton Resetting:** ALWAYS wipe globally exported class/state instances in `beforeEach()` to prevent test pollution.
+- **Structural Regression Guards:** Explicitly test HTML hierarchy. If a layout relies on a `.section` wrapper for gaps, assert its existence (`expect(container.querySelector('.section')).toBeInTheDocument();`).
+- **DRY Renders & Fixtures:** Extensively mock data MUST live in `*.fixtures.ts`. EVERY test file MUST implement a centralized `renderComponent(overrides = {})` factory.
 - **Snippet Testing:** Use `createRawSnippet` from `svelte` for snippet components. NEVER test without proper Svelte 5 snippet creation.
-- **State Pre-population:** Use component props (`initialPlayers`) to pre-populate data. NEVER rely on fragile UI click-throughs.
-- **DOM Query Updates:** Update queries immediately when CSS classes change or components are extracted. NEVER allow outdated selectors.
-- **Validation:** Run `bun run typecheck` after CSS changes and verify visual regression after component extraction. NEVER skip validation steps.
 
-## 5. General Test Editing & Maintenance
+## 3. Auto-Generated SDK Testing Patterns (CRITICAL)
+
+- **The Barrel File Trap:** Vite module resolution bypasses `vi.mock` for auto-generated `index.ts` files.
+  - _Correct:_ `import * as api from "../../generated-api"; vi.spyOn(api, "apiPlayerGetAll").mockResolvedValue(...)`
+  - _Incorrect:_ `vi.mock("../../generated-api", () => ...)`
+- **Healthy Default Mocks:** Svelte `onMount` blocks will instantly crash if an API returns `undefined`. ALWAYS provide default `mockResolvedValue` spies in `beforeEach()`.
+- **Mocking `@hey-api` Responses:** USE the `mockApiSuccess<TData>(data)` and `mockApiError(error)` helpers from `tests/mockHelpers.ts` to satisfy the complex Hey-API signature without polluting tests.
+- **Flushing Svelte Reactivity:** Waiting for DOM updates after an API call requires flushing both the microtask queue and Svelte's tick:
+  ```typescript
+  const flushPromises = async () => {
+    await tick();
+    await new Promise((r) => setTimeout(r, 0));
+    await tick();
+  };
+  ```
+
+## 4. Maintenance
 
 - **AST Integrity:** Use Nuclear Block Replacements (entire `describe`/`it` blocks). NEVER use loose line-deletion commands that break AST structure.
-
-## 6. Test Quality Standards
-
-- **Query Priority:** Use semantic HTML queries first, test user behavior over implementation details, assert accessible names over visual appearance. NEVER test implementation details or use fragile DOM traversal.
-- **Mocking Strategy:** Mock external dependencies only, test real component interactions. NEVER over-mock that hides real bugs or mock internal logic.
-- **Coverage Requirements:** Achieve 100% coverage for critical paths, ALWAYS test error handling, test edge cases with null/undefined inputs. NEVER skip error states or critical paths.
-
-## 7. Frontend Structural Regression Guards
-
-- **Assert DOM Layout Wrappers:** Because unit tests cannot test visual CSS rendering, you MUST explicitly test the structural HTML hierarchy. If a layout relies on a `.section` wrapper for Flexbox gaps, write an assertion to ensure that wrapper exists (`expect(container.querySelector('.section')).toBeInTheDocument();`).
-- **Assert State Classes, Not Inline Styles:** Validate component states by asserting the presence of active CSS classes (e.g., `.active`, `.node-game`) rather than brittle inner HTML or inline style strings.
-- **DRY UI Components:** When multiple views share a highly specific layout (e.g., timeline nodes), the UI must be extracted into a single source-of-truth component (e.g., `BaseNode`) to ensure test parity and visual consistency across the app.
-
-## 8. State Module Testing (Svelte 5)
-
-- **Pure Logic Testing:** Any logic extracted into a `.svelte.ts` file (using `$state`, `$derived`) must be tested entirely in isolation as pure TypeScript. Do not mount DOM elements or use component testing libraries to test these modules.
-- **Singleton Resetting:** If testing a reactive singleton (e.g., a globally exported class instance), you MUST wipe its state in a `beforeEach()` block to prevent test pollution.
-- **Test Real State, Not Simulations:** Component integration tests should not simulate logic via dummy variables (e.g., `let draftKey = 0; draftKey++;`). Instead, test how the component reacts to the actual imported state manager.
-- **Verify Component Isolation:** When testing flows that require total UI resets (like opening a "New List" vs editing an existing one), verify that the state generator applies unique Svelte `{#key}` bindings to force true component destruction and recreation.
-
-## 9. Test Maintenance & Resilience
-
-- **Kill Zombie Tests:** If you fix the architectural root cause of a bug (e.g., introducing `notion_id`), aggressively HUNT DOWN and DELETE tests written specifically to verify the old, hacky workarounds (e.g., `GROUP BY max()` deduplication queries).
-- **Scope DOM Selectors:** When testing UI interactions, ALWAYS scope DOM selectors to their specific domain context (e.g., `document.querySelectorAll('.country-cell .tooltip-trigger')`) to prevent test breakage as the design system expands.
-
-## 10. Test Suite Optimization
-
-- **The Fixture Rule:** Test files MUST remain hyper-focused on assertions. Any mock data array, object, or `defaultProps` setup exceeding 10 lines MUST be extracted to a sibling `*.fixtures.ts` file.
-- **The Render Wrapper Standard:** NEVER repeat `render(Component, { props: {...} })` across multiple test cases. Every test file MUST implement a centralized `renderComponent(overrides = {})` factory function to keep component mounting DRY and reduce visual noise.
+- **Kill Zombie Tests:** If you fix an architectural root cause (e.g., adding `notion_id`), aggressively DELETE old tests written to verify the legacy workarounds.

@@ -2,17 +2,17 @@
   lang="ts"
   generics="T extends { nombre: string; notion_id?: string | null; notion_name?: string | null }"
 >
-  import type { AutocompletePlayer, EditPlayerRow } from "../../types";
   import { normalizeName } from "../../utils";
   import Tooltip from "./Tooltip.svelte";
   import PlayerAutocompleteInput from "../features/PlayerAutocompleteInput.svelte";
+  import type { PlayerAutocompleteItem } from "../../generated-api";
 
   interface Props {
     player: T;
     editable?: boolean;
     showNotionIndicator?: boolean;
     compact?: boolean;
-    knownPlayers?: AutocompletePlayer[];
+    knownPlayers?: PlayerAutocompleteItem[];
     existingPlayers?: T[];
   }
 

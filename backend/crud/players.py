@@ -6,7 +6,7 @@ extracted from the monolithic crud.py file for better organization.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
 
 from sqlalchemy import delete, func, select, update
 
@@ -168,69 +168,86 @@ async def rename_player(session: AsyncSession, old_name: str, new_name: str) -> 
         return True
 
 
+SourceType = Literal["history", "notion", "default"]
+
+
+class PlayerHistoryDict(TypedDict):
+    source: SourceType
+    is_new: bool
+    juegos_este_ano: int
+    has_priority: bool
+    partidas_deseadas: int
+    partidas_gm: int
+    notion_id: NotRequired[str]
+    notion_name: NotRequired[str]
+
+
 async def lookup_player_history(
     session: AsyncSession,
     name: str,
     notion_id: str | None = None,
     snapshot_id: int | None = None,
-) -> dict[str, Any]:
+) -> PlayerHistoryDict:
     """
     Walk backward through timeline to find player's historical stats.
-
-    Args:
-        session: Database session
-        name: Player name to lookup
-        notion_id: Optional notion_id to prioritize lookup
-        snapshot_id: Starting snapshot ID (uses latest if None)
-
-    Returns:
-        Dictionary mapping player name to their stats and source flag
     """
-    # Get starting snapshot ID if not provided
     if snapshot_id is None:
         from backend.crud.snapshots import get_latest_snapshot_id
 
         snapshot_id = await get_latest_snapshot_id(session)
 
-    # Walk backward through timeline
     current_snapshot_id = snapshot_id
     found_in_history = False
-    player = None  # Initialize player variable
 
-    # Normalize name for database lookups to prevent trailing whitespace/casing misses
     norm_name = normalize_player_name(name)
 
-    # Check if player exists and grab notion info (outside loop)
     player_result = await session.execute(select(Player).where(Player.name == norm_name))
     player = player_result.scalar_one_or_none()
-    notion_info = {}
 
-    # Prioritize provided notion_id (Crucial for "Vincular Solo" CSV imports)
+    nc = None
     if notion_id:
         nc_res = await session.execute(
             select(NotionCache).where(NotionCache.notion_id == notion_id)
         )
         nc = nc_res.scalar_one_or_none()
-        if nc:
-            notion_info = {"notion_id": nc.notion_id, "notion_name": nc.name}
     elif player and player.notion_id:
         nc_res = await session.execute(
             select(NotionCache).where(NotionCache.notion_id == player.notion_id)
         )
         nc = nc_res.scalar_one_or_none()
-        if nc:
-            notion_info = {"notion_id": player.notion_id, "notion_name": nc.name}
     else:
         nc_res = await session.execute(
             select(NotionCache).where(func.lower(NotionCache.name) == name.lower())
         )
         nc = nc_res.scalar_one_or_none()
+
+    def build_response(
+        source: SourceType,
+        played: int,
+        desired: int,
+        gm: int,
+        *,
+        has_priority: bool,
+        is_new: bool,
+    ) -> PlayerHistoryDict:
+        # Explicitly declare the type so Pyright knows exactly what this is
+        res: PlayerHistoryDict = {
+            "source": source,
+            "has_priority": has_priority,
+            "is_new": is_new,
+            "juegos_este_ano": played,
+            "partidas_deseadas": desired,
+            "partidas_gm": gm,
+        }
+        # Safely add Notion fields if we found them
         if nc:
-            notion_info = {"notion_id": nc.notion_id, "notion_name": nc.name}
+            res["notion_id"] = nc.notion_id
+            res["notion_name"] = nc.name
+
+        return res
 
     while current_snapshot_id is not None and not found_in_history:
         if player:
-            # Check if player is linked to this snapshot
             snapshot_player_result = await session.execute(
                 select(SnapshotPlayer).where(
                     SnapshotPlayer.snapshot_id == current_snapshot_id,
@@ -240,25 +257,22 @@ async def lookup_player_history(
             snapshot_player = snapshot_player_result.scalar_one_or_none()
 
             if snapshot_player:
-                # Found player in history
-                return {
-                    "has_priority": snapshot_player.has_priority,
-                    "is_new": snapshot_player.is_new,
-                    "juegos_este_ano": snapshot_player.games_this_year,
-                    "partidas_deseadas": snapshot_player.desired_games,
-                    "partidas_gm": snapshot_player.gm_games,
-                    "source": "history",
-                    **notion_info,
-                }
+                return build_response(
+                    source="history",
+                    played=snapshot_player.games_this_year,
+                    desired=snapshot_player.desired_games,
+                    gm=snapshot_player.gm_games,
+                    has_priority=snapshot_player.has_priority,
+                    is_new=snapshot_player.is_new,
+                )
 
-        # Move to previous snapshot via timeline edge
         edge_result = await session.execute(
             select(TimelineEdge).where(TimelineEdge.output_snapshot_id == current_snapshot_id)
         )
         edge = edge_result.scalar_one_or_none()
         current_snapshot_id = edge.source_snapshot_id if edge else None
 
-    # Fallback 1: Global Search against SnapshotPlayer table
+    # Fallback 1: Global Search
     if not found_in_history and player:
         global_search_result = await session.execute(
             select(SnapshotPlayer)
@@ -269,18 +283,16 @@ async def lookup_player_history(
         global_snapshot_player = global_search_result.scalar_one_or_none()
 
         if global_snapshot_player:
-            # Found in global search
-            return {
-                "has_priority": global_snapshot_player.has_priority,
-                "is_new": global_snapshot_player.is_new,
-                "juegos_este_ano": global_snapshot_player.games_this_year,
-                "partidas_deseadas": global_snapshot_player.desired_games,
-                "partidas_gm": global_snapshot_player.gm_games,
-                "source": "history",
-                **notion_info,
-            }
+            return build_response(
+                source="history",
+                played=global_snapshot_player.games_this_year,
+                desired=global_snapshot_player.desired_games,
+                gm=global_snapshot_player.gm_games,
+                has_priority=global_snapshot_player.has_priority,
+                is_new=global_snapshot_player.is_new,
+            )
 
-    # Fallback 2: JSON Logs Search in SnapshotHistory
+    # Fallback 2: JSON Logs Search
     history_logs_result = await session.execute(
         select(SnapshotHistory).order_by(SnapshotHistory.id.desc()).limit(50)
     )
@@ -291,38 +303,32 @@ async def lookup_player_history(
             players_in_log = history_log.previous_state["players"]
             for logged_player in players_in_log:
                 if logged_player.get("nombre") == name:
-                    # Found in JSON logs - TypedDict provides type safety
-                    return {
-                        "has_priority": logged_player.get("has_priority", False),
-                        "is_new": logged_player.get("is_new", True),
-                        "juegos_este_ano": logged_player.get("juegos_este_ano", 0),
-                        "partidas_deseadas": logged_player.get("partidas_deseadas", 1),
-                        "partidas_gm": logged_player.get("partidas_gm", 0),
-                        "source": "history",
-                        **notion_info,
-                    }
+                    return build_response(
+                        source="history",
+                        played=logged_player.get("juegos_este_ano", 0),
+                        desired=logged_player.get("partidas_deseadas", 1),
+                        gm=logged_player.get("partidas_gm", 0),
+                        has_priority=logged_player.get("has_priority", False),
+                        is_new=logged_player.get("is_new", True),
+                    )
 
-    # Fallback 3: Check Notion cache as fallback
-    # We already fetched the NotionCache record ('nc') at the top of the function!
+    # Fallback 3: Check Notion cache
     if nc:
-        # Found in Notion cache, force priority to 0
-        return {
-            "has_priority": False,
-            "is_new": nc.is_new,
-            "juegos_este_ano": nc.games_this_year,
-            "partidas_deseadas": 1,
-            "partidas_gm": 0,
-            "source": "notion",
-            **notion_info,
-        }
-    else:
-        # Not found anywhere, return defaults
-        return {
-            "has_priority": False,
-            "is_new": True,
-            "juegos_este_ano": 0,
-            "partidas_deseadas": 1,
-            "partidas_gm": 0,
-            "source": "default",
-            **notion_info,
-        }
+        return build_response(
+            source="notion",
+            played=nc.games_this_year,
+            desired=1,
+            gm=0,
+            has_priority=False,
+            is_new=nc.is_new,
+        )
+
+    # Default Backup
+    return build_response(
+        source="default",
+        played=0,
+        desired=1,
+        gm=0,
+        has_priority=False,
+        is_new=True,
+    )

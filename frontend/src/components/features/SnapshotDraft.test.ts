@@ -1,27 +1,26 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import SnapshotDraft from "./SnapshotDraft.svelte";
 import { defaultProps, mockInitialPlayers } from "./SnapshotDraft.fixtures";
+import * as api from "../../generated-api";
+import { mockApiSuccess } from "../../tests/mockHelpers";
+import { tick } from "svelte";
+
+const mockGeneratedApi = vi.hoisted(() => ({
+  apiPlayerCheckSimilarity: vi.fn(),
+  apiPlayerGetAll: vi.fn(),
+  apiPlayerLookup: vi.fn(),
+}));
+
+vi.mock("../../generated-api", () => mockGeneratedApi);
 
 // Mock the API module
 vi.mock("../../api", () => ({
-  createSnapshot: vi.fn().mockResolvedValue({
-    snapshot_id: 123,
-  }),
-  saveSnapshot: vi.fn().mockResolvedValue({
-    snapshot_id: 123,
-  }),
+  createSnapshot: vi.fn().mockResolvedValue({ snapshot_id: 123 }),
+  saveSnapshot: vi.fn().mockResolvedValue({ snapshot_id: 123 }),
   fetchNotionPlayers: vi
     .fn()
     .mockResolvedValue({ players: [], similar_names: [] }),
-  getAllPlayers: vi.fn().mockResolvedValue({
-    players: [
-      { display: "Daniel Eiler", nombre: "Daniel Eiler" },
-      { display: "Daniel Escobar", nombre: "Daniel Escobar" },
-    ],
-  }),
-  checkPlayerSimilarity: vi.fn().mockResolvedValue({ similarities: [] }),
-  lookupPlayerHistory: vi.fn().mockResolvedValue({ players: {} }),
 }));
 
 // Mock the utils module
@@ -59,8 +58,53 @@ function renderDraft(overrides = {}) {
 }
 
 describe("SnapshotDraft", () => {
+  const flushPromises = async () => {
+    await tick();
+    await new Promise((r) => setTimeout(r, 0));
+    await tick();
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Provide healthy defaults so the component's onMount doesn't crash!
+    vi.spyOn(api, "apiPlayerGetAll").mockResolvedValue(
+      mockApiSuccess<api.ApiPlayerGetAllResponse>({
+        players: [
+          {
+            display: "Daniel Eiler",
+            nombre: "Daniel Eiler",
+            is_local: true,
+            is_alias: false,
+          },
+          {
+            display: "Daniel Escobar",
+            nombre: "Daniel Escobar",
+            is_local: true,
+            is_alias: false,
+          },
+        ],
+      }),
+    );
+
+    vi.spyOn(api, "apiPlayerLookup").mockResolvedValue(
+      mockApiSuccess<api.ApiPlayerLookupResponse>({
+        player: {
+          source: "default",
+          is_new: true,
+          juegos_este_ano: 0,
+          has_priority: false,
+          partidas_deseadas: 1,
+          partidas_gm: 0,
+        },
+      }),
+    );
+
+    vi.spyOn(api, "apiPlayerCheckSimilarity").mockResolvedValue(
+      mockApiSuccess<api.ApiPlayerCheckSimilarityResponse>({
+        similarities: [],
+      }),
+    );
   });
 
   it("renders with empty state", () => {
@@ -103,7 +147,6 @@ describe("SnapshotDraft", () => {
   });
 
   it("renders autocomplete input inside table header when add button is clicked", async () => {
-    const { tick } = await import("svelte");
     renderDraft({ initialPlayers: mockInitialPlayers });
     await fireEvent.click(screen.getByText("➕ Agregar jugador"));
     await tick();
@@ -122,7 +165,6 @@ describe("SnapshotDraft", () => {
   });
 
   it("autofocuses the new player input when adding a player", async () => {
-    const { tick } = await import("svelte");
     renderDraft({ initialPlayers: mockInitialPlayers });
     await fireEvent.click(screen.getByText("➕ Agregar jugador"));
     await tick();
@@ -162,8 +204,8 @@ describe("SnapshotDraft", () => {
   });
 
   it("filters known players in dropdown", async () => {
-    const { tick } = await import("svelte");
     const { container } = renderDraft({ initialPlayers: mockInitialPlayers });
+    await flushPromises();
     await fireEvent.click(screen.getByText("➕ Agregar jugador"));
     await tick();
     const input = screen.getByPlaceholderText(
@@ -182,9 +224,8 @@ describe("SnapshotDraft", () => {
   });
 
   it("applies active-dropdown class to elevate z-index when suggestions are open (regression guard)", async () => {
-    const { tick } = await import("svelte");
     const { container } = renderDraft({ initialPlayers: mockInitialPlayers });
-
+    await flushPromises();
     await fireEvent.click(screen.getByText("➕ Agregar jugador"));
     await tick();
 
@@ -215,12 +256,9 @@ describe("SnapshotDraft", () => {
   });
 
   it("rehydrates player history when suggested name is clicked", async () => {
-    const { tick } = await import("svelte");
-    const { lookupPlayerHistory } = await import("../../api");
-    (lookupPlayerHistory as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      players: {
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        "Daniel Eiler": {
+    vi.spyOn(api, "apiPlayerLookup").mockResolvedValueOnce(
+      mockApiSuccess<api.ApiPlayerLookupResponse>({
+        player: {
           is_new: false,
           juegos_este_ano: 5,
           has_priority: true,
@@ -228,9 +266,10 @@ describe("SnapshotDraft", () => {
           partidas_gm: 0,
           source: "history",
         },
-      },
-    });
+      }),
+    );
     renderDraft({ initialPlayers: mockInitialPlayers });
+    await flushPromises();
     await fireEvent.click(screen.getByText("➕ Agregar jugador"));
     await tick();
     const input = screen.getByPlaceholderText(
@@ -274,21 +313,20 @@ describe("SnapshotDraft", () => {
   });
 
   it("pauses CSV import and shows sync modal when similarities are found", async () => {
-    // 1. Ensure checkPlayerSimilarity is imported along with tick
-    const { tick } = await import("svelte");
-    const { checkPlayerSimilarity } = await import("../../api");
-
     // 2. Fix the mock to use notion_id, notion_name, and the similarities wrapper
-    (checkPlayerSimilarity as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      similarities: [
-        {
-          notion_id: "1",
-          notion_name: "Daniel Eiler",
-          snapshot: "Daniel Ei",
-          similarity: 0.95,
-        },
-      ],
-    });
+    vi.spyOn(api, "apiPlayerCheckSimilarity").mockResolvedValueOnce(
+      mockApiSuccess<api.ApiPlayerCheckSimilarityResponse>({
+        similarities: [
+          {
+            notion_id: "1",
+            notion_name: "Daniel Eiler",
+            snapshot: "Daniel Ei",
+            similarity: 0.95,
+            match_method: "name_fuzzy",
+          },
+        ],
+      }),
+    );
 
     const { container } = renderDraft();
 
@@ -335,8 +373,6 @@ describe("SnapshotDraft", () => {
   });
 
   it("imports CSV when import button is clicked", async () => {
-    const { tick } = await import("svelte"); // <--- Import tick
-
     const { container } = render(SnapshotDraft, {
       props: {
         parentId: null,
@@ -493,7 +529,6 @@ describe("SnapshotDraft", () => {
   });
 
   it("calls onShowError when importing CSV yields no valid players", async () => {
-    const { tick } = await import("svelte");
     const { parsePlayersCsv } = await import("../../utils");
     (parsePlayersCsv as ReturnType<typeof vi.fn>).mockReturnValueOnce([]);
 
@@ -530,8 +565,7 @@ describe("SnapshotDraft", () => {
   });
 
   it("CSV explicit fields take precedence over history defaults", async () => {
-    const { tick } = await import("svelte");
-    const api = await import("../../api");
+    const legacyApi = await import("../../api");
     const { parsePlayersCsv } = await import("../../utils");
 
     // Override the global CSV mock specifically for this test
@@ -547,17 +581,18 @@ describe("SnapshotDraft", () => {
     ]);
 
     // Mock the history API to return defaults to prove they get overridden
-    vi.mocked(api.lookupPlayerHistory).mockResolvedValueOnce({
-      player: {
-        nombre: "Andy",
-        is_new: true,
-        juegos_este_ano: 0,
-        has_priority: false,
-        partidas_deseadas: 1,
-        partidas_gm: 0,
-        source: "default",
-      },
-    });
+    vi.spyOn(api, "apiPlayerLookup").mockResolvedValueOnce(
+      mockApiSuccess<api.ApiPlayerLookupResponse>({
+        player: {
+          is_new: true,
+          juegos_este_ano: 0,
+          has_priority: false,
+          partidas_deseadas: 1,
+          partidas_gm: 0,
+          source: "default",
+        },
+      }),
+    );
 
     renderDraft();
 
@@ -579,7 +614,7 @@ describe("SnapshotDraft", () => {
       screen.getByRole("button", { name: /Crear Versión/i }),
     );
 
-    expect(api.saveSnapshot).toHaveBeenCalledWith(
+    expect(legacyApi.saveSnapshot).toHaveBeenCalledWith(
       expect.objectContaining({
         players: expect.arrayContaining([
           expect.objectContaining({
@@ -755,7 +790,6 @@ describe("SnapshotDraft", () => {
 
   describe("Inline Add & Deduplication", () => {
     it("should block duplicate when player already exists", async () => {
-      const { tick } = await import("svelte");
       const onShowErrorMock = vi.fn();
       renderDraft({
         initialPlayers: mockInitialPlayers, // Contains "Test Player"
@@ -779,23 +813,23 @@ describe("SnapshotDraft", () => {
     });
 
     it("should resolve duplicate silently when force flag is true via modal", async () => {
-      const { tick } = await import("svelte");
-      const api = await import("../../api");
       const onShowErrorMock = vi.fn();
 
       // Trigger modal by mocking a similarity match on an inline add
-      vi.mocked(api.checkPlayerSimilarity).mockResolvedValueOnce({
-        similarities: [
-          {
-            notion_id: "123",
-            notion_name: "Test Player",
-            snapshot: "Test Playe",
-            similarity: 0.95,
-            match_method: "fuzzy",
-            existing_local_name: "Test Player",
-          },
-        ],
-      });
+      vi.spyOn(api, "apiPlayerCheckSimilarity").mockResolvedValueOnce(
+        mockApiSuccess<api.ApiPlayerCheckSimilarityResponse>({
+          similarities: [
+            {
+              notion_id: "123",
+              notion_name: "Test Player",
+              snapshot: "Test Playe",
+              similarity: 0.95,
+              match_method: "fuzzy",
+              existing_local_name: "Test Player",
+            },
+          ],
+        }),
+      );
 
       renderDraft({
         initialPlayers: mockInitialPlayers, // Contains "Test Player"
@@ -825,28 +859,27 @@ describe("SnapshotDraft", () => {
     });
 
     it("should hide aliases from dropdown if the main notion_id is already in the draft", async () => {
-      const { tick } = await import("svelte");
-      const api = await import("../../api");
-
       // Mock known players with a main profile and an alias sharing the same notion_id
-      vi.mocked(api.getAllPlayers).mockResolvedValue({
-        players: [
-          {
-            display: "Main Identity",
-            nombre: "Main Identity",
-            notion_id: "shared-id-123",
-            is_local: false,
-            is_alias: false,
-          },
-          {
-            display: "Alias Name",
-            nombre: "Alias Name",
-            notion_id: "shared-id-123",
-            is_local: false,
-            is_alias: true,
-          },
-        ],
-      });
+      vi.spyOn(api, "apiPlayerGetAll").mockResolvedValueOnce(
+        mockApiSuccess<api.ApiPlayerGetAllResponse>({
+          players: [
+            {
+              display: "Main Identity",
+              nombre: "Main Identity",
+              notion_id: "shared-id-123",
+              is_local: false,
+              is_alias: false,
+            },
+            {
+              display: "Alias Name",
+              nombre: "Alias Name",
+              notion_id: "shared-id-123",
+              is_local: false,
+              is_alias: true,
+            },
+          ],
+        }),
+      );
 
       // Render with the Main Identity already in the draft
       const propsWithLinkedPlayer = {
@@ -884,9 +917,6 @@ describe("SnapshotDraft", () => {
 
   describe("SyncResolutionModal integration", () => {
     it("should show autocorrect suggestions for similar names via CSV", async () => {
-      const { tick } = await import("svelte");
-      const api = await import("../../api");
-
       renderDraft({ initialPlayers: mockInitialPlayers });
 
       const mockSimilarNames = [
@@ -899,9 +929,11 @@ describe("SnapshotDraft", () => {
           existing_local_name: "John Doe",
         },
       ];
-      vi.mocked(api.checkPlayerSimilarity).mockResolvedValue({
-        similarities: mockSimilarNames,
-      });
+      vi.spyOn(api, "apiPlayerCheckSimilarity").mockResolvedValue(
+        mockApiSuccess<api.ApiPlayerCheckSimilarityResponse>({
+          similarities: mockSimilarNames,
+        }),
+      );
 
       await fireEvent.click(screen.getByText("📥 Pegar CSV"));
       await tick();
@@ -921,9 +953,6 @@ describe("SnapshotDraft", () => {
     });
 
     it("should show autocorrect to draft player on inline add similarity", async () => {
-      const { tick } = await import("svelte");
-      const api = await import("../../api");
-
       const propsWithPlayer = {
         ...defaultProps,
         initialPlayers: [
@@ -940,17 +969,19 @@ describe("SnapshotDraft", () => {
         ],
       };
 
-      vi.mocked(api.checkPlayerSimilarity).mockResolvedValueOnce({
-        similarities: [
-          {
-            notion_id: "notion-123",
-            notion_name: "DaniVonKlaus",
-            snapshot: "Dan",
-            similarity: 0.9,
-            match_method: "fuzzy",
-          },
-        ],
-      });
+      vi.spyOn(api, "apiPlayerCheckSimilarity").mockResolvedValueOnce(
+        mockApiSuccess<api.ApiPlayerCheckSimilarityResponse>({
+          similarities: [
+            {
+              notion_id: "notion-123",
+              notion_name: "DaniVonKlaus",
+              snapshot: "Dan",
+              similarity: 0.9,
+              match_method: "fuzzy",
+            },
+          ],
+        }),
+      );
 
       render(SnapshotDraft, { props: propsWithPlayer });
 
@@ -989,23 +1020,22 @@ describe("SnapshotDraft", () => {
     });
 
     it("should handle similarity resolution modal correctly when adding inline", async () => {
-      const { tick } = await import("svelte");
-      const api = await import("../../api");
-
-      vi.mocked(api.checkPlayerSimilarity).mockResolvedValueOnce({
-        similarities: [
-          {
-            notion_id: "notion-cheder",
-            notion_name: "Cheder",
-            snapshot: "Chede",
-            similarity: 0.95,
-            match_method: "fuzzy",
-          },
-        ],
-      });
+      vi.spyOn(api, "apiPlayerCheckSimilarity").mockResolvedValueOnce(
+        mockApiSuccess<api.ApiPlayerCheckSimilarityResponse>({
+          similarities: [
+            {
+              notion_id: "notion-cheder",
+              notion_name: "Cheder",
+              snapshot: "Chede",
+              similarity: 0.95,
+              match_method: "fuzzy",
+            },
+          ],
+        }),
+      );
 
       renderDraft();
-
+      await flushPromises();
       await fireEvent.click(screen.getByText(/Agregar jugador/i));
       await tick();
       const input = screen.getByPlaceholderText(
@@ -1033,23 +1063,22 @@ describe("SnapshotDraft", () => {
     });
 
     it("should handle similarity resolution modal 'Añadir sin vincular' correctly when adding inline", async () => {
-      const { tick } = await import("svelte");
-      const api = await import("../../api");
-
-      vi.mocked(api.checkPlayerSimilarity).mockResolvedValueOnce({
-        similarities: [
-          {
-            notion_id: "notion-cheder",
-            notion_name: "Cheder",
-            snapshot: "Chede",
-            similarity: 0.95,
-            match_method: "fuzzy",
-          },
-        ],
-      });
+      vi.spyOn(api, "apiPlayerCheckSimilarity").mockResolvedValueOnce(
+        mockApiSuccess<api.ApiPlayerCheckSimilarityResponse>({
+          similarities: [
+            {
+              notion_id: "notion-cheder",
+              notion_name: "Cheder",
+              snapshot: "Chede",
+              similarity: 0.95,
+              match_method: "fuzzy",
+            },
+          ],
+        }),
+      );
 
       renderDraft();
-
+      await flushPromises();
       await fireEvent.click(screen.getByText(/Agregar jugador/i));
       await tick();
       const input = screen.getByPlaceholderText(
@@ -1077,7 +1106,6 @@ describe("SnapshotDraft", () => {
     });
 
     it("does not render the autocomplete dropdown if there are no suggested players", async () => {
-      const { tick } = await import("svelte");
       const { container } = renderDraft({ initialPlayers: mockInitialPlayers });
 
       await fireEvent.click(screen.getByText("➕ Agregar jugador"));
@@ -1094,8 +1122,7 @@ describe("SnapshotDraft", () => {
     });
 
     it("applies notion_id and shows ? icon when resolving via 'Vincular Solo'", async () => {
-      const { tick } = await import("svelte");
-      const api = await import("../../api");
+      const legacyApi = await import("../../api");
 
       // Setup initial player
       renderDraft({
@@ -1112,7 +1139,7 @@ describe("SnapshotDraft", () => {
       });
 
       // Mock Notion sync response with conflict
-      vi.mocked(api.fetchNotionPlayers).mockResolvedValueOnce({
+      vi.mocked(legacyApi.fetchNotionPlayers).mockResolvedValueOnce({
         players: [
           {
             notion_id: "notion-123",
@@ -1165,8 +1192,7 @@ describe("SnapshotDraft", () => {
     });
 
     it("CSV import with 'Vincular Solo' preserves notion_id in DOM and save payload", async () => {
-      const { tick } = await import("svelte");
-      const api = await import("../../api");
+      const legacyApi = await import("../../api");
       const { parsePlayersCsv } = await import("../../utils");
 
       // Override the global CSV mock specifically for this test
@@ -1182,30 +1208,33 @@ describe("SnapshotDraft", () => {
       ]);
 
       // 1. Setup the mocks specifically for this flow
-      vi.mocked(api.checkPlayerSimilarity).mockResolvedValueOnce({
-        similarities: [
-          {
+      vi.spyOn(api, "apiPlayerCheckSimilarity").mockResolvedValueOnce(
+        mockApiSuccess<api.ApiPlayerCheckSimilarityResponse>({
+          similarities: [
+            {
+              notion_id: "notion-999",
+              notion_name: "Real Notion Name",
+              snapshot: "Local Typo",
+              similarity: 0.85,
+              match_method: "fuzzy",
+            },
+          ],
+        }),
+      );
+      vi.spyOn(api, "apiPlayerLookup").mockResolvedValueOnce(
+        mockApiSuccess<api.ApiPlayerLookupResponse>({
+          player: {
+            is_new: false,
+            juegos_este_ano: 5,
+            has_priority: false,
+            partidas_deseadas: 1,
+            partidas_gm: 0,
+            source: "notion",
             notion_id: "notion-999",
             notion_name: "Real Notion Name",
-            snapshot: "Local Typo",
-            similarity: 0.85,
-            match_method: "fuzzy",
           },
-        ],
-      });
-      vi.mocked(api.lookupPlayerHistory).mockResolvedValue({
-        player: {
-          nombre: "Local Typo",
-          is_new: false,
-          juegos_este_ano: 5,
-          has_priority: false,
-          partidas_deseadas: 1,
-          partidas_gm: 0,
-          source: "notion",
-          notion_id: "notion-999",
-          notion_name: "Real Notion Name",
-        },
-      });
+        }),
+      );
 
       renderDraft();
 
@@ -1244,7 +1273,7 @@ describe("SnapshotDraft", () => {
       );
 
       // 7. Assert Save Payload EXACTLY matches what we expect
-      expect(api.saveSnapshot).toHaveBeenCalledWith(
+      expect(legacyApi.saveSnapshot).toHaveBeenCalledWith(
         expect.objectContaining({
           event_type: "manual",
           players: expect.arrayContaining([
@@ -1263,22 +1292,22 @@ describe("SnapshotDraft", () => {
 
   describe("confirmAddPlayer Edge Cases", () => {
     it("should handle string vs AutocompletePlayer object correctly", async () => {
-      const { tick } = await import("svelte");
       const onShowError = vi.fn();
-      const api = await import("../../api");
 
       // Mock getAllPlayers to return notion player
-      vi.mocked(api.getAllPlayers).mockResolvedValue({
-        players: [
-          {
-            display: "Notion Player",
-            nombre: "Notion Player",
-            notion_id: "notion-123",
-            is_local: false,
-            is_alias: false,
-          },
-        ],
-      });
+      vi.spyOn(api, "apiPlayerGetAll").mockResolvedValueOnce(
+        mockApiSuccess<api.ApiPlayerGetAllResponse>({
+          players: [
+            {
+              display: "Notion Player",
+              nombre: "Notion Player",
+              notion_id: "notion-123",
+              is_local: false,
+              is_alias: false,
+            },
+          ],
+        }),
+      );
 
       renderDraft({ onShowError });
 
@@ -1326,7 +1355,6 @@ describe("SnapshotDraft", () => {
     });
 
     it("should block duplicate players and call onShowError", async () => {
-      const { tick } = await import("svelte");
       const onShowError = vi.fn();
       const propsWithPlayer = {
         ...defaultProps,
@@ -1369,7 +1397,6 @@ describe("SnapshotDraft", () => {
     });
 
     it("should silently suppress duplicates when force flag is true", async () => {
-      const { tick } = await import("svelte");
       const onShowError = vi.fn();
       const propsWithPlayer = {
         ...defaultProps,

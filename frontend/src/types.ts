@@ -1,14 +1,4 @@
 // ── Domain types ──────────────────────────────────────────────────────────────
-
-export interface AutocompletePlayer {
-  display: string;
-  nombre: string;
-  notion_id?: string;
-  notion_name?: string;
-  is_local: boolean;
-  is_alias: boolean;
-}
-
 export interface CountryAssignment {
   name: string;
   reason?: string;
@@ -207,13 +197,6 @@ export interface OrganizarValidation {
   excludedPlayers: string[];
 }
 
-export interface SyncDetectResult {
-  notion_count: number;
-  snapshot_count: number;
-  similar_names: SimilarName[];
-  error?: string;
-}
-
 export interface MergePair {
   from: string;
   to: string;
@@ -240,18 +223,6 @@ export type ResolutionAction =
   | "link_rename"
   | "use_existing"
   | "skip";
-
-export interface ResolutionDecision {
-  pair: SimilarName;
-  action: ResolutionAction;
-}
-
-export interface ResolutionState {
-  pairs: SimilarName[];
-  currentIndex: number;
-  decisions: ResolutionDecision[];
-  snapshotId: number | null;
-}
 
 // ── Snapshot Group types (UI transformation) ─────────────────────────────────
 

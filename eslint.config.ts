@@ -5,6 +5,9 @@ import svelte from "eslint-plugin-svelte";
 import vitest from "@vitest/eslint-plugin";
 
 export default defineConfig([
+  {
+    ignores: ["frontend/src/generated-api/**"],
+  },
   // TypeScript files configuration
   ...tseslint.configs.strictTypeChecked.map((config) => ({
     ...config,

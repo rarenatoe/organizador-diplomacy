@@ -11,7 +11,6 @@ import {
   fetchGameDraft,
   saveGameDraft,
   deleteGame,
-  renamePlayer,
 } from "./api";
 
 describe("api.ts - FastAPI Error Handling", () => {
@@ -187,17 +186,6 @@ describe("api.ts - FastAPI Error Handling", () => {
       });
       expect(result).toEqual({ error: "Error de servidor" });
     });
-
-    it("handles malformed error response", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        json: () => Promise.resolve(null),
-      } as Response);
-
-      const result = await renamePlayer("Old", "New");
-      expect(result).toEqual({ error: "Error de servidor" });
-    });
   });
 
   describe("all API functions use safeFetch", () => {
@@ -296,18 +284,6 @@ describe("api.ts - FastAPI Error Handling", () => {
       });
       expect(result).toEqual({ error: "Failed to save game" });
     });
-
-    it("renamePlayer returns error object on failure", async () => {
-      const errorResponse = { detail: "Player not found" };
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404,
-        json: () => Promise.resolve(errorResponse),
-      } as Response);
-
-      const result = await renamePlayer("Old", "New");
-      expect(result).toEqual({ error: "Player not found" });
-    });
   });
 
   describe("Flask vs FastAPI error format compatibility", () => {
@@ -380,18 +356,6 @@ describe("api.ts - FastAPI Error Handling", () => {
       } as Response);
 
       const result = await fetchGame(1);
-      expect(result).toEqual({ error: "Error de servidor" });
-    });
-
-    it("handles response with null or undefined detail", async () => {
-      const errorResponse = { detail: null };
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        json: () => Promise.resolve(errorResponse),
-      } as Response);
-
-      const result = await renamePlayer("Old", "New");
       expect(result).toEqual({ error: "Error de servidor" });
     });
   });
@@ -502,17 +466,6 @@ describe("api.ts - FastAPI Error Handling", () => {
         expect.objectContaining({
           method: "POST",
           body: JSON.stringify(request),
-        }),
-      );
-    });
-
-    it("renamePlayer calls /api/player/rename with POST", async () => {
-      await renamePlayer("OldName", "NewName");
-      expect(mockFetch).toHaveBeenCalledWith(
-        "/api/player/rename",
-        expect.objectContaining({
-          method: "POST",
-          body: JSON.stringify({ old_name: "OldName", new_name: "NewName" }),
         }),
       );
     });

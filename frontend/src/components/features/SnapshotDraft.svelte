@@ -6,7 +6,6 @@
     SimilarName,
     MergePair,
     NotionPlayer,
-    AutocompletePlayer,
   } from "../../types";
 
   type CsvPlayerRow = {
@@ -23,13 +22,7 @@
 
   import { buildPlayerRow } from "../../snapshotUtils";
   import PlayerName from "../ui/PlayerName.svelte";
-  import {
-    saveSnapshot,
-    fetchNotionPlayers,
-    lookupPlayerHistory,
-    getAllPlayers,
-    checkPlayerSimilarity,
-  } from "../../api";
+  import { saveSnapshot, fetchNotionPlayers } from "../../api";
   import { parsePlayersCsv, normalizeName } from "../../utils";
   import { setActiveNodeId } from "../../stores.svelte";
   import { applySyncMerges } from "../../syncUtils";
@@ -43,6 +36,23 @@
   import DataTable, { type ColumnDef } from "../layout/DataTable.svelte";
   import SectionTitle from "../ui/SectionTitle.svelte";
   import PlayerAutocompleteInput from "./PlayerAutocompleteInput.svelte";
+  import {
+    apiPlayerCheckSimilarity,
+    apiPlayerGetAll,
+    apiPlayerLookup,
+    type PlayerAutocompleteItem,
+    type PlayerHistoryItem,
+    type PlayerSimilarityItem,
+  } from "../../generated-api";
+
+  const DEFAULT_PLAYER_HISTORY: PlayerHistoryItem = {
+    source: "default",
+    is_new: true,
+    juegos_este_ano: 0,
+    has_priority: false,
+    partidas_deseadas: 1,
+    partidas_gm: 0,
+  };
 
   let resolutionModal: ReturnType<typeof SyncResolutionModal>;
 
@@ -87,7 +97,7 @@
     ),
   );
   let eventType = $state(untrack(() => defaultEventType));
-  let knownPlayers: AutocompletePlayer[] = $state([]);
+  let knownPlayers: PlayerAutocompleteItem[] = $state([]);
   let isAddingPlayer = $state(false);
   let newPlayerSearchQuery = $state("");
   let pendingCsvPlayers: CsvPlayerRow[] = $state([]);
@@ -95,7 +105,7 @@
   let saving = $state(false);
   let isImporting = $state(false);
   let resolutionVisible = $state(false);
-  let resolutionPairs = $state<SimilarName[]>([]);
+  let resolutionPairs = $state<Array<PlayerSimilarityItem>>([]);
   let fetchedNotionPlayers = $state<NotionPlayer[]>([]);
 
   // Derived state for editing vs creating context
@@ -129,9 +139,9 @@
   });
 
   onMount(() => {
-    getAllPlayers()
+    apiPlayerGetAll()
       .then((res) => {
-        knownPlayers = res.players;
+        knownPlayers = res.data?.players ?? [];
       })
       .catch(console.error);
   });
@@ -146,8 +156,8 @@
   }
 
   function enrichSimilaritiesWithDraft(
-    similarities: SimilarName[],
-  ): SimilarName[] {
+    similarities: Array<PlayerSimilarityItem>,
+  ): Array<PlayerSimilarityItem> {
     return similarities.map((sim) => {
       if (sim.notion_id) {
         const draftMatch = draftPlayers.find(
@@ -162,7 +172,7 @@
   }
 
   async function confirmAddPlayer(
-    input: string | AutocompletePlayer,
+    input: string | PlayerAutocompleteItem,
     silentDuplicate: boolean = false,
   ): Promise<void> {
     // 1. Normalize input (Handle both string and rich objects)
@@ -190,20 +200,17 @@
     }
 
     // 3. Fetch History (Wait for data to prevent UI flickering)
-    let historyData: Partial<
-      EditPlayerRow & { source: "history" | "notion" | "default" }
-    > = {};
-    const notionId = isRawString ? undefined : input.notion_id;
+    let historyData: PlayerHistoryItem = DEFAULT_PLAYER_HISTORY;
 
     try {
-      const response = await lookupPlayerHistory(
-        name,
-        notionId,
-        parentId || undefined,
-      );
-      if (response.player) {
-        historyData = response.player;
-      }
+      const response = await apiPlayerLookup({
+        body: {
+          name,
+          notion_id: isRawString ? undefined : input.notion_id,
+          snapshot_id: parentId,
+        },
+      });
+      if (response.data) historyData = response.data.player;
     } catch (e) {
       console.warn("Failed to lookup player history:", e);
     }
@@ -245,10 +252,14 @@
     const playerNames = parsed.map((p) => p.nombre);
 
     try {
-      const checkRes = await checkPlayerSimilarity(playerNames);
-      if (checkRes.similarities && checkRes.similarities.length > 0) {
+      const checkRes = await apiPlayerCheckSimilarity({
+        body: { names: playerNames },
+      });
+      if (checkRes.data && checkRes.data.similarities.length > 0) {
         pendingCsvPlayers = parsed;
-        resolutionPairs = enrichSimilaritiesWithDraft(checkRes.similarities);
+        resolutionPairs = enrichSimilaritiesWithDraft(
+          checkRes.data.similarities,
+        );
         resolutionVisible = true;
         return;
       }
@@ -279,16 +290,16 @@
     }
 
     const playerPromises = uniqueRows.map(async (p) => {
-      let historyData: Partial<
-        EditPlayerRow & { source: "history" | "notion" | "default" }
-      > = {};
+      let historyData: PlayerHistoryItem = DEFAULT_PLAYER_HISTORY;
       try {
-        const response = await lookupPlayerHistory(
-          p.nombre,
-          p.notion_id ?? undefined,
-          parentId || undefined,
-        );
-        if (response.player) historyData = response.player;
+        const response = await apiPlayerLookup({
+          body: {
+            name: p.nombre,
+            notion_id: p.notion_id,
+            snapshot_id: parentId,
+          },
+        });
+        if (response.data) historyData = response.data.player;
       } catch (e) {
         console.warn(`Failed to lookup player ${p.nombre}:`, e);
       }

@@ -1,5 +1,6 @@
 import { mount } from "svelte";
 import App from "./App.svelte";
+import "./api/client";
 
 const targetElement = document.getElementById("app");
 if (!targetElement) {

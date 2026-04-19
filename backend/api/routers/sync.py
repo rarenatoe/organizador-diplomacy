@@ -2,21 +2,19 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
-from backend.core.logger import logger
-from backend.db.connection import async_engine
 from backend.sync.notion_sync import (
-    build_notion_players_lookup,
-    fetch_notion_data,
-    notion_cache_to_db,
     run_notion_sync_background,
 )
 
 router = APIRouter()
+
+
+class SyncResponse(BaseModel):
+    success: bool
+    message: str
 
 
 class RunNotionSyncRequest(BaseModel):
@@ -29,7 +27,7 @@ class RunNotionSyncRequest(BaseModel):
 async def api_run_notion_sync(
     request: RunNotionSyncRequest,
     background_tasks: BackgroundTasks,
-) -> dict[str, Any]:
+) -> SyncResponse:
     """
     Enqueues notion_sync to run in the background.
     Returns immediately with success message.
@@ -42,48 +40,9 @@ async def api_run_notion_sync(
             force=request.force,
             merges=request.merges,
         )
-        return {
-            "success": True,
-            "message": "Notion sync started in background",
-        }
+        return SyncResponse(
+            success=True,
+            message="Notion sync started in background",
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@router.post("/api/notion/force_refresh")
-async def api_notion_force_refresh(
-    background_tasks: BackgroundTasks,
-) -> dict[str, Any]:
-    """
-    Manually triggers a Notion cache update in the background.
-    Returns immediately with success message.
-    """
-    try:
-        background_tasks.add_task(_run_cache_refresh)
-        return {
-            "success": True,
-            "message": "Cache refresh started in background",
-        }
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-async def _run_cache_refresh() -> None:
-    """Helper to run cache refresh using unified pipeline."""
-    from sqlalchemy.ext.asyncio.session import AsyncSession
-
-    async with AsyncSession(async_engine) as session:
-        try:
-            # 1. Fetch and parse data from Notion using unified pipeline
-            pages, conteo, _client = await fetch_notion_data()
-            notion_players = build_notion_players_lookup(pages, conteo)
-
-            # 2. Save it to database using unified function
-            await notion_cache_to_db(session, notion_players)
-            await session.commit()
-            logger.info("[Cache Refresh] Completed successfully")
-        except Exception as e:
-            await session.rollback()
-            logger.error("[Cache Refresh] Error: %s", e, exc_info=True)
-        finally:
-            await session.close()

@@ -2,22 +2,68 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 from sqlalchemy import select
 
-from backend.sync.notion_sync import NotionPlayerDict, detect_similar_names
+from backend.sync.notion_sync import PlayerNameData, detect_similar_names
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.session import AsyncSession
 
-from backend.crud.players import lookup_player_history, rename_player
+from backend.crud.players import SourceType, lookup_player_history, rename_player
 from backend.db.connection import get_session
 from backend.db.models import NotionCache, Player
 
 router = APIRouter(prefix="/api/player")
+
+
+class SuccessResponse(BaseModel):
+    success: bool
+
+
+class PlayerAutocompleteItem(BaseModel):
+    display: str
+    nombre: str
+    notion_id: str | None = None
+    notion_name: str | None = None
+    is_local: bool
+    is_alias: bool
+
+
+class PlayerAutocompleteResponse(BaseModel):
+    players: list[PlayerAutocompleteItem]
+
+
+class PlayerHistoryItem(BaseModel):
+    source: SourceType
+    is_new: bool
+    juegos_este_ano: int
+    has_priority: bool
+    partidas_deseadas: int
+    partidas_gm: int
+    notion_id: str | None = None
+    notion_name: str | None = None
+
+
+class PlayerHistoryResponse(BaseModel):
+    player: PlayerHistoryItem
+
+
+class PlayerSimilarityItem(BaseModel):
+    notion_id: str
+    notion_name: str
+    snapshot: str
+    similarity: float
+    match_method: str
+    matched_alias: str | None = None
+    existing_local_name: str | None = None
+
+
+class PlayerSimilarityResponse(BaseModel):
+    similarities: list[PlayerSimilarityItem]
 
 
 class RenameRequest(BaseModel):
@@ -39,7 +85,7 @@ class CheckSimilarityRequest(BaseModel):
 async def api_player_rename(
     request: RenameRequest,
     session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, Any]:
+) -> SuccessResponse:
     """
     Rename a player in the players table.
     Returns: {"success": true} or error
@@ -70,7 +116,7 @@ async def api_player_rename(
             )
 
         await session.commit()
-        return {"success": True}
+        return SuccessResponse(success=True)
     except HTTPException:
         raise
     except Exception as exc:
@@ -81,7 +127,7 @@ async def api_player_rename(
 @router.get("/all")
 async def api_player_get_all(
     session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, Any]:
+) -> PlayerAutocompleteResponse:
     """Get all known players. Returns rich, unformatted objects to power UI autocomplete."""
     try:
         from backend.db.models import NotionCache
@@ -89,7 +135,7 @@ async def api_player_get_all(
         player_result = await session.execute(select(Player.name, Player.notion_id))
         local_players = player_result.fetchall()
 
-        results: list[dict[str, Any]] = []
+        results: list[PlayerAutocompleteItem] = []
         local_notion_ids: set[str] = set()
 
         # 1. Local Players (No deduplication needed; SQLite UNIQUE constraint guarantees local name uniqueness)
@@ -97,14 +143,14 @@ async def api_player_get_all(
             clean_name = player_name.strip() if player_name else ""
             if clean_name:
                 results.append(
-                    {
-                        "display": clean_name,
-                        "nombre": clean_name,
-                        "notion_id": notion_id,
-                        "notion_name": None,
-                        "is_local": True,
-                        "is_alias": False,
-                    }
+                    PlayerAutocompleteItem(
+                        display=clean_name,
+                        nombre=clean_name,
+                        notion_id=notion_id,
+                        notion_name=None,
+                        is_local=True,
+                        is_alias=False,
+                    )
                 )
                 if notion_id:
                     local_notion_ids.add(notion_id)
@@ -119,14 +165,14 @@ async def api_player_get_all(
 
                 if canonical_name:
                     results.append(
-                        {
-                            "display": canonical_name,
-                            "nombre": canonical_name,
-                            "notion_id": notion_data.notion_id,
-                            "notion_name": canonical_name,
-                            "is_local": False,
-                            "is_alias": False,
-                        }
+                        PlayerAutocompleteItem(
+                            display=canonical_name,
+                            nombre=canonical_name,
+                            notion_id=notion_data.notion_id,
+                            notion_name=canonical_name,
+                            is_local=False,
+                            is_alias=False,
+                        )
                     )
 
                 # Deduplicate aliases ONLY within this specific person's profile
@@ -136,20 +182,20 @@ async def api_player_get_all(
                         clean_alias = alias.strip()
                         if clean_alias and clean_alias.lower() not in seen_aliases_for_person:
                             results.append(
-                                {
-                                    "display": clean_alias,  # Raw alias string, preserving case
-                                    "nombre": clean_alias,
-                                    "notion_id": notion_data.notion_id,
-                                    "notion_name": canonical_name,
-                                    "is_local": False,
-                                    "is_alias": True,
-                                }
+                                PlayerAutocompleteItem(
+                                    display=clean_alias,
+                                    nombre=clean_alias,
+                                    notion_id=notion_data.notion_id,
+                                    notion_name=canonical_name,
+                                    is_local=False,
+                                    is_alias=True,
+                                )
                             )
                             seen_aliases_for_person.add(clean_alias.lower())
 
         # Sort alphabetically by lowercased display name, but return the preserved case
-        results.sort(key=lambda x: x["display"].lower())
-        return {"players": results}
+        results.sort(key=lambda x: x.display.lower())
+        return PlayerAutocompleteResponse(players=results)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -158,13 +204,13 @@ async def api_player_get_all(
 async def api_player_lookup(
     request: LookupRequest,
     session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, Any]:
+) -> PlayerHistoryResponse:
     """Targeted deep history lookup. Prioritizes notion_id if provided."""
     try:
         result = await lookup_player_history(
             session, request.name, request.notion_id, request.snapshot_id
         )
-        return {"player": result}
+        return PlayerHistoryResponse(player=PlayerHistoryItem(**result))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -173,46 +219,42 @@ async def api_player_lookup(
 async def api_player_check_similarity(
     request: CheckSimilarityRequest,
     session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, Any]:
+) -> PlayerSimilarityResponse:
     """Checks a list of names for typos against the NotionCache."""
     try:
-        result = await session.execute(select(NotionCache))
-        rows = result.scalars().all()
+        result = await session.execute(
+            select(NotionCache.notion_id, NotionCache.name, NotionCache.alias)
+        )
 
-        notion_players_list: list[NotionPlayerDict] = []
-        for r in rows:
-            notion_players_list.append(
-                {
-                    "notion_id": r.notion_id,
-                    "nombre": r.name,
-                    "is_new": r.is_new,
-                    "juegos_este_ano": r.games_this_year,
-                    "alias": r.alias or [],
-                    "c_england": r.c_england,
-                    "c_france": r.c_france,
-                    "c_germany": r.c_germany,
-                    "c_italy": r.c_italy,
-                    "c_austria": r.c_austria,
-                    "c_russia": r.c_russia,
-                    "c_turkey": r.c_turkey,
-                }
-            )
+        notion_players_list: list[PlayerNameData] = [
+            {
+                "notion_id": row.notion_id,
+                "name": row.name,
+                "alias": row.alias,
+            }
+            for row in result.all()
+        ]
 
         matches = detect_similar_names(notion_players_list, request.names)
 
         # Cross-reference matches with existing local players
         if matches:
-            notion_ids = [m["notion_id"] for m in matches if "notion_id" in m]
+            # Type-safe: 'notion_id' is guaranteed to exist by PlayerSimilarityDict
+            notion_ids = [m["notion_id"] for m in matches]
+
             if notion_ids:
                 existing_players = await session.execute(
                     select(Player.notion_id, Player.name).where(Player.notion_id.in_(notion_ids))
                 )
                 existing_map = {row[0]: row[1] for row in existing_players.fetchall()}
                 for m in matches:
-                    if m.get("notion_id") in existing_map:
+                    if m["notion_id"] in existing_map:
+                        # Adding optional key natively permitted by NotRequired
                         m["existing_local_name"] = existing_map[m["notion_id"]]
 
-        return {"similarities": matches}
+        items = TypeAdapter(list[PlayerSimilarityItem]).validate_python(matches)
+        return PlayerSimilarityResponse(similarities=items)
+
     except Exception as exc:
         await session.rollback()
         raise HTTPException(status_code=500, detail=str(exc)) from exc

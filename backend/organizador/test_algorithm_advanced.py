@@ -5,7 +5,7 @@ Cubre reglas complejas de ordenación y prioridad:
   - Prioridad de selección (Nuevo > prioridad > antiguo sin juegos > veterano)
   - Reglas de Game Master (no juega en su mesa, árbitro único, reduce cupos)
   - GM cede su cupo de jugador ante jugadores puros
-  - Balanceo de liga (juegos_ano)
+  - Balanceo de liga (juegos_este_ano)
   - Peso de participación (primeros cupos antes que segundos)
 
 Los tests básicos de corrección viven en test_organizador.py.
@@ -219,7 +219,7 @@ class TestCalcularPartidasGM(unittest.TestCase):
     def test_jugador_sin_gm_no_es_reducido_como_gm(self):
         """Para un no-GM con partidas_deseadas=2 el algoritmo genera ambos tickets.
 
-        Al dar a X el puntaje_prioridad más alto (juegos_ano=10 → weight 1.90),
+        Al dar a X el puntaje_prioridad más alto (juegos_este_ano=10 → weight 1.90),
         su primer ticket se procesa DESPUÉS de los 12 jugadores normales (1.05).
         Cuando llega el primer ticket de X los 12 cupos están repartidos [6,6];
         va a una mesa → [7,6]. Su segundo ticket (weight 2.90) solo puede ir a la
@@ -244,7 +244,7 @@ class TestCalcularPartidasBalance(unittest.TestCase):
         random.seed(0)
 
     def test_veterano_cede_primer_slot_cuando_hay_escasez(self):
-        """Con más candidatos que cupos, el jugador con más juegos_ano queda fuera."""
+        """Con más candidatos que cupos, el jugador con más juegos_este_ano queda fuera."""
         for seed in range(40):
             random.seed(seed)
             jugadores = _pool(14, games_this_year=0) + [
@@ -263,7 +263,7 @@ class TestCalcularPartidasBalance(unittest.TestCase):
 
     def test_todos_obtienen_primer_cupo_antes_de_segundos_cupos_con_historial(self):
         """Reproducción del caso Jean Carlos: el segundo ticket de quien tiene
-        más juegos_ano es el sobrante, no su primer ticket."""
+        más juegos_este_ano es el sobrante, no su primer ticket."""
         for seed in range(40):
             random.seed(seed)
             jugadores = _pool(12, games_this_year=0) + [

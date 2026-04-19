@@ -31,11 +31,8 @@ from backend.db.models import (
 )
 from backend.db.views import get_snapshot_detail
 from backend.sync.notion_sync import (
-    build_notion_players_lookup,
     detect_similar_names,
-    fetch_notion_data,
     normalize_name,
-    notion_cache_to_db,
 )
 
 
@@ -530,7 +527,11 @@ async def api_notion_fetch(
             players_dict = {}
             for p in players:
                 norm_name = normalize_name(p["nombre"])
-                players_dict[norm_name] = p
+                players_dict[norm_name] = {
+                    "notion_id": p["notion_id"],
+                    "name": p["nombre"],
+                    "alias": p["alias"],
+                }
             similar_names = detect_similar_names(players_dict, request.snapshot_names)  # type: ignore
 
         await session.commit()
@@ -539,28 +540,6 @@ async def api_notion_fetch(
             "similar_names": similar_names,
             "last_updated": last_updated,
         }
-    except Exception as exc:
-        await session.rollback()
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@router.post("/notion/force_refresh")
-async def api_notion_force_refresh(
-    session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, Any]:
-    """
-    Manually triggers a Notion cache update synchronously.
-    Returns: {"success": true, "message": "..."}
-    """
-    try:
-        # Use the unified sync pipeline
-        pages, conteo, _client = await fetch_notion_data()
-        notion_players = build_notion_players_lookup(pages, conteo)
-
-        await notion_cache_to_db(session, notion_players)
-        await session.commit()
-
-        return {"success": True, "message": "Cache updated successfully"}
     except Exception as exc:
         await session.rollback()
         raise HTTPException(status_code=500, detail=str(exc)) from exc

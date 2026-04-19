@@ -12,8 +12,6 @@ import type {
   DraftResponse,
   SaveDraftResponse,
   SaveDraftRequest,
-  SimilarName,
-  AutocompletePlayer,
 } from "./types";
 
 // ── Error Handling ────────────────────────────────────────────────────────────
@@ -169,59 +167,4 @@ export async function deleteGame(id: number): Promise<void> {
     const errorText = await res.text();
     throw new Error(errorText);
   }
-}
-
-// ── Player ────────────────────────────────────────────────────────────────────
-
-export async function renamePlayer(
-  oldName: string,
-  newName: string,
-): Promise<{ error?: string }> {
-  return safeFetch<{ error?: string }>("/api/player/rename", {
-    method: "POST",
-    // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ old_name: oldName, new_name: newName }),
-  });
-}
-
-export async function lookupPlayerHistory(
-  name: string,
-  notionId?: string,
-  snapshotId?: number,
-): Promise<{
-  player: EditPlayerRow & { source: "history" | "notion" | "default" };
-}> {
-  return safeFetch<{
-    player: EditPlayerRow & { source: "history" | "notion" | "default" };
-  }>("/api/player/lookup", {
-    method: "POST",
-    // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name,
-      notion_id: notionId,
-      snapshot_id: snapshotId,
-    }),
-  });
-}
-
-export async function getAllPlayers(): Promise<{
-  players: AutocompletePlayer[];
-}> {
-  return safeFetch<{ players: AutocompletePlayer[] }>("/api/player/all");
-}
-
-export async function checkPlayerSimilarity(
-  names: string[],
-): Promise<{ similarities: SimilarName[] }> {
-  return safeFetch<{ similarities: SimilarName[] }>(
-    "/api/player/check-similarity",
-    {
-      method: "POST",
-      // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ names }),
-    },
-  );
 }

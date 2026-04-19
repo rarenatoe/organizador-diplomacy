@@ -8,11 +8,12 @@ Covers:
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import Any
 
 from backend.sync.notion_sync import (
     NotionPage,
     NotionPlayerDict,
+    PlayerNameData,
     build_notion_players_lookup,
     detect_similar_names,
     find_notion_player,
@@ -172,38 +173,25 @@ class TestSimilarity:
 # ── Similar name detection ────────────────────────────────────────────────────
 
 
-def _create_test_notion_player(nombre: str, **kwargs: Any) -> NotionPlayerDict:
+def _create_test_notion_player_names(
+    name: str, alias: list[str] | None = None, notion_id: str = "test_id"
+) -> PlayerNameData:
     """Helper to create a minimal NotionPlayerDict for testing."""
-    defaults: dict[str, Any] = {
-        "notion_id": "test_id",
-        "is_new": True,
-        "juegos_este_ano": 0,
-        "alias": [],
-        "c_england": 0,
-        "c_france": 0,
-        "c_germany": 0,
-        "c_italy": 0,
-        "c_austria": 0,
-        "c_russia": 0,
-        "c_turkey": 0,
-    }
-    defaults.update(kwargs)
-    defaults["nombre"] = nombre
-    return cast("NotionPlayerDict", defaults)
+    return {"name": name, "alias": alias or [], "notion_id": notion_id}
 
 
 class TestDetectSimilarNames:
     def test_no_similar_names(self):
         notion_players = {
-            "john doe": _create_test_notion_player("John Doe"),
-            "jane smith": _create_test_notion_player("Jane Smith"),
+            "john doe": _create_test_notion_player_names("John Doe"),
+            "jane smith": _create_test_notion_player_names("Jane Smith"),
         }
         snapshot_names = ["John Doe", "Jane Smith"]
         result = detect_similar_names(notion_players, snapshot_names)
         assert result == []
 
     def test_detects_similar_pair(self):
-        notion_players = {"john doe": _create_test_notion_player("John Doe")}
+        notion_players = {"john doe": _create_test_notion_player_names("John Doe")}
         snapshot_names = ["John D."]
         result = detect_similar_names(notion_players, snapshot_names)
         assert len(result) == 1
@@ -212,26 +200,26 @@ class TestDetectSimilarNames:
         assert result[0]["similarity"] >= 0.75
 
     def test_skips_exact_matches(self):
-        notion_players = {"john doe": _create_test_notion_player("John Doe")}
+        notion_players = {"john doe": _create_test_notion_player_names("John Doe")}
         snapshot_names = ["John Doe"]
         result = detect_similar_names(notion_players, snapshot_names)
         assert result == []
 
     def test_skips_case_insensitive_exact_matches(self):
-        notion_players = {"john doe": _create_test_notion_player("John Doe")}
+        notion_players = {"john doe": _create_test_notion_player_names("John Doe")}
         snapshot_names = ["john doe"]
         result = detect_similar_names(notion_players, snapshot_names)
         assert result == []
 
     def test_respects_threshold(self):
-        notion_players = {"john doe": _create_test_notion_player("John Doe")}
+        notion_players = {"john doe": _create_test_notion_player_names("John Doe")}
         snapshot_names = ["Jane Smith"]
         # Default threshold is 0.75, these names are very different
         result = detect_similar_names(notion_players, snapshot_names, threshold=0.75)
         assert result == []
 
     def test_custom_threshold(self):
-        notion_players = {"john doe": _create_test_notion_player("John Doe")}
+        notion_players = {"john doe": _create_test_notion_player_names("John Doe")}
         snapshot_names = ["John D."]
         # "John Doe" vs "John D." matches (D is prefix of Doe), so it should be found
         # score = (1.0 + 0.8) / 2 = 0.9
@@ -242,8 +230,8 @@ class TestDetectSimilarNames:
         # Note: "John Doe" vs "John Doe Jr" won't match because word counts differ
         # Let's use names with same word count
         notion_players = {
-            "john doe": _create_test_notion_player("John Doe"),
-            "jane smith": _create_test_notion_player("Jane Smith"),
+            "john doe": _create_test_notion_player_names("John Doe"),
+            "jane smith": _create_test_notion_player_names("Jane Smith"),
         }
         snapshot_names = ["John D.", "Jane S."]
         result = detect_similar_names(notion_players, snapshot_names)
@@ -251,8 +239,8 @@ class TestDetectSimilarNames:
 
     def test_sorted_by_similarity(self):
         notion_players = {
-            "john doe": _create_test_notion_player("John Doe"),
-            "jane smith": _create_test_notion_player("Jane Smith"),
+            "john doe": _create_test_notion_player_names("John Doe"),
+            "jane smith": _create_test_notion_player_names("Jane Smith"),
         }
         snapshot_names = ["John D.", "Jane S."]
         result = detect_similar_names(notion_players, snapshot_names)
@@ -268,12 +256,14 @@ class TestDetectSimilarNames:
         assert result == []
 
     def test_empty_snapshot(self):
-        result = detect_similar_names({"john doe": _create_test_notion_player("John Doe")}, [])
+        result = detect_similar_names(
+            {"john doe": _create_test_notion_player_names("John Doe")}, []
+        )
         assert result == []
 
     def test_detects_alias_similarity(self):
         notion_players = {
-            "renato alegre": _create_test_notion_player("Renato Alegre", alias=["ren"])
+            "renato alegre": _create_test_notion_player_names("Renato Alegre", alias=["ren"])
         }
         snapshot_names = ["re"]  # Prefix of "ren"
         result = detect_similar_names(notion_players, snapshot_names, threshold=0.5)
@@ -284,18 +274,18 @@ class TestDetectSimilarNames:
 
     def test_alias_exact_match_skips_similarity(self):
         notion_players = {
-            "renato alegre": _create_test_notion_player("Renato Alegre", alias=["ren"])
+            "renato alegre": _create_test_notion_player_names("Renato Alegre", alias=["ren"])
         }
         snapshot_names = ["ren"]  # Exact match with alias
         result = detect_similar_names(notion_players, snapshot_names)
         assert len(result) == 1
         assert result[0]["match_method"] == "alias_exact"
-        assert result[0]["matched_alias"] == "ren"
+        assert result[0].get("matched_alias") == "ren"
         assert result[0]["notion_name"] == "Renato Alegre"
 
     def test_handles_list_input(self):
         # The function should handle both dict and list inputs for notion_players
-        notion_players = [_create_test_notion_player("John Doe")]
+        notion_players = [_create_test_notion_player_names("John Doe")]
         snapshot_names = ["John D."]
         result = detect_similar_names(notion_players, snapshot_names)
         assert len(result) == 1
@@ -305,8 +295,8 @@ class TestDetectSimilarNames:
         # Snapshot has "Renato", Notion has "Renato Alegre" and "Renato Garcia"
         # Both should match
         notion_players = [
-            _create_test_notion_player("Renato Alegre"),
-            _create_test_notion_player("Renato Garcia"),
+            _create_test_notion_player_names("Renato Alegre"),
+            _create_test_notion_player_names("Renato Garcia"),
         ]
         snapshot_names = ["Renato"]
         result = detect_similar_names(notion_players, snapshot_names)
@@ -318,7 +308,7 @@ class TestDetectSimilarNames:
     def test_detects_many_to_1_conflict(self):
         # Notion has "Renato", Snapshot has "Renato Alegre" and "Renato Garcia"
         # Both should match
-        notion_players = [_create_test_notion_player("Renato")]
+        notion_players = [_create_test_notion_player_names("Renato")]
         snapshot_names = ["Renato Alegre", "Renato Garcia"]
         result = detect_similar_names(notion_players, snapshot_names)
         assert len(result) == 2
@@ -334,17 +324,20 @@ def test_find_notion_player():
     """Test find_notion_player function for exact matches, alias matching, and normalization."""
     # Construct mock notion players dictionary
     mock_notion_players: dict[str, NotionPlayerDict] = {
-        "danivonklaus": _create_test_notion_player(
-            nombre="DaniVonKlaus",
-            alias=["daniel eiler", "dani"],
-            c_england=1,
-            c_france=2,
-            c_germany=3,
-            c_italy=4,
-            c_austria=5,
-            c_russia=6,
-            c_turkey=7,
-        )
+        "danivonklaus": {
+            "nombre": "DaniVonKlaus",
+            "alias": ["daniel eiler", "dani"],
+            "notion_id": "test_id",
+            "is_new": True,
+            "juegos_este_ano": 0,
+            "c_england": 0,
+            "c_france": 0,
+            "c_germany": 0,
+            "c_italy": 0,
+            "c_austria": 0,
+            "c_russia": 0,
+            "c_turkey": 0,
+        }
     }
 
     # Test exact match

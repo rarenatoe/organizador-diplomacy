@@ -20,6 +20,8 @@
   import SnapshotHistory from "./SnapshotHistory.svelte";
   import { logger } from "../../utils/logger";
   import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
+  import { apiPlayerRename } from "../../generated-api";
+  import { parseApiError } from "../../utils";
   let resolutionModal: ReturnType<typeof SyncResolutionModal>;
 
   interface Props {
@@ -188,10 +190,11 @@
       // 1. Process collision merges first via rename endpoint
       const collisionMerges = merges.filter((m) => m.action === "merge_local");
       for (const merge of collisionMerges) {
-        const { renamePlayer } = await import("../../api");
-        const res = await renamePlayer(merge.from, merge.to);
+        const res = await apiPlayerRename({
+          body: { old_name: merge.from, new_name: merge.to },
+        });
         if (res.error) {
-          onShowError("Error al fusionar", res.error);
+          onShowError("Error al fusionar", parseApiError(res.error));
           return;
         }
       }
@@ -208,9 +211,6 @@
   }
 
   async function executeSyncMerge(merges: MergePair[]): Promise<void> {
-    const mergeMap = new Map(merges.map((m) => [m.from, m]));
-    const currentRows = data?.players ?? [];
-
     // Extract renames payload for the backend diff algorithm
     const renameActions = ["link_rename", "merge_local", "use_existing"];
     const renamesPayload = merges
@@ -251,7 +251,7 @@
       await loadSnapshot(); // Force reactive update with new data
       onChainUpdate();
       if (result.snapshot_id !== undefined) {
-        setActiveNodeId(result.snapshot_id as number);
+        setActiveNodeId(result.snapshot_id);
         onOpenSnapshot(result.snapshot_id);
       }
     } catch (e) {

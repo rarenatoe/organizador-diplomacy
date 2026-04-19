@@ -1,8 +1,8 @@
-import type { AutocompletePlayer } from "../../types";
+import type { PlayerAutocompleteItem } from "../../generated-api";
 
 export function createAutocompleteState<
   T extends { nombre: string; notion_id?: string | null },
->(initialKnown: AutocompletePlayer[] = [], initialExisting: T[] = []) {
+>(initialKnown: PlayerAutocompleteItem[] = [], initialExisting: T[] = []) {
   let searchQuery = $state("");
   let selectedIndex = $state(-1);
   let knownPlayers = $state(initialKnown);
@@ -40,7 +40,7 @@ export function createAutocompleteState<
       return suggestions;
     },
 
-    updateKnownPlayers(players: AutocompletePlayer[]) {
+    updateKnownPlayers(players: PlayerAutocompleteItem[]) {
       knownPlayers = players;
     },
     updateExistingPlayers(players: T[]) {
@@ -52,7 +52,7 @@ export function createAutocompleteState<
     reset,
     handleKeydown(
       e: KeyboardEvent,
-      onConfirm: (input: string | AutocompletePlayer) => void,
+      onConfirm: (input: string | PlayerAutocompleteItem) => void,
     ) {
       if (e.key === "Enter") {
         e.preventDefault();
@@ -79,8 +79,8 @@ export function createAutocompleteState<
       }
     },
     selectPlayer(
-      player: AutocompletePlayer,
-      onConfirm: (input: string | AutocompletePlayer) => void,
+      player: PlayerAutocompleteItem,
+      onConfirm: (input: string | PlayerAutocompleteItem) => void,
     ) {
       onConfirm(player);
       reset();

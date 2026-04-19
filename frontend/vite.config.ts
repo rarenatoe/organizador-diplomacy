@@ -1,6 +1,10 @@
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { resolve } from "path";
+import dotenv from "dotenv";
+
+// Manually load the root .env file into Node's process.env
+dotenv.config({ path: resolve(__dirname, "../.env") });
 
 export default defineConfig({
   plugins: [svelte()],
@@ -19,7 +23,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": "http://localhost:5001",
+      "/api": `http://127.0.0.1:${process.env.API_PORT || "5000"}`,
     },
   },
 });

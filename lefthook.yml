@@ -1,5 +1,14 @@
 pre-commit:
   commands:
+    # API generation pipeline (runs in sequence)
+    api-generation:
+      run: |
+        uv run scripts/export_openapi.py
+        bun run typegen
+        bun run typecheck
+      glob: "{backend/**/*,frontend/openapi-ts.config.ts}"
+
+    # Formatting and linting hooks
     backend-format:
       glob: "backend/**/*.py"
       run: uv run ruff format {staged_files}
@@ -14,19 +23,25 @@ pre-commit:
     backend-test:
       glob: "backend/**/*.py"
       run: uv run python -m pytest -q
+
     frontend-format:
       glob: "frontend/src/**/*.{ts,svelte,css,html}"
+      exclude: "frontend/src/generated-api/.*"
       run: bun prettier --write --plugin=prettier-plugin-svelte {staged_files}
       stage_fixed: true
     frontend-typecheck:
       glob: "frontend/src/**/*.{ts,svelte}"
+      exclude: "frontend/src/generated-api/.*"
       run: bun run typecheck
     frontend-lint:
       glob: "frontend/src/**/*.{ts,svelte}"
+      exclude: "frontend/src/generated-api/.*"
       run: bun run lint
     frontend-test:
       glob: "frontend/src/**/*.{ts,svelte}"
+      exclude: "frontend/src/generated-api/.*"
       run: bun run test
+
     ai-rules:
       glob: "docs/ai-rules/*.md"
       run: bun run ai-rules:generate && git add .github/ .clinerules .windsurfrules

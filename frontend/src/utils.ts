@@ -2,6 +2,8 @@
  * Shared utility functions for the frontend.
  */
 
+import { HttpValidationError } from "./generated-api";
+
 /**
  * Parses CSV text into an array of player objects.
  * Expected columns: nombre, is_new, juegos_este_ano, prioridad, partidas_deseadas, partidas_gm
@@ -87,4 +89,17 @@ export function parsePlayersCsv(csvText: string): Array<{
  */
 export function normalizeName(name: string): string {
   return name.toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+/**
+ * Extracts a safe string from any FastAPI error response
+ */
+export function parseApiError(error: HttpValidationError): string {
+  // 1. Catch FastAPI Validation Errors (422) where detail is an array
+  if (error.detail) {
+    // We can safely map over the array knowing it matches the ValidationError shape
+    return error.detail.map((err: { msg: string }) => err.msg).join("; ");
+  }
+
+  return "Ocurrió un error inesperado";
 }

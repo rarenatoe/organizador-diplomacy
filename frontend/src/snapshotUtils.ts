@@ -1,3 +1,4 @@
+import type { PlayerHistoryItem } from "./generated-api";
 import type { SnapshotNode, Branch, EditPlayerRow } from "./types";
 
 /**
@@ -65,18 +66,16 @@ export function findLatestGameId(
  */
 export function buildPlayerRow(
   base: Partial<EditPlayerRow> & { nombre: string },
-  history: Partial<
-    EditPlayerRow & { source: "history" | "notion" | "default" }
-  >,
+  history: PlayerHistoryItem,
 ): EditPlayerRow {
   return {
     nombre: base.nombre,
     original_nombre: base.nombre,
-    is_new: base.is_new ?? history.is_new ?? true,
-    juegos_este_ano: base.juegos_este_ano ?? history.juegos_este_ano ?? 0,
-    has_priority: base.has_priority ?? history.has_priority ?? false,
-    partidas_deseadas: base.partidas_deseadas ?? history.partidas_deseadas ?? 1,
-    partidas_gm: base.partidas_gm ?? history.partidas_gm ?? 0,
+    is_new: base.is_new ?? history.is_new,
+    juegos_este_ano: base.juegos_este_ano ?? history.juegos_este_ano,
+    has_priority: base.has_priority ?? history.has_priority,
+    partidas_deseadas: base.partidas_deseadas ?? history.partidas_deseadas,
+    partidas_gm: base.partidas_gm ?? history.partidas_gm,
     notion_id: base.notion_id ?? history.notion_id ?? null,
     notion_name: base.notion_name ?? history.notion_name ?? null,
     historyRestored: history.source === "history",

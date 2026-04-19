@@ -17,7 +17,15 @@ from backend.crud.snapshots import (
     add_player_to_snapshot,
     create_snapshot,
 )
-from backend.db.models import SnapshotPlayer
+from backend.db.models import (
+    DeepDiffResult,
+    HistoryStateDict,
+    NotionCache,
+    Player,
+    SnapshotHistory,
+    SnapshotPlayer,
+    TimelineEdge,
+)
 
 pytestmark = pytest.mark.asyncio
 
@@ -229,247 +237,30 @@ class TestApiSnapshotAddPlayer:
 
 
 class TestPlayerLookup:
-    """Tests for /api/player/lookup endpoint with deep lookup and multiple fallbacks."""
+    """Consolidated tests for /api/player/lookup and lookup_player_history logic."""
 
     async def test_lookup_missing_name_returns_422(self, client: Any) -> None:
-        """Test lookup with missing name returns 422 validation error."""
         resp = await client.post("/api/player/lookup", json={})
         assert resp.status_code == 422
 
-    async def test_lookup_no_snapshots_returns_defaults(self, client: Any) -> None:
-        """Test lookup when no snapshots exist returns default values."""
-        resp = await client.post("/api/player/lookup", json={"name": "Alice"})
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "player" in data
-        player = data["player"]
+    async def test_lookup_no_data_returns_default(self, client: Any) -> None:
+        """Verify the 'default' source when absolutely nothing is found."""
+        resp = await client.post("/api/player/lookup", json={"name": "New Soul"})
+        data = resp.json()["player"]
+        assert data["source"] == "default"
+        assert data["is_new"] is True
+        assert data.get("notion_id") is None
 
-        assert player["source"] == "default"
-        assert not player["has_priority"]
-        assert player["is_new"]
-        assert player["juegos_este_ano"] == 0
-
-    async def test_lookup_timeline_traversal_finds_history(
+    async def test_lookup_prioritizes_provided_notion_id(
         self, client: Any, db_session: Any
     ) -> None:
-        """Test lookup finds player via TimelineEdge ancestry and returns source='history'."""
-        from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
-        from backend.db.models import TimelineEdge
-
-        snap_id = await create_snapshot(db_session, "manual")
-        player_id = await get_or_create_player(db_session, "Charlie")
-        await add_player_to_snapshot(
-            session=db_session,
-            snapshot_id=snap_id,
-            player_id=player_id,
-            games_this_year=0,
-            desired_games=1,
-            gm_games=0,
-            has_priority=True,
-            is_new=False,
-        )
-        await db_session.commit()
-
-        edge = TimelineEdge(
-            id=1, source_snapshot_id=None, output_snapshot_id=snap_id, edge_type="branch"
-        )
-        db_session.add(edge)
-        await db_session.commit()
-
-        resp = await client.post("/api/player/lookup", json={"name": "Charlie"})
-        assert resp.status_code == 200
-        player = resp.json()["player"]
-
-        assert player["source"] == "history"
-        assert player["has_priority"]
-        assert not player["is_new"]
-        assert player["juegos_este_ano"] == 0
-
-    async def test_lookup_global_fallback_finds_snapshot_player(
-        self, client: Any, db_session: Any
-    ) -> None:
-        """Test lookup finds player in SnapshotPlayer elsewhere and returns source='history'."""
-        from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
-
-        snap_id = await create_snapshot(db_session, "manual")
-        player_id = await get_or_create_player(db_session, "Diana")
-        await add_player_to_snapshot(
-            session=db_session,
-            snapshot_id=snap_id,
-            player_id=player_id,
-            games_this_year=1,
-            desired_games=1,
-            gm_games=1,
-            has_priority=True,
-            is_new=False,
-        )
-        await db_session.commit()
-
-        resp = await client.post(
-            "/api/player/lookup", json={"name": "Diana", "snapshot_id": snap_id + 1}
-        )
-        assert resp.status_code == 200
-        player = resp.json()["player"]
-
-        assert player["source"] == "history"
-        assert player["has_priority"]
-        assert not player["is_new"]
-        assert player["juegos_este_ano"] == 1
-
-    async def test_lookup_json_rescue_finds_deleted_player(
-        self, client: Any, db_session: Any
-    ) -> None:
-        """Test lookup finds player in SnapshotHistory JSON logs and returns source='history'."""
-        from backend.crud.snapshots import create_snapshot
-        from backend.db.models import (
-            DeepDiffResult,
-            HistoryActionType,
-            HistoryStateDict,
-            SnapshotHistory,
-            SnapshotPlayer,
-        )
-
-        player_id = await get_or_create_player(db_session, "Eve")
-        snap_id = await create_snapshot(db_session, "manual")
-        await add_player_to_snapshot(
-            db_session, snap_id, player_id, 1, 1, 1, has_priority=True, is_new=False
-        )
-        await db_session.commit()
-
-        result = await db_session.execute(
-            select(SnapshotPlayer).where(SnapshotPlayer.player_id == player_id)
-        )
-        sp_player = result.scalar_one_or_none()
-        if sp_player:
-            await db_session.delete(sp_player)
-            await db_session.commit()
-
-        changes = DeepDiffResult(added=[], removed=["Eve"], renamed=[], modified=[])
-        history_state = HistoryStateDict(
-            players=[
-                {
-                    "nombre": "Eve",
-                    "is_new": False,
-                    "juegos_este_ano": 1,
-                    "has_priority": True,
-                    "partidas_deseadas": 2,
-                    "partidas_gm": 1,
-                }
-            ]
-        )
-        history_entry = SnapshotHistory(
-            snapshot_id=snap_id,
-            action_type=HistoryActionType.MANUAL_EDIT,
-            changes=changes,
-            previous_state=history_state,
-        )
-        db_session.add(history_entry)
-        await db_session.commit()
-
-        resp = await client.post(
-            "/api/player/lookup", json={"name": "Eve", "snapshot_id": snap_id + 1}
-        )
-        assert resp.status_code == 200
-        player = resp.json()["player"]
-
-        assert player["source"] == "history"
-        assert player["has_priority"]
-        assert not player["is_new"]
-        assert player["juegos_este_ano"] == 1
-
-    async def test_lookup_notion_fallback_returns_notion_stats(
-        self, client: Any, db_session: Any
-    ) -> None:
-        """Test lookup finds player only in NotionCache and returns source='notion'."""
-        from backend.db.models import NotionCache
-
-        notion_player = NotionCache(
-            notion_id="test-notion-id",
-            name="Frank",
-            is_new=False,
-            games_this_year=3,
-            c_england=1,
-            c_france=0,
-            c_italy=0,
-            c_austria=1,
-            c_russia=0,
-            c_turkey=1,
-            last_updated=datetime.now(),
-        )
-        db_session.add(notion_player)
-        await db_session.commit()
-
-        resp = await client.post("/api/player/lookup", json={"name": "Frank"})
-        assert resp.status_code == 200
-        player = resp.json()["player"]
-
-        assert player["source"] == "notion"
-        assert not player["has_priority"]
-        assert player["partidas_deseadas"] == 1
-        assert not player["is_new"]
-        assert player["juegos_este_ano"] == 3
-
-    async def test_lookup_unknown_player_returns_defaults(self, client: Any) -> None:
-        """Test lookup for completely unknown player returns default values."""
-        resp = await client.post("/api/player/lookup", json={"name": "UnknownPlayer"})
-        assert resp.status_code == 200
-        player = resp.json()["player"]
-
-        assert player["source"] == "default"
-        assert not player["has_priority"]
-        assert player["is_new"]
-        assert player["juegos_este_ano"] == 0
-
-    async def test_lookup_with_snapshot_id_prioritizes_history(
-        self, client: Any, db_session: Any
-    ) -> None:
-        """Test that providing snapshot_id prioritizes history lookup over global fallbacks."""
-        from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
-        from backend.db.models import NotionCache
-
-        notion_player = NotionCache(
-            notion_id="global-charlie-id",
-            name="Charlie",
-            is_new=True,
-            last_updated=datetime.now(),
-        )
-        db_session.add(notion_player)
-        await db_session.commit()
-
-        snap_id = await create_snapshot(db_session, "manual")
-        player_id = await get_or_create_player(db_session, "Charlie")
-        await add_player_to_snapshot(
-            session=db_session,
-            snapshot_id=snap_id,
-            player_id=player_id,
-            games_this_year=1,
-            desired_games=1,
-            gm_games=1,
-            has_priority=True,
-            is_new=False,
-        )
-        await db_session.commit()
-
-        resp = await client.post(
-            "/api/player/lookup", json={"name": "Charlie", "snapshot_id": snap_id}
-        )
-        assert resp.status_code == 200
-        player = resp.json()["player"]
-
-        assert player["source"] == "history"
-        assert player["has_priority"]
-        assert not player["is_new"]
-
-
-class TestApiPlayerLookup:
-    async def test_lookup_prioritizes_notion_id(self, client: Any, db_session: Any) -> None:
-        """Even if the name is a typo, passing a valid notion_id should pull the right cache."""
-        from backend.db.models import NotionCache
-
-        # 1. Setup raw Notion Cache
+        """
+        Target: Refactored Notion logic.
+        Ensures 'notion_id' in request overrides everything else (Vincular Solo case).
+        """
         nc = NotionCache(
             notion_id="notion-999",
-            name="Real Notion Name",
+            name="Real Name",
             is_new=False,
             games_this_year=5,
             last_updated=datetime.now(),
@@ -477,19 +268,122 @@ class TestApiPlayerLookup:
         db_session.add(nc)
         await db_session.commit()
 
-        # 2. Call lookup with a typo name but the correct notion_id (simulating Vincular Solo)
         resp = await client.post(
-            "/api/player/lookup", json={"name": "Local Typo", "notion_id": "notion-999"}
+            "/api/player/lookup", json={"name": "Typo Name", "notion_id": "notion-999"}
         )
-
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "player" in data
-        player = data["player"]
-
-        # 3. Assert it successfully found the Notion data using the ID!
+        player = resp.json()["player"]
         assert player["notion_id"] == "notion-999"
-        assert player["notion_name"] == "Real Notion Name"
+        assert player["notion_name"] == "Real Name"
         assert player["source"] == "notion"
-        assert not player["is_new"]
+
+    async def test_lookup_finds_notion_via_local_player_link(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """
+        Target: Refactored logic 'elif player and player.notion_id'.
+        If a player exists locally and has a notion_id, use it to get stats.
+        """
+        nc = NotionCache(
+            notion_id="notion-777",
+            name="Linked Notion",
+            is_new=False,
+            games_this_year=10,
+            last_updated=datetime.now(),
+        )
+        db_session.add(nc)
+        # Create a local player already linked to that ID
+        p_id = await get_or_create_player(db_session, "Local Charlie")
+        from sqlalchemy import update
+
+        await db_session.execute(
+            update(Player).where(Player.id == p_id).values(notion_id="notion-777")
+        )
+        await db_session.commit()
+
+        resp = await client.post("/api/player/lookup", json={"name": "Local Charlie"})
+        player = resp.json()["player"]
+        assert player["notion_id"] == "notion-777"
+        assert player["juegos_este_ano"] == 10
+
+    async def test_lookup_notion_search_is_case_insensitive(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Target: 'func.lower(NotionCache.name) == name.lower()'."""
+        nc = NotionCache(
+            notion_id="notion-123", name="Case Sensitive", is_new=True, last_updated=datetime.now()
+        )
+        db_session.add(nc)
+        await db_session.commit()
+
+        resp = await client.post("/api/player/lookup", json={"name": "caSE senSITive"})
+        player = resp.json()["player"]
+        assert player["notion_id"] == "notion-123"
+
+    async def test_lookup_timeline_traversal(self, client: Any, db_session: Any) -> None:
+        """Ensures we can walk back through TimelineEdges to find history."""
+        from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
+
+        s1 = await create_snapshot(db_session, "manual")
+        s2 = await create_snapshot(db_session, "manual")  # The 'current' one
+        p_id = await get_or_create_player(db_session, "Walker")
+
+        # Add player to s1 (the past)
+        await add_player_to_snapshot(db_session, s1, p_id, 2, 1, 0, has_priority=True, is_new=False)
+        # Link s2 -> s1
+        edge = TimelineEdge(id=1, source_snapshot_id=s1, output_snapshot_id=s2, edge_type="branch")
+        db_session.add(edge)
+        await db_session.commit()
+
+        resp = await client.post("/api/player/lookup", json={"name": "Walker", "snapshot_id": s2})
+        player = resp.json()["player"]
+        assert player["source"] == "history"
+        assert player["juegos_este_ano"] == 2
+        assert player["has_priority"] is True
+
+    async def test_lookup_global_fallback(self, client: Any, db_session: Any) -> None:
+        """If not in timeline, find the most recent SnapshotPlayer record globally."""
+        from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
+
+        old_snap = await create_snapshot(db_session, "manual")
+        p_id = await get_or_create_player(db_session, "Globalist")
+        await add_player_to_snapshot(
+            db_session, old_snap, p_id, 5, 1, 0, has_priority=False, is_new=False
+        )
+        await db_session.commit()
+
+        # Lookup with a completely unrelated snapshot_id
+        resp = await client.post(
+            "/api/player/lookup", json={"name": "Globalist", "snapshot_id": 999}
+        )
+        player = resp.json()["player"]
+        assert player["source"] == "history"
         assert player["juegos_este_ano"] == 5
+
+    async def test_lookup_json_logs_rescue(self, client: Any, db_session: Any) -> None:
+        """Test the 'Fallback 2': searching through SnapshotHistory.previous_state."""
+        history_state: HistoryStateDict = {
+            "players": [
+                {
+                    "nombre": "Ghost",
+                    "is_new": False,
+                    "juegos_este_ano": 8,
+                    "has_priority": True,
+                    "partidas_deseadas": 1,
+                    "partidas_gm": 0,
+                }
+            ]
+        }
+        history_entry = SnapshotHistory(
+            snapshot_id=1,
+            action_type="manual_edit",
+            changes=DeepDiffResult(added=[], removed=[], renamed=[], modified=[]),
+            previous_state=history_state,
+        )
+        db_session.add(history_entry)
+        await db_session.commit()
+
+        resp = await client.post("/api/player/lookup", json={"name": "Ghost"})
+        player = resp.json()["player"]
+        assert player["source"] == "history"
+        assert player["juegos_este_ano"] == 8
+        assert player["has_priority"] is True

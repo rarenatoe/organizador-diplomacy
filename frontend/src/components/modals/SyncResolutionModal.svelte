@@ -1,11 +1,12 @@
 <script lang="ts">
-  import type { SimilarName, ResolutionAction, MergePair } from "../../types";
+  import type { PlayerSimilarityItem } from "../../generated-api";
+  import type { ResolutionAction, MergePair } from "../../types";
   import Badge from "../ui/Badge.svelte";
   import Button from "../ui/Button.svelte";
 
   interface Props {
     visible: boolean;
-    pairs: SimilarName[];
+    pairs: Array<PlayerSimilarityItem>;
     onComplete: (merges: MergePair[]) => void;
     onCancel: () => void;
   }
@@ -13,7 +14,9 @@
   let { visible, pairs, onComplete, onCancel }: Props = $props();
 
   let currentIndex = $state(0);
-  let decisions = $state<{ pair: SimilarName; action: ResolutionAction }[]>([]);
+  let decisions = $state<
+    { pair: PlayerSimilarityItem; action: ResolutionAction }[]
+  >([]);
 
   let currentPair = $derived(pairs[currentIndex]);
   let total = $derived(pairs.length);

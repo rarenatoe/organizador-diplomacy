@@ -162,51 +162,6 @@ class TestApiNotionPlayers:
         )
 
 
-# ── POST /api/notion/force_refresh ────────────────────────────────────────────
-
-
-class TestApiNotionForceRefresh:
-    async def test_force_refresh_triggers_cache_update(
-        self,
-        client: Any,
-        db_session: Any,  # noqa: ARG002
-    ) -> None:
-        """Force refresh should trigger an immediate cache update."""
-        with (
-            patch(
-                "backend.api.routers.sync.notion_cache_to_db", new_callable=AsyncMock
-            ) as mock_update,
-            patch(
-                "backend.api.routers.sync.fetch_notion_data",
-                new_callable=AsyncMock,
-                return_value=([], {}, MagicMock()),
-            ),
-        ):
-            resp = await client.post("/api/notion/force_refresh")
-            assert resp.status_code == 200
-            mock_update.assert_called_once()
-
-    async def test_force_refresh_returns_success(
-        self,
-        client: Any,
-        db_session: Any,  # noqa: ARG002
-    ) -> None:
-        """Force refresh should return a success message."""
-
-        with (
-            patch("backend.api.routers.sync.notion_cache_to_db", new_callable=AsyncMock),
-            patch(
-                "backend.api.routers.sync.fetch_notion_data",
-                new_callable=AsyncMock,
-                return_value=([], {}, MagicMock()),
-            ),
-        ):
-            resp = await client.post("/api/notion/force_refresh")
-            assert resp.status_code == 200
-            data = resp.json()
-            assert "status" in data or "message" in data
-
-
 # ── run_notion_sync_background Tests ──────────────────────────────────────────
 
 
