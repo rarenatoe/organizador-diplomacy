@@ -1,61 +1,81 @@
-import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import SnapshotDetail from "./SnapshotDetail.svelte";
 import GameDetail from "./GameDetail.svelte";
 import SyncDetail from "./SyncDetail.svelte";
+import * as generatedApi from "../../generated-api";
+import * as legacyApi from "../../api";
+import { mockApiSuccess } from "../../tests/mockHelpers";
 
-// Mock the API module
-vi.mock("../../api", () => ({
-  fetchSnapshot: vi.fn().mockResolvedValue({
-    source: "manual",
-    created_at: "2024-01-01",
-    players: [
-      {
-        nombre: "Test Player",
-        is_new: true,
-        juegos_este_ano: 0,
-        has_priority: false,
-        partidas_deseadas: 1,
-        partidas_gm: 0,
-      },
-    ],
-  }),
-  fetchGame: vi.fn().mockResolvedValue({
+const apiSnapshotSpy = vi.spyOn(generatedApi, "apiSnapshot");
+const apiChainSpy = vi.spyOn(generatedApi, "apiChain");
+const fetchGameSpy = vi.spyOn(legacyApi, "fetchGame");
+
+const snapshotDetailResponse = {
+  id: 1,
+  created_at: "2024-01-01",
+  source: "manual" as const,
+  players: [
+    {
+      nombre: "Test Player",
+      notion_id: null,
+      notion_name: null,
+      is_new: true,
+      juegos_este_ano: 0,
+      has_priority: false,
+      partidas_deseadas: 1,
+      partidas_gm: 0,
+      c_england: 0,
+      c_france: 0,
+      c_germany: 0,
+      c_italy: 0,
+      c_austria: 0,
+      c_russia: 0,
+      c_turkey: 0,
+      alias: null,
+    },
+  ],
+  history: [],
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  apiSnapshotSpy.mockResolvedValue(mockApiSuccess(snapshotDetailResponse));
+  apiChainSpy.mockResolvedValue(
+    mockApiSuccess({
+      roots: [
+        {
+          id: 1,
+          type: "snapshot" as const,
+          created_at: "2024-01-01 10:00:00",
+          source: "manual" as const,
+          player_count: 1,
+          is_latest: true,
+          branches: [
+            {
+              edge: {
+                id: 1,
+                type: "sync" as const,
+                created_at: "2024-01-01 11:00:00",
+                from_id: 1,
+                to_id: 2,
+              },
+              output: null,
+            },
+          ],
+        },
+      ],
+    }),
+  );
+  fetchGameSpy.mockResolvedValue({
+    id: 1,
     created_at: "2024-01-01",
     intentos: 1,
     input_snapshot_id: 1,
     output_snapshot_id: 2,
     mesas: [],
     waiting_list: [],
-  }),
-  fetchChain: vi.fn().mockResolvedValue({
-    roots: [
-      {
-        id: 1,
-        branches: [
-          {
-            edge: {
-              type: "sync",
-              id: 1,
-              from_id: 1,
-              to_id: 2,
-              created_at: "2024-01-01",
-            },
-            output: null,
-          },
-        ],
-      },
-    ],
-  }),
-  editSnapshot: vi.fn(),
-  addPlayer: vi.fn(),
-  renamePlayer: vi.fn(),
-}));
-
-// Mock the stores
-vi.mock("../../stores.svelte", () => ({
-  setSelectedSnapshot: vi.fn(),
-}));
+  });
+});
 
 describe("Panel Scroll Pattern", () => {
   describe("SnapshotDetail", () => {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { EditPlayerRow, DraftResponse } from "./types";
-  import { deleteSnapshot as apiDeleteSnapshot, deleteGame } from "./api";
+  import { deleteGame } from "./api";
   import { setActiveNodeId } from "./stores.svelte";
   import { nav, type PanelContext } from "./navigation.svelte";
   import Header from "./components/layout/Header.svelte";
@@ -16,6 +16,7 @@
     type TerminalState,
   } from "./components/modals/TerminalModal.svelte";
   import "../static/style.css";
+  import { apiSnapshot, type SnapshotSaveEventType } from "./generated-api";
 
   let chainViewer = $state<ChainViewer | null>(null);
   let toaster = $state<Toaster | null>(null);
@@ -48,7 +49,7 @@
       id: editingGameId ?? snapshotId,
       draftProps: {
         parentId: snapshotId,
-        eventType: "edit",
+        saveEventType: "manual",
         autoAction: null,
         initialPlayers: [],
         initialData: initialData ?? null,
@@ -60,7 +61,7 @@
 
   function openDraft(
     parentId: number | null = null,
-    eventType: "sync" | "manual" | "edit" = "manual",
+    saveEventType: SnapshotSaveEventType = "manual",
     autoAction: "notion" | "csv" | null = null,
     players: EditPlayerRow[] = [],
   ): void {
@@ -68,7 +69,7 @@
     let title: string;
     if (parentId === null) {
       title = "Nueva Lista";
-    } else if (eventType === "sync") {
+    } else if (saveEventType === "sync") {
       title = `Sincronizando #${parentId}`;
     } else {
       title = `Editando #${parentId}`;
@@ -80,7 +81,7 @@
       id: parentId,
       draftProps: {
         parentId,
-        eventType,
+        saveEventType,
         autoAction,
         initialPlayers: players,
         initialData: null,
@@ -101,7 +102,10 @@
     )
       return;
     try {
-      const data = await apiDeleteSnapshot(id);
+      const data = await apiSnapshot({
+        method: "DELETE",
+        path: { snapshot_id: id },
+      });
       if (data.error) {
         alert(`Error al eliminar: ${data.error}`);
         return;
@@ -168,7 +172,7 @@
         <SnapshotDraft
           parentId={nav.current.draftProps.parentId}
           initialPlayers={nav.current.draftProps.initialPlayers}
-          defaultEventType={nav.current.draftProps.eventType}
+          saveEventType={nav.current.draftProps.saveEventType}
           autoAction={nav.current.draftProps.autoAction}
           onClose={nav.close}
           onCancel={nav.pop}

@@ -13,6 +13,7 @@
   import PlayerName from "../ui/PlayerName.svelte";
   import CardGrid from "../layout/CardGrid.svelte";
   import CardGridItem from "../layout/CardGridItem.svelte";
+  import { apiChain } from "../../generated-api";
 
   interface Props {
     snapshotId: number;
@@ -171,9 +172,8 @@
       onChainUpdate();
 
       // Find and open the latest game
-      const { fetchChain } = await import("../../api");
-      const chainData = await fetchChain();
-      const gameId = findLatestGameId(chainData.roots);
+      const { data } = await apiChain();
+      const gameId = findLatestGameId(data?.roots ?? []);
       if (gameId !== null) {
         setActiveNodeId(gameId);
         onOpenGame(gameId);

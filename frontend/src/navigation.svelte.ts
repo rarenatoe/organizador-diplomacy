@@ -1,5 +1,6 @@
 import { setActiveNodeId } from "./stores.svelte";
 import type { EditPlayerRow, DraftResponse } from "./types";
+import type { SnapshotSaveEventType } from "./generated-api";
 
 export interface PanelContext {
   title: string;
@@ -7,7 +8,7 @@ export interface PanelContext {
   id: number | null;
   draftProps?: {
     parentId: number | null;
-    eventType: "sync" | "manual" | "edit";
+    saveEventType: SnapshotSaveEventType;
     autoAction: "notion" | "csv" | null;
     initialPlayers: EditPlayerRow[];
     initialData: DraftResponse | null;

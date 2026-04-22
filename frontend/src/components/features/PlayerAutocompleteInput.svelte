@@ -2,7 +2,7 @@
   lang="ts"
   generics="T extends { nombre: string; notion_id?: string | null; notion_name?: string | null }"
 >
-  import type { MergePair } from "../../types";
+  import type { MergePair } from "../../syncResolution";
   import { createAutocompleteState } from "./playerAutocompleteState.svelte.ts";
   import { clickOutside } from "../../clickOutside";
   import { normalizeName } from "../../utils";
@@ -135,13 +135,13 @@
 
   function handleResolutionComplete(merges: MergePair[]) {
     if (resolutionState.status !== "resolving") return;
-    const { input: originalName } = resolutionState;
+    const { input: inputName } = resolutionState;
     resolutionState = { status: "idle" };
 
-    const mergeTarget = merges.find((m) => m.from === originalName);
+    const mergeTarget = merges.find((m) => m.from === inputName);
 
     if (!mergeTarget || mergeTarget.action === "skip") {
-      return executeConfirm(originalName);
+      return executeConfirm(inputName);
     }
 
     if (mergeTarget.action === "use_existing") {
@@ -160,7 +160,7 @@
     const shouldRename = ["link_rename", "merge_notion"].includes(
       mergeTarget.action,
     );
-    const finalName = shouldRename ? mergeTarget.to : originalName;
+    const finalName = shouldRename ? mergeTarget.to : inputName;
     executeConfirm({
       display: finalName,
       nombre: finalName,

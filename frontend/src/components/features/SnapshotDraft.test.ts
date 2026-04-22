@@ -10,21 +10,15 @@ const mockGeneratedApi = vi.hoisted(() => ({
   apiPlayerCheckSimilarity: vi.fn(),
   apiPlayerGetAll: vi.fn(),
   apiPlayerLookup: vi.fn(),
+  apiNotionFetch: vi.fn(),
+  apiSnapshotSave: vi.fn(),
 }));
 
 vi.mock("../../generated-api", () => mockGeneratedApi);
 
-// Mock the API module
-vi.mock("../../api", () => ({
-  createSnapshot: vi.fn().mockResolvedValue({ snapshot_id: 123 }),
-  saveSnapshot: vi.fn().mockResolvedValue({ snapshot_id: 123 }),
-  fetchNotionPlayers: vi
-    .fn()
-    .mockResolvedValue({ players: [], similar_names: [] }),
-}));
-
 // Mock the utils module
 vi.mock("../../utils", () => ({
+  parseApiError: vi.fn().mockReturnValue("Ocurrió un error inesperado"),
   parsePlayersCsv: vi.fn().mockReturnValue([
     {
       nombre: "Alice",
@@ -66,6 +60,21 @@ describe("SnapshotDraft", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    vi.spyOn(api, "apiSnapshotSave").mockResolvedValue(
+      mockApiSuccess<api.ApiSnapshotSaveResponse>({
+        snapshot_id: 123,
+        status: null,
+      }),
+    );
+
+    vi.spyOn(api, "apiNotionFetch").mockResolvedValue(
+      mockApiSuccess<api.ApiNotionFetchResponse>({
+        players: [],
+        similar_names: [],
+        last_updated: null,
+      }),
+    );
 
     // Provide healthy defaults so the component's onMount doesn't crash!
     vi.spyOn(api, "apiPlayerGetAll").mockResolvedValue(
@@ -112,7 +121,7 @@ describe("SnapshotDraft", () => {
       props: {
         parentId: null,
         initialPlayers: [],
-        defaultEventType: "manual",
+        saveEventType: "manual",
         onClose: () => {},
         onCancel: () => {},
         onChainUpdate: () => {},
@@ -133,7 +142,7 @@ describe("SnapshotDraft", () => {
       props: {
         parentId: null,
         initialPlayers: [],
-        defaultEventType: "manual",
+        saveEventType: "manual",
         onClose: () => {},
         onCancel: () => {},
         onChainUpdate: () => {},
@@ -296,7 +305,7 @@ describe("SnapshotDraft", () => {
       props: {
         parentId: null,
         initialPlayers: [],
-        defaultEventType: "manual",
+        saveEventType: "manual",
         onClose: () => {},
         onCancel: () => {},
         onChainUpdate: () => {},
@@ -356,7 +365,7 @@ describe("SnapshotDraft", () => {
       props: {
         parentId: null,
         initialPlayers: [],
-        defaultEventType: "manual",
+        saveEventType: "manual",
         onClose: () => {},
         onCancel: () => {},
         onChainUpdate: () => {},
@@ -377,7 +386,7 @@ describe("SnapshotDraft", () => {
       props: {
         parentId: null,
         initialPlayers: [],
-        defaultEventType: "manual",
+        saveEventType: "manual",
         onClose: () => {},
         onCancel: () => {},
         onChainUpdate: () => {},
@@ -419,7 +428,7 @@ describe("SnapshotDraft", () => {
       props: {
         parentId: null,
         initialPlayers: [],
-        defaultEventType: "manual",
+        saveEventType: "manual",
         onClose: () => {},
         onCancel: () => {},
         onChainUpdate: () => {},
@@ -459,7 +468,7 @@ describe("SnapshotDraft", () => {
       props: {
         parentId: null,
         initialPlayers: [],
-        defaultEventType: "manual",
+        saveEventType: "manual",
         onClose: () => {},
         onCancel: () => {},
         onChainUpdate: () => {},
@@ -482,13 +491,12 @@ describe("SnapshotDraft", () => {
     expect(saveButton).not.toBeDisabled();
   });
 
-  it("calls saveSnapshot when save button is clicked", async () => {
-    const { saveSnapshot } = await import("../../api");
+  it("calls apiSnapshotSave when save button is clicked", async () => {
     renderDraft({ initialPlayers: mockInitialPlayers });
     await fireEvent.click(
       screen.getByRole("button", { name: /Crear Versión/i }),
     );
-    expect(saveSnapshot).toHaveBeenCalled();
+    expect(api.apiSnapshotSave).toHaveBeenCalled();
   });
 
   it("pre-populates players from initialPlayers prop", () => {
@@ -513,7 +521,7 @@ describe("SnapshotDraft", () => {
             partidas_gm: 1,
           },
         ],
-        defaultEventType: "manual",
+        saveEventType: "manual",
         onClose: () => {},
         onCancel: () => {},
         onChainUpdate: () => {},
@@ -537,7 +545,7 @@ describe("SnapshotDraft", () => {
       props: {
         parentId: null,
         initialPlayers: [],
-        defaultEventType: "manual",
+        saveEventType: "manual",
         onClose: () => {},
         onCancel: () => {},
         onChainUpdate: () => {},
@@ -565,7 +573,6 @@ describe("SnapshotDraft", () => {
   });
 
   it("CSV explicit fields take precedence over history defaults", async () => {
-    const legacyApi = await import("../../api");
     const { parsePlayersCsv } = await import("../../utils");
 
     // Override the global CSV mock specifically for this test
@@ -614,18 +621,20 @@ describe("SnapshotDraft", () => {
       screen.getByRole("button", { name: /Crear Versión/i }),
     );
 
-    expect(legacyApi.saveSnapshot).toHaveBeenCalledWith(
+    expect(api.apiSnapshotSave).toHaveBeenCalledWith(
       expect.objectContaining({
-        players: expect.arrayContaining([
-          expect.objectContaining({
-            nombre: "Andy",
-            is_new: false,
-            juegos_este_ano: 5,
-            has_priority: true,
-            partidas_deseadas: 3,
-            partidas_gm: 1,
-          }),
-        ]),
+        body: expect.objectContaining({
+          players: expect.arrayContaining([
+            expect.objectContaining({
+              nombre: "Andy",
+              is_new: false,
+              juegos_este_ano: 5,
+              has_priority: true,
+              partidas_deseadas: 3,
+              partidas_gm: 1,
+            }),
+          ]),
+        }),
       }),
     );
   });
@@ -636,7 +645,7 @@ describe("SnapshotDraft", () => {
       props: {
         parentId: null,
         initialPlayers: [],
-        defaultEventType: "manual",
+        saveEventType: "manual",
         onClose: () => {},
         onCancel: () => {},
         onChainUpdate: () => {},
@@ -657,7 +666,6 @@ describe("SnapshotDraft", () => {
   });
 
   it("sends renames payload when player name is edited", async () => {
-    const { saveSnapshot } = await import("../../api");
     const onClose = vi.fn();
     const onChainUpdate = vi.fn();
 
@@ -674,7 +682,7 @@ describe("SnapshotDraft", () => {
             partidas_gm: 1,
           },
         ],
-        defaultEventType: "manual",
+        saveEventType: "manual",
         onClose,
         onCancel: () => {},
         onChainUpdate,
@@ -702,23 +710,26 @@ describe("SnapshotDraft", () => {
     });
     await fireEvent.click(saveButton);
 
-    // Verify saveSnapshot was called with renames payload
-    expect(saveSnapshot).toHaveBeenCalledWith({
-      parent_id: 1,
-      event_type: "manual",
-      players: [
-        {
-          nombre: "Daniel Villafranca",
-          is_new: false,
-          juegos_este_ano: 5,
-          has_priority: true,
-          partidas_deseadas: 2,
-          partidas_gm: 1,
-          notion_id: null,
-          notion_name: null,
-        },
-      ],
-      renames: [{ from: "Daniel V.", to: "Daniel Villafranca" }],
+    // Verify apiSnapshotSave was called with renames payload
+    expect(api.apiSnapshotSave).toHaveBeenCalledWith({
+      method: "POST",
+      body: {
+        parent_id: 1,
+        event_type: "manual",
+        players: [
+          expect.objectContaining({
+            nombre: "Daniel Villafranca",
+            is_new: false,
+            juegos_este_ano: 5,
+            has_priority: true,
+            partidas_deseadas: 2,
+            partidas_gm: 1,
+            notion_id: null,
+            notion_name: null,
+          }),
+        ],
+        renames: [{ old_name: "Daniel V.", new_name: "Daniel Villafranca" }],
+      },
     });
   });
 
@@ -734,10 +745,10 @@ describe("SnapshotDraft", () => {
             has_priority: true,
             partidas_deseadas: 2,
             partidas_gm: 1,
-            original_nombre: "Jugador Existente",
+            oldName: "Jugador Existente",
           },
         ],
-        defaultEventType: "edit",
+        saveEventType: "manual",
         onClose: vi.fn(),
         onCancel: vi.fn(),
         onChainUpdate: vi.fn(),
@@ -766,10 +777,10 @@ describe("SnapshotDraft", () => {
             has_priority: true,
             partidas_deseadas: 2,
             partidas_gm: 1,
-            original_nombre: "Jugador Existente",
+            oldName: "Jugador Existente",
           },
         ],
-        defaultEventType: "edit",
+        saveEventType: "manual",
         onClose: vi.fn(),
         onCancel: vi.fn(),
         onChainUpdate: vi.fn(),
@@ -1122,8 +1133,6 @@ describe("SnapshotDraft", () => {
     });
 
     it("applies notion_id and shows ? icon when resolving via 'Vincular Solo'", async () => {
-      const legacyApi = await import("../../api");
-
       // Setup initial player
       renderDraft({
         initialPlayers: [
@@ -1139,25 +1148,36 @@ describe("SnapshotDraft", () => {
       });
 
       // Mock Notion sync response with conflict
-      vi.mocked(legacyApi.fetchNotionPlayers).mockResolvedValueOnce({
-        players: [
-          {
-            notion_id: "notion-123",
-            nombre: "Notion Name",
-            is_new: false,
-            juegos_este_ano: 5,
-          },
-        ],
-        similar_names: [
-          {
-            notion_id: "notion-123",
-            notion_name: "Notion Name",
-            snapshot: "Local Name",
-            similarity: 0.9,
-            match_method: "fuzzy",
-          },
-        ],
-      });
+      vi.mocked(api.apiNotionFetch).mockResolvedValueOnce(
+        mockApiSuccess<api.ApiNotionFetchResponse>({
+          players: [
+            {
+              notion_id: "notion-123",
+              nombre: "Notion Name",
+              is_new: false,
+              juegos_este_ano: 5,
+              c_england: 0,
+              c_france: 0,
+              c_germany: 0,
+              c_italy: 0,
+              c_austria: 0,
+              c_russia: 0,
+              c_turkey: 0,
+              alias: null,
+            },
+          ],
+          similar_names: [
+            {
+              notion_id: "notion-123",
+              notion_name: "Notion Name",
+              snapshot: "Local Name",
+              similarity: 0.9,
+              match_method: "fuzzy",
+            },
+          ],
+          last_updated: null,
+        }),
+      );
 
       // Click Importar Notion
       await fireEvent.click(
@@ -1192,7 +1212,6 @@ describe("SnapshotDraft", () => {
     });
 
     it("CSV import with 'Vincular Solo' preserves notion_id in DOM and save payload", async () => {
-      const legacyApi = await import("../../api");
       const { parsePlayersCsv } = await import("../../utils");
 
       // Override the global CSV mock specifically for this test
@@ -1273,18 +1292,20 @@ describe("SnapshotDraft", () => {
       );
 
       // 7. Assert Save Payload EXACTLY matches what we expect
-      expect(legacyApi.saveSnapshot).toHaveBeenCalledWith(
+      expect(api.apiSnapshotSave).toHaveBeenCalledWith(
         expect.objectContaining({
-          event_type: "manual",
-          players: expect.arrayContaining([
-            expect.objectContaining({
-              nombre: "Local Typo",
-              notion_id: "notion-999",
-              notion_name: "Real Notion Name",
-              is_new: true, // Overridden by CSV input!
-              juegos_este_ano: 0, // Overridden by CSV input!
-            }),
-          ]),
+          body: expect.objectContaining({
+            event_type: "manual",
+            players: expect.arrayContaining([
+              expect.objectContaining({
+                nombre: "Local Typo",
+                notion_id: "notion-999",
+                notion_name: "Real Notion Name",
+                is_new: true,
+                juegos_este_ano: 0,
+              }),
+            ]),
+          }),
         }),
       );
     });

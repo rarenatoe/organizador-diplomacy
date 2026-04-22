@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -11,10 +11,20 @@ from sqlalchemy import delete, select, update
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.api.models.snapshots import (
+    DeleteResponse,
+    HistoryState,
+    NotionFetchResponse,
+    NotionPlayerData,
+    RenameChange,
+    SimilarName,
+    SnapshotDetailResponse,
+    SnapshotSaveEventType,
+    SnapshotSaveResponse,
+)
 from backend.crud.players import get_or_create_player
 from backend.crud.snapshots import (
     add_player_to_snapshot,
-    create_root_manual_snapshot,
     delete_snapshot_cascade,
     generate_deep_diff,
     get_snapshot_players,
@@ -22,12 +32,10 @@ from backend.crud.snapshots import (
 )
 from backend.db.connection import get_session
 from backend.db.models import (
-    HistoryActionType,
     NotionCache,
     Player,
-    RenameDict,
     Snapshot,
-    SnapshotPlayer,
+    SnapshotSource,
 )
 from backend.db.views import get_snapshot_detail
 from backend.sync.notion_sync import (
@@ -73,104 +81,27 @@ class PlayerCreate(BaseModel):
 
 
 class SnapshotCreateRequest(BaseModel):
-    source: str = "manual"
+    source: SnapshotSource = SnapshotSource.MANUAL
     parent_id: int | None = None
     players: list[PlayerCreate]
 
 
 class SnapshotSaveRequest(BaseModel):
     parent_id: int | None = None
-    event_type: str = "manual"
+    event_type: SnapshotSaveEventType = SnapshotSaveEventType.MANUAL
     players: list[PlayerCreate]
-    renames: list[RenameDict] = []
+    renames: list[RenameChange] = []
 
 
 class NotionFetchRequest(BaseModel):
     snapshot_names: list[str] = []
 
 
-class AddPlayerRequest(BaseModel):
-    nombre: str
-    notion_id: str | None = None
-    notion_name: str | None = None
-    is_new: bool = True
-    juegos_este_ano: int = 0
-    has_priority: bool = False
-    partidas_deseadas: int = 1
-    partidas_gm: int = 0
-
-
-@router.get("")
-async def api_snapshot_list(
-    session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, Any]:
-    """Returns a list of all snapshots with player counts."""
-    from sqlalchemy import func
-
-    result = await session.execute(
-        select(Snapshot, func.count(SnapshotPlayer.player_id).label("player_count"))
-        .outerjoin(SnapshotPlayer, Snapshot.id == SnapshotPlayer.snapshot_id)
-        .group_by(Snapshot.id)
-        .order_by(Snapshot.id)
-    )
-    snapshots: list[dict[str, Any]] = []
-    for snap, count in result.all():
-        snapshots.append(
-            {
-                "id": snap.id,
-                "created_at": snap.created_at.isoformat() if snap.created_at else None,
-                "source": snap.source,
-                "player_count": count,
-            }
-        )
-    return {"snapshots": snapshots}
-
-
-@router.post("")
-async def api_create_snapshot_root(
-    request: SnapshotCreateRequest,
-    session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, int]:
-    """
-    Creates a new snapshot. If parent_id is provided, links to parent via event.
-    Returns: {"snapshot_id": <new_id>}
-    """
-    from backend.crud.chain import create_branch_edge
-    from backend.crud.snapshots import create_snapshot
-
-    try:
-        # If parent_id provided, check if parent exists
-        parent_id = request.parent_id
-        if parent_id is not None:
-            result = await session.execute(select(Snapshot).where(Snapshot.id == parent_id))
-            parent_row = result.scalar_one_or_none()
-            if not parent_row:
-                raise HTTPException(status_code=404, detail="parent snapshot not found")
-
-        # Create new snapshot
-        snap_id = await create_snapshot(session, request.source)
-
-        # Add players using DRY helper
-        await _insert_snapshot_players(session, snap_id, request.players)
-
-        # Create event linking to parent if provided
-        if parent_id is not None:
-            await create_branch_edge(session, parent_id, snap_id)
-
-        await session.commit()
-        return {"snapshot_id": snap_id}
-    except HTTPException:
-        raise
-    except Exception as exc:
-        await session.rollback()
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
 @router.get("/{snapshot_id}")
 async def api_snapshot(
     snapshot_id: int,
     session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, Any]:
+) -> SnapshotDetailResponse:
     """Returns snapshot metadata + player list for the detail panel."""
     detail = await get_snapshot_detail(session, snapshot_id)
     if detail is None:
@@ -183,7 +114,7 @@ async def api_snapshot(
 async def api_delete_snapshot(
     snapshot_id: int,
     session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, Any]:
+) -> DeleteResponse:
     """Deletes a snapshot and all its dependent snapshots/events."""
     from backend.crud.chain import squash_linear_branch
     from backend.db.models import TimelineEdge
@@ -213,75 +144,7 @@ async def api_delete_snapshot(
             await squash_linear_branch(session, parent_id)
 
         await session.commit()
-        return {"deleted": deleted}
-    except HTTPException:
-        raise
-    except Exception as exc:
-        await session.rollback()
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@router.post("/new")
-async def api_create_snapshot(
-    request: SnapshotCreateRequest,
-    session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, int]:
-    """
-    Creates a new root 'manual' snapshot (no source snapshot).
-    Returns: {"snapshot_id": <new_id>}
-    """
-    try:
-        players_data = [
-            {
-                "nombre": p.nombre,
-                "notion_id": p.notion_id,
-                "is_new": p.is_new,
-                "juegos_este_ano": p.juegos_este_ano,
-                "has_priority": p.has_priority,
-                "partidas_deseadas": p.partidas_deseadas,
-                "partidas_gm": p.partidas_gm,
-            }
-            for p in request.players
-        ]
-        new_id = await create_root_manual_snapshot(session, players_data)
-        await session.commit()
-        return {"snapshot_id": new_id}
-    except Exception as exc:
-        await session.rollback()
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@router.post("/{snapshot_id}/save")
-async def api_snapshot_save_by_id(
-    snapshot_id: int,
-    request: SnapshotCreateRequest,
-    session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, int]:
-    """
-    Save/update a snapshot's players and metadata by ID.
-    Returns: {"snapshot_id": <id>}
-    """
-
-    try:
-        # Check if snapshot exists
-        result = await session.execute(select(Snapshot).where(Snapshot.id == snapshot_id))
-        snap = result.scalar_one_or_none()
-        if not snap:
-            raise HTTPException(status_code=404, detail="snapshot not found")
-
-        # Update source
-        snap.source = request.source
-
-        # Clear old roster
-        await session.execute(
-            delete(SnapshotPlayer).where(SnapshotPlayer.snapshot_id == snapshot_id)
-        )
-
-        # Add players using DRY helper
-        await _insert_snapshot_players(session, snapshot_id, request.players)
-
-        await session.commit()
-        return {"snapshot_id": snapshot_id}
+        return DeleteResponse(deleted=deleted)
     except HTTPException:
         raise
     except Exception as exc:
@@ -293,7 +156,7 @@ async def api_snapshot_save_by_id(
 async def api_snapshot_save(
     request: SnapshotSaveRequest,
     session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, int | str]:
+) -> SnapshotSaveResponse:
     """
     Unified endpoint to save a new snapshot from a player list.
     Returns: {"snapshot_id": <new_id>}
@@ -305,12 +168,9 @@ async def api_snapshot_save(
         parent_id = request.parent_id
         event_type = request.event_type
 
-        if event_type not in ("manual", "sync"):
-            raise HTTPException(status_code=400, detail="event_type must be 'manual' or 'sync'")
-
         # Determine action type early using enum
         action_type = (
-            HistoryActionType.NOTION_SYNC if event_type == "sync" else HistoryActionType.MANUAL_EDIT
+            SnapshotSource.NOTION_SYNC if event_type == "sync" else SnapshotSource.MANUAL_EDIT
         )
 
         # Validate parent exists if provided
@@ -334,7 +194,7 @@ async def api_snapshot_save(
                 "partidas_gm",
             }
             previous_players_roster_only = [
-                {k: v for k, v in p.items() if k in roster_fields} for p in previous_players
+                p.model_dump(include=roster_fields) for p in previous_players
             ]
 
             # Calculate diff before making changes
@@ -355,20 +215,17 @@ async def api_snapshot_save(
 
             # Apply renames before checking for no changes
             for r in request.renames:
-                target_exists = await session.execute(select(Player).where(Player.name == r["to"]))
+                target_exists = await session.execute(
+                    select(Player).where(Player.name == r.new_name)
+                )
                 if not target_exists.scalar_one_or_none():
                     await session.execute(
-                        update(Player).where(Player.name == r["from"]).values(name=r["to"])
+                        update(Player).where(Player.name == r.old_name).values(name=r.new_name)
                     )
 
             # No changes check - skip database writes entirely
-            if (
-                not diff["added"]
-                and not diff["removed"]
-                and not diff["renamed"]
-                and not diff["modified"]
-            ):
-                return {"snapshot_id": parent_id, "status": "no_changes"}
+            if not diff.added and not diff.removed and not diff.renamed and not diff.modified:
+                return SnapshotSaveResponse(snapshot_id=parent_id, status="no_changes")
 
             # Check if parent is a leaf node (has no children)
             from backend.db.models import TimelineEdge
@@ -381,7 +238,7 @@ async def api_snapshot_save(
             # If parent is a leaf node, update in-place
             if not has_children:
                 # Update snapshot source using enum
-                parent_row.source = action_type.value
+                parent_row.source = action_type
 
                 # Clear old roster
                 from backend.db.models import SnapshotPlayer
@@ -397,13 +254,13 @@ async def api_snapshot_save(
                 await log_snapshot_history(
                     session,
                     snapshot_id=parent_id,
-                    action_type=action_type.value,
+                    action_type=action_type,
                     changes=diff,
-                    previous_state={"players": previous_players},
+                    previous_state=HistoryState(players=previous_players),
                 )
 
                 await session.commit()
-                return {"snapshot_id": parent_id}
+                return SnapshotSaveResponse(snapshot_id=parent_id)
 
             # If parent is an internal node (has children), apply STRICT GUARD
             if event_type == "sync" and parent_row.source == "notion_sync":
@@ -413,7 +270,7 @@ async def api_snapshot_save(
                 )
 
         # Create snapshot with appropriate source (for internal nodes or no parent)
-        source = "notion_sync" if event_type == "sync" else "manual"
+        source = SnapshotSource.NOTION_SYNC if event_type == "sync" else SnapshotSource.MANUAL
         snap_id = await create_snapshot(session, source)
 
         # Add players using DRY helper
@@ -424,55 +281,7 @@ async def api_snapshot_save(
             await create_branch_edge(session, parent_id, snap_id)
 
         await session.commit()
-        return {"snapshot_id": snap_id}
-    except HTTPException:
-        raise
-    except Exception as exc:
-        await session.rollback()
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-@router.post("/{snapshot_id}/add-player")
-async def api_add_player(
-    snapshot_id: int,
-    request: AddPlayerRequest,
-    session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, int]:
-    """Add a player to a snapshot."""
-    try:
-        # Check if snapshot exists
-        result = await session.execute(select(Snapshot).where(Snapshot.id == snapshot_id))
-        if not result.scalar_one_or_none():
-            raise HTTPException(status_code=404, detail="snapshot not found")
-
-        if not request.nombre:
-            raise HTTPException(status_code=400, detail="nombre is required")
-
-        player_id = await get_or_create_player(session, request.nombre, request.notion_id)
-
-        # Check if player already exists in this snapshot
-        existing = await session.execute(
-            select(SnapshotPlayer).where(
-                SnapshotPlayer.snapshot_id == snapshot_id, SnapshotPlayer.player_id == player_id
-            )
-        )
-        if existing.scalar_one_or_none():
-            # Player already exists in snapshot, just return their ID
-            await session.commit()
-            return {"player_id": player_id}
-
-        await add_player_to_snapshot(
-            session,
-            snapshot_id,
-            player_id,
-            request.juegos_este_ano,
-            request.partidas_deseadas,
-            request.partidas_gm,
-            has_priority=request.has_priority,
-            is_new=request.is_new,
-        )
-        await session.commit()
-        return {"player_id": player_id}
+        return SnapshotSaveResponse(snapshot_id=snap_id)
     except HTTPException:
         raise
     except Exception as exc:
@@ -487,7 +296,7 @@ async def api_add_player(
 async def api_notion_fetch(
     request: NotionFetchRequest,
     session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, Any]:
+) -> NotionFetchResponse:
     """
     Fetches raw player data from the local notion_cache table.
     Returns: {"players": [...], "similar_names": [...], "last_updated": "..."}
@@ -498,27 +307,27 @@ async def api_notion_fetch(
         rows = result.scalars().all()
 
         if not rows:
-            return {"players": [], "similar_names": [], "last_updated": None}
+            return NotionFetchResponse(players=[], similar_names=[], last_updated=None)
 
-        players: list[dict[str, Any]] = []
+        players: list[NotionPlayerData] = []
         last_updated = rows[0].last_updated if rows else None
 
         for r in rows:
             players.append(
-                {
-                    "notion_id": r.notion_id,
-                    "nombre": r.name,
-                    "is_new": r.is_new,
-                    "juegos_este_ano": r.games_this_year,
-                    "c_england": r.c_england,
-                    "c_france": r.c_france,
-                    "c_germany": r.c_germany,
-                    "c_italy": r.c_italy,
-                    "c_austria": r.c_austria,
-                    "c_russia": r.c_russia,
-                    "c_turkey": r.c_turkey,
-                    "alias": r.alias,
-                }
+                NotionPlayerData(
+                    notion_id=r.notion_id,
+                    nombre=r.name,
+                    is_new=r.is_new,
+                    juegos_este_ano=r.games_this_year,
+                    c_england=r.c_england or 0,
+                    c_france=r.c_france or 0,
+                    c_germany=r.c_germany or 0,
+                    c_italy=r.c_italy or 0,
+                    c_austria=r.c_austria or 0,
+                    c_russia=r.c_russia or 0,
+                    c_turkey=r.c_turkey or 0,
+                    alias=r.alias,
+                )
             )
 
         similar_names = []
@@ -526,20 +335,21 @@ async def api_notion_fetch(
             # Create dict with normalized names as keys and player data as values
             players_dict = {}
             for p in players:
-                norm_name = normalize_name(p["nombre"])
+                norm_name = normalize_name(p.nombre)
                 players_dict[norm_name] = {
-                    "notion_id": p["notion_id"],
-                    "name": p["nombre"],
-                    "alias": p["alias"],
+                    "notion_id": p.notion_id,
+                    "name": p.nombre,
+                    "alias": p.alias,
                 }
-            similar_names = detect_similar_names(players_dict, request.snapshot_names)  # type: ignore
+            similar_names_raw = detect_similar_names(players_dict, request.snapshot_names)  # type: ignore
+            similar_names = [SimilarName(**match) for match in similar_names_raw]
 
         await session.commit()
-        return {
-            "players": players,
-            "similar_names": similar_names,
-            "last_updated": last_updated,
-        }
+        return NotionFetchResponse(
+            players=players,
+            similar_names=similar_names,
+            last_updated=last_updated,
+        )
     except Exception as exc:
         await session.rollback()
         raise HTTPException(status_code=500, detail=str(exc)) from exc

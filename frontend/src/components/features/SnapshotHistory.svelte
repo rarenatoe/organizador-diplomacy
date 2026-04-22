@@ -1,12 +1,8 @@
 <script lang="ts">
-  import type { HistoryLog } from "../../types";
+  import type { HistoryEntry } from "../../generated-api";
   import { formatAction, formatDate } from "../../i18n";
 
-  interface Props {
-    history: HistoryLog[];
-  }
-
-  let { history }: Props = $props();
+  let { history }: { history: HistoryEntry[] } = $props();
 </script>
 
 {#if history && history.length > 0}
@@ -35,7 +31,7 @@
             {#if log.changes.renamed.length > 0}
               <div class="change-renamed">
                 ✏️ Renombrados: {log.changes.renamed
-                  .map((r) => `${r.from} ➔ ${r.to}`)
+                  .map((r) => `${r.old_name} ➔ ${r.new_name}`)
                   .join(", ")}
               </div>
             {/if}

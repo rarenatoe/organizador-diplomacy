@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import type { ChainResponse } from "./generated-api";
 import {
   setSnapshotCount,
   setChainData,
@@ -20,7 +21,7 @@ describe("stores.svelte", () => {
     });
 
     it("setChainData updates the value", () => {
-      const data = {
+      const data: ChainResponse = {
         roots: [
           {
             type: "snapshot" as const,
@@ -29,6 +30,7 @@ describe("stores.svelte", () => {
             source: "manual",
             player_count: 5,
             is_latest: true,
+            branches: [],
           },
         ],
       };

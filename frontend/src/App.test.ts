@@ -11,7 +11,7 @@ describe("App Integration - Draft State Reset", () => {
       has_priority: false,
       partidas_deseadas: 1,
       partidas_gm: 0,
-      original_nombre: "Alice",
+      oldName: "Alice",
       historyRestored: false,
     },
     {
@@ -21,7 +21,7 @@ describe("App Integration - Draft State Reset", () => {
       has_priority: true,
       partidas_deseadas: 2,
       partidas_gm: 1,
-      original_nombre: "Bob",
+      oldName: "Bob",
       historyRestored: false,
     },
   ];
@@ -39,7 +39,7 @@ describe("App Integration - Draft State Reset", () => {
       id: 123,
       draftProps: {
         parentId: 123,
-        eventType: "edit",
+        saveEventType: "manual",
         autoAction: null,
         initialPlayers: mockExistingPlayers,
         initialData: null,
@@ -60,7 +60,7 @@ describe("App Integration - Draft State Reset", () => {
       id: null,
       draftProps: {
         parentId: null,
-        eventType: "manual",
+        saveEventType: "manual",
         autoAction: null,
         initialPlayers: [],
         initialData: null,
@@ -89,7 +89,7 @@ describe("App Integration - Draft State Reset", () => {
       id: 1,
       draftProps: {
         parentId: 1,
-        eventType: "edit",
+        saveEventType: "manual",
         autoAction: null,
         initialPlayers: [],
         initialData: null,

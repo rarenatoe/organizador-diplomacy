@@ -8,12 +8,15 @@ Tests the two-step Draft Mode:
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 import pytest
 from sqlalchemy import select
 
-from backend.db.models import TimelineEdge
+from backend.db.models import SnapshotSource, TimelineEdge
+
+if TYPE_CHECKING:
+    from typing import Any
 
 pytestmark = pytest.mark.asyncio
 
@@ -26,7 +29,7 @@ async def make_snapshot_with_players(db_session: Any, count: int = 14) -> int:
     from backend.crud.players import get_or_create_player
     from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
 
-    snap_id = await create_snapshot(db_session, "manual")
+    snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
     for i in range(count):
         pid = await get_or_create_player(db_session, f"Jugador_{i:02d}")
         await add_player_to_snapshot(
@@ -75,7 +78,7 @@ class TestApiGameDraft:
         from backend.crud.players import get_or_create_player
         from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
 
-        snap_id = await create_snapshot(db_session, "manual")
+        snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
         for i in range(3):
             pid = await get_or_create_player(db_session, f"Few_{i}")
             await add_player_to_snapshot(
@@ -261,7 +264,7 @@ class TestApiGameSave:
             select(TimelineEdge).where(TimelineEdge.id == original_game_id)
         )
         game_row = result.scalar_one()
-        child_snapshot_id = await create_snapshot(db_session, "manual")
+        child_snapshot_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
         await create_branch_edge(db_session, game_row.output_snapshot_id, child_snapshot_id)
         await db_session.commit()
 
@@ -453,7 +456,7 @@ class TestApiGameDelete:
 
         # Setup: Snap A -> Game 1 -> Snap B
         snap_a = await make_snapshot_with_players(db_session, 14)
-        snap_b = await create_snapshot(db_session, "organizar")
+        snap_b = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
 
         # Create game edge from A to B
         game_edge_id = await create_game_edge(db_session, snap_a, snap_b, 1)
@@ -505,7 +508,7 @@ class TestApiGameDelete:
 
         # Helper function for this test
         async def make_snapshot_with_players_source(
-            db_session: Any, n: int = 5, source: str = "notion_sync"
+            db_session: Any, n: int = 5, source: SnapshotSource = SnapshotSource.NOTION_SYNC
         ) -> int:
             """Creates a snapshot with n players and returns snapshot_id."""
             snap_id = await create_snapshot(db_session, source)
@@ -519,9 +522,11 @@ class TestApiGameDelete:
 
         # Setup: A -> Game -> B
         #        A -> Manual -> C
-        snap_a = await make_snapshot_with_players_source(db_session, n=5, source="notion_sync")
-        snap_b = await create_snapshot(db_session, "organizar")
-        snap_c = await create_snapshot(db_session, "manual")
+        snap_a = await make_snapshot_with_players_source(
+            db_session, n=5, source=SnapshotSource.NOTION_SYNC
+        )
+        snap_b = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
+        snap_c = await create_snapshot(db_session, SnapshotSource.MANUAL)
 
         # Add different players to C to verify squashing
         pid_c1 = await get_or_create_player(db_session, "PlayerC1")
@@ -572,7 +577,7 @@ class TestApiGameDelete:
         # Assert 4: A's roster is now C's roster
         players_a = await get_snapshot_players(db_session, snap_a)
         assert len(players_a) == 2
-        player_names = {p["nombre"] for p in players_a}
+        player_names = {p.nombre for p in players_a}
         assert player_names == {"PlayerC1", "PlayerC2"}
 
         # Assert 5: A inherited C's source and timestamp

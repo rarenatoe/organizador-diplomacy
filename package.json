@@ -14,7 +14,7 @@
     "format": "prettier --write --plugin=prettier-plugin-svelte .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typegen": "cd frontend && openapi-ts"
+    "typegen": "uv run scripts/export_openapi.py && cd frontend && openapi-ts"
   },
   "repository": {
     "type": "git",

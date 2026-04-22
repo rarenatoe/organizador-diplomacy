@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { PlayerSimilarityItem } from "../../generated-api";
-  import type { ResolutionAction, MergePair } from "../../types";
+  import type { ResolutionAction, MergePair } from "../../syncResolution";
   import Badge from "../ui/Badge.svelte";
   import Button from "../ui/Button.svelte";
 

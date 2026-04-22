@@ -52,62 +52,6 @@ export interface WaitingItem {
   c_turkey?: number;
 }
 
-export interface SnapshotNode {
-  type: "snapshot";
-  id: number;
-  created_at: string;
-  source: string;
-  player_count: number;
-  is_latest: boolean;
-  branches?: Branch[];
-}
-
-export interface GameEdge {
-  type: "game";
-  id: number;
-  created_at: string;
-  from_id: number;
-  to_id: number;
-  intentos: number;
-  mesa_count: number;
-  espera_count: number;
-}
-
-export interface SyncEdge {
-  type: "sync";
-  id: number;
-  created_at: string;
-  from_id: number;
-  to_id: number;
-}
-
-export interface EditEdge {
-  type: "edit";
-  id: number;
-  created_at: string;
-  from_id: number;
-  to_id: number;
-}
-
-export type EdgeNode = GameEdge | SyncEdge | EditEdge;
-
-export interface Branch {
-  edge: EdgeNode;
-  output: SnapshotNode | null;
-}
-
-export interface ChainData {
-  roots?: SnapshotNode[];
-}
-
-export interface SnapshotDetail {
-  id: number;
-  created_at: string;
-  source: string;
-  players?: EditPlayerRow[];
-  history?: HistoryLog[];
-}
-
 export interface GameDetail {
   id: number;
   created_at: string;
@@ -118,74 +62,17 @@ export interface GameDetail {
   output_snapshot_id: number;
 }
 
-export interface DeleteResult {
-  deleted: number[];
-  error?: string;
-}
-
-export interface HistoryChanges {
-  added: string[];
-  removed: string[];
-  renamed: { from: string; to: string }[];
-  modified: {
-    nombre: string;
-    changes: Record<
-      string,
-      {
-        old: string | number | boolean | null;
-        new: string | number | boolean | null;
-      }
-    >;
-  }[];
-}
-
-export interface HistoryLog {
-  id: number;
-  created_at: string;
-  action_type: string;
-  changes: HistoryChanges;
-}
-
 export interface EditPlayerRow {
   nombre: string;
   notion_id?: string | null;
   notion_name?: string | null;
-  original_nombre?: string;
+  oldName?: string;
   is_new?: boolean;
   juegos_este_ano?: number;
   has_priority: boolean;
   partidas_deseadas: number;
   partidas_gm: number;
   historyRestored?: boolean;
-}
-
-export interface SnapshotSaveResponse {
-  snapshot_id: number;
-  error?: string;
-}
-
-export interface NotionFetchResponse {
-  players: NotionPlayer[];
-  similar_names: SimilarName[];
-  error?: string;
-}
-
-export interface NotionPlayer {
-  nombre: string;
-  is_new: boolean;
-  juegos_este_ano: number;
-  alias?: string[];
-  notion_id?: string | null;
-}
-
-export interface SimilarName {
-  notion_id: string;
-  notion_name: string;
-  snapshot: string;
-  similarity: number;
-  match_method: string;
-  matched_alias?: string;
-  existing_local_name?: string;
 }
 
 export interface OrganizarValidation {
@@ -197,44 +84,9 @@ export interface OrganizarValidation {
   excludedPlayers: string[];
 }
 
-export interface MergePair {
-  from: string;
-  to: string;
-  action: ResolutionAction;
-  notion_id?: string;
-}
-
 // ── Toast notification types ─────────────────────────────────────────────────
 
 export type ToastState = "syncing" | "success" | "error";
-
-export interface ToastOptions {
-  state: ToastState;
-  message: string;
-  dismissible?: boolean;
-}
-
-// ── Resolution card types ────────────────────────────────────────────────────
-
-export type ResolutionAction =
-  | "merge_notion"
-  | "merge_local"
-  | "link_only"
-  | "link_rename"
-  | "use_existing"
-  | "skip";
-
-// ── Snapshot Group types (UI transformation) ─────────────────────────────────
-
-export interface SnapshotVersion {
-  snapshot: SnapshotNode;
-  incomingEdge: SyncEdge | EditEdge | null; // The event that created THIS version (null for the root of the group)
-}
-
-export interface SnapshotGroup {
-  versions: SnapshotVersion[];
-  branches: Branch[]; // The branches emanating from the LAST version in this group
-}
 
 // ── Draft Mode types ─────────────────────────────────────────────────────────
 
@@ -281,11 +133,4 @@ export interface SaveDraftRequest {
   snapshot_id: number;
   draft: DraftResponse;
   editing_game_id?: number | null;
-}
-
-export interface SnapshotSaveRequest {
-  parent_id?: number | null;
-  event_type?: string;
-  players: PlayerData[];
-  renames?: { from: string; to: string }[];
 }

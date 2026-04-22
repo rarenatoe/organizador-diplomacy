@@ -8,9 +8,12 @@ models.py – Domain types shared across organizador.py, formatter.py, and viewe
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, field_validator
+
+if TYPE_CHECKING:
+    from typing import Any
 
 # ── CSV column reference ───────────────────────────────────────────────────────
 # Columns: Nombre, is_new, Juegos_Este_Ano, Prioridad, Partidas_Deseadas, Partidas_GM

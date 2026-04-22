@@ -6,11 +6,16 @@ Tests the sync daemon and Notion cache functionality.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
+
+from backend.db.models import SnapshotSource
+
+if TYPE_CHECKING:
+    from typing import Any
 
 pytestmark = pytest.mark.asyncio
 
@@ -255,22 +260,22 @@ class TestNotionSyncBackground:
             assert len(players) == 2
 
             # Build lookup by name
-            players_by_name = {p["nombre"]: p for p in players}
+            players_by_name = {p.nombre: p for p in players}
 
             # Verify Alice data (Antiguo with 5 games)
             assert "Alice" in players_by_name
             alice = players_by_name["Alice"]
-            assert not alice["is_new"]
-            assert alice["juegos_este_ano"] == 5
-            assert alice.get("c_england", 0) == 0
-            assert alice.get("c_france", 0) == 0
+            assert not alice.is_new
+            assert alice.juegos_este_ano == 5
+            assert alice.c_england == 0
+            assert alice.c_france == 0
 
             # Verify Bob data (Nuevo with 2 games)
             assert "Bob" in players_by_name
             bob = players_by_name["Bob"]
-            assert bob["is_new"]
-            assert bob["juegos_este_ano"] == 2
-            assert bob.get("c_england", 0) == 1  # Has England preference
+            assert bob.is_new
+            assert bob.juegos_este_ano == 2
+            assert bob.c_england == 1  # Has England preference
 
     async def test_run_sync_applies_merges_and_renames(
         self,
@@ -295,7 +300,7 @@ class TestNotionSyncBackground:
         from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
 
         async with AsyncSession(test_engine) as session:
-            snap_id = await create_snapshot(session, "test_source")
+            snap_id = await create_snapshot(session, SnapshotSource.NOTION_SYNC)
             player_id = await get_or_create_player(session, "AliceOld")
             await add_player_to_snapshot(
                 session, snap_id, player_id, 0, 1, 0, has_priority=False, is_new=True
@@ -352,9 +357,9 @@ class TestNotionSyncBackground:
 
             player = players[0]
             # Old name should be gone, new name should exist
-            assert player["nombre"] == "AliceNew"
+            assert player.nombre == "AliceNew"
             # Games this year should be updated from Notion (10)
-            assert player["juegos_este_ano"] == 10
+            assert player.juegos_este_ano == 10
 
             # Verify the player was renamed in the players table (continuity)
             from sqlalchemy import select
@@ -390,7 +395,7 @@ class TestNotionSyncBackground:
         from backend.crud.snapshots import add_player_to_snapshot
 
         async with AsyncSession(test_engine) as session:
-            snap_id = await create_snapshot(session, "notion_sync")
+            snap_id = await create_snapshot(session, SnapshotSource.NOTION_SYNC)
             player1_id = await get_or_create_player(session, "Alice")
             player2_id = await get_or_create_player(session, "Bob")
             await add_player_to_snapshot(
@@ -490,10 +495,9 @@ class TestNotionSyncBackground:
             assert history.changes["renamed"] == []
             assert len(history.changes["modified"]) == 1
             assert history.changes["modified"][0]["nombre"] == "Alice"
-            assert "players" in history.previous_state
 
             # Verify the previous roster is stored (Alice, Bob)
-            previous_players: list[dict[str, object]] = history.previous_state["players"]  # type: ignore[assignment]
+            previous_players = history.previous_state["players"]  # type: ignore[assignment]
             assert len(previous_players) == 2
             previous_names = {p["nombre"] for p in previous_players}
             assert previous_names == {"Alice", "Bob"}

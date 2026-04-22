@@ -6,13 +6,20 @@ migrating from raw SQLite to SQLAlchemy 2.0 with async sessions.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypedDict
 
+from pydantic import ValidationError
 from sqlalchemy import select, text
+
+from backend.api.models.snapshots import DeepDiffResult, HistoryEntry
+from backend.core.logger import logger
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+
+from backend.api.models.chain import Branch, ChainEdge, ChainResponse, SnapshotNode
+from backend.api.models.snapshots import SnapshotDetailResponse
 from backend.crud.snapshots import get_snapshot_players
 from backend.db.models import (
     GameDetail,
@@ -22,13 +29,31 @@ from backend.db.models import (
     Snapshot,
     SnapshotHistory,
     SnapshotPlayer,
+    SnapshotSource,
     TablePlayer,
     TimelineEdge,
     WaitingList,
 )
 
 
-async def build_chain_data(session: AsyncSession) -> dict[str, Any]:
+def _normalize_snapshot_source(raw_source: SnapshotSource | str) -> SnapshotSource:
+    """Normalize DB enum payloads to SnapshotSource-compatible values."""
+    if isinstance(raw_source, SnapshotSource):
+        return raw_source
+
+    # SQLAlchemy/SQLite raw queries can return enum names (e.g. NOTION_SYNC)
+    # instead of enum values (e.g. notion_sync).
+    return SnapshotSource(raw_source.lower())
+
+
+class ChainSnapshotRow(TypedDict):
+    id: int
+    created_at: str
+    source: SnapshotSource
+    player_count: int
+
+
+async def build_chain_data(session: AsyncSession) -> ChainResponse:
     """
     Builds the full chain tree for /api/chain.
 
@@ -51,17 +76,22 @@ async def build_chain_data(session: AsyncSession) -> dict[str, Any]:
         ORDER  BY s.id
     """)
     result = await session.execute(snap_query)
-    snap_rows = {
-        int(r[0]): {"id": r[0], "created_at": r[1], "source": r[2], "player_count": r[3]}
-        for r in result.all()
-    }
+    snap_rows: dict[int, ChainSnapshotRow] = {}
+    for r in result.all():
+        snapshot_id = int(r[0])
+        created_at = r[1].isoformat() if hasattr(r[1], "isoformat") else str(r[1]).replace(" ", "T")
+        snap_rows[snapshot_id] = {
+            "id": snapshot_id,
+            "created_at": created_at,
+            "source": _normalize_snapshot_source(r[2]),
+            "player_count": int(r[3]),
+        }
 
     if not snap_rows:
-        return {"roots": []}
+        return ChainResponse(roots=[])
 
     latest_id = max(snap_rows)
 
-    # Get all edges from unified timeline_edges table
     edges_query = text("""
         SELECT e.id, e.created_at, e.edge_type, e.source_snapshot_id, e.output_snapshot_id,
                gd.attempts,
@@ -74,59 +104,64 @@ async def build_chain_data(session: AsyncSession) -> dict[str, Any]:
         WHERE  e.source_snapshot_id IS NOT NULL
         GROUP  BY e.id
     """)
+
     result = await session.execute(edges_query)
 
-    edges: list[dict[str, Any]] = []
-    for r in result.all():
-        edge: dict[str, Any] = {
-            "type": r[2],
-            "id": int(r[0]),
-            "created_at": r[1],
-            "from_id": int(r[3]),
-            "to_id": int(r[4]),
-        }
-        if r[2] == "game":
-            edge["intentos"] = int(r[5] or 0)
-            edge["mesa_count"] = int(r[6])
-            edge["espera_count"] = int(r[7])
+    rows = result.mappings().all()
+
+    edges: list[ChainEdge] = []
+    for r in rows:
+        edge = ChainEdge(
+            type=r["edge_type"],
+            id=int(r["id"]),
+            created_at=r["created_at"].isoformat()
+            if hasattr(r["created_at"], "isoformat")
+            else str(r["created_at"]).replace(" ", "T"),
+            from_id=int(r["source_snapshot_id"]),
+            to_id=r["output_snapshot_id"],
+        )
+        if r["edge_type"] == "game":
+            edge.intentos = r["attempts"] or 0
+            edge.mesa_count = r["mesa_count"]
+            edge.espera_count = r["espera_count"]
         edges.append(edge)
 
     # from_id → [edges] sorted chronologically
-    from_to: dict[int, list[dict[str, Any]]] = {}
+    from_to: dict[int, list[ChainEdge]] = {}
     for edge in edges:
-        from_to.setdefault(edge["from_id"], []).append(edge)
+        from_to.setdefault(edge.from_id, []).append(edge)
     for lst in from_to.values():
-        lst.sort(key=lambda e: e["created_at"])
+        lst.sort(key=lambda e: e.created_at)
 
     # Root snapshots: no edge with a non-null source points to it
-    produced_ids: set[int] = {e["to_id"] for e in edges}
+    produced_ids: set[int] = {e.to_id for e in edges if e.to_id is not None}
     root_ids = [sid for sid in sorted(snap_rows) if sid not in produced_ids]
 
     visited: set[int] = set()
 
-    def _snap_node(sid: int) -> dict[str, Any]:
+    def _snap_node(sid: int) -> SnapshotNode:
         r = snap_rows[sid]
-        return {
-            "type": "snapshot",
-            "id": sid,
-            "created_at": r["created_at"],
-            "source": r["source"],
-            "player_count": r["player_count"],
-            "is_latest": sid == latest_id,
-            "branches": [],
-        }
+        return SnapshotNode(
+            type="snapshot",
+            id=sid,
+            created_at=r["created_at"],
+            source=r["source"],
+            player_count=r["player_count"],
+            is_latest=sid == latest_id,
+            branches=[],
+        )
 
-    def _walk(sid: int) -> dict[str, Any] | None:
+    def _walk(sid: int) -> SnapshotNode | None:
         if sid not in snap_rows or sid in visited:
             return None
         visited.add(sid)
         node = _snap_node(sid)
         for edge in from_to.get(sid, []):
-            output = _walk(edge["to_id"]) if edge.get("to_id") else None
-            node["branches"].append({"edge": edge, "output": output})
+            output = _walk(edge.to_id) if edge.to_id else None
+            node.branches.append(Branch(edge=edge, output=output))
         return node
 
-    roots: list[dict[str, Any]] = []
+    roots: list[SnapshotNode] = []
     for r in root_ids:
         n = _walk(r)
         if n is not None:
@@ -139,10 +174,12 @@ async def build_chain_data(session: AsyncSession) -> dict[str, Any]:
             if n is not None:
                 roots.append(n)
 
-    return {"roots": roots}
+    return ChainResponse(roots=roots)
 
 
-async def get_snapshot_detail(session: AsyncSession, snapshot_id: int) -> dict[str, Any] | None:
+async def get_snapshot_detail(
+    session: AsyncSession, snapshot_id: int
+) -> SnapshotDetailResponse | None:
     """Returns snapshot metadata + player list for the detail panel. None if not found."""
     result = await session.execute(select(Snapshot).where(Snapshot.id == snapshot_id))
     snap = result.scalar_one_or_none()
@@ -158,27 +195,31 @@ async def get_snapshot_detail(session: AsyncSession, snapshot_id: int) -> dict[s
     history_entries = history_result.scalars().all()
 
     # Serialize history for the frontend
-    history = [
-        {
-            "id": entry.id,
-            "created_at": entry.created_at.isoformat()
-            if hasattr(entry.created_at, "isoformat")
-            else str(entry.created_at),
-            "action_type": entry.action_type,
-            "changes": entry.changes,
-        }
-        for entry in history_entries
-    ]
+    history: list[HistoryEntry] = []
+    for entry in history_entries:
+        try:
+            history.append(
+                HistoryEntry(
+                    id=entry.id,
+                    created_at=entry.created_at,
+                    action_type=entry.action_type,
+                    changes=DeepDiffResult.model_validate(entry.changes),
+                )
+            )
+        except ValidationError:
+            logger.warning(
+                "Skipping malformed snapshot history entry",
+                exc_info=True,
+                extra={"snapshot_id": snapshot_id, "history_id": entry.id},
+            )
 
-    return {
-        "id": snap.id,
-        "created_at": snap.created_at.isoformat()
-        if hasattr(snap.created_at, "isoformat")
-        else str(snap.created_at),
-        "source": snap.source,
-        "players": await get_snapshot_players(session, snapshot_id),
-        "history": history,
-    }
+    return SnapshotDetailResponse(
+        id=snap.id,
+        created_at=snap.created_at,
+        source=snap.source,
+        players=await get_snapshot_players(session, snapshot_id),
+        history=history,
+    )
 
 
 async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[str, Any] | None:

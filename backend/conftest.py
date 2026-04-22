@@ -17,7 +17,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from backend.db.connection import get_session
-from backend.db.models import Base
+from backend.db.models import Base, SnapshotSource
 from backend.main import app
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient]:
 
 
 async def add_snapshot(
-    db_session: AsyncSession, source: str = "notion_sync", players: int = 5
+    db_session: AsyncSession, source: SnapshotSource = SnapshotSource.NOTION_SYNC, players: int = 5
 ) -> int:
     """Creates a snapshot with `players` dummy players and returns the snapshot id."""
     from backend.crud.players import get_or_create_player

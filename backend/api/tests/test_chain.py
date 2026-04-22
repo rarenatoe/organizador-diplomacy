@@ -6,12 +6,16 @@ Tests the chain data structure and snapshot relationships.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 import pytest
 
 from backend.crud.chain import create_game_edge
 from backend.crud.snapshots import create_snapshot
+from backend.db.models import SnapshotSource
+
+if TYPE_CHECKING:
+    from typing import Any
 
 pytestmark = pytest.mark.asyncio
 
@@ -80,8 +84,8 @@ class TestApiChain:
         from backend.conftest import add_snapshot
 
         snap1 = await add_snapshot(db_session, players=14)
-        snap2 = await create_snapshot(db_session, "organizar")
-        snap3 = await create_snapshot(db_session, "organizar")
+        snap2 = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
+        snap3 = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
         await db_session.commit()
 
         await create_game_edge(db_session, snap1, snap2, 1)

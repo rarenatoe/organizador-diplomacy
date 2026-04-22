@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { findLatestSnapshotId, findLatestGameId } from "./snapshotUtils";
-import type { SnapshotNode, GameEdge, SyncEdge } from "./types";
+import type { Branch, ChainEdge, SnapshotNode } from "./generated-api";
 
 describe("snapshotUtils", () => {
   const createSnapshot = (
@@ -17,7 +17,7 @@ describe("snapshotUtils", () => {
     branches,
   });
 
-  const createGameEdge = (id: number, createdAt: string): GameEdge => ({
+  const createGameEdge = (id: number, createdAt: string): ChainEdge => ({
     type: "game",
     id,
     created_at: createdAt,
@@ -28,12 +28,29 @@ describe("snapshotUtils", () => {
     espera_count: 0,
   });
 
-  const createSyncEdge = (id: number): SyncEdge => ({
+  const createSyncEdge = (id: number): ChainEdge => ({
     type: "sync",
     id,
     created_at: "2024-01-01",
     from_id: 1,
     to_id: 2,
+  });
+
+  const createSyncBranch = (
+    id: number,
+    output: SnapshotNode | null,
+  ): Branch => ({
+    edge: createSyncEdge(id),
+    output,
+  });
+
+  const createGameBranch = (
+    id: number,
+    createdAt: string,
+    output: SnapshotNode | null,
+  ): Branch => ({
+    edge: createGameEdge(id, createdAt),
+    output,
   });
 
   describe("findLatestSnapshotId", () => {
@@ -58,36 +75,28 @@ describe("snapshotUtils", () => {
 
     it("finds latest snapshot in nested branches", () => {
       const child = createSnapshot(3, true);
-      const root = createSnapshot(1, false, [
-        { edge: createSyncEdge(10), output: child },
-      ]);
+      const root = createSnapshot(1, false, [createSyncBranch(10, child)]);
       expect(findLatestSnapshotId([root])).toBe(3);
     });
 
     it("finds latest snapshot in deeply nested branches", () => {
       const grandchild = createSnapshot(4, true);
       const child = createSnapshot(3, false, [
-        { edge: createSyncEdge(11), output: grandchild },
+        createSyncBranch(11, grandchild),
       ]);
-      const root = createSnapshot(1, false, [
-        { edge: createSyncEdge(10), output: child },
-      ]);
+      const root = createSnapshot(1, false, [createSyncBranch(10, child)]);
       expect(findLatestSnapshotId([root])).toBe(4);
     });
 
     it("returns last found when multiple snapshots have is_latest true", () => {
       const child = createSnapshot(2, true);
-      const root = createSnapshot(1, true, [
-        { edge: createSyncEdge(10), output: child },
-      ]);
+      const root = createSnapshot(1, true, [createSyncBranch(10, child)]);
       // Should return the last one found (child)
       expect(findLatestSnapshotId([root])).toBe(2);
     });
 
     it("handles branches with null output", () => {
-      const root = createSnapshot(1, true, [
-        { edge: createSyncEdge(10), output: null },
-      ]);
+      const root = createSnapshot(1, true, [createSyncBranch(10, null)]);
       expect(findLatestSnapshotId([root])).toBe(1);
     });
   });
@@ -109,10 +118,7 @@ describe("snapshotUtils", () => {
     it("finds latest game by timestamp", () => {
       const child = createSnapshot(2, false);
       const root = createSnapshot(1, true, [
-        {
-          edge: createGameEdge(10, "2024-01-01T10:00:00"),
-          output: child,
-        },
+        createGameBranch(10, "2024-01-01T10:00:00", child),
       ]);
       expect(findLatestGameId([root])).toBe(10);
     });
@@ -121,14 +127,8 @@ describe("snapshotUtils", () => {
       const child1 = createSnapshot(2, false);
       const child2 = createSnapshot(3, false);
       const root = createSnapshot(1, true, [
-        {
-          edge: createGameEdge(10, "2024-01-01T10:00:00"),
-          output: child1,
-        },
-        {
-          edge: createGameEdge(11, "2024-01-01T12:00:00"),
-          output: child2,
-        },
+        createGameBranch(10, "2024-01-01T10:00:00", child1),
+        createGameBranch(11, "2024-01-01T12:00:00", child2),
       ]);
       expect(findLatestGameId([root])).toBe(11);
     });
@@ -136,25 +136,17 @@ describe("snapshotUtils", () => {
     it("finds latest game in nested branches", () => {
       const grandchild = createSnapshot(3, false);
       const child = createSnapshot(2, false, [
-        {
-          edge: createGameEdge(11, "2024-01-01T12:00:00"),
-          output: grandchild,
-        },
+        createGameBranch(11, "2024-01-01T12:00:00", grandchild),
       ]);
       const root = createSnapshot(1, true, [
-        {
-          edge: createGameEdge(10, "2024-01-01T10:00:00"),
-          output: child,
-        },
+        createGameBranch(10, "2024-01-01T10:00:00", child),
       ]);
       expect(findLatestGameId([root])).toBe(11);
     });
 
     it("ignores non-game edges", () => {
       const child = createSnapshot(2, false);
-      const root = createSnapshot(1, true, [
-        { edge: createSyncEdge(10), output: child },
-      ]);
+      const root = createSnapshot(1, true, [createSyncBranch(10, child)]);
       expect(findLatestGameId([root])).toBeNull();
     });
 
@@ -162,21 +154,15 @@ describe("snapshotUtils", () => {
       const child1 = createSnapshot(2, false);
       const child2 = createSnapshot(3, false);
       const root = createSnapshot(1, true, [
-        { edge: createSyncEdge(10), output: child1 },
-        {
-          edge: createGameEdge(11, "2024-01-01T12:00:00"),
-          output: child2,
-        },
+        createSyncBranch(10, child1),
+        createGameBranch(11, "2024-01-01T12:00:00", child2),
       ]);
       expect(findLatestGameId([root])).toBe(11);
     });
 
     it("handles branches with null output", () => {
       const root = createSnapshot(1, true, [
-        {
-          edge: createGameEdge(10, "2024-01-01T10:00:00"),
-          output: null,
-        },
+        createGameBranch(10, "2024-01-01T10:00:00", null),
       ]);
       expect(findLatestGameId([root])).toBe(10);
     });

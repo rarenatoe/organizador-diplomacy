@@ -1,6 +1,4 @@
 <script lang="ts">
-  import type { SnapshotNode } from "../../types";
-  import { fetchChain } from "../../api";
   import {
     setSnapshotCount,
     setChainData,
@@ -8,6 +6,7 @@
   } from "../../stores.svelte";
   import Button from "../ui/Button.svelte";
   import Node from "../ui/Node.svelte";
+  import { apiChain, type SnapshotNode } from "../../generated-api";
 
   interface Props {
     onOpenSnapshot: (id: number) => void;
@@ -33,10 +32,10 @@
   export async function loadChain(): Promise<void> {
     loading = true;
     try {
-      const data = await fetchChain();
+      const { data } = await apiChain();
       setChainData(data);
-      setSnapshotCount(data.roots?.length ?? 0);
-      localRoots = data.roots ?? [];
+      setSnapshotCount(data?.roots.length ?? 0);
+      localRoots = data?.roots ?? [];
     } finally {
       loading = false;
     }

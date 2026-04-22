@@ -7,10 +7,11 @@ Tests to prevent tuple indexing errors in SQL result processing.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING
 
 import pytest
 
+from backend.api.models.snapshots import DeepDiffResult, HistoryState, PlayerData
 from backend.crud.chain import create_game_edge
 from backend.crud.games import (
     add_table_player,
@@ -21,8 +22,11 @@ from backend.crud.snapshots import (
     add_player_to_snapshot,
     create_snapshot,
 )
-from backend.db.models import NotionCache
+from backend.db.models import NotionCache, SnapshotSource
 from backend.db.views import get_game_event_detail, get_snapshot_detail
+
+if TYPE_CHECKING:
+    from typing import Any
 
 pytestmark = pytest.mark.asyncio
 
@@ -44,7 +48,7 @@ class TestGetGameEventDetailCountryRegression:
         where p[12] was used instead of p[13] for the country field.
         """
         # Setup: Create players with different c_turkey values
-        snap1 = await create_snapshot(db_session, "manual")
+        snap1 = await create_snapshot(db_session, SnapshotSource.MANUAL)
 
         # Create players with distinct c_turkey values
         pid1 = await get_or_create_player(db_session, "PlayerWithHighTurkey")
@@ -94,7 +98,7 @@ class TestGetGameEventDetailCountryRegression:
         await db_session.commit()
 
         # Create game event with tables
-        snap2 = await create_snapshot(db_session, "organizar")
+        snap2 = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
         await db_session.commit()
 
         edge_id = await create_game_edge(db_session, snap1, snap2, 1)
@@ -143,7 +147,7 @@ class TestGetGameEventDetailCountryRegression:
         The view returns raw country names (not translated) from the database.
         """
         # Setup: Create 7 players with each country
-        snap1 = await create_snapshot(db_session, "manual")
+        snap1 = await create_snapshot(db_session, SnapshotSource.MANUAL)
         countries = ["England", "France", "Germany", "Italy", "Austria", "Russia", "Turkey"]
         player_ids: list[int] = []
 
@@ -156,7 +160,7 @@ class TestGetGameEventDetailCountryRegression:
             )
         await db_session.commit()
 
-        snap2 = await create_snapshot(db_session, "organizar")
+        snap2 = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
         await db_session.commit()
 
         edge_id = await create_game_edge(db_session, snap1, snap2, 1)
@@ -200,7 +204,7 @@ class TestGetGameEventDetailCountryRegression:
         empty string to represent "no country assigned".
         """
         # Setup
-        snap1 = await create_snapshot(db_session, "manual")
+        snap1 = await create_snapshot(db_session, SnapshotSource.MANUAL)
         pid = await get_or_create_player(db_session, "PlayerNoCountry")
         await db_session.commit()
 
@@ -209,7 +213,7 @@ class TestGetGameEventDetailCountryRegression:
         )
         await db_session.commit()
 
-        snap2 = await create_snapshot(db_session, "organizar")
+        snap2 = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
         await db_session.commit()
 
         edge_id = await create_game_edge(db_session, snap1, snap2, 1)
@@ -244,8 +248,8 @@ async def test_view_returns_country_reason(db_session: Any) -> None:
     player = await get_or_create_player(db_session, "TestPlayer")
 
     # Create snapshots and game edge
-    input_snap = await create_snapshot(db_session, "manual")
-    output_snap = await create_snapshot(db_session, "organizar")
+    input_snap = await create_snapshot(db_session, SnapshotSource.MANUAL)
+    output_snap = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
 
     # Add player to both snapshots so they appear in the view
     await add_player_to_snapshot(
@@ -284,13 +288,13 @@ class TestSnapshotHistoryInDetail:
         """
         Verify get_snapshot_detail returns an empty history array for new snapshots.
         """
-        snap_id = await create_snapshot(db_session, "manual")
+        snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
         await db_session.commit()
 
         detail = await get_snapshot_detail(db_session, snap_id)
         assert detail is not None
-        assert "history" in detail, "history key should exist in snapshot detail"
-        assert detail["history"] == [], "New snapshot should have empty history"
+        assert hasattr(detail, "history"), "history attribute should exist in snapshot detail"
+        assert detail.history == [], "New snapshot should have empty history"
 
     async def test_snapshot_detail_includes_history_after_log(self, db_session: Any) -> None:
         """
@@ -299,7 +303,7 @@ class TestSnapshotHistoryInDetail:
         from backend.crud.snapshots import log_snapshot_history
 
         # Create snapshot
-        snap_id = await create_snapshot(db_session, "manual")
+        snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
         pid = await get_or_create_player(db_session, "Player1")
         await add_player_to_snapshot(
             db_session, snap_id, pid, 5, 2, 0, has_priority=True, is_new=False
@@ -310,36 +314,44 @@ class TestSnapshotHistoryInDetail:
         await log_snapshot_history(
             db_session,
             snapshot_id=snap_id,
-            action_type="manual_edit",
-            changes={"added": [], "removed": [], "renamed": [], "modified": []},
-            previous_state={
-                "players": [
-                    {
-                        "nombre": "OldPlayer",
-                        "is_new": True,
-                        "juegos_este_ano": 0,
-                        "has_priority": True,
-                        "partidas_deseadas": 1,
-                        "partidas_gm": 0,
-                    }
+            action_type=SnapshotSource.MANUAL_EDIT,
+            changes=DeepDiffResult(added=[], removed=[], renamed=[], modified=[]),
+            previous_state=HistoryState(
+                players=[
+                    PlayerData(
+                        nombre="OldPlayer",
+                        notion_id="old-notion-1",
+                        notion_name="OldPlayer",
+                        is_new=True,
+                        juegos_este_ano=0,
+                        has_priority=True,
+                        partidas_deseadas=1,
+                        partidas_gm=0,
+                        c_england=0,
+                        c_france=0,
+                        c_germany=0,
+                        c_italy=0,
+                        c_austria=0,
+                        c_russia=0,
+                        c_turkey=0,
+                        alias=None,
+                    )
                 ]
-            },
+            ),
         )
         await db_session.commit()
 
         # Retrieve and verify
         detail = await get_snapshot_detail(db_session, snap_id)
         assert detail is not None
-        assert "history" in detail
-        assert len(detail["history"]) == 1, (
-            f"Expected 1 history entry, got {len(detail['history'])}"
-        )
+        assert hasattr(detail, "history"), "history attribute should exist in snapshot detail"
+        assert len(detail.history) == 1, f"Expected 1 history entry, got {len(detail.history)}"
 
-        log = detail["history"][0]
-        assert "id" in log
-        assert "created_at" in log
-        assert log["action_type"] == "manual_edit"
-        assert log["changes"] == {"added": [], "removed": [], "renamed": [], "modified": []}
+        log = detail.history[0]
+        assert hasattr(log, "id")
+        assert hasattr(log, "created_at")
+        assert log.action_type == "manual_edit"
+        assert log.changes == DeepDiffResult(added=[], removed=[], renamed=[], modified=[])
 
     async def test_snapshot_detail_history_ordered_by_date_desc(self, db_session: Any) -> None:
         """
@@ -350,33 +362,32 @@ class TestSnapshotHistoryInDetail:
         """
         from backend.crud.snapshots import log_snapshot_history
 
-        snap_id = await create_snapshot(db_session, "manual")
+        snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
         await db_session.commit()
 
         # Log multiple entries
-        for i in range(3):
+        for _ in range(3):
             await log_snapshot_history(
                 db_session,
                 snapshot_id=snap_id,
-                action_type=f"action_{i}",
-                changes={"added": [], "removed": [], "renamed": [], "modified": []},
-                previous_state={"players": []},
+                action_type=SnapshotSource.MANUAL_EDIT,
+                changes=DeepDiffResult(added=[], removed=[], renamed=[], modified=[]),
+                previous_state=HistoryState(players=[]),
             )
             await db_session.commit()
 
         # Retrieve and verify
         detail = await get_snapshot_detail(db_session, snap_id)
         assert detail is not None
-        assert len(detail["history"]) == 3
+        assert len(detail.history) == 3
 
         # Verify all action types are present
-        action_types = {entry["action_type"] for entry in detail["history"]}
-        assert action_types == {"action_0", "action_1", "action_2"}
+        action_types = {entry.action_type for entry in detail.history}
+        assert action_types == {SnapshotSource.MANUAL_EDIT}
 
         # Verify timestamps are present and properly formatted
-        for entry in detail["history"]:
-            assert "created_at" in entry
-            assert isinstance(entry["created_at"], str)
+        for entry in detail.history:
+            assert isinstance(entry.created_at, datetime)
 
 
 class TestGetSnapshotDetailFanOutRegression:
@@ -400,7 +411,7 @@ class TestGetSnapshotDetailFanOutRegression:
         from backend.crud.snapshots import get_snapshot_players
 
         # Setup: Create a snapshot with one player
-        snap_id = await create_snapshot(db_session, "manual")
+        snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
         player_id = await get_or_create_player(db_session, "VeteranPlayer")
 
         # Add player to snapshot
@@ -434,12 +445,12 @@ class TestGetSnapshotDetailFanOutRegression:
         # The bug would cause 3 rows (one per NotionCache entry) before .distinct()
         assert len(players) == 1, (
             f"Expected 1 player, got {len(players)} - JOIN fan-out bug! "
-            f"Players returned: {[p['nombre'] for p in players]}"
+            f"Players returned: {[p.nombre for p in players]}"
         )
 
         # Verify the single player has the correct data
-        assert players[0]["nombre"] == "VeteranPlayer"
-        assert not players[0]["is_new"]
+        assert players[0].nombre == "VeteranPlayer"
+        assert not players[0].is_new
 
     async def test_get_snapshot_detail_no_duplicates_with_history(self, db_session: Any) -> None:
         """
@@ -449,7 +460,7 @@ class TestGetSnapshotDetailFanOutRegression:
         get_snapshot_players to ensure no fan-out occurs.
         """
         # Setup: Create a snapshot with a player
-        snap_id = await create_snapshot(db_session, "manual")
+        snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
         player_id = await get_or_create_player(db_session, "MultiCachePlayer")
 
         await add_player_to_snapshot(
@@ -479,7 +490,7 @@ class TestGetSnapshotDetailFanOutRegression:
         detail = await get_snapshot_detail(db_session, snap_id)
 
         assert detail is not None
-        assert len(detail["players"]) == 1, (
-            f"Expected 1 player in snapshot detail, got {len(detail['players'])}"
+        assert len(detail.players) == 1, (
+            f"Expected 1 player in snapshot detail, got {len(detail.players)}"
         )
-        assert detail["players"][0]["nombre"] == "MultiCachePlayer"
+        assert detail.players[0].nombre == "MultiCachePlayer"

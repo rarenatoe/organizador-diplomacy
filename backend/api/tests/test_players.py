@@ -1,31 +1,33 @@
 """
-test_players.py — Tests for /api/player/rename and /api/snapshot/<id>/add-player endpoints.
+test_players.py - Tests for player API behavior.
 
-Tests player renaming functionality.
+Tests player renaming and lookup functionality.
 """
 
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING
 
 import pytest
 from sqlalchemy import select
 
+from backend.api.models.snapshots import DeepDiffResult, HistoryState, PlayerData
 from backend.crud.players import get_or_create_player
 from backend.crud.snapshots import (
     add_player_to_snapshot,
     create_snapshot,
 )
 from backend.db.models import (
-    DeepDiffResult,
-    HistoryStateDict,
     NotionCache,
     Player,
     SnapshotHistory,
-    SnapshotPlayer,
+    SnapshotSource,
     TimelineEdge,
 )
+
+if TYPE_CHECKING:
+    from typing import Any
 
 pytestmark = pytest.mark.asyncio
 
@@ -35,7 +37,7 @@ pytestmark = pytest.mark.asyncio
 
 async def make_snapshot_with_player(db_session: Any, name: str = "Alice") -> tuple[int, int]:
     """Creates a snapshot with one player; returns (snapshot_id, player_id)."""
-    snap_id = await create_snapshot(db_session, "manual")
+    snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
     pid = await get_or_create_player(db_session, name)
     await add_player_to_snapshot(
         db_session,
@@ -98,7 +100,7 @@ class TestApiPlayerRename:
         self, client: Any, db_session: Any
     ) -> None:
         """Rename fails with 409 when both players are in the same snapshot."""
-        snap_id = await create_snapshot(db_session, "manual")
+        snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
         # Add two players to the same snapshot
         carol_id = await get_or_create_player(db_session, "Carol")
         diana_id = await get_or_create_player(db_session, "Diana")
@@ -127,7 +129,7 @@ class TestApiPlayerRename:
         # Rename the player
         await client.post("/api/player/rename", json={"old_name": "Eve", "new_name": "Evelyn"})
         # Create a new snapshot after the rename
-        snap_id2 = await create_snapshot(db_session, "manual")
+        snap_id2 = await create_snapshot(db_session, SnapshotSource.MANUAL)
         await add_player_to_snapshot(
             db_session,
             snap_id2,
@@ -143,7 +145,7 @@ class TestApiPlayerRename:
         from backend.crud.snapshots import get_snapshot_players
 
         rows = await get_snapshot_players(db_session, snap_id)
-        names = [r["nombre"] for r in rows]
+        names = [r.nombre for r in rows]
         assert "Eve" in names or "Evelyn" in names
 
     async def test_rename_is_global_across_snapshots(self, client: Any, db_session: Any) -> None:
@@ -152,7 +154,7 @@ class TestApiPlayerRename:
         (they share the same player_id).
         """
         snap_id, pid = await make_snapshot_with_player(db_session, "Frank")
-        snap_id2 = await create_snapshot(db_session, "manual")
+        snap_id2 = await create_snapshot(db_session, SnapshotSource.MANUAL)
         await add_player_to_snapshot(
             db_session,
             snap_id2,
@@ -170,70 +172,11 @@ class TestApiPlayerRename:
 
         rows1 = await get_snapshot_players(db_session, snap_id)
         rows2 = await get_snapshot_players(db_session, snap_id2)
-        names1 = [r["nombre"] for r in rows1]
-        names2 = [r["nombre"] for r in rows2]
+        names1 = [r.nombre for r in rows1]
+        names2 = [r.nombre for r in rows2]
         # Both snapshots should see the new name
         assert all(n == "Francis" for n in names1)
         assert all(n == "Francis" for n in names2)
-
-
-# ── POST /api/snapshot/<id>/add-player ───────────────────────────────────────
-
-
-class TestApiSnapshotAddPlayer:
-    async def test_add_player_missing_name(self, client: Any, db_session: Any) -> None:
-        snap_id = await create_snapshot(db_session, "manual")
-        await db_session.commit()
-        resp = await client.post(f"/api/snapshot/{snap_id}/add-player", json={})
-        assert resp.status_code == 422  # FastAPI validation error
-
-    async def test_add_player_to_snapshot_succeeds(self, client: Any, db_session: Any) -> None:
-        """Adding a player increases the snapshot's player count."""
-        from backend.crud.snapshots import get_snapshot_players
-
-        snap_id = await create_snapshot(db_session, "manual")
-        await db_session.commit()
-        rows_before = await get_snapshot_players(db_session, snap_id)
-        resp = await client.post(
-            f"/api/snapshot/{snap_id}/add-player",
-            json={
-                "nombre": "Grace",
-                "is_new": False,
-                "juegos_este_ano": 1,
-                "has_priority": True,
-                "partidas_deseadas": 2,
-                "partidas_gm": 0,
-            },
-        )
-        assert resp.status_code == 200
-        await db_session.commit()
-        rows_after = await get_snapshot_players(db_session, snap_id)
-        assert len(rows_after) == len(rows_before) + 1
-        names = [r["nombre"] for r in rows_after]
-        assert "Grace" in names
-
-    async def test_add_duplicate_player_reuses_id(self, client: Any, db_session: Any) -> None:
-        """Adding a player with an existing name must reuse the same player_id."""
-        snap_id, pid = await make_snapshot_with_player(db_session, "Helen")
-        resp = await client.post(
-            f"/api/snapshot/{snap_id}/add-player",
-            json={
-                "nombre": "Helen",
-                "is_new": True,
-                "juegos_este_ano": 5,
-                "has_priority": False,
-                "partidas_deseadas": 1,
-                "partidas_gm": 1,
-            },
-        )
-        assert resp.status_code == 200
-        # Check that we only have one player entry for Helen
-        result = await db_session.execute(
-            select(SnapshotPlayer).where(SnapshotPlayer.snapshot_id == snap_id)
-        )
-        snapshot_players = result.scalars().all()
-        helen_entries = [sp for sp in snapshot_players if sp.player_id == pid]
-        assert len(helen_entries) == 1
 
 
 class TestPlayerLookup:
@@ -323,8 +266,8 @@ class TestPlayerLookup:
         """Ensures we can walk back through TimelineEdges to find history."""
         from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
 
-        s1 = await create_snapshot(db_session, "manual")
-        s2 = await create_snapshot(db_session, "manual")  # The 'current' one
+        s1 = await create_snapshot(db_session, SnapshotSource.MANUAL)
+        s2 = await create_snapshot(db_session, SnapshotSource.MANUAL)  # The 'current' one
         p_id = await get_or_create_player(db_session, "Walker")
 
         # Add player to s1 (the past)
@@ -344,7 +287,7 @@ class TestPlayerLookup:
         """If not in timeline, find the most recent SnapshotPlayer record globally."""
         from backend.crud.snapshots import add_player_to_snapshot, create_snapshot
 
-        old_snap = await create_snapshot(db_session, "manual")
+        old_snap = await create_snapshot(db_session, SnapshotSource.MANUAL)
         p_id = await get_or_create_player(db_session, "Globalist")
         await add_player_to_snapshot(
             db_session, old_snap, p_id, 5, 1, 0, has_priority=False, is_new=False
@@ -361,23 +304,33 @@ class TestPlayerLookup:
 
     async def test_lookup_json_logs_rescue(self, client: Any, db_session: Any) -> None:
         """Test the 'Fallback 2': searching through SnapshotHistory.previous_state."""
-        history_state: HistoryStateDict = {
-            "players": [
-                {
-                    "nombre": "Ghost",
-                    "is_new": False,
-                    "juegos_este_ano": 8,
-                    "has_priority": True,
-                    "partidas_deseadas": 1,
-                    "partidas_gm": 0,
-                }
+        history_state = HistoryState(
+            players=[
+                PlayerData(
+                    nombre="Ghost",
+                    is_new=False,
+                    juegos_este_ano=8,
+                    has_priority=True,
+                    partidas_deseadas=1,
+                    partidas_gm=0,
+                    notion_id=None,
+                    notion_name=None,
+                    c_england=0,
+                    c_france=0,
+                    c_germany=0,
+                    c_italy=0,
+                    c_austria=0,
+                    c_russia=0,
+                    c_turkey=0,
+                    alias=None,
+                )
             ]
-        }
+        )
         history_entry = SnapshotHistory(
             snapshot_id=1,
-            action_type="manual_edit",
-            changes=DeepDiffResult(added=[], removed=[], renamed=[], modified=[]),
-            previous_state=history_state,
+            action_type=SnapshotSource.MANUAL_EDIT,
+            changes=DeepDiffResult(added=[], removed=[], renamed=[], modified=[]).model_dump(),
+            previous_state=history_state.model_dump(),
         )
         db_session.add(history_entry)
         await db_session.commit()

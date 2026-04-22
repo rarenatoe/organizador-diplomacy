@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.session import AsyncSession
 
+
+from backend.api.models.chain import ChainResponse
 from backend.db.connection import get_session
 from backend.db.views import build_chain_data
 
@@ -18,7 +20,7 @@ router = APIRouter(prefix="/api")
 @router.get("/chain")
 async def api_chain(
     session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, Any]:
+) -> ChainResponse:
     """Returns the full chain tree for the timeline view."""
     try:
         data = await build_chain_data(session)

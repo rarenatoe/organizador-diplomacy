@@ -2,77 +2,45 @@
 
 from __future__ import annotations
 
-from datetime import datetime  # noqa: TCH003
+from datetime import datetime
 from enum import StrEnum
-from typing import Any, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import JSON, ForeignKey, String, func
+from pydantic import BaseModel
+from sqlalchemy import JSON, ForeignKey, String, TypeDecorator, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, MappedAsDataclass, mapped_column, relationship
 
-# ── TypedDict types for diffing logic ─────────────────────────────────────────
+if TYPE_CHECKING:
+    from sqlalchemy.engine.interfaces import Dialect
 
-# Using alternative TypedDict syntax to handle reserved keyword 'from'
-RenameDict = TypedDict("RenameDict", {"from": str, "to": str})
-
-
-class FieldChange(TypedDict):
-    """A change to a single field with old and new values."""
-
-    old: Any
-    new: Any
+    # We import these ONLY for Pyright autocomplete to avoid circular imports!
 
 
-class ModifiedPlayer(TypedDict):
-    """A player with modified fields."""
+class PydanticJSON(TypeDecorator[BaseModel | dict[str, Any]]):
+    """Seamlessly converts Pydantic models to JSON dictionaries on database write."""
 
-    nombre: str
-    changes: dict[str, FieldChange]
+    impl = JSON
+    cache_ok = True
 
+    def process_bind_param(
+        self,
+        value: BaseModel | dict[str, Any] | None,
+        dialect: Dialect,
+    ) -> dict[str, Any] | list[Any] | None:
+        del dialect
+        if value is None:
+            return None
+        if isinstance(value, BaseModel):
+            return value.model_dump(by_alias=True)
+        return value
 
-class DeepDiffResult(TypedDict):
-    """Result of a deep diff operation on player lists."""
-
-    added: list[str]
-    removed: list[str]
-    renamed: list[RenameDict]
-    modified: list[ModifiedPlayer]
-
-
-class PlayerStateDict(TypedDict):
-    """TypedDict for player state in JSON history logs."""
-
-    # Basic fields (always present)
-    nombre: str
-    notion_id: NotRequired[str | None]
-    notion_name: NotRequired[str | None]
-    is_new: bool
-    juegos_este_ano: int
-    has_priority: bool
-    partidas_deseadas: int
-    partidas_gm: int
-
-    # Country fields (optional, may not be present in history logs)
-    c_england: NotRequired[int]
-    c_france: NotRequired[int]
-    c_germany: NotRequired[int]
-    c_italy: NotRequired[int]
-    c_austria: NotRequired[int]
-    c_russia: NotRequired[int]
-    c_turkey: NotRequired[int]
-
-
-class HistoryStateDict(TypedDict, total=False):
-    """TypedDict for history state JSON structure."""
-
-    players: list[PlayerStateDict]
-
-
-class HistoryActionType(StrEnum):
-    """Types of history actions for snapshot mutations."""
-
-    MANUAL_EDIT = "manual_edit"
-    NOTION_SYNC = "notion_sync"
-    CREATION = "creation"
+    def process_result_value(
+        self,
+        value: dict[str, Any] | None,
+        dialect: Dialect,
+    ) -> dict[str, Any] | None:
+        del dialect
+        return value
 
 
 class Base(MappedAsDataclass, DeclarativeBase):
@@ -110,6 +78,13 @@ class Player(Base, kw_only=True):
     )
 
 
+class SnapshotSource(StrEnum):
+    MANUAL = "manual"
+    MANUAL_EDIT = "manual_edit"
+    NOTION_SYNC = "notion_sync"
+    ORGANIZAR = "organizar"
+
+
 class Snapshot(Base, kw_only=True):
     """Point-in-time roster snapshots."""
 
@@ -117,7 +92,7 @@ class Snapshot(Base, kw_only=True):
 
     id: Mapped[int] = mapped_column(ForeignKey("graph_nodes.id"), primary_key=True)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
-    source: Mapped[str] = mapped_column()
+    source: Mapped[SnapshotSource] = mapped_column()
 
     # Relationships
     history_logs: Mapped[list[SnapshotHistory]] = relationship(
@@ -246,8 +221,6 @@ class SnapshotHistory(Base, kw_only=True):
     id: Mapped[int] = mapped_column(primary_key=True, init=False)
     snapshot_id: Mapped[int] = mapped_column(ForeignKey("snapshots.id"))
     created_at: Mapped[datetime] = mapped_column(default=func.now())
-    action_type: Mapped[str] = mapped_column()  # e.g., 'notion_sync', 'manual_edit'
-    changes: Mapped[DeepDiffResult] = mapped_column(JSON)  # Structured changes object
-    previous_state: Mapped[HistoryStateDict] = mapped_column(
-        JSON
-    )  # Raw dict of the roster before the change
+    action_type: Mapped[SnapshotSource] = mapped_column(String)
+    changes: Mapped[dict[str, Any]] = mapped_column(JSON)
+    previous_state: Mapped[dict[str, Any]] = mapped_column(JSON)

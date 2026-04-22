@@ -1,12 +1,8 @@
 <script lang="ts">
   import { onMount, tick, untrack } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
-  import type {
-    EditPlayerRow,
-    SimilarName,
-    MergePair,
-    NotionPlayer,
-  } from "../../types";
+  import type { EditPlayerRow } from "../../types";
+  import type { MergePair } from "../../syncResolution";
 
   type CsvPlayerRow = {
     nombre: string;
@@ -22,8 +18,7 @@
 
   import { buildPlayerRow } from "../../snapshotUtils";
   import PlayerName from "../ui/PlayerName.svelte";
-  import { saveSnapshot, fetchNotionPlayers } from "../../api";
-  import { parsePlayersCsv, normalizeName } from "../../utils";
+  import { parseApiError, parsePlayersCsv, normalizeName } from "../../utils";
   import { setActiveNodeId } from "../../stores.svelte";
   import { applySyncMerges } from "../../syncUtils";
   import { clickOutside } from "../../clickOutside";
@@ -40,6 +35,10 @@
     apiPlayerCheckSimilarity,
     apiPlayerGetAll,
     apiPlayerLookup,
+    apiNotionFetch,
+    apiSnapshotSave,
+    type SnapshotSaveEventType,
+    type NotionPlayerData,
     type PlayerAutocompleteItem,
     type PlayerHistoryItem,
     type PlayerSimilarityItem,
@@ -59,7 +58,7 @@
   interface Props {
     parentId: number | null;
     initialPlayers: EditPlayerRow[];
-    defaultEventType: "manual" | "sync" | "edit";
+    saveEventType: SnapshotSaveEventType;
     autoAction?: "notion" | "csv" | null;
     onClose: () => void;
     onCancel: () => void;
@@ -71,7 +70,7 @@
   let {
     parentId,
     initialPlayers,
-    defaultEventType,
+    saveEventType: initialSaveEventType,
     autoAction = null,
     onClose,
     onCancel,
@@ -84,7 +83,7 @@
     untrack(() =>
       initialPlayers.map((p) => ({
         nombre: p.nombre,
-        original_nombre: p.nombre, // Track original name for rename detection
+        oldName: p.nombre, // Track original name for rename detection
         is_new: p.is_new ?? true,
         juegos_este_ano: p.juegos_este_ano ?? 0,
         has_priority: p.has_priority,
@@ -96,7 +95,7 @@
       })),
     ),
   );
-  let eventType = $state(untrack(() => defaultEventType));
+  let saveEventType = $state(untrack(() => initialSaveEventType));
   let knownPlayers: PlayerAutocompleteItem[] = $state([]);
   let isAddingPlayer = $state(false);
   let newPlayerSearchQuery = $state("");
@@ -106,7 +105,7 @@
   let isImporting = $state(false);
   let resolutionVisible = $state(false);
   let resolutionPairs = $state<Array<PlayerSimilarityItem>>([]);
-  let fetchedNotionPlayers = $state<NotionPlayer[]>([]);
+  let fetchedNotionPlayers = $state<NotionPlayerData[]>([]);
 
   // Derived state for editing vs creating context
   let isEditing = $derived(parentId !== null);
@@ -120,7 +119,7 @@
   );
   let saveButtonText = $derived.by(() => {
     if (saving) return "Guardando...";
-    if (eventType === "sync") return "Guardar Sincronización";
+    if (saveEventType === "sync") return "Guardar Sincronización";
     if (isEditing) return "Guardar Cambios";
     return "Crear Versión";
   });
@@ -322,18 +321,20 @@
       const unlinkedNames = draftPlayers
         .filter((p) => !p.notion_id)
         .map((p) => p.nombre);
-      const response = await fetchNotionPlayers(unlinkedNames);
+      const response = await apiNotionFetch({
+        body: { snapshot_names: unlinkedNames },
+      });
 
       if (response.error) {
-        onShowError("Aviso / Error", `Error: ${response.error}`);
+        onShowError("Aviso / Error", parseApiError(response.error));
         return;
       }
 
-      fetchedNotionPlayers = response.players;
+      fetchedNotionPlayers = response.data?.players ?? [];
 
-      if (response.similar_names && response.similar_names.length > 0) {
+      if ((response.data?.similar_names?.length ?? 0) > 0) {
         // Show resolution modal
-        resolutionPairs = response.similar_names;
+        resolutionPairs = response.data?.similar_names ?? [];
         resolutionVisible = true;
       } else {
         // No conflicts, merge directly
@@ -367,7 +368,7 @@
         )
         .map((p) => ({
           ...p, // Spread Notion stats (is_new, juegos_este_ano)
-          original_nombre: p.nombre,
+          oldName: p.nombre,
           has_priority: false,
           partidas_deseadas: 1,
           partidas_gm: 0,
@@ -380,7 +381,7 @@
       draftPlayers.push(...newPlayers);
     }
 
-    eventType = "sync";
+    saveEventType = "sync";
     resolutionVisible = false;
     resolutionPairs = [];
     fetchedNotionPlayers = [];
@@ -432,39 +433,34 @@
       // Calculate manual renames by comparing current name to original
       const manualRenames = draftPlayers
         .filter(
-          (p): p is EditPlayerRow & { original_nombre: string } =>
-            p.original_nombre !== undefined && p.original_nombre !== p.nombre,
+          (p): p is EditPlayerRow & { oldName: string } =>
+            p.oldName !== undefined && p.oldName !== p.nombre,
         )
-        .map((p) => ({ from: p.original_nombre, to: p.nombre }));
+        .map((p) => {
+          const newName = p.nombre;
+          return { old_name: p.oldName, new_name: newName };
+        });
 
-      const players: EditPlayerRow[] = draftPlayers.map((p) => ({
-        nombre: p.nombre,
-        notion_id: p.notion_id,
-        notion_name: p.notion_name,
-        is_new: p.is_new,
-        juegos_este_ano: p.juegos_este_ano,
-        has_priority: p.has_priority,
-        partidas_deseadas: p.partidas_deseadas,
-        partidas_gm: p.partidas_gm,
-      }));
-
-      const result = await saveSnapshot({
-        parent_id: parentId,
-        event_type: eventType,
-        players,
-        renames: manualRenames,
+      const { data, error } = await apiSnapshotSave({
+        method: "POST",
+        body: {
+          parent_id: parentId,
+          event_type: saveEventType,
+          players: draftPlayers,
+          renames: manualRenames,
+        },
       });
 
-      if (result.error) {
-        onShowError("Aviso / Error", `Error: ${result.error}`);
+      if (error) {
+        onShowError("Aviso / Error", parseApiError(error));
         return;
       }
 
       onClose();
       onChainUpdate();
-      if (result.snapshot_id !== undefined) {
-        setActiveNodeId(result.snapshot_id as number);
-        onOpenSnapshot(result.snapshot_id);
+      if (data.snapshot_id !== undefined) {
+        setActiveNodeId(data.snapshot_id);
+        onOpenSnapshot(data.snapshot_id);
       }
     } catch (e) {
       onShowError("Error de conexión", String(e));

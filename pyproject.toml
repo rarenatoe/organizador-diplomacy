@@ -57,6 +57,15 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["backend"]
 
+[tool.ruff.lint.flake8-type-checking]
+exempt-modules = [
+    "typing",
+    "datetime",
+    "collections.abc", 
+    "backend.db.models",
+    "backend.api.models"
+]
+
 [tool.pyright]
 include = ["backend"]
 typeCheckingMode = "strict"

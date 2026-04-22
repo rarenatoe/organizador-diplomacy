@@ -15,22 +15,24 @@ from sqlalchemy import delete, func, select
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.crud.players import get_or_create_player
-from backend.db.models import (
+from backend.api.models.snapshots import (
     DeepDiffResult,
     FieldChange,
+    HistoryState,
+    ModifiedPlayer,
+    PlayerData,
+    RenameChange,
+)
+from backend.db.models import (
     GameDetail,
     GameTable,
     GraphNode,
-    HistoryStateDict,
-    ModifiedPlayer,
     NotionCache,
     Player,
-    PlayerStateDict,
-    RenameDict,
     Snapshot,
     SnapshotHistory,
     SnapshotPlayer,
+    SnapshotSource,
     TablePlayer,
     TimelineEdge,
     WaitingList,
@@ -42,7 +44,7 @@ from backend.db.models import (
 def generate_deep_diff(
     old_players: list[dict[str, Any]],
     new_players: list[dict[str, Any]],
-    renames: list[RenameDict],
+    renames: list[RenameChange],
 ) -> DeepDiffResult:
     """Generate a structured changes object comparing old and new player lists with rename handling."""
     # Create lookup dictionaries by player name
@@ -51,8 +53,8 @@ def generate_deep_diff(
 
     # Apply renames to old_dict: update keys from old names to new names
     for rename in renames:
-        old_name = rename["from"]
-        new_name = rename["to"]
+        old_name = rename.old_name
+        new_name = rename.new_name
         if old_name in old_dict:
             old_dict[new_name] = old_dict.pop(old_name)
 
@@ -83,17 +85,17 @@ def generate_deep_diff(
             new_value = new.get(key)
 
             if old_value != new_value:
-                field_changes[key] = {"old": old_value, "new": new_value}
+                field_changes[key] = FieldChange(old=old_value, new=new_value)
 
         if field_changes:
-            modified.append({"nombre": name, "changes": field_changes})
+            modified.append(ModifiedPlayer(nombre=name, changes=field_changes))
 
-    return {
-        "added": added,
-        "removed": removed,
-        "renamed": renames,
-        "modified": modified,
-    }
+    return DeepDiffResult(
+        added=added,
+        removed=removed,
+        renamed=renames,
+        modified=modified,
+    )
 
 
 # ── Players ────────────────────────────────────────────────────────────────────
@@ -128,7 +130,7 @@ async def add_player_to_snapshot(
 # ── Snapshots ────────────────────────────────────────────────────────────────
 
 
-async def create_snapshot(session: AsyncSession, source: str) -> int:
+async def create_snapshot(session: AsyncSession, source: SnapshotSource) -> int:
     """Create a new snapshot and return its ID."""
     # Create graph node
     node = GraphNode(entity_type="snapshot")
@@ -192,7 +194,7 @@ async def snapshots_have_same_roster(
     return snap_dict == notion_dict
 
 
-async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[PlayerStateDict]:
+async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[PlayerData]:
     """Return all players in a snapshot as dictionaries with Notion identity data."""
     result = await session.execute(
         select(
@@ -215,23 +217,24 @@ async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[
     rows = result.all()
 
     return [
-        {
-            "nombre": player.name,
-            "notion_id": player.notion_id,
-            "notion_name": notion_name,
-            "is_new": sp.is_new,
-            "juegos_este_ano": sp.games_this_year,
-            "has_priority": sp.has_priority,
-            "partidas_deseadas": sp.desired_games,
-            "partidas_gm": sp.gm_games,
-            "c_england": c_england or 0,
-            "c_france": c_france or 0,
-            "c_germany": c_germany or 0,
-            "c_italy": c_italy or 0,
-            "c_austria": c_austria or 0,
-            "c_russia": c_russia or 0,
-            "c_turkey": c_turkey or 0,
-        }
+        PlayerData(
+            nombre=player.name,
+            notion_id=player.notion_id,
+            notion_name=notion_name,
+            is_new=sp.is_new,
+            juegos_este_ano=sp.games_this_year,
+            has_priority=sp.has_priority,
+            partidas_deseadas=sp.desired_games,
+            partidas_gm=sp.gm_games,
+            c_england=c_england or 0,
+            c_france=c_france or 0,
+            c_germany=c_germany or 0,
+            c_italy=c_italy or 0,
+            c_austria=c_austria or 0,
+            c_russia=c_russia or 0,
+            c_turkey=c_turkey or 0,
+            alias=None,
+        )
         for sp, player, notion_name, c_england, c_france, c_germany, c_italy, c_austria, c_russia, c_turkey in rows
     ]
 
@@ -323,31 +326,6 @@ async def delete_snapshot_cascade(session: AsyncSession, snapshot_id: int) -> bo
 # ── Game Organization ─────────────────────────────────────────────────────────
 
 
-async def create_root_manual_snapshot(
-    session: AsyncSession,
-    players: list[dict[str, Any]],
-) -> int:
-    """Create a manual snapshot from scratch (no source)."""
-    snap_id = await create_snapshot(session, "manual")
-
-    for p in players:
-        if not p["nombre"]:
-            continue
-        player_id = await get_or_create_player(session, p["nombre"], p.get("notion_id"))
-        await add_player_to_snapshot(
-            session,
-            snap_id,
-            player_id,
-            int(p["juegos_este_ano"]),
-            int(p.get("partidas_deseadas", 1)),
-            int(p.get("partidas_gm", 0)),
-            has_priority=p.get("has_priority", False),
-            is_new=p["is_new"],
-        )
-
-    return snap_id
-
-
 # ── Notion Cache ─────────────────────────────────────────────────────────────
 
 
@@ -412,15 +390,15 @@ async def get_notion_cache(session: AsyncSession) -> list[dict[str, Any]]:
 async def log_snapshot_history(
     session: AsyncSession,
     snapshot_id: int,
-    action_type: str,
+    action_type: SnapshotSource,
     changes: DeepDiffResult,
-    previous_state: HistoryStateDict,
+    previous_state: HistoryState,
 ) -> None:
     """Log a snapshot history entry."""
     history_entry = SnapshotHistory(
         snapshot_id=snapshot_id,
         action_type=action_type,
-        changes=changes,
-        previous_state=previous_state,
+        changes=changes.model_dump(mode="json"),
+        previous_state=previous_state.model_dump(),
     )
     session.add(history_entry)

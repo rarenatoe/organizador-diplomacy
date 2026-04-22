@@ -1,13 +1,24 @@
 // ── Sync Utilities ────────────────────────────────────────────────────
 // Name similarity detection logic ported from backend/sync/notion_sync.py
 
-import type {
-  EditPlayerRow,
-  MergePair,
-  NotionPlayer,
-  OrganizarValidation,
-} from "./types";
+import { MergePair } from "./syncResolution";
+import type { OrganizarValidation } from "./types";
+import type { NotionPlayerData } from "./generated-api";
 import { normalizeName } from "./utils";
+
+type OrganizarPlayer = {
+  nombre: string;
+  partidas_deseadas: number;
+  partidas_gm: number;
+};
+
+type SyncMergePlayer = {
+  nombre: string;
+  notion_id?: string | null;
+  notion_name?: string | null;
+  is_new?: boolean;
+  juegos_este_ano?: number;
+};
 
 // ── Validation Utilities ──────────────────────────────────────────────────────
 
@@ -31,7 +42,7 @@ export function checkGMShortage(assigned: number, required: number): boolean {
  * Returns a validation object if warnings are found, null otherwise.
  */
 export function validateOrganizar(
-  players: EditPlayerRow[],
+  players: OrganizarPlayer[],
 ): OrganizarValidation | null {
   if (players.length === 0) return null;
 
@@ -58,15 +69,15 @@ export function validateOrganizar(
   return null;
 }
 
-export function applySyncMerges(
-  currentRows: EditPlayerRow[],
+export function applySyncMerges<T extends SyncMergePlayer>(
+  currentRows: T[],
   merges: MergePair[],
-  fetchedNotionPlayers: NotionPlayer[],
-): EditPlayerRow[] {
+  fetchedNotionPlayers: NotionPlayerData[],
+): T[] {
   const renameActions = ["link_rename", "merge_notion", "use_existing"];
   const mergeMap = new Map(merges.map((m) => [m.from, m]));
   const seenNames = new Set<string>();
-  const deduplicatedPlayers: EditPlayerRow[] = [];
+  const deduplicatedPlayers: T[] = [];
 
   for (const row of currentRows) {
     const mergeInfo = mergeMap.get(row.nombre);
@@ -102,9 +113,9 @@ export function applySyncMerges(
         juegos_este_ano: notionPlayer.juegos_este_ano,
         notion_id: notionPlayer.notion_id || null,
         notion_name: notionPlayer.nombre || null,
-      });
+      } as T);
     } else {
-      deduplicatedPlayers.push({ ...row, nombre: newName });
+      deduplicatedPlayers.push({ ...row, nombre: newName } as T);
     }
   }
   return deduplicatedPlayers;

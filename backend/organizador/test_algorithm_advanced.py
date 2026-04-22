@@ -15,10 +15,13 @@ from __future__ import annotations
 
 import random
 import unittest
-from typing import Any
+from typing import TYPE_CHECKING
 
 from .core import calculate_matches
 from .models import DraftPlayer
+
+if TYPE_CHECKING:
+    from typing import Any
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

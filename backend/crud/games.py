@@ -21,7 +21,7 @@ from backend.crud.snapshots import (
     create_snapshot,
     get_snapshot_players,
 )
-from backend.db.models import GameDetail, GameTable, TablePlayer, WaitingList
+from backend.db.models import GameDetail, GameTable, SnapshotSource, TablePlayer, WaitingList
 
 
 async def add_table_player(
@@ -144,11 +144,11 @@ async def _create_output_snapshot_from_draft(
 
     names_in_waitlist: set[str] = {j["nombre"] for j in draft_data.get("tickets_sobrantes", [])}
 
-    snap_id = await create_snapshot(session, "organizar")
+    snap_id = await create_snapshot(session, SnapshotSource.ORGANIZAR)
 
     rows = await get_snapshot_players(session, input_snapshot_id)
     for p in rows:
-        name = p["nombre"]
+        name = p.nombre
         played = slots_played[name]
 
         # Get or create player
@@ -158,9 +158,9 @@ async def _create_output_snapshot_from_draft(
             session=session,
             snapshot_id=snap_id,
             player_id=pid,
-            is_new=p["is_new"] and played == 0,
-            games_this_year=p["juegos_este_ano"] + played,
-            desired_games=p["partidas_deseadas"],
+            is_new=p.is_new and played == 0,
+            games_this_year=p.juegos_este_ano + played,
+            desired_games=p.partidas_deseadas,
             gm_games=0,  # partidas_gm reset
             has_priority=name in names_in_waitlist,
         )
@@ -222,7 +222,7 @@ async def update_game_draft(
 
     rows = await get_snapshot_players(session, input_snapshot_id)
     for p in rows:
-        name = p["nombre"]
+        name = p.nombre
         played = slots_played[name]
         pid = await get_or_create_player(session, name)
 
@@ -230,9 +230,9 @@ async def update_game_draft(
             session=session,
             snapshot_id=output_snapshot_id,
             player_id=pid,
-            is_new=p["is_new"] and played == 0,
-            games_this_year=p["juegos_este_ano"] + played,
-            desired_games=p["partidas_deseadas"],
+            is_new=p.is_new and played == 0,
+            games_this_year=p.juegos_este_ano + played,
+            desired_games=p.partidas_deseadas,
             gm_games=0,  # partidas_gm reset
             has_priority=name in names_in_waitlist,
         )

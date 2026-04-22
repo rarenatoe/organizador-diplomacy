@@ -1,10 +1,10 @@
 import { render, screen, fireEvent } from "@testing-library/svelte";
 import { describe, it, expect } from "vitest";
 import SnapshotHistory from "./SnapshotHistory.svelte";
-import type { HistoryLog } from "../../types";
+import type { HistoryEntry } from "../../generated-api";
 
 describe("SnapshotHistory.svelte", () => {
-  const mockHistory: HistoryLog[] = [
+  const mockHistory: HistoryEntry[] = [
     {
       id: 1,
       created_at: "2024-01-02T10:30:00Z",
@@ -23,7 +23,7 @@ describe("SnapshotHistory.svelte", () => {
       changes: {
         added: [],
         removed: [],
-        renamed: [{ from: "Juan", to: "Juan Perez" }],
+        renamed: [{ old_name: "Juan", new_name: "Juan Perez" }],
         modified: [
           {
             nombre: "David",
@@ -92,7 +92,7 @@ describe("SnapshotHistory.svelte", () => {
   });
 
   it("displays 'Sin cambios locales' when no changes exist", () => {
-    const noChangesHistory: HistoryLog[] = [
+    const noChangesHistory: HistoryEntry[] = [
       {
         id: 1,
         created_at: "2024-01-01T10:00:00Z",
@@ -145,7 +145,7 @@ describe("SnapshotHistory.svelte", () => {
   });
 
   it("handles multiple modified fields correctly", () => {
-    const historyWithMultipleMods: HistoryLog[] = [
+    const historyWithMultipleMods: HistoryEntry[] = [
       {
         id: 1,
         created_at: "2024-01-01T10:00:00Z",

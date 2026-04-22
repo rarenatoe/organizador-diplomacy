@@ -83,6 +83,9 @@ export default defineConfig([
   {
     files: ["frontend/src/**/*.test.ts", "frontend/test-setup.ts"],
     ...vitest.configs.recommended,
+    languageOptions: {
+      globals: vitest.environments.env.globals,
+    },
     rules: {
       "@typescript-eslint/no-unsafe-assignment": "off",
     },

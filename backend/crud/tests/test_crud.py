@@ -6,7 +6,7 @@ Tests the async CRUD functions in backend/db/crud.py.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 import pytest
 from sqlalchemy import select
@@ -35,9 +35,13 @@ from backend.db.models import (
     Player,
     Snapshot,
     SnapshotPlayer,
+    SnapshotSource,
     TablePlayer,
     TimelineEdge,
 )
+
+if TYPE_CHECKING:
+    from typing import Any
 
 pytestmark = pytest.mark.asyncio
 
@@ -84,14 +88,14 @@ class TestPlayerOperations:
 class TestSnapshotOperations:
     async def test_create_snapshot(self, db_session: Any) -> None:
         """Creating a snapshot should assign an ID and timestamp."""
-        snap_id = await create_snapshot(db_session, "manual")
+        snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
         await db_session.commit()
         assert snap_id is not None
         assert isinstance(snap_id, int)
 
     async def test_add_player_to_snapshot(self, db_session: Any) -> None:
         """Adding a player to a snapshot should create a SnapshotPlayer entry."""
-        snap_id = await create_snapshot(db_session, "manual")
+        snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
         pid = await get_or_create_player(db_session, "Charlie")
         await db_session.commit()
         await add_player_to_snapshot(
@@ -111,7 +115,7 @@ class TestSnapshotOperations:
 
     async def test_get_snapshot_players(self, db_session: Any) -> None:
         """Getting snapshot players should return all players in the snapshot."""
-        snap_id = await create_snapshot(db_session, "manual")
+        snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
         for i in range(3):
             pid = await get_or_create_player(db_session, f"Player{i}")
             await add_player_to_snapshot(
@@ -128,8 +132,8 @@ class TestSnapshotOperations:
 class TestTimelineEdgeOperations:
     async def test_create_branch_edge(self, db_session: Any) -> None:
         """Creating a sync event should link two snapshots."""
-        snap1 = await create_snapshot(db_session, "notion_sync")
-        snap2 = await create_snapshot(db_session, "notion_sync")
+        snap1 = await create_snapshot(db_session, SnapshotSource.NOTION_SYNC)
+        snap2 = await create_snapshot(db_session, SnapshotSource.NOTION_SYNC)
         await db_session.commit()
         event_id = await create_branch_edge(db_session, snap1, snap2)
         await db_session.commit()
@@ -142,8 +146,8 @@ class TestTimelineEdgeOperations:
 
     async def test_create_game_edge(self, db_session: Any) -> None:
         """Creating a game event should create event and game_detail."""
-        snap1 = await create_snapshot(db_session, "manual")
-        snap2 = await create_snapshot(db_session, "organizar")
+        snap1 = await create_snapshot(db_session, SnapshotSource.MANUAL)
+        snap2 = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
         await db_session.commit()
         event_id = await create_game_edge(db_session, snap1, snap2, 5)
         await db_session.commit()
@@ -162,8 +166,8 @@ class TestGameTableOperations:
     async def test_create_game_table(self, db_session: Any) -> None:
         """Creating a mesa should assign an ID."""
         # First create a game event
-        snap1 = await create_snapshot(db_session, "manual")
-        snap2 = await create_snapshot(db_session, "organizar")
+        snap1 = await create_snapshot(db_session, SnapshotSource.MANUAL)
+        snap2 = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
         await db_session.commit()
         event_id = await create_game_edge(db_session, snap1, snap2, 1)
         await db_session.commit()
@@ -174,8 +178,8 @@ class TestGameTableOperations:
     async def test_add_table_player(self, db_session: Any) -> None:
         """Adding a player to a mesa should create a TablePlayer entry."""
         # Setup
-        snap1 = await create_snapshot(db_session, "manual")
-        snap2 = await create_snapshot(db_session, "organizar")
+        snap1 = await create_snapshot(db_session, SnapshotSource.MANUAL)
+        snap2 = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
         pid = await get_or_create_player(db_session, "David")
         await db_session.commit()
         event_id = await create_game_edge(db_session, snap1, snap2, 1)
@@ -201,7 +205,7 @@ class TestGameTableOperations:
 class TestRosterComparison:
     async def test_same_roster_returns_true(self, db_session: Any) -> None:
         """Snapshot roster matching Notion data should return True."""
-        snap_id = await create_snapshot(db_session, "manual")
+        snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
         for name in ["Alice", "Bob", "Charlie"]:
             pid = await get_or_create_player(db_session, name)
             await add_player_to_snapshot(
@@ -241,7 +245,7 @@ class TestRosterComparison:
 
     async def test_different_roster_returns_false(self, db_session: Any) -> None:
         """Snapshot roster different from Notion data should return False."""
-        snap_id = await create_snapshot(db_session, "manual")
+        snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
         pid = await get_or_create_player(db_session, "Alice")
         await add_player_to_snapshot(
             db_session, snap_id, pid, 0, 2, 0, has_priority=True, is_new=False
@@ -269,7 +273,7 @@ class TestRosterComparison:
 class TestCascadeDelete:
     async def test_delete_snapshot_cascade(self, db_session: Any) -> None:
         """Deleting a snapshot should cascade to related entities."""
-        snap_id = await create_snapshot(db_session, "manual")
+        snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
         pid = await get_or_create_player(db_session, "Test")
         await add_player_to_snapshot(
             db_session, snap_id, pid, 0, 2, 0, has_priority=True, is_new=False
@@ -295,8 +299,8 @@ class TestLinearBranchSquashing:
     async def test_squash_single_non_game_edge(self, db_session: Any) -> None:
         """Squashing a snapshot with one non-game child should absorb the child."""
         # Setup: A -> branch -> B
-        snap_a = await create_snapshot(db_session, "notion_sync")
-        snap_b = await create_snapshot(db_session, "manual")
+        snap_a = await create_snapshot(db_session, SnapshotSource.NOTION_SYNC)
+        snap_b = await create_snapshot(db_session, SnapshotSource.MANUAL)
 
         # Add players to both snapshots
         pid_a = await get_or_create_player(db_session, "PlayerA")
@@ -340,7 +344,7 @@ class TestLinearBranchSquashing:
         # Assert 3: A's roster is now B's roster
         players_a = await get_snapshot_players(db_session, snap_a)
         assert len(players_a) == 2
-        player_names = {p["nombre"] for p in players_a}
+        player_names = {p.nombre for p in players_a}
         assert player_names == {"PlayerB1", "PlayerB2"}
 
         # Assert 4: A inherited B's source and timestamp
@@ -356,8 +360,8 @@ class TestLinearBranchSquashing:
     async def test_squash_does_not_affect_game_edges(self, db_session: Any) -> None:
         """Squashing should not affect snapshots with game edges."""
         # Setup: A -> game -> B
-        snap_a = await create_snapshot(db_session, "notion_sync")
-        snap_b = await create_snapshot(db_session, "organizar")
+        snap_a = await create_snapshot(db_session, SnapshotSource.NOTION_SYNC)
+        snap_b = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
 
         pid = await get_or_create_player(db_session, "Test")
         await add_player_to_snapshot(
@@ -386,9 +390,9 @@ class TestLinearBranchSquashing:
         """Squashing should not affect snapshots with multiple outgoing edges."""
         # Setup: A -> branch -> B
         #        A -> branch -> C
-        snap_a = await create_snapshot(db_session, "notion_sync")
-        snap_b = await create_snapshot(db_session, "manual")
-        snap_c = await create_snapshot(db_session, "manual")
+        snap_a = await create_snapshot(db_session, SnapshotSource.NOTION_SYNC)
+        snap_b = await create_snapshot(db_session, SnapshotSource.MANUAL)
+        snap_c = await create_snapshot(db_session, SnapshotSource.MANUAL)
 
         pid = await get_or_create_player(db_session, "Test")
         await add_player_to_snapshot(
@@ -423,9 +427,9 @@ class TestLinearBranchSquashing:
     async def test_squash_recursive_chain(self, db_session: Any) -> None:
         """Squashing should recursively collapse linear chains A -> B -> C -> A."""
         # Setup: A -> branch -> B -> branch -> C
-        snap_a = await create_snapshot(db_session, "notion_sync")
-        snap_b = await create_snapshot(db_session, "manual")
-        snap_c = await create_snapshot(db_session, "manual")
+        snap_a = await create_snapshot(db_session, SnapshotSource.NOTION_SYNC)
+        snap_b = await create_snapshot(db_session, SnapshotSource.MANUAL)
+        snap_c = await create_snapshot(db_session, SnapshotSource.MANUAL)
 
         # Only add players to C (final state)
         pid = await get_or_create_player(db_session, "FinalPlayer")
@@ -466,7 +470,7 @@ class TestLinearBranchSquashing:
 
         # Assert 2: A has C's final roster
         players_a = await get_snapshot_players(db_session, snap_a)
-        assert players_a[0]["juegos_este_ano"] == 2
+        assert players_a[0].juegos_este_ano == 2
 
         # Assert 3: A inherited the final source
         result = await db_session.execute(select(Snapshot).where(Snapshot.id == snap_a))

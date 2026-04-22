@@ -2,13 +2,7 @@
 // Centralized fetch calls for the Diplomacy viewer backend.
 
 import type {
-  ChainData,
-  SnapshotDetail,
   GameDetail,
-  DeleteResult,
-  EditPlayerRow,
-  SnapshotSaveResponse,
-  NotionFetchResponse,
   DraftResponse,
   SaveDraftResponse,
   SaveDraftRequest,
@@ -75,61 +69,6 @@ async function safeFetch<T>(url: string, options?: RequestInit): Promise<T> {
   }
 
   return data as T;
-}
-
-// ── Chain ─────────────────────────────────────────────────────────────────────
-
-export async function fetchChain(): Promise<ChainData> {
-  return safeFetch<ChainData>("/api/chain");
-}
-
-// ── Snapshot ──────────────────────────────────────────────────────────────────
-
-export async function fetchSnapshot(id: number): Promise<SnapshotDetail> {
-  return safeFetch<SnapshotDetail>(`/api/snapshot/${id}`);
-}
-
-export async function deleteSnapshot(id: number): Promise<DeleteResult> {
-  return safeFetch<DeleteResult>(`/api/snapshot/${id}`, { method: "DELETE" });
-}
-
-export async function createSnapshot(
-  players: EditPlayerRow[],
-): Promise<SnapshotSaveResponse> {
-  return safeFetch<SnapshotSaveResponse>("/api/snapshot/new", {
-    method: "POST",
-    // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ players }),
-  });
-}
-
-export async function saveSnapshot(payload: {
-  parent_id: number | null;
-  event_type: string;
-  players: EditPlayerRow[];
-  renames?: { from: string; to: string }[];
-}): Promise<{ snapshot_id: number; status?: string; error?: string }> {
-  return safeFetch<{ snapshot_id: number; status?: string; error?: string }>(
-    "/api/snapshot/save",
-    {
-      method: "POST",
-      // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    },
-  );
-}
-
-export async function fetchNotionPlayers(
-  snapshotNames: string[] = [],
-): Promise<NotionFetchResponse> {
-  return safeFetch<NotionFetchResponse>("/api/snapshot/notion/fetch", {
-    method: "POST",
-    // eslint-disable-next-line @typescript-eslint/naming-convention -- HTTP header field name
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ snapshot_names: snapshotNames }),
-  });
 }
 
 // ── Game ──────────────────────────────────────────────────────────────────────

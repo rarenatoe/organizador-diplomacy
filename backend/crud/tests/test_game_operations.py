@@ -25,7 +25,7 @@ from backend.crud.snapshots import (
     create_snapshot,
     get_snapshot_players,
 )
-from backend.db.models import Player, Snapshot, TablePlayer, TimelineEdge
+from backend.db.models import Player, Snapshot, SnapshotSource, TablePlayer, TimelineEdge
 
 pytestmark = pytest.mark.asyncio
 
@@ -39,7 +39,7 @@ class TestGameDraftOperations:
     async def test_save_game_draft_creates_complete_game_structure(self, db_session: Any) -> None:
         """save_game_draft should create game event, tables, players, and waiting list."""
         # Setup: Create input snapshot with players
-        input_snap = await create_snapshot(db_session, "manual")
+        input_snap = await create_snapshot(db_session, SnapshotSource.MANUAL)
 
         # Create players
         pid1 = await get_or_create_player(db_session, "Alice")
@@ -116,7 +116,7 @@ class TestGameDraftOperations:
     async def test_save_game_draft_handles_empty_draft(self, db_session: Any) -> None:
         """save_game_draft should handle draft with no tables or waiting list."""
         # Setup
-        input_snap = await create_snapshot(db_session, "manual")
+        input_snap = await create_snapshot(db_session, SnapshotSource.MANUAL)
         pid = await get_or_create_player(db_session, "Alice")
         await add_player_to_snapshot(
             db_session, input_snap, pid, 5, 2, 0, has_priority=True, is_new=False
@@ -139,13 +139,13 @@ class TestGameDraftOperations:
         # Verify: Output snapshot created with updated player is_new
         output_players = await get_snapshot_players(db_session, game_event.output_snapshot_id)
         assert len(output_players) == 1
-        assert output_players[0]["juegos_este_ano"] == 5  # No games played, should remain same
+        assert output_players[0].juegos_este_ano == 5  # No games played, should remain same
 
     async def test_update_game_draft_deletes_and_recreates_structure(self, db_session: Any) -> None:
         """update_game_draft should delete existing tables/waiting list and recreate."""
         # Setup: Create initial game
-        input_snap = await create_snapshot(db_session, "manual")
-        output_snap = await create_snapshot(db_session, "organizar")
+        input_snap = await create_snapshot(db_session, SnapshotSource.MANUAL)
+        output_snap = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
 
         pid1 = await get_or_create_player(db_session, "Alice")
         pid2 = await get_or_create_player(db_session, "Bob")
@@ -215,8 +215,8 @@ class TestGameDraftOperations:
     async def test_update_game_draft_raw_sql_delete_operations(self, db_session: Any) -> None:
         """Regression test: verify raw SQL DELETE statements work correctly."""
         # Setup: Create game with complex structure
-        input_snap = await create_snapshot(db_session, "manual")
-        output_snap = await create_snapshot(db_session, "organizar")
+        input_snap = await create_snapshot(db_session, SnapshotSource.MANUAL)
+        output_snap = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
 
         pid1 = await get_or_create_player(db_session, "Alice")
         pid2 = await get_or_create_player(db_session, "Bob")
@@ -296,7 +296,7 @@ class TestGameDraftOperations:
     ) -> None:
         """_create_output_snapshot_from_draft should promote Nuevo players who play games."""
         # Setup: Create input snapshot with mix of Nuevo and Antiguo players
-        input_snap = await create_snapshot(db_session, "manual")
+        input_snap = await create_snapshot(db_session, SnapshotSource.MANUAL)
 
         pid_nuevo = await get_or_create_player(db_session, "NewPlayer")
         pid_antiguo = await get_or_create_player(db_session, "OldPlayer")
@@ -337,17 +337,17 @@ class TestGameDraftOperations:
         game_event = result.scalar_one()
 
         output_players = await get_snapshot_players(db_session, game_event.output_snapshot_id)
-        output_player_data = {p["nombre"]: p for p in output_players}
+        output_player_data = {p.nombre: p for p in output_players}
 
         # Verify: NewPlayer promoted to Antiguo, played 1 game
-        assert not output_player_data["NewPlayer"]["is_new"]
-        assert output_player_data["NewPlayer"]["juegos_este_ano"] == 1
+        assert not output_player_data["NewPlayer"].is_new
+        assert output_player_data["NewPlayer"].juegos_este_ano == 1
 
         # Verify: OldPlayer remains Antiguo, played 1 more game
-        assert not output_player_data["OldPlayer"]["is_new"]
-        assert output_player_data["OldPlayer"]["juegos_este_ano"] == 6
+        assert not output_player_data["OldPlayer"].is_new
+        assert output_player_data["OldPlayer"].juegos_este_ano == 6
 
         # Verify: IdlePlayer remains Nuevo, didn't play, in waitlist
-        assert output_player_data["IdlePlayer"]["is_new"]
-        assert output_player_data["IdlePlayer"]["juegos_este_ano"] == 0
-        assert output_player_data["IdlePlayer"]["has_priority"]  # In waitlist
+        assert output_player_data["IdlePlayer"].is_new
+        assert output_player_data["IdlePlayer"].juegos_este_ano == 0
+        assert output_player_data["IdlePlayer"].has_priority  # In waitlist

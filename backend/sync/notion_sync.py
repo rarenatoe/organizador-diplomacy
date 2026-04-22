@@ -7,6 +7,9 @@ This module provides async functions for use with FastAPI background tasks.
 
 from __future__ import annotations
 
+from backend.api.models.snapshots import HistoryState, RenameChange
+from backend.db.models import SnapshotSource
+
 __all__ = [
     "fetch_notion_data",
     "build_notion_players_lookup",
@@ -34,6 +37,7 @@ from backend.crud.players import get_or_create_player, rename_player
 from backend.crud.snapshots import (
     add_player_to_snapshot,
     create_snapshot,
+    generate_deep_diff,
     get_latest_snapshot_id,
     get_snapshot_players,
     log_snapshot_history,
@@ -45,7 +49,6 @@ from backend.db.connection import async_engine
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from backend.db.models import RenameDict
 
 logger = logging.getLogger(__name__)
 
@@ -601,7 +604,7 @@ async def _update_snapshot_in_place(
     session: AsyncSession,
     snapshot_id: int,
     rows: list[dict[str, Any]],
-    renames: list[RenameDict],
+    renames: list[RenameChange],
 ) -> None:
     """Update an existing snapshot in-place with new player data."""
     from sqlalchemy import delete, update
@@ -617,10 +620,10 @@ async def _update_snapshot_in_place(
     from backend.db.models import Player
 
     for r in renames or []:
-        target_exists = await session.execute(select(Player).where(Player.name == r["to"]))
+        target_exists = await session.execute(select(Player).where(Player.name == r.new_name))
         if not target_exists.scalar_one_or_none():
             await session.execute(
-                update(Player).where(Player.name == r["from"]).values(name=r["to"])
+                update(Player).where(Player.name == r.old_name).values(name=r.new_name)
             )
 
     # Update the existing snapshot source
@@ -645,9 +648,6 @@ async def _update_snapshot_in_place(
             is_new=row["is_new"],
         )
 
-    # Calculate dynamic diff for history logging
-    from backend.crud.snapshots import generate_deep_diff
-
     roster_fields = {
         "nombre",
         "is_new",
@@ -656,7 +656,7 @@ async def _update_snapshot_in_place(
         "partidas_deseadas",
         "partidas_gm",
     }
-    prev_roster = [{k: v for k, v in p.items() if k in roster_fields} for p in previous_players]
+    prev_roster = [p.model_dump(include=roster_fields) for p in previous_players]
     new_roster = [
         {
             "nombre": r["nombre"],
@@ -674,9 +674,9 @@ async def _update_snapshot_in_place(
     await log_snapshot_history(
         session,
         snapshot_id=snapshot_id,
-        action_type="notion_sync",
+        action_type=SnapshotSource.NOTION_SYNC,
         changes=diff,
-        previous_state={"players": previous_players},
+        previous_state=HistoryState(players=previous_players),
     )
 
     logger.info(f"Snapshot #{snapshot_id} updated in-place with {len(rows)} jugador(es).")
@@ -688,7 +688,7 @@ async def _create_new_snapshot(
     rows: list[dict[str, Any]],
 ) -> int:
     """Create a new snapshot with player data and sync event."""
-    snap_id = await create_snapshot(session, "notion_sync")
+    snap_id = await create_snapshot(session, SnapshotSource.NOTION_SYNC)
 
     for row in rows:
         pid = await get_or_create_player(session, row["nombre"], row.get("notion_id"))
@@ -767,7 +767,7 @@ async def _build_snapshot_rows(
     if source_snapshot_id is not None:
         # Get existing players from source snapshot
         existing_list = await get_snapshot_players(session, source_snapshot_id)
-        existing_map = {p["nombre"]: p for p in existing_list}
+        existing_map = {p.nombre: p for p in existing_list}
 
         merged_notion_normalized = {normalize_name(v["to"]) for v in merges.values()}
 
@@ -790,17 +790,9 @@ async def _build_snapshot_rows(
                             "nombre": notion_data["nombre"] if action == "merge_notion" else nombre,
                             "is_new": notion_data["is_new"],
                             "juegos_este_ano": notion_data["juegos_este_ano"],
-                            "has_priority": int(
-                                existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
-                            ),
-                            "partidas_deseadas": int(
-                                existente.get(
-                                    "partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"]
-                                )
-                            ),
-                            "partidas_gm": int(
-                                existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
-                            ),
+                            "has_priority": existente.has_priority,
+                            "partidas_deseadas": existente.partidas_deseadas,
+                            "partidas_gm": existente.partidas_gm,
                             "alias": notion_data.get("alias", []),
                             "notion_id": notion_data["notion_id"],
                             **{c: notion_data[c] for c in COUNTRY_PROPS},
@@ -821,17 +813,9 @@ async def _build_snapshot_rows(
                             "nombre": notion_data["nombre"],
                             "is_new": notion_data["is_new"],
                             "juegos_este_ano": notion_data["juegos_este_ano"],
-                            "has_priority": int(
-                                existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
-                            ),
-                            "partidas_deseadas": int(
-                                existente.get(
-                                    "partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"]
-                                )
-                            ),
-                            "partidas_gm": int(
-                                existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
-                            ),
+                            "has_priority": existente.has_priority,
+                            "partidas_deseadas": existente.partidas_deseadas,
+                            "partidas_gm": existente.partidas_gm,
                             "alias": notion_data.get("alias", []),
                             "notion_id": notion_data["notion_id"],
                             **{c: notion_data[c] for c in COUNTRY_PROPS},
@@ -850,15 +834,9 @@ async def _build_snapshot_rows(
                         "nombre": nombre,  # Keep local name
                         "is_new": notion_data["is_new"],
                         "juegos_este_ano": notion_data["juegos_este_ano"],
-                        "has_priority": int(
-                            existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
-                        ),
-                        "partidas_deseadas": int(
-                            existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])
-                        ),
-                        "partidas_gm": int(
-                            existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
-                        ),
+                        "has_priority": existente.has_priority,
+                        "partidas_deseadas": existente.partidas_deseadas,
+                        "partidas_gm": existente.partidas_gm,
                         "alias": notion_data.get("alias", []),
                         "notion_id": notion_data["notion_id"],
                         **{c: notion_data[c] for c in COUNTRY_PROPS},
@@ -869,18 +847,12 @@ async def _build_snapshot_rows(
                 rows.append(
                     {
                         "nombre": nombre,
-                        "is_new": existente.get("is_new", True),
-                        "juegos_este_ano": int(existente.get("juegos_este_ano", 0)),
-                        "has_priority": int(
-                            existente.get("has_priority", FIELD_DEFAULTS["has_priority"])
-                        ),
-                        "partidas_deseadas": int(
-                            existente.get("partidas_deseadas", FIELD_DEFAULTS["partidas_deseadas"])
-                        ),
-                        "partidas_gm": int(
-                            existente.get("partidas_gm", FIELD_DEFAULTS["partidas_gm"])
-                        ),
-                        **{c: existente.get(c, 0) for c in COUNTRY_PROPS},
+                        "is_new": existente.is_new,
+                        "juegos_este_ano": existente.juegos_este_ano,
+                        "has_priority": existente.has_priority,
+                        "partidas_deseadas": existente.partidas_deseadas,
+                        "partidas_gm": existente.partidas_gm,
+                        **{c: getattr(existente, c, 0) for c in COUNTRY_PROPS},
                     }
                 )
 
@@ -986,7 +958,7 @@ async def run_notion_sync_background(
                 rows = await _build_snapshot_rows(session, snapshot_id, notion_players, merges)
 
                 existing_names: set[str] = (
-                    {p["nombre"] for p in await get_snapshot_players(session, snapshot_id)}
+                    {p.nombre for p in await get_snapshot_players(session, snapshot_id)}
                     if snapshot_id is not None
                     else set()
                 )
@@ -1011,8 +983,8 @@ async def run_notion_sync_background(
                     has_children = await _check_snapshot_has_children(session, snapshot_id)
 
                     # Extract renames for merge_notion actions
-                    renames_list: list[RenameDict] = [
-                        {"from": k, "to": v["to"]}
+                    renames_list = [
+                        RenameChange(old_name=k, new_name=v["to"])
                         for k, v in (merges or {}).items()
                         if v.get("action") == "merge_notion"
                     ]

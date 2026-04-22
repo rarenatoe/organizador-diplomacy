@@ -6,7 +6,7 @@ Tests to prevent "tried to blank-out primary key" errors and relationship confli
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 import pytest
 from sqlalchemy import select
@@ -19,10 +19,14 @@ from backend.db.models import (
     Player,
     Snapshot,
     SnapshotPlayer,
+    SnapshotSource,
     TablePlayer,
     TimelineEdge,
     WaitingList,
 )
+
+if TYPE_CHECKING:
+    from typing import Any
 
 pytestmark = pytest.mark.asyncio
 
@@ -48,7 +52,7 @@ class TestModelInstantiation:
         await db_session.flush()
 
         # Snapshot uses the node's ID as its PK
-        snapshot = Snapshot(id=node.id, source="manual")
+        snapshot = Snapshot(id=node.id, source=SnapshotSource.MANUAL)
         db_session.add(snapshot)
         await db_session.flush()
         assert snapshot.id == node.id
@@ -66,7 +70,7 @@ class TestModelInstantiation:
         node = GraphNode(entity_type="snapshot")
         db_session.add(node)
         await db_session.flush()
-        snapshot = Snapshot(id=node.id, source="manual")
+        snapshot = Snapshot(id=node.id, source=SnapshotSource.MANUAL)
         db_session.add(snapshot)
         player = Player(name="TestPlayer")
         db_session.add(player)
@@ -99,7 +103,7 @@ class TestModelInstantiation:
         node1 = GraphNode(entity_type="snapshot")
         db_session.add(node1)
         await db_session.flush()
-        snapshot = Snapshot(id=node1.id, source="manual")
+        snapshot = Snapshot(id=node1.id, source=SnapshotSource.MANUAL)
         db_session.add(snapshot)
 
         node2 = GraphNode(entity_type="timeline_edge")
@@ -122,7 +126,7 @@ class TestModelInstantiation:
         node1 = GraphNode(entity_type="snapshot")
         db_session.add(node1)
         await db_session.flush()
-        snapshot = Snapshot(id=node1.id, source="manual")
+        snapshot = Snapshot(id=node1.id, source=SnapshotSource.MANUAL)
         db_session.add(snapshot)
 
         node2 = GraphNode(entity_type="timeline_edge")
@@ -150,7 +154,7 @@ class TestModelInstantiation:
         node1 = GraphNode(entity_type="snapshot")
         db_session.add(node1)
         await db_session.flush()
-        snapshot = Snapshot(id=node1.id, source="manual")
+        snapshot = Snapshot(id=node1.id, source=SnapshotSource.MANUAL)
         db_session.add(snapshot)
 
         node2 = GraphNode(entity_type="timeline_edge")
@@ -195,7 +199,7 @@ class TestModelInstantiation:
         node1 = GraphNode(entity_type="snapshot")
         db_session.add(node1)
         await db_session.flush()
-        snapshot = Snapshot(id=node1.id, source="manual")
+        snapshot = Snapshot(id=node1.id, source=SnapshotSource.MANUAL)
         db_session.add(snapshot)
 
         node2 = GraphNode(entity_type="timeline_edge")
@@ -236,7 +240,7 @@ class TestModelInstantiation:
         node1 = GraphNode(entity_type="snapshot")
         db_session.add(node1)
         await db_session.flush()
-        snapshot = Snapshot(id=node1.id, source="manual")
+        snapshot = Snapshot(id=node1.id, source=SnapshotSource.MANUAL)
         db_session.add(snapshot)
 
         node2 = GraphNode(entity_type="timeline_edge")
@@ -279,7 +283,7 @@ class TestRelationshipConfiguration:
         node1 = GraphNode(entity_type="snapshot")
         db_session.add(node1)
         await db_session.flush()
-        snapshot = Snapshot(id=node1.id, source="manual")
+        snapshot = Snapshot(id=node1.id, source=SnapshotSource.MANUAL)
         db_session.add(snapshot)
 
         node2 = GraphNode(entity_type="timeline_edge")
@@ -321,7 +325,7 @@ class TestRelationshipConfiguration:
         node = GraphNode(entity_type="snapshot")
         db_session.add(node)
         await db_session.flush()
-        snapshot = Snapshot(id=node.id, source="manual")
+        snapshot = Snapshot(id=node.id, source=SnapshotSource.MANUAL)
         db_session.add(snapshot)
         player = Player(name="TestPlayer")
         db_session.add(player)
@@ -363,7 +367,7 @@ class TestEdgeCases:
         node1 = GraphNode(entity_type="snapshot")
         db_session.add(node1)
         await db_session.flush()
-        snapshot = Snapshot(id=node1.id, source="manual")
+        snapshot = Snapshot(id=node1.id, source=SnapshotSource.MANUAL)
         db_session.add(snapshot)
 
         node2 = GraphNode(entity_type="timeline_edge")

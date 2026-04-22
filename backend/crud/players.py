@@ -13,6 +13,7 @@ from sqlalchemy import delete, func, select, update
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.api.models.snapshots import HistoryState
 from backend.db.models import (
     GameTable,
     NotionCache,
@@ -299,17 +300,18 @@ async def lookup_player_history(
     history_logs = history_logs_result.scalars().all()
 
     for history_log in history_logs:
-        if history_log.previous_state and "players" in history_log.previous_state:
-            players_in_log = history_log.previous_state["players"]
-            for logged_player in players_in_log:
-                if logged_player.get("nombre") == name:
+        if history_log.previous_state:
+            state = HistoryState.model_validate(history_log.previous_state)
+
+            for logged_player in state.players:
+                if logged_player.nombre == name:
                     return build_response(
                         source="history",
-                        played=logged_player.get("juegos_este_ano", 0),
-                        desired=logged_player.get("partidas_deseadas", 1),
-                        gm=logged_player.get("partidas_gm", 0),
-                        has_priority=logged_player.get("has_priority", False),
-                        is_new=logged_player.get("is_new", True),
+                        played=logged_player.juegos_este_ano,
+                        desired=logged_player.partidas_deseadas,
+                        gm=logged_player.partidas_gm,
+                        has_priority=logged_player.has_priority,
+                        is_new=logged_player.is_new,
                     )
 
     # Fallback 3: Check Notion cache

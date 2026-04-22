@@ -1,6 +1,5 @@
 <script lang="ts">
-  import { fetchChain } from "../../api";
-  import type { SnapshotNode } from "../../types";
+  import { apiChain, type SnapshotNode } from "../../generated-api";
   import PanelLayout from "../layout/PanelLayout.svelte";
 
   interface Props {
@@ -11,7 +10,7 @@
 
   let info = $state<{
     from_id: number;
-    to_id: number;
+    to_id: number | null;
     created_at: string;
   } | null>(null);
   let loading = $state(true);
@@ -19,14 +18,14 @@
   async function loadSyncInfo(): Promise<void> {
     loading = true;
     try {
-      const chain = await fetchChain();
+      const { data } = await apiChain();
       function findSync(roots: SnapshotNode[]): void {
         for (const root of roots) {
           for (const branch of root.branches ?? []) {
             if (branch.edge.type === "sync" && branch.edge.id === id) {
               info = {
                 from_id: branch.edge.from_id,
-                to_id: branch.edge.to_id,
+                to_id: branch.edge.to_id ?? null,
                 created_at: branch.edge.created_at,
               };
             }
@@ -34,7 +33,7 @@
           }
         }
       }
-      findSync(chain.roots ?? []);
+      if (data?.roots) findSync(data.roots);
     } finally {
       loading = false;
     }

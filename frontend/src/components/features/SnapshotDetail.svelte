@@ -1,13 +1,6 @@
 <script lang="ts">
-  import type {
-    SnapshotDetail,
-    EditPlayerRow,
-    SimilarName,
-    MergePair,
-    NotionPlayer,
-    OrganizarValidation,
-  } from "../../types";
-  import { fetchSnapshot, fetchNotionPlayers, saveSnapshot } from "../../api";
+  import type { EditPlayerRow, OrganizarValidation } from "../../types";
+  import type { MergePair } from "../../syncResolution";
   import { setActiveNodeId } from "../../stores.svelte";
   import { validateOrganizar, applySyncMerges } from "../../syncUtils";
   import OrganizarConfirmModal from "../modals/OrganizarConfirmModal.svelte";
@@ -20,7 +13,17 @@
   import SnapshotHistory from "./SnapshotHistory.svelte";
   import { logger } from "../../utils/logger";
   import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
-  import { apiPlayerRename } from "../../generated-api";
+  import {
+    apiPlayerRename,
+    type PlayerData,
+    apiSnapshot,
+    apiSnapshotSave,
+    type SimilarName,
+    type SnapshotSaveEventType,
+    type SnapshotDetailResponse,
+    apiNotionFetch,
+    type NotionPlayerData,
+  } from "../../generated-api";
   import { parseApiError } from "../../utils";
   let resolutionModal: ReturnType<typeof SyncResolutionModal>;
 
@@ -33,7 +36,7 @@
     onOpenGameDraft: (snapshotId: number) => void;
     onEditDraft: (
       parentId: number,
-      eventType: "sync" | "manual" | "edit",
+      eventType: SnapshotSaveEventType,
       autoAction?: "notion" | "csv" | null,
       players?: EditPlayerRow[],
     ) => void;
@@ -51,7 +54,7 @@
     onShowToast,
   }: Props = $props();
 
-  let data = $state<SnapshotDetail | null>(null);
+  let snapshotDetail = $state<SnapshotDetailResponse | undefined>(undefined);
   const ui = $state({
     loading: true,
     isSyncing: false,
@@ -60,7 +63,7 @@
     csvCopied: false,
   });
   let resolutionPairs = $state<SimilarName[]>([]);
-  let fetchedNotionPlayers = $state<NotionPlayer[]>([]);
+  let fetchedNotionPlayers = $state<NotionPlayerData[]>([]);
   let validation = $state<OrganizarValidation | null>(null);
 
   const CSV_COLS = {
@@ -79,8 +82,8 @@
   }
 
   const csvText = $derived(() => {
-    if (!data?.players) return "";
-    const rows = data.players;
+    if (!snapshotDetail?.players) return "";
+    const rows = snapshotDetail.players;
     return [
       Object.keys(CSV_COLS).join(","),
       ...rows.map((r) =>
@@ -98,7 +101,7 @@
   });
 
   const playersForDraft = $derived(() => {
-    return (data?.players || []).map((p) => ({
+    return (snapshotDetail?.players || []).map((p) => ({
       nombre: p.nombre,
       is_new: p.is_new ?? true,
       juegos_este_ano: p.juegos_este_ano ?? 0,
@@ -113,8 +116,25 @@
   async function loadSnapshot(): Promise<void> {
     ui.loading = true;
     try {
-      data = await fetchSnapshot(id);
+      const { data, error } = await apiSnapshot({ path: { snapshot_id: id } });
+      if (error) {
+        onShowError("Error al cargar snapshot", parseApiError(error));
+        snapshotDetail = undefined;
+        return;
+      }
+      if (!data) {
+        onShowError(
+          "Error al cargar snapshot",
+          "La respuesta del snapshot no contiene datos.",
+        );
+        snapshotDetail = undefined;
+        return;
+      }
+      snapshotDetail = data;
       logger.info("Loaded snapshot data:", data);
+    } catch (e) {
+      onShowError("Error de conexión", String(e));
+      snapshotDetail = undefined;
     } finally {
       ui.loading = false;
     }
@@ -129,9 +149,9 @@
   }
 
   async function handleOrganizar(): Promise<void> {
-    if (!data?.players) return;
+    if (!snapshotDetail?.players) return;
 
-    if (data.players.length < 7) {
+    if (snapshotDetail.players.length < 7) {
       onShowError(
         "Error al organizar",
         "Se necesitan al menos 7 jugadores para organizar partidas.",
@@ -139,7 +159,7 @@
       return;
     }
 
-    validation = validateOrganizar(data.players);
+    validation = validateOrganizar(snapshotDetail.players);
     if (validation) {
       ui.showConfirm = true;
     } else {
@@ -157,23 +177,24 @@
     ui.isSyncing = true;
     try {
       const unlinkedNames =
-        data?.players?.filter((p) => !p.notion_id).map((p) => p.nombre) || [];
-      const response = await fetchNotionPlayers(unlinkedNames);
+        snapshotDetail?.players
+          ?.filter((p) => !p.notion_id)
+          .map((p) => p.nombre) || [];
+      const response = await apiNotionFetch({
+        body: { snapshot_names: unlinkedNames },
+      });
 
       if (response.error) {
-        onShowError(
-          "Error de Sincronización",
-          response.error || "Error desconocido",
-        );
+        onShowError("Error de Sincronización", parseApiError(response.error));
         ui.isSyncing = false;
         return;
       }
 
-      fetchedNotionPlayers = response.players;
+      fetchedNotionPlayers = response.data?.players ?? [];
 
-      if (response.similar_names && response.similar_names.length > 0) {
+      if ((response.data?.similar_names?.length ?? 0) > 0) {
         // Show resolution modal - isSyncing remains true until modal completes
-        resolutionPairs = response.similar_names;
+        resolutionPairs = response.data?.similar_names ?? [];
         ui.resolutionVisible = true;
       } else {
         // No conflicts, merge directly - executeSyncMerge will handle isSyncing reset
@@ -215,34 +236,37 @@
     const renameActions = ["link_rename", "merge_local", "use_existing"];
     const renamesPayload = merges
       .filter((m) => renameActions.includes(m.action))
-      .map((m) => ({ from: m.from, to: m.to }));
+      .map((m) => ({ old_name: m.from, new_name: m.to }));
 
     const deduplicatedPlayers = applySyncMerges(
-      data?.players || [],
+      snapshotDetail?.players || [],
       merges,
       fetchedNotionPlayers,
     );
-    if (data) data.players = deduplicatedPlayers;
 
     try {
-      const result = await saveSnapshot({
-        parent_id: id,
-        event_type: "sync",
-        players: deduplicatedPlayers,
-        renames: renamesPayload,
+      const { data, error } = await apiSnapshotSave({
+        method: "POST",
+        body: {
+          parent_id: id,
+          event_type: "sync",
+          players: deduplicatedPlayers,
+          renames: renamesPayload,
+        },
       });
 
-      if (result.error) {
-        if (result.error.includes("ya fue generado por notion_sync")) {
-          onShowToast("⚠️ " + result.error);
+      if (error) {
+        const errorMessage = parseApiError(error);
+        if (errorMessage.includes("ya fue generado por notion_sync")) {
+          onShowToast("⚠️ " + errorMessage);
         } else {
-          onShowError("Error de Sincronización", result.error);
+          onShowError("Error de Sincronización", errorMessage);
         }
         return;
       }
 
       // Handle no_changes response
-      if (result.status === "no_changes") {
+      if (data.status === "no_changes") {
         onShowToast("Notion ya está actualizado (sin cambios detectados)");
         return;
       }
@@ -250,9 +274,9 @@
       // Only trigger updates if the sync was successful
       await loadSnapshot(); // Force reactive update with new data
       onChainUpdate();
-      if (result.snapshot_id !== undefined) {
-        setActiveNodeId(result.snapshot_id);
-        onOpenSnapshot(result.snapshot_id);
+      if (data.snapshot_id !== undefined) {
+        setActiveNodeId(data.snapshot_id);
+        onOpenSnapshot(data.snapshot_id);
       }
     } catch (e) {
       onShowError("Error de conexión", String(e));
@@ -279,19 +303,19 @@
 
 {#if ui.loading}
   <p class="loading-text">Cargando…</p>
-{:else if data}
-  {@const rows = data.players ?? []}
+{:else if snapshotDetail}
+  {@const rows = snapshotDetail.players ?? []}
   <PanelLayout scrollable={false}>
     {#snippet header()}
       <div class="section snapshot-header">
         <div class="header-row">
           <div>
             <SectionTitle
-              title={`Snapshot #${id} · ${sourceLabel(data?.source)}`}
+              title={`Snapshot #${id} · ${sourceLabel(snapshotDetail?.source)}`}
               class="header-title"
             />
             <div class="meta-data">
-              {data?.created_at}
+              {snapshotDetail?.created_at}
             </div>
           </div>
           <Button
@@ -312,11 +336,11 @@
     {/snippet}
 
     {#snippet body()}
-      {#snippet nameCell(row: EditPlayerRow)}
+      {#snippet nameCell(row: PlayerData)}
         <PlayerName player={row} editable={false} showNotionIndicator={true} />
       {/snippet}
 
-      {#snippet expCell(row: EditPlayerRow, index: number)}
+      {#snippet expCell(row: PlayerData, index: number)}
         {#if row.is_new !== undefined}
           <Badge
             variant={row.is_new ? "warning" : "success"}
@@ -326,15 +350,15 @@
         {/if}
       {/snippet}
 
-      {#snippet priorCell(row: EditPlayerRow, index: number)}
+      {#snippet priorCell(row: PlayerData, index: number)}
         {row.has_priority ? "✓" : ""}
       {/snippet}
 
-      {#snippet gmCell(row: EditPlayerRow, index: number)}
+      {#snippet gmCell(row: PlayerData, index: number)}
         {row.partidas_gm > 0 ? "✓" : ""}
       {/snippet}
 
-      {@const tableColumns: ColumnDef<EditPlayerRow>[] = [
+      {@const tableColumns: ColumnDef<PlayerData>[] = [
     { header: "Nombre", cell: nameCell, sticky: true },
     { header: "Exp.", cell: expCell },
     { header: "Juegos", key: "juegos_este_ano" },
@@ -344,8 +368,8 @@
   ]}
 
       <DataTable data={rows} columns={tableColumns} />
-      {#if data?.history && data.history.length > 0}
-        <SnapshotHistory history={data.history} />
+      {#if snapshotDetail?.history && snapshotDetail.history.length > 0}
+        <SnapshotHistory history={snapshotDetail.history} />
       {/if}
     {/snippet}
     {#snippet footer()}

@@ -1,18 +1,30 @@
 // ── Sync Utilities Tests ──────────────────────────────────────────────
 import { describe, it, expect } from "vitest";
 import { applySyncMerges } from "./syncUtils";
-import type { EditPlayerRow, NotionPlayer, MergePair } from "./types";
+import type { EditPlayerRow } from "./types";
+import type { NotionPlayerData } from "./generated-api";
+import { MergePair } from "./syncResolution";
+
+const createNotionPlayer = (
+  overrides: Partial<NotionPlayerData> = {},
+): NotionPlayerData => ({
+  notion_id: "notion_123",
+  nombre: "Notion Name",
+  is_new: false,
+  juegos_este_ano: 5,
+  c_england: 0,
+  c_france: 0,
+  c_germany: 0,
+  c_italy: 0,
+  c_austria: 0,
+  c_russia: 0,
+  c_turkey: 0,
+  alias: ["alias1", "alias2"],
+  ...overrides,
+});
 
 describe("applySyncMerges", () => {
-  const mockNotionPlayers: NotionPlayer[] = [
-    {
-      notion_id: "notion_123",
-      nombre: "Notion Name",
-      is_new: false,
-      juegos_este_ano: 5,
-      alias: ["alias1", "alias2"],
-    },
-  ];
+  const mockNotionPlayers: NotionPlayerData[] = [createNotionPlayer()];
 
   describe("Edge Case 1: Standard Deduplication", () => {
     it("should deduplicate identical names", () => {
@@ -172,7 +184,7 @@ describe("applySyncMerges", () => {
       ];
 
       const merges: MergePair[] = []; // No merges
-      const emptyNotionPlayers: NotionPlayer[] = []; // No Notion matches
+      const emptyNotionPlayers: NotionPlayerData[] = []; // No Notion matches
 
       const result = applySyncMerges(currentRows, merges, emptyNotionPlayers);
 

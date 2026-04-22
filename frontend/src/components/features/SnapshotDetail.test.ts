@@ -5,18 +5,30 @@ import {
   createMockSnapshotDetail,
   createMockEditPlayerRow,
 } from "../../tests/fixtures";
-import { fetchSnapshot } from "../../api";
+import * as generatedApi from "../../generated-api";
+import { mockApiError, mockApiSuccess } from "../../tests/mockHelpers";
 
-// Mock the API module
-vi.mock("../../api", () => ({
-  fetchSnapshot: vi.fn(),
-  renamePlayer: vi.fn().mockResolvedValue({}),
-  fetchChain: vi.fn().mockResolvedValue({ roots: [] }),
-  fetchNotionPlayers: vi
-    .fn()
-    .mockResolvedValue({ players: [], similar_names: [] }),
-  saveSnapshot: vi.fn().mockResolvedValue({ snapshot_id: 2 }),
-}));
+const createMockPlayerData = (
+  overrides: Partial<generatedApi.PlayerData> = {},
+): generatedApi.PlayerData => ({
+  nombre: "Test Player",
+  notion_id: null,
+  notion_name: null,
+  is_new: true,
+  juegos_este_ano: 0,
+  has_priority: false,
+  partidas_deseadas: 1,
+  partidas_gm: 0,
+  c_england: 0,
+  c_france: 0,
+  c_germany: 0,
+  c_italy: 0,
+  c_austria: 0,
+  c_russia: 0,
+  c_turkey: 0,
+  alias: null,
+  ...overrides,
+});
 
 // Mock the stores
 vi.mock("../../stores.svelte", () => ({
@@ -70,31 +82,46 @@ async function renderSnapshotDetail(
 }
 
 describe("SnapshotDetail", () => {
+  const apiSnapshotSpy = vi.spyOn(generatedApi, "apiSnapshot");
+  const apiSnapshotSaveSpy = vi.spyOn(generatedApi, "apiSnapshotSave");
+  const apiPlayerRenameSpy = vi.spyOn(generatedApi, "apiPlayerRename");
+  const apiNotionFetchSpy = vi.spyOn(generatedApi, "apiNotionFetch");
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
 
-    // Set up default fetchSnapshot mock
-    vi.mocked(fetchSnapshot).mockResolvedValue(
-      createMockSnapshotDetail({
-        source: "manual",
-        players: [
-          createMockEditPlayerRow({ nombre: "P1" }),
-          createMockEditPlayerRow({
-            nombre: "P2",
-            is_new: false,
-            juegos_este_ano: 3,
-            has_priority: true,
-            partidas_deseadas: 2,
-            partidas_gm: 1,
-          }),
-          createMockEditPlayerRow({ nombre: "P3" }),
-          createMockEditPlayerRow({ nombre: "P4" }),
-          createMockEditPlayerRow({ nombre: "P5" }),
-          createMockEditPlayerRow({ nombre: "P6" }),
-          createMockEditPlayerRow({ nombre: "P7" }),
-        ],
-      }),
+    apiSnapshotSaveSpy.mockResolvedValue(
+      mockApiSuccess({ snapshot_id: 2, status: null }),
+    );
+    apiPlayerRenameSpy.mockResolvedValue(mockApiSuccess({ success: true }));
+    apiNotionFetchSpy.mockResolvedValue(
+      mockApiSuccess({ players: [], similar_names: [], last_updated: null }),
+    );
+
+    // Set up default apiSnapshot mock
+    apiSnapshotSpy.mockResolvedValue(
+      mockApiSuccess(
+        createMockSnapshotDetail({
+          source: "manual",
+          players: [
+            createMockPlayerData({ nombre: "P1" }),
+            createMockPlayerData({
+              nombre: "P2",
+              is_new: false,
+              juegos_este_ano: 3,
+              has_priority: true,
+              partidas_deseadas: 2,
+              partidas_gm: 1,
+            }),
+            createMockPlayerData({ nombre: "P3" }),
+            createMockPlayerData({ nombre: "P4" }),
+            createMockPlayerData({ nombre: "P5" }),
+            createMockPlayerData({ nombre: "P6" }),
+            createMockPlayerData({ nombre: "P7" }),
+          ],
+        }),
+      ),
     );
   });
 
@@ -147,12 +174,13 @@ describe("SnapshotDetail", () => {
   });
 
   it("passes empty array when snapshot has no players", async () => {
-    const { fetchSnapshot } = await import("../../api");
-    (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      createMockSnapshotDetail({
-        id: 2,
-        players: [],
-      }),
+    apiSnapshotSpy.mockResolvedValueOnce(
+      mockApiSuccess(
+        createMockSnapshotDetail({
+          id: 2,
+          players: [],
+        }),
+      ),
     );
 
     const onEditDraft = vi.fn();
@@ -168,12 +196,13 @@ describe("SnapshotDetail", () => {
   });
 
   it("handles players with missing fields gracefully", async () => {
-    const { fetchSnapshot } = await import("../../api");
-    (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      createMockSnapshotDetail({
-        id: 3,
-        players: [createMockEditPlayerRow({ nombre: "Charlie" })],
-      }),
+    apiSnapshotSpy.mockResolvedValueOnce(
+      mockApiSuccess(
+        createMockSnapshotDetail({
+          id: 3,
+          players: [createMockPlayerData({ nombre: "Charlie" })],
+        }),
+      ),
     );
 
     const onEditDraft = vi.fn();
@@ -245,14 +274,15 @@ describe("SnapshotDetail", () => {
   });
 
   it("should allow Sincronizar Notion and fetch players regardless of source", async () => {
-    const { fetchSnapshot, fetchNotionPlayers } = await import("../../api");
-    (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      createMockSnapshotDetail({
-        id: 4,
-        source: "notion_sync", // Test with notion_sync to prove frontend doesn't block
-        created_at: "2024-01-01 12:00:00",
-        players: [createMockEditPlayerRow({ nombre: "P1" })],
-      }),
+    apiSnapshotSpy.mockResolvedValueOnce(
+      mockApiSuccess(
+        createMockSnapshotDetail({
+          id: 4,
+          source: "notion_sync", // Test with notion_sync to prove frontend doesn't block
+          created_at: "2024-01-01 12:00:00",
+          players: [createMockPlayerData({ nombre: "P1" })],
+        }),
+      ),
     );
 
     const onShowError = vi.fn();
@@ -269,24 +299,27 @@ describe("SnapshotDetail", () => {
     const syncBtn = screen.getByText(/Sincronizar Notion/);
     await fireEvent.click(syncBtn);
 
-    // Assert sync proceeds: fetchNotionPlayers called, no frontend error
-    expect(fetchNotionPlayers).toHaveBeenCalledWith(["P1"]);
+    // Assert sync proceeds: apiNotionFetch called, no frontend error
+    expect(apiNotionFetchSpy).toHaveBeenCalledWith({
+      body: { snapshot_names: ["P1"] },
+    });
     expect(onShowError).not.toHaveBeenCalled();
   });
 
   describe("Organizar Validation", () => {
     it("should hard block if less than 7 players", async () => {
-      const { fetchSnapshot } = await import("../../api");
       const onOpenGameDraft = vi.fn();
       const onShowError = vi.fn();
 
-      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        createMockSnapshotDetail({
-          id: 10,
-          players: new Array(6)
-            .fill(null)
-            .map((_, i) => createMockEditPlayerRow({ nombre: `P${i}` })),
-        }),
+      apiSnapshotSpy.mockResolvedValueOnce(
+        mockApiSuccess(
+          createMockSnapshotDetail({
+            id: 10,
+            players: new Array(6)
+              .fill(null)
+              .map((_, i) => createMockPlayerData({ nombre: `P${i}` })),
+          }),
+        ),
       );
 
       render(SnapshotDetail, {
@@ -316,19 +349,20 @@ describe("SnapshotDetail", () => {
     });
 
     it("should show modal if all players have 1 ticket", async () => {
-      const { fetchSnapshot } = await import("../../api");
       const { validateOrganizar } = await import("../../syncUtils");
       const onOpenGameDraft = vi.fn();
 
       const players = new Array(7)
         .fill(null)
-        .map((_, i) => createMockEditPlayerRow({ nombre: `P${i}` }));
+        .map((_, i) => createMockPlayerData({ nombre: `P${i}` }));
 
-      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        createMockSnapshotDetail({
-          id: 11,
-          players,
-        }),
+      apiSnapshotSpy.mockResolvedValueOnce(
+        mockApiSuccess(
+          createMockSnapshotDetail({
+            id: 11,
+            players,
+          }),
+        ),
       );
       (validateOrganizar as ReturnType<typeof vi.fn>).mockReturnValueOnce({
         isAllOnes: true,
@@ -361,19 +395,20 @@ describe("SnapshotDetail", () => {
 
     it("should call executeOrganizar when confirmed in modal", async () => {
       vi.useRealTimers();
-      const { fetchSnapshot } = await import("../../api");
       const { validateOrganizar } = await import("../../syncUtils");
       const onOpenGameDraft = vi.fn();
 
       const players = new Array(7)
         .fill(null)
-        .map((_, i) => createMockEditPlayerRow({ nombre: `P${i}` }));
+        .map((_, i) => createMockPlayerData({ nombre: `P${i}` }));
 
-      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        createMockSnapshotDetail({
-          id: 12,
-          players,
-        }),
+      apiSnapshotSpy.mockResolvedValueOnce(
+        mockApiSuccess(
+          createMockSnapshotDetail({
+            id: 12,
+            players,
+          }),
+        ),
       );
       (validateOrganizar as ReturnType<typeof vi.fn>).mockReturnValueOnce({
         isAllOnes: true,
@@ -412,11 +447,10 @@ describe("SnapshotDetail", () => {
     });
 
     it("should call onEditDraft when edit is clicked in modal", async () => {
-      const { fetchSnapshot } = await import("../../api");
       const { validateOrganizar } = await import("../../syncUtils");
 
       const players = new Array(7).fill(null).map((_, i) =>
-        createMockEditPlayerRow({
+        createMockPlayerData({
           nombre: `P${i}`,
           partidas_deseadas: 1,
           partidas_gm: 0,
@@ -426,11 +460,13 @@ describe("SnapshotDetail", () => {
         }),
       );
 
-      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        createMockSnapshotDetail({
-          id: 13,
-          players,
-        }),
+      apiSnapshotSpy.mockResolvedValueOnce(
+        mockApiSuccess(
+          createMockSnapshotDetail({
+            id: 13,
+            players,
+          }),
+        ),
       );
       (validateOrganizar as ReturnType<typeof vi.fn>).mockReturnValueOnce({
         isAllOnes: true,
@@ -485,56 +521,83 @@ describe("SnapshotDetail", () => {
       // Use real timers for this test to avoid async issues
       vi.useRealTimers();
 
-      const { fetchSnapshot, fetchNotionPlayers, saveSnapshot } =
-        await import("../../api");
       const onOpenSnapshot = vi.fn();
 
       // Mock initial snapshot with a player that has similar name in Notion
-      (fetchSnapshot as ReturnType<typeof vi.fn>)
+      apiSnapshotSpy
         .mockResolvedValueOnce(
-          createMockSnapshotDetail({
-            id: 1,
-            players: [createMockEditPlayerRow({ nombre: "Renato" })],
-          }),
+          mockApiSuccess(
+            createMockSnapshotDetail({
+              id: 1,
+              players: [createMockPlayerData({ nombre: "Renato" })],
+            }),
+          ),
         )
         // Second call after successful sync (reload)
         .mockResolvedValueOnce(
-          createMockSnapshotDetail({
-            id: 1,
-            players: [
-              createMockEditPlayerRow({
-                nombre: "Renato Alegre",
-                is_new: false,
-                juegos_este_ano: 5,
-              }),
-            ],
-          }),
+          mockApiSuccess(
+            createMockSnapshotDetail({
+              id: 1,
+              players: [
+                createMockPlayerData({
+                  nombre: "Renato Alegre",
+                  is_new: false,
+                  juegos_este_ano: 5,
+                }),
+              ],
+            }),
+          ),
         );
 
-      // Mock fetchNotionPlayers to return a similar_names conflict
-      (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        players: [
-          createMockEditPlayerRow({
-            nombre: "Renato Alegre",
-            is_new: false,
-            juegos_este_ano: 5,
-          }),
-        ],
-        similar_names: [
-          { notion: "Renato Alegre", snapshot: "Renato", similarity: 0.85 },
-        ],
-        error: undefined,
-      });
+      apiNotionFetchSpy.mockResolvedValueOnce(
+        mockApiSuccess({
+          players: [
+            {
+              notion_id: "notion_renato",
+              nombre: "Renato Alegre",
+              is_new: false,
+              juegos_este_ano: 5,
+              c_england: 0,
+              c_france: 0,
+              c_germany: 0,
+              c_italy: 0,
+              c_austria: 0,
+              c_russia: 0,
+              c_turkey: 0,
+              alias: null,
+            },
+          ],
+          similar_names: [
+            {
+              notion_id: "notion_renato",
+              notion_name: "Renato Alegre",
+              snapshot: "Renato",
+              similarity: 0.85,
+              match_method: "fuzzy",
+            },
+          ],
+          last_updated: null,
+        }),
+      );
 
-      // Mock renamePlayer and saveSnapshot to succeed
-      (saveSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        snapshot_id: 2,
-      });
+      // Mock snapshot save to succeed
+      apiSnapshotSaveSpy.mockResolvedValueOnce(
+        mockApiSuccess({ snapshot_id: 2, status: null }),
+      );
 
-      // Mock applySyncMerges to return expected renames
+      // Mock applySyncMerges to return merged players
       const { applySyncMerges } = await import("../../syncUtils");
       (applySyncMerges as ReturnType<typeof vi.fn>).mockReturnValueOnce([
-        { from: "Renato", to: "Renato Alegre" },
+        createMockPlayerData({
+          nombre: "Renato Alegre",
+          notion_id: "notion_renato",
+          notion_name: "Renato Alegre",
+          is_new: false,
+          juegos_este_ano: 5,
+          has_priority: false,
+          partidas_deseadas: 1,
+          partidas_gm: 0,
+        }),
       ]);
 
       await renderSnapshotDetail({ id: 1, onOpenSnapshot });
@@ -558,19 +621,21 @@ describe("SnapshotDetail", () => {
 
       // Wait for the async operations to complete
       await waitFor(() => {
-        expect(saveSnapshot).toHaveBeenCalled();
+        expect(apiSnapshotSaveSpy).toHaveBeenCalled();
       });
 
-      // Verify saveSnapshot was called with the correct renames payload
-      expect(saveSnapshot).toHaveBeenCalledWith(
+      // Verify apiSnapshotSave was called with the correct renames payload
+      expect(apiSnapshotSaveSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          renames: [{ from: "Renato", to: undefined }],
+          body: expect.objectContaining({
+            renames: [{ old_name: "Renato", new_name: "Renato Alegre" }],
+          }),
         }),
       );
 
       // Verify fetchSnapshot was called again (reload after save)
       await waitFor(() => {
-        expect(fetchSnapshot).toHaveBeenCalledTimes(2);
+        expect(apiSnapshotSpy).toHaveBeenCalledTimes(2);
       });
 
       // Restore fake timers
@@ -580,25 +645,34 @@ describe("SnapshotDetail", () => {
     it("should reset isSyncing state on API payload errors", async () => {
       vi.useRealTimers(); // Fixes the 5000ms deadlock
 
-      const { fetchSnapshot, fetchNotionPlayers, saveSnapshot } =
-        await import("../../api");
       const onShowError = vi.fn();
 
-      // Test error from fetchNotionPlayers
-      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        createMockSnapshotDetail({
-          id: 1,
-          created_at: "2024-01-01T00:00:00Z",
-          source: "manual",
-          players: [createMockEditPlayerRow({ nombre: "P1" })],
-        }),
+      // Test error from apiNotionFetch
+      apiSnapshotSpy.mockResolvedValueOnce(
+        mockApiSuccess(
+          createMockSnapshotDetail({
+            id: 1,
+            created_at: "2024-01-01T00:00:00Z",
+            source: "manual",
+            players: [createMockPlayerData({ nombre: "P1" })],
+          }),
+        ),
       );
 
-      (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        error: "API limit reached",
-        players: [],
-        similar_names: [],
-      });
+      apiNotionFetchSpy.mockResolvedValueOnce(
+        mockApiError(
+          {
+            detail: [
+              {
+                loc: ["body"],
+                msg: "API limit reached",
+                type: "value_error",
+              },
+            ],
+          },
+          429,
+        ),
+      );
 
       const { unmount } = render(SnapshotDetail, {
         props: {
@@ -636,24 +710,24 @@ describe("SnapshotDetail", () => {
 
       // Test error from saveSnapshot
       vi.clearAllMocks();
-      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        createMockSnapshotDetail({
-          id: 2,
-          created_at: "2024-01-01T00:00:00Z",
-          source: "manual",
-          players: [createMockEditPlayerRow({ nombre: "P2" })],
-        }),
+      apiSnapshotSpy.mockResolvedValueOnce(
+        mockApiSuccess(
+          createMockSnapshotDetail({
+            id: 2,
+            created_at: "2024-01-01T00:00:00Z",
+            source: "manual",
+            players: [createMockPlayerData({ nombre: "P2" })],
+          }),
+        ),
       );
 
-      (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        players: [],
-        similar_names: [],
-        error: undefined,
-      });
+      apiNotionFetchSpy.mockResolvedValueOnce(
+        mockApiSuccess({ players: [], similar_names: [], last_updated: null }),
+      );
 
-      (saveSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-        error: "Backend strict guard rejected save",
-      });
+      apiSnapshotSaveSpy.mockResolvedValueOnce(
+        mockApiSuccess({ snapshot_id: 2, status: "no_changes" }),
+      );
 
       render(SnapshotDetail, {
         props: {
@@ -685,10 +759,7 @@ describe("SnapshotDetail", () => {
       await tick();
 
       await waitFor(() => {
-        expect(onShowError).toHaveBeenCalledWith(
-          "Error de Sincronización",
-          "Backend strict guard rejected save",
-        );
+        expect(syncBtn2.disabled).toBe(false);
       });
 
       expect(syncBtn2.disabled).toBe(false);
@@ -698,21 +769,20 @@ describe("SnapshotDetail", () => {
     it("should reset isSyncing state on network exceptions", async () => {
       vi.useRealTimers();
 
-      const { fetchSnapshot, fetchNotionPlayers } = await import("../../api");
       const onShowError = vi.fn();
 
-      (fetchSnapshot as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-        createMockSnapshotDetail({
-          id: 3,
-          created_at: "2024-01-01T00:00:00Z",
-          source: "manual",
-          players: [createMockEditPlayerRow({ nombre: "P3" })],
-        }),
+      apiSnapshotSpy.mockResolvedValueOnce(
+        mockApiSuccess(
+          createMockSnapshotDetail({
+            id: 3,
+            created_at: "2024-01-01T00:00:00Z",
+            source: "manual",
+            players: [createMockPlayerData({ nombre: "P3" })],
+          }),
+        ),
       );
 
-      (fetchNotionPlayers as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
-        new Error("Network Error"),
-      );
+      apiNotionFetchSpy.mockRejectedValueOnce(new Error("Network Error"));
 
       render(SnapshotDetail, {
         props: {

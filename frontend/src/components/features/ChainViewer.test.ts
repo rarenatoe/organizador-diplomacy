@@ -1,14 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/svelte";
 
-// Mock the API module
-vi.mock("../../api", () => ({
-  fetchChain: vi.fn(),
-}));
-
 // Import ChainViewer and API
 import ChainViewer from "./ChainViewer.svelte";
-import { fetchChain } from "../../api";
+import * as generatedApi from "../../generated-api";
+import { mockApiSuccess } from "../../tests/mockHelpers";
+
+const apiChainSpy = vi.spyOn(generatedApi, "apiChain");
 
 describe("ChainViewer.svelte - Empty State Integration", () => {
   const mockProps = {
@@ -22,10 +20,12 @@ describe("ChainViewer.svelte - Empty State Integration", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Mock fetchChain to return empty data for empty state
-    vi.mocked(fetchChain).mockResolvedValue({
-      roots: [],
-    });
+    // Mock apiChain to return empty data for empty state
+    apiChainSpy.mockResolvedValue(
+      mockApiSuccess({
+        roots: [],
+      }),
+    );
   });
 
   it("renders empty state when there are no snapshots", async () => {
@@ -128,34 +128,35 @@ describe("ChainViewer.svelte - Delete Functionality", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // Mock fetchChain to return data with snapshot and game nodes
-    vi.mocked(fetchChain).mockResolvedValue({
-      roots: [
-        {
-          id: 1,
-          type: "snapshot",
-          created_at: "2024-01-01 10:00:00",
-          source: "manual",
-          player_count: 5,
-          is_latest: true,
-          branches: [
-            {
-              edge: {
-                id: 2,
-                type: "game",
-                created_at: "2024-01-01 11:00:00",
-                mesa_count: 2,
-                espera_count: 3,
-                to_id: 2,
-                from_id: 1,
-                intentos: 0,
+    apiChainSpy.mockResolvedValue(
+      mockApiSuccess({
+        roots: [
+          {
+            id: 1,
+            type: "snapshot",
+            created_at: "2024-01-01 10:00:00",
+            source: "manual",
+            player_count: 5,
+            is_latest: true,
+            branches: [
+              {
+                edge: {
+                  id: 2,
+                  type: "game",
+                  created_at: "2024-01-01 11:00:00",
+                  mesa_count: 2,
+                  espera_count: 3,
+                  to_id: 2,
+                  from_id: 1,
+                  intentos: 0,
+                },
+                output: null,
               },
-              output: null,
-            },
-          ],
-        },
-      ],
-    });
+            ],
+          },
+        ],
+      }),
+    );
   });
 
   it("renders delete buttons for both snapshot and game nodes", async () => {
@@ -204,41 +205,47 @@ describe("ChainViewer.svelte - Layout Regression Guards", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    apiChainSpy.mockResolvedValue(
+      mockApiSuccess({
+        roots: [],
+      }),
+    );
   });
 
   it("renders multiple root snapshots in separate chain lanes", async () => {
-    // Mock fetchChain to return multiple root snapshots
-    vi.mocked(fetchChain).mockResolvedValue({
-      roots: [
-        {
-          id: 1,
-          type: "snapshot",
-          created_at: "2024-01-01 10:00:00",
-          source: "manual",
-          player_count: 5,
-          is_latest: false,
-          branches: [],
-        },
-        {
-          id: 2,
-          type: "snapshot",
-          created_at: "2024-01-02 11:00:00",
-          source: "notion",
-          player_count: 7,
-          is_latest: true,
-          branches: [],
-        },
-        {
-          id: 3,
-          type: "snapshot",
-          created_at: "2024-01-03 12:00:00",
-          source: "csv",
-          player_count: 4,
-          is_latest: false,
-          branches: [],
-        },
-      ],
-    });
+    apiChainSpy.mockResolvedValue(
+      mockApiSuccess({
+        roots: [
+          {
+            id: 1,
+            type: "snapshot",
+            created_at: "2024-01-01 10:00:00",
+            source: "manual",
+            player_count: 5,
+            is_latest: false,
+            branches: [],
+          },
+          {
+            id: 2,
+            type: "snapshot",
+            created_at: "2024-01-02 11:00:00",
+            source: "notion_sync",
+            player_count: 7,
+            is_latest: true,
+            branches: [],
+          },
+          {
+            id: 3,
+            type: "snapshot",
+            created_at: "2024-01-03 12:00:00",
+            source: "manual",
+            player_count: 4,
+            is_latest: false,
+            branches: [],
+          },
+        ],
+      }),
+    );
 
     render(ChainViewer, { props: mockProps });
 
@@ -261,19 +268,21 @@ describe("ChainViewer.svelte - Layout Regression Guards", () => {
 
   it("renders single root snapshot in one chain lane", async () => {
     // Mock with single snapshot
-    vi.mocked(fetchChain).mockResolvedValue({
-      roots: [
-        {
-          id: 1,
-          type: "snapshot",
-          created_at: "2024-01-01 10:00:00",
-          source: "manual",
-          player_count: 5,
-          is_latest: true,
-          branches: [],
-        },
-      ],
-    });
+    apiChainSpy.mockResolvedValue(
+      mockApiSuccess({
+        roots: [
+          {
+            id: 1,
+            type: "snapshot",
+            created_at: "2024-01-01 10:00:00",
+            source: "manual",
+            player_count: 5,
+            is_latest: true,
+            branches: [],
+          },
+        ],
+      }),
+    );
 
     render(ChainViewer, { props: mockProps });
 
@@ -290,39 +299,40 @@ describe("ChainViewer.svelte - Layout Regression Guards", () => {
   });
 
   it("renders root nodes and their branches within a single chain lane without recursive wrapping", async () => {
-    // Mock fetchChain to return one root snapshot that has a nested branch (child snapshot)
-    vi.mocked(fetchChain).mockResolvedValue({
-      roots: [
-        {
-          id: 1,
-          type: "snapshot",
-          created_at: "2024-01-01 10:00:00",
-          source: "manual",
-          player_count: 5,
-          is_latest: false,
-          branches: [
-            {
-              edge: {
-                id: 1,
-                type: "edit",
-                created_at: "2024-01-01 10:30:00",
-                to_id: 2,
-                from_id: 1,
+    apiChainSpy.mockResolvedValue(
+      mockApiSuccess({
+        roots: [
+          {
+            id: 1,
+            type: "snapshot",
+            created_at: "2024-01-01 10:00:00",
+            source: "manual",
+            player_count: 5,
+            is_latest: false,
+            branches: [
+              {
+                edge: {
+                  id: 1,
+                  type: "edit",
+                  created_at: "2024-01-01 10:30:00",
+                  to_id: 2,
+                  from_id: 1,
+                },
+                output: {
+                  id: 2,
+                  type: "snapshot",
+                  created_at: "2024-01-01 11:00:00",
+                  source: "manual",
+                  player_count: 5,
+                  is_latest: true,
+                  branches: [],
+                },
               },
-              output: {
-                id: 2,
-                type: "snapshot",
-                created_at: "2024-01-01 11:00:00",
-                source: "manual",
-                player_count: 5,
-                is_latest: true,
-                branches: [],
-              },
-            },
-          ],
-        },
-      ],
-    });
+            ],
+          },
+        ],
+      }),
+    );
 
     render(ChainViewer, { props: mockProps });
 

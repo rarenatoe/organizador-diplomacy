@@ -1,5 +1,5 @@
-import type { PlayerHistoryItem } from "./generated-api";
-import type { SnapshotNode, Branch, EditPlayerRow } from "./types";
+import type { Branch, PlayerHistoryItem, SnapshotNode } from "./generated-api";
+import type { EditPlayerRow } from "./types";
 
 /**
  * Generic DFS walker for the snapshot chain tree.
@@ -11,7 +11,7 @@ export function walkChain(
 ): void {
   function visit(node: SnapshotNode): void {
     callback(node);
-    for (const branch of node.branches ?? []) {
+    for (const branch of node.branches) {
       callback(node, branch);
       if (branch.output) visit(branch.output);
     }
@@ -70,7 +70,7 @@ export function buildPlayerRow(
 ): EditPlayerRow {
   return {
     nombre: base.nombre,
-    original_nombre: base.nombre,
+    oldName: base.nombre,
     is_new: base.is_new ?? history.is_new,
     juegos_este_ano: base.juegos_este_ano ?? history.juegos_este_ano,
     has_priority: base.has_priority ?? history.has_priority,

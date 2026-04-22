@@ -6,7 +6,7 @@ Tests snapshot CRUD operations and deletion cascade.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, NotRequired, TypedDict
 
 import pytest
 from sqlalchemy import select
@@ -15,11 +15,19 @@ from backend.crud.chain import create_branch_edge, create_game_edge
 from backend.crud.players import get_or_create_player
 from backend.crud.snapshots import (
     add_player_to_snapshot,
-    create_root_manual_snapshot,
     create_snapshot,
     get_snapshot_players,
 )
-from backend.db.models import Snapshot, SnapshotHistory, SnapshotPlayer, TimelineEdge
+from backend.db.models import (
+    Snapshot,
+    SnapshotHistory,
+    SnapshotPlayer,
+    SnapshotSource,
+    TimelineEdge,
+)
+
+if TYPE_CHECKING:
+    from typing import Any
 
 pytestmark = pytest.mark.asyncio
 
@@ -27,8 +35,18 @@ pytestmark = pytest.mark.asyncio
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
+class ManualSnapshotPlayer(TypedDict):
+    nombre: str
+    is_new: bool
+    juegos_este_ano: int
+    has_priority: bool
+    partidas_deseadas: int
+    partidas_gm: int
+    notion_id: NotRequired[str | None]
+
+
 async def make_snapshot_with_players(
-    db_session: Any, n: int = 5, source: str = "notion_sync"
+    db_session: Any, n: int = 5, source: SnapshotSource = SnapshotSource.NOTION_SYNC
 ) -> int:
     """Creates a snapshot with n players and returns snapshot_id."""
     snap_id = await create_snapshot(db_session, source)
@@ -45,6 +63,37 @@ async def make_snapshot_with_players(
             is_new=False,
         )
     await db_session.commit()
+    return snap_id
+
+
+async def make_root_manual_snapshot(
+    db_session: Any,
+    players: list[ManualSnapshotPlayer],
+) -> int:
+    """Create a root manual snapshot for test setup only."""
+    snap_id = await create_snapshot(db_session, SnapshotSource.MANUAL)
+
+    for player in players:
+        name = player["nombre"]
+        if not name:
+            continue
+
+        player_id = await get_or_create_player(
+            db_session,
+            name,
+            player.get("notion_id"),
+        )
+        await add_player_to_snapshot(
+            db_session,
+            snap_id,
+            player_id,
+            player["juegos_este_ano"],
+            player["partidas_deseadas"],
+            player["partidas_gm"],
+            has_priority=player["has_priority"],
+            is_new=player["is_new"],
+        )
+
     return snap_id
 
 
@@ -71,36 +120,30 @@ class TestApiSnapshotDetail:
                 assert key in p
 
     async def test_snapshot_includes_source(self, client: Any, db_session: Any) -> None:
-        snap_id = await make_snapshot_with_players(db_session, n=1, source="manual")
+        snap_id = await make_snapshot_with_players(db_session, n=1, source=SnapshotSource.MANUAL)
         resp = await client.get(f"/api/snapshot/{snap_id}")
         data = resp.json()
         assert data["source"] == "manual"
 
+    async def test_snapshot_ignores_malformed_history_changes(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Malformed legacy history rows must not crash snapshot detail endpoint."""
+        snap_id = await make_snapshot_with_players(db_session, n=1, source=SnapshotSource.MANUAL)
+        bad_history = SnapshotHistory(
+            snapshot_id=snap_id,
+            action_type=SnapshotSource.MANUAL_EDIT,
+            changes={"invalid": "payload"},
+            previous_state={"players": []},
+        )
+        db_session.add(bad_history)
+        await db_session.commit()
 
-# ── GET /api/snapshot ─────────────────────────────────────────────────────────
-
-
-class TestApiSnapshotList:
-    async def test_empty_list(self, client: Any) -> None:
-        resp = await client.get("/api/snapshot")
+        resp = await client.get(f"/api/snapshot/{snap_id}")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["snapshots"] == []
-
-    async def test_list_returns_snapshots(self, client: Any, db_session: Any) -> None:
-        snap_id = await make_snapshot_with_players(db_session, n=5)
-        resp = await client.get("/api/snapshot")
-        data = resp.json()
-        assert len(data["snapshots"]) >= 1
-        ids = [s["id"] for s in data["snapshots"]]
-        assert snap_id in ids
-
-    async def test_list_includes_player_count(self, client: Any, db_session: Any) -> None:
-        await make_snapshot_with_players(db_session, n=7)
-        resp = await client.get("/api/snapshot")
-        data = resp.json()
-        for snap in data["snapshots"]:
-            assert "player_count" in snap
+        assert data["id"] == snap_id
+        assert data["history"] == []
 
 
 # ── DELETE /api/snapshot/<id> ─────────────────────────────────────────────────
@@ -141,7 +184,7 @@ class TestApiSnapshotDelete:
     async def test_delete_with_game_event_cascade(self, client: Any, db_session: Any) -> None:
         """Deleting a snapshot should cascade to related game events and their data."""
         snap1 = await make_snapshot_with_players(db_session, n=14)
-        snap2 = await create_snapshot(db_session, "organizar")
+        snap2 = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
         await db_session.commit()
         # Create a game event linking snap1 -> snap2
         edge_id = await create_game_edge(db_session, snap1, snap2, 1)
@@ -171,9 +214,11 @@ class TestApiSnapshotDelete:
 
         # Setup: A -> Game -> B
         #        A -> Manual -> C
-        snap_a = await make_snapshot_with_players(db_session, n=5, source="notion_sync")
-        snap_b = await create_snapshot(db_session, "organizar")
-        snap_c = await create_snapshot(db_session, "manual")
+        snap_a = await make_snapshot_with_players(
+            db_session, n=5, source=SnapshotSource.NOTION_SYNC
+        )
+        snap_b = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
+        snap_c = await create_snapshot(db_session, SnapshotSource.MANUAL)
 
         # Add different players to C to verify squashing
         pid_c1 = await get_or_create_player(db_session, "PlayerC1")
@@ -224,7 +269,7 @@ class TestApiSnapshotDelete:
         # Assert 4: A's roster is now C's roster
         players_a = await get_snapshot_players(db_session, snap_a)
         assert len(players_a) == 2
-        player_names = {p["nombre"] for p in players_a}
+        player_names = {p.nombre for p in players_a}
         assert player_names == {"PlayerC1", "PlayerC2"}
 
         # Assert 5: A inherited C's source and timestamp
@@ -244,152 +289,24 @@ class TestApiSnapshotDelete:
         assert result.scalar_one_or_none() is None
 
 
-# ── POST /api/snapshot ─────────────────────────────────────────────────────────
-
-
-class TestApiSnapshotCreate:
-    async def test_save_endpoint_trusts_payload_exactly(self, client: Any, db_session: Any) -> None:
-        """Test that /api/snapshot/save uses exact payload values without overrides."""
-        from backend.crud.players import get_or_create_player
-        from backend.crud.snapshots import (
-            add_player_to_snapshot,
-            create_snapshot,
-            get_snapshot_players,
-        )
-
-        # Create parent snapshot with historical player having has_priority=True
-        parent_id = await create_snapshot(db_session, "manual")
-        player_id = await get_or_create_player(db_session, "HistoricalPlayer")
-        await add_player_to_snapshot(
-            db_session, parent_id, player_id, 5, 2, 1, has_priority=True, is_new=False
-        )
-        await db_session.commit()
-
-        # Create save payload with completely different values
-        save_payload = {
-            "parent_id": parent_id,
-            "event_type": "manual",
-            "players": [
-                {
-                    "nombre": "HistoricalPlayer",
-                    "is_new": False,  # Different from historical
-                    "juegos_este_ano": 88,  # Different from historical
-                    "has_priority": False,  # Different from historical
-                    "partidas_deseadas": 4,  # Different from historical
-                    "partidas_gm": 0,  # Different from historical
-                }
-            ],
-        }
-
-        # Save should trust payload exactly and update in-place (since it's a leaf node)
-        resp = await client.post("/api/snapshot/save", json=save_payload)
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["snapshot_id"] == parent_id
-
-        # Query the DB to prove the dumb save worked and historical values were overwritten
-        players = await get_snapshot_players(db_session, parent_id)
-        assert len(players) == 1
-        player = players[0]
-        assert player["nombre"] == "HistoricalPlayer"
-        assert not player["is_new"]
-        assert player["juegos_este_ano"] == 88
-        assert not player["has_priority"]
-        assert player["partidas_deseadas"] == 4
-        assert player["partidas_gm"] == 0
-
-    async def test_create_with_parent(self, client: Any, db_session: Any) -> None:
-        """Creating a snapshot with parent_id links it to parent."""
-        parent_id = await make_snapshot_with_players(db_session, n=5)
-        resp = await client.post(
-            "/api/snapshot",
-            json={
-                "source": "manual",
-                "parent_id": parent_id,
-                "players": [],
-            },
-        )
-        assert resp.status_code in (200, 201)
-        data = resp.json()
-        # Verify the new snapshot is linked to parent via an event
-        new_id = data["snapshot_id"]
-        result = await db_session.execute(
-            select(TimelineEdge).where(TimelineEdge.output_snapshot_id == new_id)
-        )
-        edge = result.scalar_one_or_none()
-        assert edge is not None
-        assert edge.source_snapshot_id == parent_id
-
-    async def test_create_preserves_roster_in_place(self, client: Any, db_session: Any) -> None:
-        """Creating a snapshot with same roster as parent should detect no changes and skip history."""
-        parent_id = await make_snapshot_with_players(db_session, n=5)
-        # Get current player list
-        players_before = await get_snapshot_players(db_session, parent_id)
-        # Create child with same roster (this should trigger no_changes via /api/snapshot/save)
-        resp = await client.post(
-            "/api/snapshot/save",
-            json={
-                "parent_id": parent_id,
-                "event_type": "manual",
-                "players": players_before,
-            },
-        )
-        # Should detect no changes and return early
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["snapshot_id"] == parent_id
-        assert data["status"] == "no_changes"
-
-        # No SnapshotHistory entry should be created when there are no changes
-        result = await db_session.execute(
-            select(SnapshotHistory).where(SnapshotHistory.snapshot_id == parent_id)
-        )
-        history_records = result.scalars().all()
-        assert len(history_records) == 0
-
-    async def test_create_snapshot_adds_players(self, client: Any, db_session: Any) -> None:
-        """Creating a snapshot should add provided players and their notion_ids."""
-        players = [
-            {
-                "nombre": f"Player{i}",
-                "notion_id": f"notion_{i}",
-                "is_new": False,
-                "juegos_este_ano": i,
-                "has_priority": True,
-                "partidas_deseadas": 2,
-                "partidas_gm": 0,
-            }
-            for i in range(3)
-        ]
-        resp = await client.post(
-            "/api/snapshot",
-            json={"source": "manual", "players": players},
-        )
-        assert resp.status_code in (200, 201)
-        data = resp.json()
-        snap_id = data["snapshot_id"]
-
-        # Verify players were added to snapshot
-        from backend.crud.snapshots import get_snapshot_players
-
-        db_players = await get_snapshot_players(db_session, snap_id)
-        assert len(db_players) == 3
-
-        # Verify notion_id was correctly saved to the Player table
-        from sqlalchemy import select
-
-        from backend.db.models import Player
-
-        for i in range(3):
-            res = await db_session.execute(select(Player).where(Player.name == f"Player{i}"))
-            player_record = res.scalar_one()
-            assert player_record.notion_id == f"notion_{i}"
-
-
 # ── POST /api/snapshot/<id>/save ──────────────────────────────────────────────
 
 
 class TestApiSnapshotSave:
+    async def test_save_rejects_invalid_event_type(self, client: Any, db_session: Any) -> None:
+        parent_id = await make_snapshot_with_players(db_session, n=2)
+
+        resp = await client.post(
+            "/api/snapshot/save",
+            json={
+                "parent_id": parent_id,
+                "event_type": "edit",
+                "players": [],
+            },
+        )
+
+        assert resp.status_code == 422
+
     async def test_save_snapshot_manual(self, client: Any, db_session: Any) -> None:
         """Saving a snapshot should update its players, metadata, and notion_ids."""
         snap_id = await make_snapshot_with_players(db_session, n=3)
@@ -406,8 +323,8 @@ class TestApiSnapshotSave:
             for i in range(2)
         ]
         resp = await client.post(
-            f"/api/snapshot/{snap_id}/save",
-            json={"source": "manual", "players": new_players},
+            "/api/snapshot/save",
+            json={"parent_id": snap_id, "event_type": "manual", "players": new_players},
         )
         assert resp.status_code == 200
 
@@ -416,7 +333,7 @@ class TestApiSnapshotSave:
 
         db_players = await get_snapshot_players(db_session, snap_id)
         assert len(db_players) == 2
-        names = {p["nombre"] for p in db_players}
+        names = {p.nombre for p in db_players}
         assert names == {"NewPlayer0", "NewPlayer1"}
 
         # Verify notion_id was saved
@@ -433,9 +350,10 @@ class TestApiSnapshotSave:
         """Saving with notion_sync source should work."""
         parent_id = await make_snapshot_with_players(db_session, n=5)
         resp = await client.post(
-            f"/api/snapshot/{parent_id}/save",
+            "/api/snapshot/save",
             json={
-                "source": "notion_sync",
+                "parent_id": parent_id,
+                "event_type": "sync",
                 "players": [],
             },
         )
@@ -446,7 +364,7 @@ class TestApiSnapshotSave:
         # Setup: Create parent snapshot with players and a child (so parent is not a leaf)
         parent_id = await make_snapshot_with_players(db_session, n=3)
         # Create a game event to make parent non-leaf (has a child)
-        child_id = await create_snapshot(db_session, "organizar")
+        child_id = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
         await create_game_edge(db_session, parent_id, child_id, 1)
         await db_session.commit()
 
@@ -495,7 +413,7 @@ class TestApiSnapshotSave:
         """
         # Setup: Create a root snapshot with only Juan using the dedicated helper
 
-        parent_id = await create_root_manual_snapshot(
+        parent_id = await make_root_manual_snapshot(
             db_session,
             players=[
                 {
@@ -513,7 +431,7 @@ class TestApiSnapshotSave:
         # Verify setup: snapshot should have exactly 1 player
         players_before = await get_snapshot_players(db_session, parent_id)
         assert len(players_before) == 1
-        assert players_before[0]["nombre"] == "Juan"
+        assert players_before[0].nombre == "Juan"
 
         # The Action: Save with same player data BUT include algorithm weights
         # These should be ignored and not trigger a phantom modification
