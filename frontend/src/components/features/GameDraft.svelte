@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Waitlist from "./Waitlist.svelte";
   import { apiGameDraft, apiGameSave } from "../../generated-api/sdk.gen";
   import type {
     GameDraftResponseOutput,
@@ -476,12 +477,14 @@
       {#if draftData.tickets_sobrantes.length > 0}
         <div class="section">
           <SectionTitle title="Lista de espera" class="waiting-title" />
-          {#each draftData.tickets_sobrantes as w, i (w.nombre + "_" + i)}
-            {@const target = { type: "waiting" as const, playerIndex: i }}
-            {@const isSelected = isSelectedSwap(target)}
-            <div class="waiting-item" class:swapping-active={isSelected}>
-              <span class="waiting-name">{w.nombre}</span>
-              <span class="waiting-cupos">{w.partidas_deseadas} cupos</span>
+
+          <Waitlist
+            players={draftData.tickets_sobrantes}
+            isSwapping={(i) =>
+              isSelectedSwap({ type: "waiting", playerIndex: i })}
+          >
+            {#snippet actions(i)}
+              {@const target = { type: "waiting" as const, playerIndex: i }}
               <Button
                 variant="ghost"
                 size="sm"
@@ -490,8 +493,8 @@
                 title="Intercambiar"
                 onclick={() => handlePlayerClick(target)}
               />
-            </div>
-          {/each}
+            {/snippet}
+          </Waitlist>
         </div>
       {/if}
     {:else}
@@ -627,36 +630,5 @@
     background: var(--info-bg-subtle);
     outline: 1px solid var(--border-focus);
     border-radius: var(--space-4);
-  }
-
-  .waiting-item {
-    display: grid;
-    grid-template-columns: 1fr var(--space-56) var(--space-32);
-    align-items: center;
-    padding: var(--space-8);
-    background: var(--warning-bg-subtle);
-    border: 1px solid var(--warning-border-subtle);
-    border-radius: var(--space-8);
-    margin-bottom: var(--space-8);
-    font-size: 12px;
-  }
-
-  .waiting-item.swapping-active {
-    background: var(--info-bg-subtle);
-    outline: var(--space-4) solid var(--border-focus);
-    border-color: var(--border-focus);
-  }
-
-  .waiting-name {
-    font-weight: 600;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .waiting-cupos {
-    color: var(--warning-text-subtle);
-    font-size: 11px;
-    text-align: right;
   }
 </style>

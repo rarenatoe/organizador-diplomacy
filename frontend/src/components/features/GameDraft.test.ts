@@ -900,4 +900,16 @@ describe("GameDraft.svelte", () => {
       });
     }
   });
+
+  it("enforces structural regression guard: uses centralized Waitlist component", async () => {
+    const { container } = render(GameDraft, { props: mockProps });
+
+    await vi.waitFor(() => {
+      expect(screen.getByText("Partida 1")).toBeInTheDocument();
+    });
+
+    // Verify it uses the waitlist-container abstraction to govern spacing
+    // If someone decouples the interactive list from the read-only list, this test will fail
+    expect(container.querySelector(".waitlist-container")).toBeInTheDocument();
+  });
 });

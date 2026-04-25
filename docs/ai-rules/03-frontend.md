@@ -34,9 +34,11 @@ priority: 30
 
 - **Component Routing:** `ui/` MUST be domain-agnostic. `features/` MUST be domain-aware.
 - **Reference Swapping:** When exchanging complex nested objects, swap the entire object reference. NEVER manually overwrite individual properties.
-- **Zero Layout Shift:** Read-only states (`<span>`) MUST mimic the exact padding/height of editable states (`<input>`).
+- **Zero Layout Shift (Ghost Elements):** Read-only states MUST mimic the exact padding/height of editable states. Specifically, conditional ghost buttons or icons MUST NOT stretch grid/flex rows. Always set a strict `min-height` on the row container (e.g., `min-height: var(--space-32)`) to absorb conditional elements without shifting the layout.
 - **Action Bubbling:** Feature components MUST bubble actions via callback props. NEVER perform API side-effects deeply in nested UI components.
 - **Data Discovery:** NEVER rely on native HTML `title` attributes. ALWAYS use `<Tooltip>` components wrapping Svelte Snippets.
 - **Banned Browser APIs:** NEVER use `window.prompt()`, `window.alert()`, or `window.confirm()`. ALWAYS use custom modal components.
 - **Floating UI Guard:** Do not base the visibility of floating elements (dropdowns, modals) solely on derived array lengths. ALWAYS pair visibility with an explicit user-interaction boolean (e.g., `isActive`) to prevent zombie UI elements.
 - **Logging:** ALWAYS use `logger.info()` from `src/utils/logger.ts`. NEVER use `console.log()`.
+- **List-Level Abstraction Priority:** When standardizing repeated UI elements across different views (e.g., read-only vs. interactive), prioritize abstracting the _entire list container_ (e.g., `<Waitlist>`) rather than just the leaf item (`<WaitlistItem>`). This guarantees unified flex/grid `gap` spacing and eliminates duplicated `{#each}` loops in parent views.
+- **Snippet Arguments for Domain Logic:** Presentation list components MUST remain entirely unaware of domain logic. Use Svelte 5 Snippet arguments (e.g., `actions?: Snippet<[number]>`) to yield contextual data (like loop indices or player IDs) back to the parent. The parent injects the UI (like `<Button>`) and handles the API side-effects.

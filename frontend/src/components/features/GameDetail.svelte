@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Waitlist from "./Waitlist.svelte";
   import {
     apiGame,
     type GameDetailResponse,
@@ -290,16 +291,9 @@
         {@const waitTxt = waiting.map((w) => w.nombre).join("\n")}
         <div class="section">
           <SectionTitle title="Lista de espera" />
-          {#each waiting as w (w.nombre)}
-            <div class="waiting-item">
-              <PlayerName
-                player={w}
-                compact={true}
-                showNotionIndicator={false}
-              />
-              <span class="waiting-cupos">{w.cupos_faltantes} cupo(s)</span>
-            </div>
-          {/each}
+
+          <Waitlist players={waiting} />
+
           <Button
             size="sm"
             variant={copiedId === "waiting" ? "success" : "secondary"}
@@ -395,23 +389,5 @@
     align-items: center;
     justify-content: flex-end;
     gap: var(--space-8);
-  }
-
-  .waiting-item {
-    display: grid;
-    grid-template-columns: 1fr var(--space-56);
-    align-items: center;
-    padding: var(--space-4) var(--space-8);
-    background: var(--warning-bg-subtle);
-    border: 1px solid var(--warning-border-subtle);
-    border-radius: var(--space-8);
-    margin-bottom: var(--space-4);
-    font-size: 12px;
-  }
-
-  .waiting-cupos {
-    color: var(--warning-text-subtle);
-    font-size: 11px;
-    text-align: right;
   }
 </style>

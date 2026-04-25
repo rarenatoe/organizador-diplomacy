@@ -15,7 +15,7 @@ priority: 40
 
 - **State Module Testing:** Logic extracted to `.svelte.ts` files MUST be tested in isolation as pure TypeScript. NEVER use DOM mounting for pure logic.
 - **Singleton Resetting:** ALWAYS wipe globally exported class/state instances in `beforeEach()` to prevent test pollution.
-- **Structural Regression Guards:** Explicitly test HTML hierarchy. If a layout relies on a `.section` wrapper for gaps, assert its existence (`expect(container.querySelector('.section')).toBeInTheDocument();`).
+- **Structural Regression Guards:** Explicitly test HTML hierarchy. When a layout is centralized into a shared container component (e.g., `Waitlist.svelte`), parent components MUST explicitly assert the presence of that specific abstraction's CSS class in their DOM (e.g., `expect(container.querySelector(".waitlist-container")).toBeInTheDocument()`). This guarantees future refactors do not accidentally decouple layouts back into raw `{#each}` loops.
 - **DRY Renders & Fixtures:** Extensively mock data MUST live in `*.fixtures.ts`. EVERY test file MUST implement a centralized `renderComponent(overrides = {})` factory.
 - **Snippet Testing:** Use `createRawSnippet` from `svelte` for snippet components. NEVER test without proper Svelte 5 snippet creation.
 
