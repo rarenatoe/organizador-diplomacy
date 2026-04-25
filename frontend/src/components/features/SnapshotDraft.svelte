@@ -113,13 +113,14 @@
   let headerSubtitle = $derived(
     isEditing
       ? "Modifica los jugadores, su is_new o has_priority para esta versión."
-      : "Crea una nueva versión desde cero o importa jugadores desde CSV.",
+      : "Crea una nueva lista desde cero o importa jugadores desde CSV.",
   );
+
   let saveButtonText = $derived.by(() => {
     if (saving) return "Guardando...";
     if (saveEventType === "sync") return "Guardar Sincronización";
     if (isEditing) return "Guardar Cambios";
-    return "Crear Versión";
+    return "Crear Lista";
   });
 
   // Auto-action on mount

@@ -478,7 +478,7 @@ describe("SnapshotDraft", () => {
     });
 
     const saveButton = screen.getByRole("button", {
-      name: /Crear Versión/i,
+      name: /Crear Lista/i,
     });
     expect(saveButton).toBeDisabled();
   });
@@ -486,16 +486,14 @@ describe("SnapshotDraft", () => {
   it("enables save button when players exist", () => {
     renderDraft({ initialPlayers: mockInitialPlayers });
     const saveButton = screen.getByRole("button", {
-      name: /Crear Versión/i,
+      name: /Crear Lista/i,
     });
     expect(saveButton).not.toBeDisabled();
   });
 
   it("calls apiSnapshotSave when save button is clicked", async () => {
     renderDraft({ initialPlayers: mockInitialPlayers });
-    await fireEvent.click(
-      screen.getByRole("button", { name: /Crear Versión/i }),
-    );
+    await fireEvent.click(screen.getByRole("button", { name: /Crear Lista/i }));
     expect(api.apiSnapshotSave).toHaveBeenCalled();
   });
 
@@ -617,9 +615,7 @@ describe("SnapshotDraft", () => {
     await tick();
 
     // Verify the final save payload gets the exact CSV values, not the history defaults
-    await fireEvent.click(
-      screen.getByRole("button", { name: /Crear Versión/i }),
-    );
+    await fireEvent.click(screen.getByRole("button", { name: /Crear Lista/i }));
 
     expect(api.apiSnapshotSave).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -655,7 +651,7 @@ describe("SnapshotDraft", () => {
     });
 
     const saveButton = screen.getByRole("button", {
-      name: /Crear Versión/i,
+      name: /Crear Lista/i,
     });
     // Verify button is disabled and has helpful title
     expect(saveButton).toBeDisabled();
@@ -1288,7 +1284,7 @@ describe("SnapshotDraft", () => {
 
       // 6. Click Save
       await fireEvent.click(
-        screen.getByRole("button", { name: /Crear Versión/i }),
+        screen.getByRole("button", { name: /Crear Lista/i }),
       );
 
       // 7. Assert Save Payload EXACTLY matches what we expect
