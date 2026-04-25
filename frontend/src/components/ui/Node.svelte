@@ -26,7 +26,8 @@
   // Parse metadata items intelligently
   function parseMetadataItem(item: string) {
     const text = item.toLowerCase();
-    if (/^\d{1,2}:\d{2}:\d{2}$/.test(text)) return { icon: "🕒", text: item };
+    if (/^\d{1,2}:\d{2}(:\d{2})?(\.\d+)?$/.test(text))
+      return { icon: "🕒", text: item };
     if (text.includes("jugadores")) return { icon: "👥", text: item };
     if (text.includes("partida")) return { icon: "🎮", text: item };
     if (text.includes("espera")) return { icon: "⏳", text: item };

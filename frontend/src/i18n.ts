@@ -72,12 +72,20 @@ export function formatAction(action: string): string {
 }
 
 /**
- * Formats a date string to Spanish locale format
+ * Formats a date string to Spanish locale format and local timezone
  * @param dateString - The date string to format
  * @returns The formatted date string in Spanish locale
  */
-export function formatDate(dateString: string): string {
-  return new Date(dateString).toLocaleString("es-PE", {
+export function formatDate(dateString?: string): string {
+  if (!dateString) return "";
+
+  // Append 'Z' to force UTC parsing if the backend sends naive timestamps
+  // This ensures toLocaleString translates it to the user's local timezone
+  const normalizedStr = dateString.endsWith("Z")
+    ? dateString
+    : `${dateString}Z`;
+
+  return new Date(normalizedStr).toLocaleString("es-PE", {
     month: "short",
     day: "numeric",
     hour: "2-digit",

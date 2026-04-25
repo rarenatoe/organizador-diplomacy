@@ -10,6 +10,7 @@
     type SnapshotDetailResponse,
     type SnapshotSaveEventType,
   } from "../../generated-api";
+  import { formatDate } from "../../i18n";
   import { setActiveNodeId } from "../../stores.svelte";
   import type { MergePair } from "../../syncResolution";
   import { applySyncMerges, validateOrganizar } from "../../syncUtils";
@@ -312,7 +313,10 @@
       <PanelSection>
         <SectionTitle title={`Snapshot #${id}`} />
         <MetaGrid>
-          <MetaItem label="Generado" value={snapshotDetail?.created_at} />
+          <MetaItem
+            label="Generado"
+            value={formatDate(snapshotDetail?.created_at)}
+          />
           <MetaItem
             label="Origen"
             value={sourceLabel(snapshotDetail?.source)}

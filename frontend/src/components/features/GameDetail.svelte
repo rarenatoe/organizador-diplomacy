@@ -6,7 +6,7 @@
     type GameDraftResponseOutput,
     type GameDraftTableOutput,
   } from "../../generated-api";
-  import { getCountryEmoji, translateCountry } from "../../i18n";
+  import { formatDate, getCountryEmoji, translateCountry } from "../../i18n";
   import CardGrid from "../layout/CardGrid.svelte";
   import CardGridItem from "../layout/CardGridItem.svelte";
   import PanelLayout from "../layout/PanelLayout.svelte";
@@ -195,7 +195,10 @@
       <PanelSection>
         <SectionTitle title="Resumen" />
         <MetaGrid>
-          <MetaItem label="Generado" value={gameDetail?.created_at} />
+          <MetaItem
+            label="Generado"
+            value={formatDate(gameDetail?.created_at)}
+          />
           <MetaItem label="Intentos" value={gameDetail?.intentos} />
           <MetaItem
             label="Snapshot entrada"

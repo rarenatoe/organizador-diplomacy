@@ -1,5 +1,6 @@
 <script lang="ts">
   import { apiChain, type SnapshotNode } from "../../generated-api";
+  import { formatDate } from "../../i18n";
   import {
     getActiveNodeId,
     setChainData,
@@ -62,13 +63,9 @@
         variant="snapshot"
         isActive={getActiveNodeId() === node.id}
         title={`Snapshot #${node.id}`}
-        subtitle={(node.created_at || "").split(" ")[0] ?? ""}
+        subtitle={formatDate(node.created_at)}
         icon="📋"
-        metadata={[
-          (node.created_at || "").split(" ")[1] ?? "",
-          `${node.player_count} jugadores`,
-          node.source,
-        ]}
+        metadata={[`${node.player_count} jugadores`, node.source]}
         onDelete={() => handleDelete(node.id)}
         onClick={() => handleSelect(node.id)}
       />
@@ -84,11 +81,9 @@
                     variant="game"
                     isActive={getActiveNodeId() === branch.edge.id}
                     title="Jornada"
-                    subtitle={(branch.edge.created_at || "").split(" ")[0] ??
-                      ""}
+                    subtitle={formatDate(branch.edge.created_at)}
                     icon="📊"
                     metadata={[
-                      (branch.edge.created_at || "").split(" ")[1] ?? "",
                       `${branch.edge.mesa_count} partida(s)`,
                       `${branch.edge.espera_count} en espera`,
                     ]}

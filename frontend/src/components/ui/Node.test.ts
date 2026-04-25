@@ -139,4 +139,28 @@ describe("Node", () => {
 
     expect(container.querySelector(".node-icon")?.textContent).toBe("");
   });
+
+  it("renders the clock icon for standard HH:mm times", () => {
+    const { container } = render(Node, {
+      props: { ...defaultProps, metadata: ["06:01"] },
+    });
+    const icon = container.querySelectorAll(".footer-icon")[0]?.textContent;
+    expect(icon).toBe("🕒");
+  });
+
+  it("renders the clock icon for HH:mm:ss times", () => {
+    const { container } = render(Node, {
+      props: { ...defaultProps, metadata: ["06:01:33"] },
+    });
+    const icon = container.querySelectorAll(".footer-icon")[0]?.textContent;
+    expect(icon).toBe("🕒");
+  });
+
+  it("renders the clock icon for HH:mm:ss.SSSSSS times with decimals", () => {
+    const { container } = render(Node, {
+      props: { ...defaultProps, metadata: ["06:01:33.000000"] },
+    });
+    const icon = container.querySelectorAll(".footer-icon")[0]?.textContent;
+    expect(icon).toBe("🕒");
+  });
 });

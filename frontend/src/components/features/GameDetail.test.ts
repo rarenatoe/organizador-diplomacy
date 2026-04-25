@@ -5,6 +5,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 
 import * as generatedApi from "../../generated-api";
 import type { GameDetailResponse } from "../../generated-api";
+import { formatDate } from "../../i18n";
 import { createMockDraftPlayer } from "../../tests/fixtures";
 import { mockApiSuccess } from "../../tests/mockHelpers";
 import GameDetail from "./GameDetail.svelte";
@@ -108,6 +109,13 @@ describe("GameDetail", () => {
     expect(nuevoTag.closest(".badge")).toHaveClass("warning");
     expect(antiguoTag.closest(".badge")).toBeInTheDocument();
     expect(antiguoTag.closest(".badge")).toHaveClass("success");
+
+    // Normalize the expected date to use standard spaces, matching Testing Library's DOM normalizer
+    const expectedDate = formatDate("2024-01-01T00:00:00Z").replace(
+      /\s+/g,
+      " ",
+    );
+    expect(screen.getByText(expectedDate)).toBeInTheDocument();
   });
 
   it("copies share list and shows feedback when share button is clicked", async () => {

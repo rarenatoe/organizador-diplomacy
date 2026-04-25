@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 
 import * as generatedApi from "../../generated-api";
+import { formatDate } from "../../i18n";
 import {
   createMockEditPlayerRow,
   createMockSnapshotDetail,
@@ -144,6 +145,18 @@ describe("SnapshotDetail", () => {
     expect(screen.getByText("P5")).toBeInTheDocument();
     expect(screen.getByText("P6")).toBeInTheDocument();
     expect(screen.getByText("P7")).toBeInTheDocument();
+
+    // Assert structural hierarchy - major content blocks should be wrapped in .section divs
+    expect(container.querySelector(".panel-section")).toBeInTheDocument();
+
+    // Normalize the expected date to use standard spaces, matching Testing Library's DOM normalizer
+    const expectedDate = formatDate("2024-01-01T00:00:00Z").replace(
+      /\s+/g,
+      " ",
+    );
+    expect(screen.getByText(expectedDate)).toBeInTheDocument();
+
+    expect(screen.getByText("P1")).toBeInTheDocument();
   });
 
   it("passes current players to onEditDraft when edit button is clicked", async () => {

@@ -1,4 +1,4 @@
-import { getCountryEmoji, translateCountry } from "./i18n";
+import { formatDate, getCountryEmoji, translateCountry } from "./i18n";
 
 describe("translateCountry", () => {
   it("should translate English country names to Spanish", () => {
@@ -69,5 +69,27 @@ describe("getCountryEmoji", () => {
     expect(getCountryEmoji("england")).toBe("");
     expect(getCountryEmoji("ENGLAND")).toBe("");
     expect(getCountryEmoji("England")).toBe("🇬🇧");
+  });
+});
+
+describe("formatDate", () => {
+  it("should handle empty or null inputs", () => {
+    expect(formatDate("")).toBe("");
+    expect(formatDate(undefined)).toBe("");
+  });
+
+  it("should force naive backend timestamps to UTC by appending Z", () => {
+    // Appending 'Z' causes the Date object to treat the string as UTC
+    // rather than the user's local timezone.
+    const naiveDate = "2026-04-25T23:02:47";
+    const explicitUTCDate = "2026-04-25T23:02:47Z";
+
+    const formattedNaive = formatDate(naiveDate);
+    const formattedUTC = formatDate(explicitUTCDate);
+
+    // Verify the parser successfully handled the string
+    expect(formattedNaive).not.toContain("Invalid");
+    // Verify both strings yield the exact same local time translation
+    expect(formattedNaive).toEqual(formattedUTC);
   });
 });

@@ -22,6 +22,7 @@ priority: 40
 - **Snippet API Integrity:** NEVER weaken a component's API for testing convenience (e.g., changing `children: Snippet` to `children?: Snippet`) just to prevent Svelte 5 runtime `{@render}` errors.
 - **Test Wrappers for Snippets:** To test layout or wrapper components that require Snippets, you MUST create a dedicated `.test.svelte` wrapper file (e.g., `MetaGridTestWrapper.test.svelte`). Render the wrapper in your test so the Snippet is populated with actual DOM nodes.
 - **Selector Stability:** When testing structural hierarchy, ensure you are targeting the centralized layout classes (e.g., `.panel-section`) rather than legacy/generic utility classes.
+- **Testing Library & i18n Dates:** When testing UI components that render localized dates, `Intl.DateTimeFormat` often inserts invisible unicode spaces (like `\u202F`). Testing Library's `getByText` normalizes DOM whitespace to standard spaces, causing exact string matching to fail against raw formatter output. **DO NOT** use complex custom matcher callbacks. **DO** apply whitespace normalization to the expected string to match Testing Library's DOM normalization: `const expectedText = formatDate(dateStr).replace(/\s+/g, " "); expect(screen.getByText(expectedText)).toBeInTheDocument();`.
 
 ## 3. Auto-Generated SDK Testing Patterns (CRITICAL)
 

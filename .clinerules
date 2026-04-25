@@ -112,6 +112,7 @@
 - **Logging:** ALWAYS use `logger.info()` from `src/utils/logger.ts`. NEVER use `console.log()`.
 - **List-Level Abstraction Priority:** When standardizing repeated UI elements across different views (e.g., read-only vs. interactive), prioritize abstracting the _entire list container_ (e.g., `<Waitlist>`) rather than just the leaf item (`<WaitlistItem>`). This guarantees unified flex/grid `gap` spacing and eliminates duplicated `{#each}` loops in parent views.
 - **Snippet Arguments for Domain Logic:** Presentation list components MUST remain entirely unaware of domain logic. Use Svelte 5 Snippet arguments (e.g., `actions?: Snippet<[number]>`) to yield contextual data (like loop indices or player IDs) back to the parent. The parent injects the UI (like `<Button>`) and handles the API side-effects.
+- **Date & Time Formatting:** The backend often sends "naive" timestamps (e.g., `2024-01-01T10:00:00`). To ensure the browser correctly translates these to the user's local timezone, frontend formatters must explicitly cast them to UTC by appending a "Z" if it is missing before parsing them with `new Date()`. ALWAYS use the shared `formatDate` utility from `src/i18n.ts` rather than manually splitting or parsing strings in Svelte components.
 
 ## 1. Execution & Strategy
 
@@ -131,6 +132,7 @@
 - **Snippet API Integrity:** NEVER weaken a component's API for testing convenience (e.g., changing `children: Snippet` to `children?: Snippet`) just to prevent Svelte 5 runtime `{@render}` errors.
 - **Test Wrappers for Snippets:** To test layout or wrapper components that require Snippets, you MUST create a dedicated `.test.svelte` wrapper file (e.g., `MetaGridTestWrapper.test.svelte`). Render the wrapper in your test so the Snippet is populated with actual DOM nodes.
 - **Selector Stability:** When testing structural hierarchy, ensure you are targeting the centralized layout classes (e.g., `.panel-section`) rather than legacy/generic utility classes.
+- **Testing Library & i18n Dates:** When testing UI components that render localized dates, `Intl.DateTimeFormat` often inserts invisible unicode spaces (like `\u202F`). Testing Library's `getByText` normalizes DOM whitespace to standard spaces, causing exact string matching to fail against raw formatter output. **DO NOT** use complex custom matcher callbacks. **DO** apply whitespace normalization to the expected string to match Testing Library's DOM normalization: `const expectedText = formatDate(dateStr).replace(/\s+/g, " "); expect(screen.getByText(expectedText)).toBeInTheDocument();`.
 
 ## 3. Auto-Generated SDK Testing Patterns (CRITICAL)
 
