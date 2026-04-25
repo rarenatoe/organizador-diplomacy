@@ -19,7 +19,7 @@ from backend.api.routers.snapshots import router as snapshots_router
 from backend.api.routers.sync import router as sync_router
 from backend.config import FRONTEND_DIR
 from backend.db.connection import init_db
-from backend.sync.notion_sync import daemon_loop
+from backend.sync.core import daemon_loop
 
 if TYPE_CHECKING:
     from fastapi.routing import APIRoute

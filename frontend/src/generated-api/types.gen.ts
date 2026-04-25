@@ -930,6 +930,16 @@ export type SyncResponse = {
 };
 
 /**
+ * SyncStatusResponse
+ */
+export type SyncStatusResponse = {
+    /**
+     * Status
+     */
+    status: 'pending' | 'syncing' | 'ready' | 'unconfigured' | 'error';
+};
+
+/**
  * ValidationError
  */
 export type ValidationError = {
@@ -1316,6 +1326,22 @@ export type ApiRunNotionSyncResponses = {
 };
 
 export type ApiRunNotionSyncResponse = ApiRunNotionSyncResponses[keyof ApiRunNotionSyncResponses];
+
+export type ApiSyncStatusData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/sync/status';
+};
+
+export type ApiSyncStatusResponses = {
+    /**
+     * Successful Response
+     */
+    200: SyncStatusResponse;
+};
+
+export type ApiSyncStatusResponse = ApiSyncStatusResponses[keyof ApiSyncStatusResponses];
 
 export type CatchAllData = {
     body?: never;

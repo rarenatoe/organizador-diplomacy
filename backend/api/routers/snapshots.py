@@ -38,10 +38,7 @@ from backend.db.models import (
     SnapshotSource,
 )
 from backend.db.views import get_snapshot_detail
-from backend.sync.notion_sync import (
-    detect_similar_names,
-    normalize_name,
-)
+from backend.sync.matching import detect_similar_names, normalize_name
 
 
 async def _insert_snapshot_players(

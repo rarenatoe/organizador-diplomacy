@@ -10,16 +10,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from backend.sync.notion_sync import (
-    NotionPage,
+from backend.sync.client import COUNTRY_PROPS, NotionPage, NotionProperty, extract_number
+from backend.sync.core import (
+    FIELD_DEFAULTS,
     NotionPlayerDict,
-    PlayerNameData,
     build_notion_players_lookup,
-    detect_similar_names,
     find_notion_player,
-    normalize_name,
-    similarity,
 )
+from backend.sync.matching import PlayerNameData, detect_similar_names, normalize_name, similarity
 
 if TYPE_CHECKING:
     from typing import Any
@@ -397,12 +395,6 @@ class TestSyncBehavior:
         is_first_sync: bool = False,
     ) -> list[dict[str, Any]]:
         """Helper to simulate the exact row-building logic from notion_sync.py"""
-        from .notion_sync import (
-            COUNTRY_PROPS,
-            FIELD_DEFAULTS,
-            find_notion_player,
-            normalize_name,
-        )
 
         if merges is None:
             merges = {}
@@ -550,7 +542,6 @@ class TestSyncBehavior:
 
     def test_country_stats_extraction(self):
         """Test that country stats are correctly extracted and updated."""
-        from .notion_sync import NotionProperty, extract_number
 
         # Mock property with number
         prop_num: NotionProperty = {"type": "number", "number": 5}

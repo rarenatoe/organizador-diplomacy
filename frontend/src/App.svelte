@@ -1,6 +1,10 @@
 <script lang="ts">
   import type { EditPlayerRow } from "./types";
-  import { apiGameDelete, type GameDraftResponseOutput } from "./generated-api";
+  import {
+    apiGameDelete,
+    apiSyncStatus,
+    type GameDraftResponseOutput,
+  } from "./generated-api";
   import { nav, type PanelContext } from "./navigation.svelte";
   import Header from "./components/layout/Header.svelte";
   import ChainViewer from "./components/features/ChainViewer.svelte";
@@ -17,6 +21,7 @@
   import "../static/style.css";
   import { apiSnapshot, type SnapshotSaveEventType } from "./generated-api";
 
+  let isAppReady = $state(false);
   let chainViewer = $state<ChainViewer | null>(null);
   let toaster = $state<Toaster | null>(null);
 
@@ -133,71 +138,103 @@
   function onChainUpdate(): void {
     void chainViewer?.loadChain();
   }
+
+  async function checkInitialSync() {
+    try {
+      const { data } = await apiSyncStatus();
+      if (data) {
+        // If it's done, errored, or no token is provided, let the user in
+        if (["ready", "unconfigured", "error"].includes(data.status)) {
+          isAppReady = true;
+          return;
+        }
+      }
+    } catch (e) {
+      // Fallback: if the endpoint fails, let them in to avoid an infinite loader
+      isAppReady = true;
+      return;
+    }
+
+    // If still "pending" or "syncing", poll again in 1 second
+    setTimeout(checkInitialSync, 1000);
+  }
+
+  $effect(() => {
+    checkInitialSync();
+  });
 </script>
 
-<Header onNewDraft={() => openDraft()} />
+{#if !isAppReady}
+  <div class="app-loading-screen">
+    <div class="spinner"></div>
+    <h2>Iniciando Organizador...</h2>
+    <p>Sincronizando caché con Notion</p>
+  </div>
+{:else}
+  <Header onNewDraft={() => openDraft()} />
 
-<div class="main">
-  <ChainViewer
-    bind:this={chainViewer}
-    {onOpenSnapshot}
-    {onOpenGame}
-    {onDeleteSnapshot}
-    {onDeleteGame}
-    onNewDraft={(options) =>
-      openDraft(null, "manual", options?.autoAction ?? null)}
-    panelOpen={nav.isOpen}
-  />
-  <SidePanel
-    title={nav.current?.title ?? ""}
-    open={nav.isOpen}
-    onClose={nav.close}
-  >
-    {#if nav.current?.type === "snapshot" && nav.current.id !== null}
-      <SnapshotDetail
-        id={nav.current.id}
-        onClose={nav.close}
-        {onChainUpdate}
-        {onOpenSnapshot}
-        {onOpenGame}
-        {onOpenGameDraft}
-        onEditDraft={(parentId, eventType, autoAction, players) =>
-          openDraft(parentId, eventType, autoAction ?? null, players ?? [])}
-        onShowError={showError}
-        onShowToast={(message) => toaster?.showSuccessToast(message)}
-      />
-    {:else if nav.current?.type === "draft" && nav.current.draftProps}
-      {#key nav.current.draftProps.draftKey}
-        <SnapshotDraft
-          parentId={nav.current.draftProps.parentId}
-          initialPlayers={nav.current.draftProps.initialPlayers}
-          saveEventType={nav.current.draftProps.saveEventType}
-          autoAction={nav.current.draftProps.autoAction}
+  <div class="main">
+    <ChainViewer
+      bind:this={chainViewer}
+      {onOpenSnapshot}
+      {onOpenGame}
+      {onDeleteSnapshot}
+      {onDeleteGame}
+      onNewDraft={(options) =>
+        openDraft(null, "manual", options?.autoAction ?? null)}
+      panelOpen={nav.isOpen}
+    />
+    <SidePanel
+      title={nav.current?.title ?? ""}
+      open={nav.isOpen}
+      onClose={nav.close}
+    >
+      {#if nav.current?.type === "snapshot" && nav.current.id !== null}
+        <SnapshotDetail
+          id={nav.current.id}
+          onClose={nav.close}
+          {onChainUpdate}
+          {onOpenSnapshot}
+          {onOpenGame}
+          {onOpenGameDraft}
+          onEditDraft={(parentId, eventType, autoAction, players) =>
+            openDraft(parentId, eventType, autoAction ?? null, players ?? [])}
+          onShowError={showError}
+          onShowToast={(message) => toaster?.showSuccessToast(message)}
+        />
+      {:else if nav.current?.type === "draft" && nav.current.draftProps}
+        {#key nav.current.draftProps.draftKey}
+          <SnapshotDraft
+            parentId={nav.current.draftProps.parentId}
+            initialPlayers={nav.current.draftProps.initialPlayers}
+            saveEventType={nav.current.draftProps.saveEventType}
+            autoAction={nav.current.draftProps.autoAction}
+            onClose={nav.close}
+            onCancel={nav.pop}
+            {onChainUpdate}
+            {onOpenSnapshot}
+            onShowError={showError}
+          />
+        {/key}
+      {:else if nav.current?.type === "game" && nav.current.id !== null}
+        <GameDetail id={nav.current.id} {onOpenGameDraft} />
+      {:else if nav.current?.type === "game_draft" && nav.current.draftProps && nav.current.id !== null}
+        <GameDraft
+          snapshotId={nav.current.draftProps.parentId ?? 0}
           onClose={nav.close}
           onCancel={nav.pop}
           {onChainUpdate}
-          {onOpenSnapshot}
+          {onOpenGame}
           onShowError={showError}
+          editingGameId={nav.current.draftProps.editingGameId}
+          initialDraft={nav.current.draftProps.initialData}
         />
-      {/key}
-    {:else if nav.current?.type === "game" && nav.current.id !== null}
-      <GameDetail id={nav.current.id} {onOpenGameDraft} />
-    {:else if nav.current?.type === "game_draft" && nav.current.draftProps && nav.current.id !== null}
-      <GameDraft
-        snapshotId={nav.current.draftProps.parentId ?? 0}
-        onClose={nav.close}
-        onCancel={nav.pop}
-        {onChainUpdate}
-        {onOpenGame}
-        onShowError={showError}
-        editingGameId={nav.current.draftProps.editingGameId}
-        initialDraft={nav.current.draftProps.initialData}
-      />
-    {:else if nav.current?.type === "sync" && nav.current.id !== null}
-      <SyncDetail id={nav.current.id} />
-    {/if}
-  </SidePanel>
-</div>
+      {:else if nav.current?.type === "sync" && nav.current.id !== null}
+        <SyncDetail id={nav.current.id} />
+      {/if}
+    </SidePanel>
+  </div>
+{/if}
 
 <Toaster bind:this={toaster} />
 
@@ -212,5 +249,25 @@
     flex: 1;
     overflow: hidden;
     position: relative;
+  }
+
+  .app-loading-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    gap: var(--space-16);
+  }
+
+  .app-loading-screen .spinner {
+    width: var(--space-40);
+    height: var(--space-40);
+    border: 3px solid var(--border-subtle);
+    border-top-color: var(--primary-bg);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
   }
 </style>

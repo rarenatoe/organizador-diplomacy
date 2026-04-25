@@ -22,7 +22,7 @@ from backend.api.models.players import (
 from backend.crud.players import lookup_player_history, rename_player
 from backend.db.connection import get_session
 from backend.db.models import NotionCache, Player
-from backend.sync.notion_sync import PlayerNameData, detect_similar_names
+from backend.sync.matching import PlayerNameData, detect_similar_names
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.session import AsyncSession

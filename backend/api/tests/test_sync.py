@@ -13,6 +13,7 @@ import pytest
 import pytest_asyncio
 
 from backend.db.models import SnapshotSource
+from backend.sync.core import run_notion_sync_background
 
 if TYPE_CHECKING:
     from typing import Any
@@ -187,8 +188,6 @@ class TestNotionSyncBackground:
         - Spanish/English JSON key mismatches (participaciones vs games_this_year)
         """
 
-        from backend.sync.notion_sync import run_notion_sync_background
-
         # Use the shared test engine from the fixture
         test_engine = background_test_engine
 
@@ -234,12 +233,12 @@ class TestNotionSyncBackground:
         # Patch both _fetch_notion_data and async_engine to use test engine
         with (
             patch(
-                "backend.sync.notion_sync.fetch_notion_data",
+                "backend.sync.core.fetch_notion_data",
                 return_value=(mock_pages, mock_conteo, mock_client),
                 new_callable=AsyncMock,
             ),
             patch(
-                "backend.sync.notion_sync.async_engine",
+                "backend.sync.core.async_engine",
                 test_engine,
             ),
         ):
@@ -290,7 +289,6 @@ class TestNotionSyncBackground:
         from sqlalchemy.ext.asyncio import AsyncSession
 
         from backend.crud.snapshots import get_snapshot_players
-        from backend.sync.notion_sync import run_notion_sync_background
 
         # Use the shared test engine from the fixture
         test_engine = background_test_engine
@@ -331,12 +329,12 @@ class TestNotionSyncBackground:
         # Step 3: Run sync with merges payload renaming AliceOld -> AliceNew
         with (
             patch(
-                "backend.sync.notion_sync.fetch_notion_data",
+                "backend.sync.core.fetch_notion_data",
                 return_value=(mock_pages, mock_conteo, mock_client),
                 new_callable=AsyncMock,
             ),
             patch(
-                "backend.sync.notion_sync.async_engine",
+                "backend.sync.core.async_engine",
                 test_engine,
             ),
         ):
@@ -385,7 +383,6 @@ class TestNotionSyncBackground:
 
         from backend.crud.snapshots import create_snapshot
         from backend.db.models import SnapshotHistory
-        from backend.sync.notion_sync import run_notion_sync_background
 
         # Use the shared test engine from the fixture
         test_engine = background_test_engine
@@ -457,12 +454,12 @@ class TestNotionSyncBackground:
         # Step 4: Run sync (should update in-place and log history)
         with (
             patch(
-                "backend.sync.notion_sync.fetch_notion_data",
+                "backend.sync.core.fetch_notion_data",
                 return_value=(mock_pages, mock_conteo, mock_client),
                 new_callable=AsyncMock,
             ),
             patch(
-                "backend.sync.notion_sync.async_engine",
+                "backend.sync.core.async_engine",
                 test_engine,
             ),
         ):

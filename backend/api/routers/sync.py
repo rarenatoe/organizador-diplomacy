@@ -5,7 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
-from backend.sync.notion_sync import (
+from backend.sync.core import (
+    SyncState,
+    SyncStateStatus,
     run_notion_sync_background,
 )
 
@@ -46,3 +48,13 @@ async def api_run_notion_sync(
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+class SyncStatusResponse(BaseModel):
+    status: SyncStateStatus
+
+
+@router.get("/api/sync/status")
+async def api_sync_status() -> SyncStatusResponse:
+    """Returns the current status of the background Notion sync daemon."""
+    return SyncStatusResponse(status=SyncState.status)
