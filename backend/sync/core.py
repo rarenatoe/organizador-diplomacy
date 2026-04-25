@@ -210,7 +210,10 @@ async def _update_snapshot_in_place(
 
 
 async def _create_new_snapshot(
-    session: "AsyncSession", source_snapshot_id: int | None, rows: list[dict[str, Any]]
+    session: "AsyncSession",
+    source_snapshot_id: int | None,
+    rows: list[dict[str, Any]],
+    renames: list[RenameChange] | None = None,
 ) -> int:
     snap_id = await create_snapshot(session, SnapshotSource.NOTION_SYNC)
     for row in rows:
@@ -228,6 +231,39 @@ async def _create_new_snapshot(
 
     if source_snapshot_id is not None:
         await create_branch_edge(session, source_snapshot_id, snap_id)
+
+        # Calculate diff and log history for the new sync branch
+        previous_players = await get_snapshot_players(session, source_snapshot_id)
+        roster_fields = {
+            "nombre",
+            "is_new",
+            "juegos_este_ano",
+            "has_priority",
+            "partidas_deseadas",
+            "partidas_gm",
+        }
+        prev_roster = [p.model_dump(include=roster_fields) for p in previous_players]
+        new_roster = [
+            {
+                "nombre": r["nombre"],
+                "is_new": r["is_new"],
+                "juegos_este_ano": r["juegos_este_ano"],
+                "has_priority": r.get("has_priority", False),
+                "partidas_deseadas": r.get("partidas_deseadas", 1),
+                "partidas_gm": r.get("partidas_gm", 0),
+            }
+            for r in rows
+        ]
+
+        diff = generate_deep_diff(prev_roster, new_roster, renames or [])
+        await log_snapshot_history(
+            session,
+            snapshot_id=snap_id,
+            action_type=SnapshotSource.NOTION_SYNC,
+            changes=diff,
+            previous_state=HistoryState(players=previous_players),
+        )
+
     return snap_id
 
 
@@ -422,20 +458,21 @@ async def run_notion_sync_background(
                 ):
                     return None
 
+                renames_list = [
+                    RenameChange(old_name=k, new_name=v["to"])
+                    for k, v in (merges or {}).items()
+                    if v.get("action") == "merge_notion"
+                ]
+
                 if snapshot_id is not None:
                     has_children = await _check_snapshot_has_children(session, snapshot_id)
-                    renames_list = [
-                        RenameChange(old_name=k, new_name=v["to"])
-                        for k, v in (merges or {}).items()
-                        if v.get("action") == "merge_notion"
-                    ]
 
                     if not has_children:
                         await _update_snapshot_in_place(session, snapshot_id, rows, renames_list)
                         await session.commit()
                         return snapshot_id
 
-                new_snap_id = await _create_new_snapshot(session, snapshot_id, rows)
+                new_snap_id = await _create_new_snapshot(session, snapshot_id, rows, renames_list)
                 await session.commit()
                 return new_snap_id
 

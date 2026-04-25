@@ -29,6 +29,10 @@ from backend.db.models import (
 if TYPE_CHECKING:
     from typing import Any
 
+    from httpx import AsyncClient
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+
 pytestmark = pytest.mark.asyncio
 
 
@@ -43,6 +47,93 @@ class ManualSnapshotPlayer(TypedDict):
     partidas_deseadas: int
     partidas_gm: int
     notion_id: NotRequired[str | None]
+
+
+@pytest.mark.asyncio
+async def test_api_snapshot_save_branch_logs_history(client: AsyncClient, db_session: AsyncSession):
+    """
+    Ensures that when a snapshot save creates a NEW branch (because the parent
+    is an internal node with existing children), the diff between the parent
+    and the new branch is successfully logged to SnapshotHistory.
+    """
+
+    # 1. Setup: Create a parent snapshot with one player
+    parent_id = await create_snapshot(db_session, source=SnapshotSource.MANUAL)
+    p1_id = await get_or_create_player(db_session, "Alice", None)
+    await add_player_to_snapshot(
+        db_session,
+        parent_id,
+        p1_id,
+        has_priority=False,
+        is_new=True,
+        games_this_year=0,
+        desired_games=1,
+        gm_games=0,
+    )
+
+    # 2. Setup: Force the parent to be an 'internal node' by giving it a child
+    child_id = await create_snapshot(db_session, source=SnapshotSource.MANUAL)
+    edge = TimelineEdge(
+        source_snapshot_id=parent_id,
+        output_snapshot_id=child_id,
+        id=1,
+        edge_type="game",
+    )
+    db_session.add(edge)
+    await db_session.commit()
+
+    # 3. Action: Call /api/snapshot/save targeting the parent, modifying the roster
+    payload = {
+        "parent_id": parent_id,
+        "event_type": "manual",
+        "players": [
+            {
+                "nombre": "Alice",
+                "juegos_este_ano": 1,  # Modified value
+                "is_new": True,
+                "has_priority": False,
+                "partidas_deseadas": 1,
+                "partidas_gm": 0,
+            },
+            {
+                "nombre": "Bob",  # Added player
+                "juegos_este_ano": 0,
+                "is_new": True,
+                "has_priority": False,
+                "partidas_deseadas": 1,
+                "partidas_gm": 0,
+            },
+        ],
+        "renames": [],
+    }
+
+    response = await client.post("/api/snapshot/save", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    new_snap_id = data["snapshot_id"]
+
+    # Verify a branch was actually created
+    assert new_snap_id != parent_id, "Expected a new snapshot branch to be created"
+    assert new_snap_id != child_id, "Expected a totally new snapshot ID"
+
+    # 4. Assert: Check that SnapshotHistory was created for the new branch
+    result = await db_session.execute(
+        select(SnapshotHistory).where(SnapshotHistory.snapshot_id == new_snap_id)
+    )
+    history_logs = result.scalars().all()
+
+    assert len(history_logs) > 0, "Expected history to be logged upon branch creation"
+
+    # 5. Assert: Verify the diff correctly captured the changes
+    changes = history_logs[0].changes
+
+    # 'added' is a list of strings
+    assert "Bob" in changes.get("added", []), "Expected 'Bob' to be registered as added"
+
+    # 'modified' is a list of dictionaries, so we use a generator expression to find Alice
+    assert any(mod.get("nombre") == "Alice" for mod in changes.get("modified", [])), (
+        "Expected 'Alice' to be registered as modified"
+    )
 
 
 async def make_snapshot_with_players(

@@ -170,6 +170,10 @@ async def api_snapshot_save(
             SnapshotSource.NOTION_SYNC if event_type == "sync" else SnapshotSource.MANUAL_EDIT
         )
 
+        # Initialize variables to appease Pylance
+        previous_players = None
+        diff = None
+
         # Validate parent exists if provided
         if parent_id is not None:
             result = await session.execute(select(Snapshot).where(Snapshot.id == parent_id))
@@ -274,8 +278,17 @@ async def api_snapshot_save(
         await _insert_snapshot_players(session, snap_id, request.players)
 
         # Create event linking parent to new snapshot if parent provided
-        if parent_id is not None:
+        if parent_id is not None and diff is not None and previous_players is not None:
             await create_branch_edge(session, parent_id, snap_id)
+
+            # Log the diff upon branch creation
+            await log_snapshot_history(
+                session,
+                snapshot_id=snap_id,
+                action_type=action_type,
+                changes=diff,
+                previous_state=HistoryState(players=previous_players),
+            )
 
         await session.commit()
         return SnapshotSaveResponse(snapshot_id=snap_id)
