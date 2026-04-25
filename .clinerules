@@ -26,12 +26,21 @@
 - **Manual Save (Dumb Save):** Frontend is absolute source of truth for manual edits. Backend strictly overwrites existing state. NEVER merge historical weights or apply smart corrections on manual saves.
 - **Draft Pipeline:** Calculate Tickets -> Distribute to Tables -> Assign Countries -> Deduplicate Waitlist. NEVER skip phases or execute out of order.
 
+## 5. Domain-Driven Design (DDD) & DTO Separation
+
+- **Domain Model Purity:** Core business logic in `organizador/` (e.g., weight calculations, distribution algorithms) MUST NEVER import FastAPI, Pydantic, or any web framework. Domain models are plain Python dataclasses or TypedDicts only.
+- **Strict Layer Boundaries:** `organizador/` owns Domain Models. `api/models/` owns DTOs (Pydantic). `api/routers/` owns HTTP concerns only. NEVER collapse these layers.
+- **Factory Methods on DTOs:** Pydantic response models in `api/models/` MUST expose a `@classmethod def from_domain(cls, obj: DomainModel) -> "Self"` factory to translate Domain Models into API responses. NEVER perform this translation inside a router function.
+- **Lean Routers:** FastAPI routers MUST only: validate input, call a CRUD or domain function, call the DTO factory, and return. NEVER embed business logic or data reshaping directly in router functions.
+- **No Upward Coupling:** Domain layer (`organizador/`) MUST NEVER reference DTO models from `api/models/`. Data flows strictly downward: Router → CRUD/Domain → DTO factory → Response.
+
 ## 1. Database & Schema
 
 - **Database System:** Use disposable local SQLite (`aiosqlite`). NEVER use persistent external DBs or Alembic migrations. Define schema strictly in code.
 - **Universal IDs:** Use centralized `graph_nodes` table for universal IDs and cascading deletes. NEVER implement separate ID systems.
 - **Immutable Identity:** ALWAYS anchor to immutable external IDs (`notion_id`). NEVER rely on user-editable strings (`name`) for relational mapping.
 - **Immutable Snapshots:** Flow data through immutable snapshots connected by `timeline_edges`. NEVER create mutable historical data structures.
+- **Fortifying the Database Boundary:** Raw SQL results from `db/views.py` MUST be immediately mapped into strict Pydantic models at the data access layer. NEVER pass raw `Row` objects or dicts with unsanitized DB values (e.g., SQLite ISO date strings) beyond the `crud/` layer. Sanitize and coerce types (dates, enums) before Pydantic validation.
 
 ## 2. API & Logic Boundaries
 
@@ -39,6 +48,8 @@
 - **Strict API Purity:** Backend MUST NEVER send formatted UI strings (e.g., `"Antiguo (15 juegos)"`). APIs MUST send strictly typed primitive data.
 - **Synchronized CQRS:** When altering a schema or write payload, you MUST simultaneously update aggregate SQL views and their TS interfaces.
 - **Two-Step Generation:** Enforce `/api/game/draft` (in-memory) followed by `/api/game/save` (persistence). NEVER write draft data directly to DB.
+- **Eradication of Type Cancer:** NEVER use `dict[str, Any]` across architectural boundaries. Every API endpoint MUST return a strictly defined Pydantic response model. Internal functions that pass data between layers MUST use typed `TypedDict` or Pydantic models, not bare dicts.
+- **Absolute Trimming:** API response Pydantic models MUST contain ONLY the exact fields the frontend UI consumes. NEVER expose additional fields just because they were queried from the database. Each response model is a deliberate contract, not a DB row mirror.
 
 ## 3. Performance & SQLAlchemy "Fat Trimming"
 
@@ -51,6 +62,7 @@
 - **Minimal TypedDicts (ISP):** Pure functions MUST declare a minimal `TypedDict` representing exactly what they need, rather than demanding massive DB models.
 - **Covariant Hints:** Use `collections.abc.Mapping` and `Sequence` in type hints so functions accept both slim and ORM-derived dicts.
 - **Hashing Keys:** ALWAYS hash by primitive attributes (`.name`). NEVER pass Pydantic models as dict/Counter keys.
+- **Front-to-Back Honesty:** Do NOT overuse `Optional` / `| None` types in API response models. ALWAYS force default values to empty primitives (`""` instead of `None`, `[]` instead of `None`) unless `null` is a semantically meaningful value the frontend must distinguish from empty. Nullable fields MUST be documented with an explicit reason.
 
 ## 5. Coding Standards & Logging
 
@@ -68,6 +80,8 @@
 ## 2. Auto-Generated API SDK (CRITICAL)
 
 - **NO MANUAL FETCHING:** NEVER write manual `fetch` calls or custom interfaces. ALWAYS use the `@hey-api` generated endpoints (e.g., `apiPlayerCheckSimilarity`) and types from `frontend/src/generated-api`.
+- **SDK as Single Source of Truth:** The generated SDK (`frontend/src/generated-api`) is the ABSOLUTE single source of truth for all domain types. NEVER manually define domain interfaces (e.g., `Game`, `Player`, `DraftResponse`) in `src/types.ts` or any other file. ALL domain types MUST be imported exclusively from `frontend/src/generated-api`. `src/types.ts` is reserved ONLY for purely UI-local types (e.g., `ToastState`, `EditPlayerRow`) that have no backend equivalent.
+- **Explicit Response Unpacking:** ALWAYS unpack the `@hey-api` standardized response tuple immediately at the call site: `const { data, error } = await apiEndpoint()`. NEVER pass the raw response object to child components. Handle `error` explicitly before using `data`.
 - **Global Error Handling:** FastAPI `422 ValidationErrors` are intercepted/normalized in `api/client.ts`. UI components MUST safely read `response.error` as a clean string. Legacy `api.ts` is DEPRECATED.
 
 ## 3. Layout, CSS Grid & The Rule of 8
@@ -96,6 +110,7 @@
 - **Runners:** Frontend: `bun run test` (Vitest). Backend: `uv run python -m pytest -q`.
 - **Backend Mocking:** Use `unittest.mock` for external dependencies (e.g., Notion API). Use `:memory:` SQLite. NEVER hit real external APIs.
 - **Frontend Querying:** Use semantic queries (`getByRole`, `getByPlaceholderText`). NEVER test implementation details or use fragile DOM traversal.
+- **Backend Model Assertions:** When asserting structured API/view outputs in Python tests, ALWAYS use object attribute dot-notation (`response.mesas`, `result.players`). NEVER use dictionary key access (`response["mesas"]`, `result["players"]`). This enforces that response types are proper Pydantic models, not raw dicts.
 
 ## 2. Svelte & DOM Testing Rules
 
@@ -107,12 +122,17 @@
 
 ## 3. Auto-Generated SDK Testing Patterns (CRITICAL)
 
+- **SDK Vitest Mocking:** ALWAYS mock `../../generated-api/sdk.gen` directly in `vi.mock()`. NEVER mock the barrel file (`../../generated-api`) as Vite module resolution bypasses `vi.mock` for auto-generated `index.ts` re-exports.
+  - _Correct:_ `vi.mock("../../generated-api/sdk.gen", () => ({ apiGameDraft: vi.fn(), apiGameSave: vi.fn() }))`
+  - _Incorrect:_ `vi.mock("../../generated-api", () => ...)`
+- **Mock All Called Endpoints:** Every SDK function called by the component under test MUST be declared in the `vi.mock` factory AND given a default `mockResolvedValue` in `beforeEach()`. Missing mocks cause silent `undefined` returns that crash `onMount` blocks.
 - **The Barrel File Trap:** Vite module resolution bypasses `vi.mock` for auto-generated `index.ts` files.
   - _Correct:_ `import * as api from "../../generated-api"; vi.spyOn(api, "apiPlayerGetAll").mockResolvedValue(...)`
   - _Incorrect:_ `vi.mock("../../generated-api", () => ...)`
 - **Healthy Default Mocks:** Svelte `onMount` blocks will instantly crash if an API returns `undefined`. ALWAYS provide default `mockResolvedValue` spies in `beforeEach()`.
-- **Mocking `@hey-api` Responses:** USE the `mockApiSuccess<TData>(data)` and `mockApiError(error)` helpers from `tests/mockHelpers.ts` to satisfy the complex Hey-API signature without polluting tests.
+- **Mocking `@hey-api` Responses:** USE the `mockSdkSuccess(mockFn, data)` and `mockSdkError(mockFn, errorData)` helpers from `tests/mockHelpers.ts` to replicate the expected `{ data, error, request, response }` structure. NEVER construct this shape inline in tests. For return-value helpers use `mockApiSuccess(data)` and `mockApiError(error)` with `.mockResolvedValue()`.
 - **Flushing Svelte Reactivity:** Waiting for DOM updates after an API call requires flushing both the microtask queue and Svelte's tick:
+
   ```typescript
   const flushPromises = async () => {
     await tick();

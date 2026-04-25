@@ -318,8 +318,7 @@ class TestCountryReasonPersistence:
         # Manually add reason to simulate algorithm output
         test_reason = "Player was assigned this country to avoid repetition after 3 games"
         if draft["mesas"] and draft["mesas"][0]["jugadores"]:
-            if not draft["mesas"][0]["jugadores"][0].get("country"):
-                draft["mesas"][0]["jugadores"][0]["country"] = {"name": "England"}
+            draft["mesas"][0]["jugadores"][0]["country"]["name"] = "England"
             draft["mesas"][0]["jugadores"][0]["country"]["reason"] = test_reason
 
         # Save draft
@@ -332,17 +331,14 @@ class TestCountryReasonPersistence:
         # Retrieve game detail
         detail = await get_game_event_detail(db_session, game_id)
         assert detail is not None
-        assert "mesas" in detail
-        assert len(detail["mesas"]) > 0
+        assert len(detail.mesas) > 0
 
         # Verify country.reason was persisted
-        first_mesa = detail["mesas"][0]
-        assert "jugadores" in first_mesa
-        assert len(first_mesa["jugadores"]) > 0
+        first_mesa = detail.mesas[0]
+        assert len(first_mesa.jugadores) > 0
 
-        first_player = first_mesa["jugadores"][0]
-        assert "country" in first_player and first_player["country"] is not None
-        assert first_player["country"].get("reason") == test_reason
+        first_player = first_mesa.jugadores[0]
+        assert first_player.country.reason == test_reason
 
     async def test_save_draft_handles_missing_country_reason(
         self, client: Any, db_session: Any
@@ -350,7 +346,7 @@ class TestCountryReasonPersistence:
         """
         Verify that missing country.reason is handled gracefully.
 
-        Players without country.reason should have None/null in the database.
+        Players without country.reason should have empty string in the database.
         """
         from backend.db.views import get_game_event_detail
 
@@ -362,11 +358,10 @@ class TestCountryReasonPersistence:
         assert draft_resp.status_code == 200
         draft = draft_resp.json()
 
-        # Explicitly remove country.reason from all players
+        # Explicitly set country.reason to empty string for all players
         for mesa in draft["mesas"]:
             for jugador in mesa["jugadores"]:
-                if "country" in jugador and jugador["country"] is not None:
-                    jugador["country"].pop("reason", None)
+                jugador["country"]["reason"] = ""
 
         # Save draft
         save_resp = await client.post(
@@ -379,11 +374,10 @@ class TestCountryReasonPersistence:
         detail = await get_game_event_detail(db_session, game_id)
         assert detail is not None
 
-        # Verify all players have None/null for country.reason
-        for mesa in detail["mesas"]:
-            for jugador in mesa["jugadores"]:
-                country = jugador.get("country")
-                assert country is None or country.get("reason") is None
+        # Verify all players have empty string for country.reason
+        for mesa in detail.mesas:
+            for jugador in mesa.jugadores:
+                assert jugador.country.reason == ""
 
     async def test_save_draft_with_mixed_country_reasons(
         self, client: Any, db_session: Any
@@ -406,13 +400,11 @@ class TestCountryReasonPersistence:
         # Add reason to only the first player
         reason_for_first = "Test reason for first player"
         if draft["mesas"] and len(draft["mesas"][0]["jugadores"]) >= 2:
-            if not draft["mesas"][0]["jugadores"][0].get("country"):
-                draft["mesas"][0]["jugadores"][0]["country"] = {"name": "England"}
+            draft["mesas"][0]["jugadores"][0]["country"]["name"] = "England"
             draft["mesas"][0]["jugadores"][0]["country"]["reason"] = reason_for_first
 
-            # Explicitly ensure second player has no reason
-            if draft["mesas"][0]["jugadores"][1].get("country"):
-                draft["mesas"][0]["jugadores"][1]["country"].pop("reason", None)
+            # Explicitly ensure second player has empty reason
+            draft["mesas"][0]["jugadores"][1]["country"]["reason"] = ""
 
         # Save draft
         save_resp = await client.post(
@@ -426,13 +418,12 @@ class TestCountryReasonPersistence:
         assert detail is not None
 
         # Verify mixed country.reason values
-        first_mesa = detail["mesas"][0]
-        first_player = first_mesa["jugadores"][0]
-        second_player = first_mesa["jugadores"][1]
+        first_mesa = detail.mesas[0]
+        first_player = first_mesa.jugadores[0]
+        second_player = first_mesa.jugadores[1]
 
-        assert first_player["country"]["reason"] == reason_for_first
-        country = second_player.get("country")
-        assert country is None or country.get("reason") is None
+        assert first_player.country.reason == reason_for_first
+        assert second_player.country.reason == ""
 
 
 # ── DELETE /api/game/{game_id} ───────────────────────────────────────────────────

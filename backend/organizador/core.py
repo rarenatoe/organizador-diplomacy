@@ -16,7 +16,7 @@ def assign_countries_to_table(players: list[DraftPlayer]) -> None:
     # Initialize all players with no country
     for player in players:
         player.country = ""
-        player.country_reason = None
+        player.country_reason = ""
 
     # Identify cursed players (those with >= 2 games in any country)
     cursed_assignments: list[tuple[DraftPlayer, str, int]] = []

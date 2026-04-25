@@ -71,6 +71,20 @@ export type CheckSimilarityRequest = {
 };
 
 /**
+ * CountrySelection
+ */
+export type CountrySelection = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Reason
+     */
+    reason: string;
+};
+
+/**
  * DeepDiffResult
  */
 export type DeepDiffResult = {
@@ -119,6 +133,103 @@ export type FieldChange = {
 };
 
 /**
+ * GameDetailResponse
+ */
+export type GameDetailResponse = {
+    /**
+     * Id
+     */
+    id: number;
+    /**
+     * Created At
+     */
+    created_at: string | string;
+    /**
+     * Intentos
+     */
+    intentos: number;
+    /**
+     * Mesas
+     */
+    mesas: Array<GameDraftTableOutput>;
+    /**
+     * Waiting List
+     */
+    waiting_list: Array<GameDraftPlayer>;
+    /**
+     * Input Snapshot Id
+     */
+    input_snapshot_id?: number | null;
+    /**
+     * Output Snapshot Id
+     */
+    output_snapshot_id?: number | null;
+};
+
+/**
+ * GameDraftPlayer
+ */
+export type GameDraftPlayer = {
+    /**
+     * Nombre
+     */
+    nombre: string;
+    /**
+     * Is New
+     */
+    is_new: boolean;
+    /**
+     * Juegos Este Ano
+     */
+    juegos_este_ano: number;
+    /**
+     * Has Priority
+     */
+    has_priority: boolean;
+    /**
+     * Partidas Deseadas
+     */
+    partidas_deseadas: number;
+    /**
+     * Partidas Gm
+     */
+    partidas_gm: number;
+    /**
+     * C England
+     */
+    c_england: number;
+    /**
+     * C France
+     */
+    c_france: number;
+    /**
+     * C Germany
+     */
+    c_germany: number;
+    /**
+     * C Italy
+     */
+    c_italy: number;
+    /**
+     * C Austria
+     */
+    c_austria: number;
+    /**
+     * C Russia
+     */
+    c_russia: number;
+    /**
+     * C Turkey
+     */
+    c_turkey: number;
+    country: CountrySelection;
+    /**
+     * Cupos Faltantes
+     */
+    cupos_faltantes?: number | null;
+};
+
+/**
  * GameDraftRequest
  */
 export type GameDraftRequest = {
@@ -129,6 +240,80 @@ export type GameDraftRequest = {
 };
 
 /**
+ * GameDraftResponse
+ */
+export type GameDraftResponseInput = {
+    /**
+     * Mesas
+     */
+    mesas: Array<GameDraftTableInput>;
+    /**
+     * Tickets Sobrantes
+     */
+    tickets_sobrantes: Array<GameDraftPlayer>;
+    /**
+     * Minimo Teorico
+     */
+    minimo_teorico: number;
+    /**
+     * Intentos Usados
+     */
+    intentos_usados: number;
+};
+
+/**
+ * GameDraftResponse
+ */
+export type GameDraftResponseOutput = {
+    /**
+     * Mesas
+     */
+    mesas: Array<GameDraftTableOutput>;
+    /**
+     * Tickets Sobrantes
+     */
+    tickets_sobrantes: Array<GameDraftPlayer>;
+    /**
+     * Minimo Teorico
+     */
+    minimo_teorico: number;
+    /**
+     * Intentos Usados
+     */
+    intentos_usados: number;
+};
+
+/**
+ * GameDraftTable
+ */
+export type GameDraftTableInput = {
+    /**
+     * Numero
+     */
+    numero: number;
+    gm?: GameDraftPlayer | null;
+    /**
+     * Jugadores
+     */
+    jugadores: Array<GameDraftPlayer>;
+};
+
+/**
+ * GameDraftTable
+ */
+export type GameDraftTableOutput = {
+    /**
+     * Numero
+     */
+    numero: number;
+    gm?: GameDraftPlayer | null;
+    /**
+     * Jugadores
+     */
+    jugadores: Array<GameDraftPlayer>;
+};
+
+/**
  * GameSaveRequest
  */
 export type GameSaveRequest = {
@@ -136,12 +321,7 @@ export type GameSaveRequest = {
      * Snapshot Id
      */
     snapshot_id: number;
-    /**
-     * Draft
-     */
-    draft: {
-        [key: string]: unknown;
-    };
+    draft: GameDraftResponseInput;
     /**
      * Editing Game Id
      */
@@ -589,16 +769,6 @@ export type RunNotionSyncRequest = {
 };
 
 /**
- * RunScriptRequest
- */
-export type RunScriptRequest = {
-    /**
-     * Snapshot
-     */
-    snapshot?: number | null;
-};
-
-/**
  * SimilarName
  *
  * Similar name detection result.
@@ -936,13 +1106,9 @@ export type ApiGameError = ApiGameErrors[keyof ApiGameErrors];
 
 export type ApiGameResponses = {
     /**
-     * Response Api Game
-     *
      * Successful Response
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: GameDetailResponse;
 };
 
 export type ApiGameResponse = ApiGameResponses[keyof ApiGameResponses];
@@ -999,13 +1165,9 @@ export type ApiGameDraftError = ApiGameDraftErrors[keyof ApiGameDraftErrors];
 
 export type ApiGameDraftResponses = {
     /**
-     * Response Api Game Draft
-     *
      * Successful Response
      */
-    200: {
-        [key: string]: unknown;
-    };
+    200: GameDraftResponseOutput;
 };
 
 export type ApiGameDraftResponse = ApiGameDraftResponses[keyof ApiGameDraftResponses];
@@ -1038,40 +1200,6 @@ export type ApiGameSaveResponses = {
 };
 
 export type ApiGameSaveResponse = ApiGameSaveResponses[keyof ApiGameSaveResponses];
-
-export type ApiRunData = {
-    body: RunScriptRequest;
-    path: {
-        /**
-         * Script
-         */
-        script: string;
-    };
-    query?: never;
-    url: '/api/game/run/{script}';
-};
-
-export type ApiRunErrors = {
-    /**
-     * Validation Error
-     */
-    422: HttpValidationError;
-};
-
-export type ApiRunError = ApiRunErrors[keyof ApiRunErrors];
-
-export type ApiRunResponses = {
-    /**
-     * Response Api Run
-     *
-     * Successful Response
-     */
-    200: {
-        [key: string]: unknown;
-    };
-};
-
-export type ApiRunResponse = ApiRunResponses[keyof ApiRunResponses];
 
 export type ApiPlayerRenameData = {
     body: RenameRequest;

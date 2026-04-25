@@ -1,16 +1,29 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/svelte";
-import type { EditPlayerRow } from "../../types";
 import PlayerNameTestWrapper from "./PlayerNameTestWrapper.svelte";
+import type { GameDraftPlayer } from "../../generated-api";
 
 describe("PlayerName.svelte", () => {
-  const basePlayer: EditPlayerRow = {
+  type PlayerNameTestPlayer = GameDraftPlayer & {
+    notion_id?: string | null;
+    notion_name?: string | null;
+  };
+
+  const basePlayer: PlayerNameTestPlayer = {
     nombre: "Local Name",
     is_new: true,
     juegos_este_ano: 0,
     has_priority: false,
     partidas_deseadas: 1,
     partidas_gm: 0,
+    c_england: 0,
+    c_france: 0,
+    c_germany: 0,
+    c_italy: 0,
+    c_austria: 0,
+    c_russia: 0,
+    c_turkey: 0,
+    country: { name: "", reason: "" },
   };
 
   it("renders just the name when not linked (read-only)", () => {
@@ -30,7 +43,7 @@ describe("PlayerName.svelte", () => {
   });
 
   it("renders ⚡️ icon when notion_id is present", () => {
-    const linkedPlayer: EditPlayerRow = {
+    const linkedPlayer: PlayerNameTestPlayer = {
       ...basePlayer,
       notion_id: "123",
       notion_name: "Local Name",
@@ -43,7 +56,7 @@ describe("PlayerName.svelte", () => {
   });
 
   it("renders alias hint when notion_name differs from nombre", () => {
-    const aliasPlayer: EditPlayerRow = {
+    const aliasPlayer: PlayerNameTestPlayer = {
       ...basePlayer,
       notion_id: "123",
       notion_name: "Notion Name",
@@ -57,7 +70,7 @@ describe("PlayerName.svelte", () => {
   });
 
   it("hides ⚡️ icon if showNotionIndicator is false", () => {
-    const linkedPlayer: EditPlayerRow = {
+    const linkedPlayer: PlayerNameTestPlayer = {
       ...basePlayer,
       notion_id: "123",
       notion_name: "Local Name",
@@ -74,7 +87,7 @@ describe("PlayerName.svelte", () => {
 
   it("hides alias hint when notion_name normalizes to the same string as nombre", () => {
     // Different casing and whitespace, but normalizes to the same identity
-    const sameNamePlayer: EditPlayerRow = {
+    const sameNamePlayer: PlayerNameTestPlayer = {
       ...basePlayer,
       nombre: "Local Name",
       notion_id: "123",
@@ -91,7 +104,7 @@ describe("PlayerName.svelte", () => {
   });
 
   it("renders ⚡️ icon when only notion_name is present (no notion_id)", () => {
-    const nameOnlyLinkedPlayer: EditPlayerRow = {
+    const nameOnlyLinkedPlayer: PlayerNameTestPlayer = {
       ...basePlayer,
       notion_id: null,
       notion_name: "Notion Name",

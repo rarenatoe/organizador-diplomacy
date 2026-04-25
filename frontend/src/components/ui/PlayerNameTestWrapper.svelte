@@ -1,9 +1,9 @@
 <script lang="ts">
   import PlayerName from "./PlayerName.svelte";
-  import type { PlayerData } from "../../types";
+  import type { GameDraftPlayer } from "../../generated-api";
 
   interface Props {
-    player: PlayerData;
+    player: GameDraftPlayer;
     editable?: boolean;
     showNotionIndicator?: boolean;
   }

@@ -11,20 +11,19 @@ from typing import TYPE_CHECKING, Any, TypedDict
 from pydantic import ValidationError
 from sqlalchemy import select, text
 
-from backend.api.models.snapshots import DeepDiffResult, HistoryEntry
-from backend.core.logger import logger
-
-if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
-
-
 from backend.api.models.chain import Branch, ChainEdge, ChainResponse, SnapshotNode
-from backend.api.models.snapshots import SnapshotDetailResponse
+from backend.api.models.games import (  # noqa: TC001
+    CountrySelection,
+    GameDetailResponse,
+    GameDraftPlayer,
+    GameDraftTable,
+)
+from backend.api.models.snapshots import DeepDiffResult, HistoryEntry, SnapshotDetailResponse
+from backend.core.logger import logger
 from backend.crud.snapshots import get_snapshot_players
 from backend.db.models import (
     GameDetail,
     GameTable,
-    NotionCache,
     Player,
     Snapshot,
     SnapshotHistory,
@@ -34,6 +33,9 @@ from backend.db.models import (
     TimelineEdge,
     WaitingList,
 )
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 def _normalize_snapshot_source(raw_source: SnapshotSource | str) -> SnapshotSource:
@@ -222,7 +224,14 @@ async def get_snapshot_detail(
     )
 
 
-async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[str, Any] | None:
+def _format_created_at(raw: Any) -> str:
+    """Normalize datetime or string to ISO-like format."""
+    if hasattr(raw, "isoformat"):
+        return raw.isoformat()
+    return str(raw).replace(" ", "T")
+
+
+async def get_game_event_detail(session: AsyncSession, event_id: int) -> GameDetailResponse | None:
     """Returns full game event detail for the detail panel. None if not found."""
     # Get game event basic info using ORM
     result = await session.execute(
@@ -245,31 +254,48 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[st
     )
     mesa_rows = mesas_result.scalars().all()
 
-    mesas_data: list[dict[str, Any]] = []
+    mesas_data: list[GameDraftTable] = []
     for mesa in mesa_rows:
-        # Get GM name
-        gm_name: str | None = None
+        # Get GM player data
+        gm_player: GameDraftPlayer | None = None
         if mesa.gm_player_id is not None:
             gm_result = await session.execute(
-                select(Player.name).where(Player.id == mesa.gm_player_id)
+                select(
+                    Player,
+                    SnapshotPlayer,
+                )
+                .join(
+                    SnapshotPlayer,
+                    (SnapshotPlayer.player_id == Player.id)
+                    & (SnapshotPlayer.snapshot_id == input_sid),
+                )
+                .where(Player.id == mesa.gm_player_id)
             )
-            gm_name = gm_result.scalar_one_or_none()
+            gm_row = gm_result.first()
+            if gm_row:
+                gm_p, gm_sp = gm_row
+                gm_player = GameDraftPlayer(
+                    nombre=gm_p.name,
+                    is_new=gm_sp.is_new,
+                    juegos_este_ano=gm_sp.games_this_year,
+                    has_priority=gm_sp.has_priority,
+                    partidas_deseadas=gm_sp.desired_games,
+                    partidas_gm=gm_sp.gm_games,
+                    c_england=0,
+                    c_france=0,
+                    c_germany=0,
+                    c_italy=0,
+                    c_austria=0,
+                    c_russia=0,
+                    c_turkey=0,
+                    country=CountrySelection(name="", reason=""),
+                )
 
-        # Get players for this mesa using NotionCache directly
+        # Get players for this mesa
         players_result = await session.execute(
             select(
                 Player,
                 SnapshotPlayer,
-                NotionCache.notion_id,
-                NotionCache.name.label("notion_name"),
-                NotionCache.alias,
-                NotionCache.c_england,
-                NotionCache.c_france,
-                NotionCache.c_germany,
-                NotionCache.c_italy,
-                NotionCache.c_austria,
-                NotionCache.c_russia,
-                NotionCache.c_turkey,
                 TablePlayer.country,
                 TablePlayer.country_reason,
             )
@@ -278,130 +304,87 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> dict[st
                 SnapshotPlayer,
                 (SnapshotPlayer.player_id == Player.id) & (SnapshotPlayer.snapshot_id == input_sid),
             )
-            .outerjoin(NotionCache, Player.notion_id == NotionCache.notion_id)
             .where(TablePlayer.table_id == mesa.id)
             .order_by(TablePlayer.seat_order)
         )
 
-        jugadores: list[dict[str, Any]] = []
+        jugadores: list[GameDraftPlayer] = []
         for p in players_result.all():
-            (
-                player,
-                sp,
-                notion_id,
-                notion_name,
-                alias,
-                c_england,
-                c_france,
-                c_germany,
-                c_italy,
-                c_austria,
-                c_russia,
-                c_turkey,
-                country,
-                country_reason,
-            ) = p
+            player, sp, country, country_reason = p
             jugadores.append(
-                {
-                    "nombre": player.name,
-                    "notion_id": notion_id,
-                    "notion_name": notion_name,
-                    "notion_alias": alias,
-                    "country": {"name": country, "reason": country_reason} if country else None,
-                    "is_new": sp.is_new,
-                    "juegos_este_ano": sp.games_this_year,
-                    "has_priority": sp.has_priority,
-                    "partidas_deseadas": sp.desired_games,
-                    "partidas_gm": sp.gm_games,
-                    "c_england": c_england or 0,
-                    "c_france": c_france or 0,
-                    "c_germany": c_germany or 0,
-                    "c_italy": c_italy or 0,
-                    "c_austria": c_austria or 0,
-                    "c_russia": c_russia or 0,
-                    "c_turkey": c_turkey or 0,
-                    "cupos": sp.desired_games,  # For backward compatibility
-                }
+                GameDraftPlayer(
+                    nombre=player.name,
+                    is_new=sp.is_new,
+                    juegos_este_ano=sp.games_this_year,
+                    has_priority=sp.has_priority,
+                    partidas_deseadas=sp.desired_games,
+                    partidas_gm=sp.gm_games,
+                    c_england=0,
+                    c_france=0,
+                    c_germany=0,
+                    c_italy=0,
+                    c_austria=0,
+                    c_russia=0,
+                    c_turkey=0,
+                    country=CountrySelection(
+                        name=country or "",
+                        reason=country_reason or "",
+                    ),
+                )
             )
 
         mesas_data.append(
-            {
-                "numero": mesa.table_number,
-                "gm": gm_name,
-                "jugadores": jugadores,
-            }
+            GameDraftTable(
+                numero=mesa.table_number,
+                gm=gm_player,
+                jugadores=jugadores,
+            )
         )
 
-    # Get waiting list using NotionCache directly
+    # Get waiting list
     waiting_result = await session.execute(
         select(
             Player,
             SnapshotPlayer,
-            NotionCache.notion_id,
-            NotionCache.name.label("notion_name"),
-            NotionCache.alias,
-            NotionCache.c_england,
-            NotionCache.c_france,
-            NotionCache.c_germany,
-            NotionCache.c_italy,
-            NotionCache.c_austria,
-            NotionCache.c_russia,
-            NotionCache.c_turkey,
         )
         .join(WaitingList, Player.id == WaitingList.player_id)
         .join(
             SnapshotPlayer,
             (SnapshotPlayer.player_id == Player.id) & (SnapshotPlayer.snapshot_id == input_sid),
         )
-        .outerjoin(NotionCache, Player.notion_id == NotionCache.notion_id)
         .where(WaitingList.timeline_edge_id == event_id)
         .order_by(WaitingList.list_order)
     )
 
-    waiting: list[dict[str, Any]] = []
+    waiting: list[GameDraftPlayer] = []
     for row in waiting_result.all():
-        (
-            player,
-            sp,
-            notion_id,
-            notion_name,
-            alias,
-            c_england,
-            c_france,
-            c_germany,
-            c_italy,
-            c_austria,
-            c_russia,
-            c_turkey,
-        ) = row
+        player, sp = row
         waiting.append(
-            {
-                "nombre": player.name,
-                "notion_id": notion_id,
-                "notion_name": notion_name,
-                "notion_alias": alias,
-                "is_new": sp.is_new,
-                "juegos_este_ano": sp.games_this_year,
-                "has_priority": sp.has_priority,
-                "partidas_deseadas": sp.desired_games,
-                "partidas_gm": sp.gm_games,
-                "c_england": c_england or 0,
-                "c_france": c_france or 0,
-                "c_germany": c_germany or 0,
-                "c_italy": c_italy or 0,
-                "c_austria": c_austria or 0,
-                "c_russia": c_russia or 0,
-                "c_turkey": c_turkey or 0,
-                "cupos_faltantes": sp.desired_games,  # For backward compatibility
-            }
+            GameDraftPlayer(
+                nombre=player.name,
+                is_new=sp.is_new,
+                juegos_este_ano=sp.games_this_year,
+                has_priority=sp.has_priority,
+                partidas_deseadas=sp.desired_games,
+                partidas_gm=sp.gm_games,
+                c_england=0,
+                c_france=0,
+                c_germany=0,
+                c_italy=0,
+                c_austria=0,
+                c_russia=0,
+                c_turkey=0,
+                country=CountrySelection(name="", reason=""),
+                cupos_faltantes=sp.desired_games,
+            )
         )
 
-    return {
-        "id": timeline_edge.id,
-        "created_at": timeline_edge.created_at,
-        "intentos": game_detail.attempts,
-        "mesas": mesas_data,
-        "waiting_list": waiting,
-        "input_snapshot_id": input_sid,
-        "output_snapshot_id": timeline_edge.output_snapshot_id,
-    }
+    return GameDetailResponse(
+        id=timeline_edge.id,
+        created_at=_format_created_at(timeline_edge.created_at),
+        intentos=game_detail.attempts,
+        mesas=mesas_data,
+        waiting_list=waiting,
+        input_snapshot_id=input_sid,
+        output_snapshot_id=timeline_edge.output_snapshot_id,
+    )

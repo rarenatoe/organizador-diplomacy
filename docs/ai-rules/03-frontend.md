@@ -16,6 +16,8 @@ priority: 30
 ## 2. Auto-Generated API SDK (CRITICAL)
 
 - **NO MANUAL FETCHING:** NEVER write manual `fetch` calls or custom interfaces. ALWAYS use the `@hey-api` generated endpoints (e.g., `apiPlayerCheckSimilarity`) and types from `frontend/src/generated-api`.
+- **SDK as Single Source of Truth:** The generated SDK (`frontend/src/generated-api`) is the ABSOLUTE single source of truth for all domain types. NEVER manually define domain interfaces (e.g., `Game`, `Player`, `DraftResponse`) in `src/types.ts` or any other file. ALL domain types MUST be imported exclusively from `frontend/src/generated-api`. `src/types.ts` is reserved ONLY for purely UI-local types (e.g., `ToastState`, `EditPlayerRow`) that have no backend equivalent.
+- **Explicit Response Unpacking:** ALWAYS unpack the `@hey-api` standardized response tuple immediately at the call site: `const { data, error } = await apiEndpoint()`. NEVER pass the raw response object to child components. Handle `error` explicitly before using `data`.
 - **Global Error Handling:** FastAPI `422 ValidationErrors` are intercepted/normalized in `api/client.ts`. UI components MUST safely read `response.error` as a clean string. Legacy `api.ts` is DEPRECATED.
 
 ## 3. Layout, CSS Grid & The Rule of 8

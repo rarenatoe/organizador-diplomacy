@@ -9,6 +9,7 @@ priority: 40
 - **Runners:** Frontend: `bun run test` (Vitest). Backend: `uv run python -m pytest -q`.
 - **Backend Mocking:** Use `unittest.mock` for external dependencies (e.g., Notion API). Use `:memory:` SQLite. NEVER hit real external APIs.
 - **Frontend Querying:** Use semantic queries (`getByRole`, `getByPlaceholderText`). NEVER test implementation details or use fragile DOM traversal.
+- **Backend Model Assertions:** When asserting structured API/view outputs in Python tests, ALWAYS use object attribute dot-notation (`response.mesas`, `result.players`). NEVER use dictionary key access (`response["mesas"]`, `result["players"]`). This enforces that response types are proper Pydantic models, not raw dicts.
 
 ## 2. Svelte & DOM Testing Rules
 
@@ -20,12 +21,17 @@ priority: 40
 
 ## 3. Auto-Generated SDK Testing Patterns (CRITICAL)
 
+- **SDK Vitest Mocking:** ALWAYS mock `../../generated-api/sdk.gen` directly in `vi.mock()`. NEVER mock the barrel file (`../../generated-api`) as Vite module resolution bypasses `vi.mock` for auto-generated `index.ts` re-exports.
+  - _Correct:_ `vi.mock("../../generated-api/sdk.gen", () => ({ apiGameDraft: vi.fn(), apiGameSave: vi.fn() }))`
+  - _Incorrect:_ `vi.mock("../../generated-api", () => ...)`
+- **Mock All Called Endpoints:** Every SDK function called by the component under test MUST be declared in the `vi.mock` factory AND given a default `mockResolvedValue` in `beforeEach()`. Missing mocks cause silent `undefined` returns that crash `onMount` blocks.
 - **The Barrel File Trap:** Vite module resolution bypasses `vi.mock` for auto-generated `index.ts` files.
   - _Correct:_ `import * as api from "../../generated-api"; vi.spyOn(api, "apiPlayerGetAll").mockResolvedValue(...)`
   - _Incorrect:_ `vi.mock("../../generated-api", () => ...)`
 - **Healthy Default Mocks:** Svelte `onMount` blocks will instantly crash if an API returns `undefined`. ALWAYS provide default `mockResolvedValue` spies in `beforeEach()`.
-- **Mocking `@hey-api` Responses:** USE the `mockApiSuccess<TData>(data)` and `mockApiError(error)` helpers from `tests/mockHelpers.ts` to satisfy the complex Hey-API signature without polluting tests.
+- **Mocking `@hey-api` Responses:** USE the `mockSdkSuccess(mockFn, data)` and `mockSdkError(mockFn, errorData)` helpers from `tests/mockHelpers.ts` to replicate the expected `{ data, error, request, response }` structure. NEVER construct this shape inline in tests. For return-value helpers use `mockApiSuccess(data)` and `mockApiError(error)` with `.mockResolvedValue()`.
 - **Flushing Svelte Reactivity:** Waiting for DOM updates after an API call requires flushing both the microtask queue and Svelte's tick:
+
   ```typescript
   const flushPromises = async () => {
     await tick();

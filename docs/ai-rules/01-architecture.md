@@ -29,3 +29,11 @@ priority: 10
 - **History Lookup:** MUST use strict 4-tier traversal: `TimelineEdge` -> `SnapshotPlayer` -> `SnapshotHistory JSON` -> `NotionCache`. NEVER skip tiers.
 - **Manual Save (Dumb Save):** Frontend is absolute source of truth for manual edits. Backend strictly overwrites existing state. NEVER merge historical weights or apply smart corrections on manual saves.
 - **Draft Pipeline:** Calculate Tickets -> Distribute to Tables -> Assign Countries -> Deduplicate Waitlist. NEVER skip phases or execute out of order.
+
+## 5. Domain-Driven Design (DDD) & DTO Separation
+
+- **Domain Model Purity:** Core business logic in `organizador/` (e.g., weight calculations, distribution algorithms) MUST NEVER import FastAPI, Pydantic, or any web framework. Domain models are plain Python dataclasses or TypedDicts only.
+- **Strict Layer Boundaries:** `organizador/` owns Domain Models. `api/models/` owns DTOs (Pydantic). `api/routers/` owns HTTP concerns only. NEVER collapse these layers.
+- **Factory Methods on DTOs:** Pydantic response models in `api/models/` MUST expose a `@classmethod def from_domain(cls, obj: DomainModel) -> "Self"` factory to translate Domain Models into API responses. NEVER perform this translation inside a router function.
+- **Lean Routers:** FastAPI routers MUST only: validate input, call a CRUD or domain function, call the DTO factory, and return. NEVER embed business logic or data reshaping directly in router functions.
+- **No Upward Coupling:** Domain layer (`organizador/`) MUST NEVER reference DTO models from `api/models/`. Data flows strictly downward: Router → CRUD/Domain → DTO factory → Response.

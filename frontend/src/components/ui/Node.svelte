@@ -1,10 +1,8 @@
 <script lang="ts">
-  import { getActiveNodeId } from "../../stores.svelte";
   import Button from "./Button.svelte";
 
   interface Props {
     variant: "game" | "snapshot";
-    nodeId?: number;
     isActive?: boolean;
     title: string;
     subtitle?: string;
@@ -16,7 +14,6 @@
 
   let {
     variant,
-    nodeId,
     isActive = false,
     title,
     subtitle = "",
@@ -25,11 +22,6 @@
     onDelete,
     onClick,
   }: Props = $props();
-
-  // Generate variant-specific classes
-  let variantClass = $derived(
-    variant === "game" ? "node-game" : "node-snapshot",
-  );
 
   // Parse metadata items intelligently
   function parseMetadataItem(item: string) {

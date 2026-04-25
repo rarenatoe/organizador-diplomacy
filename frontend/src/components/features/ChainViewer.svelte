@@ -60,7 +60,6 @@
     <div class="chain-row">
       <Node
         variant="snapshot"
-        nodeId={node.id}
         isActive={getActiveNodeId() === node.id}
         title={`Snapshot #${node.id}`}
         subtitle={(node.created_at || "").split(" ")[0] ?? ""}
@@ -83,7 +82,6 @@
                 {#if branch.edge && branch.edge.type === "game"}
                   <Node
                     variant="game"
-                    nodeId={branch.edge.id}
                     isActive={getActiveNodeId() === branch.edge.id}
                     title="Jornada"
                     subtitle={(branch.edge.created_at || "").split(" ")[0] ??

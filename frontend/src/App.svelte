@@ -1,7 +1,6 @@
 <script lang="ts">
-  import type { EditPlayerRow, DraftResponse } from "./types";
-  import { deleteGame } from "./api";
-  import { setActiveNodeId } from "./stores.svelte";
+  import type { EditPlayerRow } from "./types";
+  import { apiGameDelete, type GameDraftResponseOutput } from "./generated-api";
   import { nav, type PanelContext } from "./navigation.svelte";
   import Header from "./components/layout/Header.svelte";
   import ChainViewer from "./components/features/ChainViewer.svelte";
@@ -38,7 +37,7 @@
 
   function onOpenGameDraft(
     snapshotId: number,
-    initialData?: DraftResponse,
+    initialData?: GameDraftResponseOutput,
     editingGameId?: number,
   ): void {
     nav.push({
@@ -123,7 +122,7 @@
     )
       return;
     try {
-      await deleteGame(id);
+      await apiGameDelete({ path: { game_id: id } });
       nav.close();
       await chainViewer?.loadChain();
     } catch (e) {

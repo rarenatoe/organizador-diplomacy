@@ -117,15 +117,12 @@ class TestGetGameEventDetailCountryRegression:
         assert detail is not None
 
         # Verify: Players should show their assigned countries, not c_turkey
-        assert len(detail["mesas"]) == 1
-        mesa = detail["mesas"][0]
-        assert len(mesa["jugadores"]) == 2
+        assert len(detail.mesas) == 1
+        mesa = detail.mesas[0]
+        assert len(mesa.jugadores) == 2
 
         # Find the players
-        player_countries = {
-            j["nombre"]: (j["country"]["name"] if j.get("country") else "")
-            for j in mesa["jugadores"]
-        }
+        player_countries = {j.nombre: j.country.name for j in mesa.jugadores}
 
         # Key assertion: PlayerWithHighTurkey should show "England", not 99 (c_turkey)
         # If the bug existed (p[12] instead of p[13]), this would show c_turkey value (99)
@@ -179,8 +176,8 @@ class TestGetGameEventDetailCountryRegression:
         assert detail is not None
 
         # Verify all countries are correctly returned (raw values, not translated)
-        jugadores = detail["mesas"][0]["jugadores"]
-        country_names = {(j["country"]["name"] if j.get("country") else "") for j in jugadores}
+        jugadores = detail.mesas[0].jugadores
+        country_names = {j.country.name for j in jugadores}
 
         expected_countries = {
             "England",
@@ -230,10 +227,10 @@ class TestGetGameEventDetailCountryRegression:
         detail = await get_game_event_detail(db_session, edge_id)
         assert detail is not None
 
-        # Verify: Empty country should result in empty string
-        player = detail["mesas"][0]["jugadores"][0]
-        assert not player.get("country") or player["country"]["name"] == "", (
-            f"Empty country should return empty string, got: {player.get('country')}"
+        # Verify: Empty country should result in empty string name
+        player = detail.mesas[0].jugadores[0]
+        assert player.country.name == "", (
+            f"Empty country should return empty string name, got: {player.country}"
         )
 
 
@@ -269,11 +266,11 @@ async def test_view_returns_country_reason(db_session: Any) -> None:
     # Test the view
     detail = await get_game_event_detail(db_session, game_id)
     assert detail is not None
-    assert len(detail["mesas"]) == 1
-    assert len(detail["mesas"][0]["jugadores"]) == 1
+    assert len(detail.mesas) == 1
+    assert len(detail.mesas[0].jugadores) == 1
 
-    player_data = detail["mesas"][0]["jugadores"][0]
-    assert player_data["country"]["reason"] == "Test Reason"
+    player_data = detail.mesas[0].jugadores[0]
+    assert player_data.country.reason == "Test Reason"
 
 
 class TestSnapshotHistoryInDetail:

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick, untrack } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
   import type { EditPlayerRow } from "../../types";
   import type { MergePair } from "../../syncResolution";
@@ -52,8 +52,6 @@
     partidas_deseadas: 1,
     partidas_gm: 0,
   };
-
-  let resolutionModal: ReturnType<typeof SyncResolutionModal>;
 
   interface Props {
     parentId: number | null;
@@ -148,10 +146,6 @@
   function handleAddPlayer(): void {
     isAddingPlayer = true;
     newPlayerSearchQuery = "";
-  }
-
-  function focusOnMount(node: HTMLInputElement) {
-    node.focus();
   }
 
   function enrichSimilaritiesWithDraft(
@@ -531,7 +525,7 @@
   {/snippet}
 
   {#snippet body()}
-    {#snippet nameInput(row: EditPlayerRow, i: number)}
+    {#snippet nameInput(_row: EditPlayerRow, i: number)}
       {#if draftPlayers[i]}
         <div class="name-input-wrapper">
           <PlayerName
@@ -602,7 +596,7 @@
         onchange={(e) => handleCheckboxChange(e, i, "partidas_gm")}
       />
     {/snippet}
-    {#snippet actionsCell(row: EditPlayerRow, i: number)}
+    {#snippet actionsCell(_row: EditPlayerRow, i: number)}
       <Button
         variant="ghost"
         destructive={true}
@@ -698,7 +692,6 @@
 {/if}
 
 <SyncResolutionModal
-  bind:this={resolutionModal}
   visible={resolutionVisible}
   pairs={resolutionPairs}
   onComplete={handleResolutionComplete}

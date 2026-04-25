@@ -1,6 +1,9 @@
 import { setActiveNodeId } from "./stores.svelte";
-import type { EditPlayerRow, DraftResponse } from "./types";
-import type { SnapshotSaveEventType } from "./generated-api";
+import type { EditPlayerRow } from "./types";
+import type {
+  SnapshotSaveEventType,
+  GameDraftResponseOutput,
+} from "./generated-api";
 
 export interface PanelContext {
   title: string;
@@ -11,7 +14,7 @@ export interface PanelContext {
     saveEventType: SnapshotSaveEventType;
     autoAction: "notion" | "csv" | null;
     initialPlayers: EditPlayerRow[];
-    initialData: DraftResponse | null;
+    initialData: GameDraftResponseOutput | null;
     editingGameId: number | null;
     draftKey: number;
   };

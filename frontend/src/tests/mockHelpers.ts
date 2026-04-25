@@ -23,3 +23,23 @@ export function mockApiError<TError>(error: TError, status = 400) {
     response: new Response(null, { status, statusText: "Error" }),
   };
 }
+
+import type { Mock } from "vitest";
+
+export function mockSdkSuccess(mockFn: Mock, data: unknown) {
+  mockFn.mockResolvedValue({
+    data,
+    error: undefined,
+    request: new Request("http://localhost"),
+    response: new Response(),
+  });
+}
+
+export function mockSdkError(mockFn: Mock, errorData: unknown) {
+  mockFn.mockResolvedValue({
+    data: undefined,
+    error: errorData,
+    request: new Request("http://localhost"),
+    response: new Response(),
+  });
+}

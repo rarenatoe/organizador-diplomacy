@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ApiChainData, ApiChainResponses, ApiDeleteSnapshotData, ApiDeleteSnapshotErrors, ApiDeleteSnapshotResponses, ApiGameData, ApiGameDeleteData, ApiGameDeleteErrors, ApiGameDeleteResponses, ApiGameDraftData, ApiGameDraftErrors, ApiGameDraftResponses, ApiGameErrors, ApiGameResponses, ApiGameSaveData, ApiGameSaveErrors, ApiGameSaveResponses, ApiNotionFetchData, ApiNotionFetchErrors, ApiNotionFetchResponses, ApiPlayerCheckSimilarityData, ApiPlayerCheckSimilarityErrors, ApiPlayerCheckSimilarityResponses, ApiPlayerGetAllData, ApiPlayerGetAllResponses, ApiPlayerLookupData, ApiPlayerLookupErrors, ApiPlayerLookupResponses, ApiPlayerRenameData, ApiPlayerRenameErrors, ApiPlayerRenameResponses, ApiRunData, ApiRunErrors, ApiRunNotionSyncData, ApiRunNotionSyncErrors, ApiRunNotionSyncResponses, ApiRunResponses, ApiSnapshotData, ApiSnapshotErrors, ApiSnapshotResponses, ApiSnapshotSaveData, ApiSnapshotSaveErrors, ApiSnapshotSaveResponses, CatchAllData, CatchAllErrors, CatchAllResponses } from './types.gen';
+import type { ApiChainData, ApiChainResponses, ApiDeleteSnapshotData, ApiDeleteSnapshotErrors, ApiDeleteSnapshotResponses, ApiGameData, ApiGameDeleteData, ApiGameDeleteErrors, ApiGameDeleteResponses, ApiGameDraftData, ApiGameDraftErrors, ApiGameDraftResponses, ApiGameErrors, ApiGameResponses, ApiGameSaveData, ApiGameSaveErrors, ApiGameSaveResponses, ApiNotionFetchData, ApiNotionFetchErrors, ApiNotionFetchResponses, ApiPlayerCheckSimilarityData, ApiPlayerCheckSimilarityErrors, ApiPlayerCheckSimilarityResponses, ApiPlayerGetAllData, ApiPlayerGetAllResponses, ApiPlayerLookupData, ApiPlayerLookupErrors, ApiPlayerLookupResponses, ApiPlayerRenameData, ApiPlayerRenameErrors, ApiPlayerRenameResponses, ApiRunNotionSyncData, ApiRunNotionSyncErrors, ApiRunNotionSyncResponses, ApiSnapshotData, ApiSnapshotErrors, ApiSnapshotResponses, ApiSnapshotSaveData, ApiSnapshotSaveErrors, ApiSnapshotSaveResponses, CatchAllData, CatchAllErrors, CatchAllResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -107,20 +107,6 @@ export const apiGameDraft = <ThrowOnError extends boolean = false>(options: Opti
  */
 export const apiGameSave = <ThrowOnError extends boolean = false>(options: Options<ApiGameSaveData, ThrowOnError>) => (options.client ?? client).post<ApiGameSaveResponses, ApiGameSaveErrors, ThrowOnError>({
     url: '/api/game/save',
-    ...options,
-    headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-    }
-});
-
-/**
- * Api Run
- *
- * Runs a background script (e.g., notion_sync).
- */
-export const apiRun = <ThrowOnError extends boolean = false>(options: Options<ApiRunData, ThrowOnError>) => (options.client ?? client).post<ApiRunResponses, ApiRunErrors, ThrowOnError>({
-    url: '/api/game/run/{script}',
     ...options,
     headers: {
         'Content-Type': 'application/json',

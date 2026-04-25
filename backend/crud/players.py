@@ -6,13 +6,14 @@ extracted from the monolithic crud.py file for better organization.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, NotRequired, TypedDict
+from typing import TYPE_CHECKING
 
 from sqlalchemy import delete, func, select, update
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.api.models.players import PlayerHistoryItem, SourceType
 from backend.api.models.snapshots import HistoryState
 from backend.db.models import (
     GameTable,
@@ -169,26 +170,12 @@ async def rename_player(session: AsyncSession, old_name: str, new_name: str) -> 
         return True
 
 
-SourceType = Literal["history", "notion", "default"]
-
-
-class PlayerHistoryDict(TypedDict):
-    source: SourceType
-    is_new: bool
-    juegos_este_ano: int
-    has_priority: bool
-    partidas_deseadas: int
-    partidas_gm: int
-    notion_id: NotRequired[str]
-    notion_name: NotRequired[str]
-
-
 async def lookup_player_history(
     session: AsyncSession,
     name: str,
     notion_id: str | None = None,
     snapshot_id: int | None = None,
-) -> PlayerHistoryDict:
+) -> PlayerHistoryItem:
     """
     Walk backward through timeline to find player's historical stats.
     """
@@ -230,22 +217,17 @@ async def lookup_player_history(
         *,
         has_priority: bool,
         is_new: bool,
-    ) -> PlayerHistoryDict:
-        # Explicitly declare the type so Pyright knows exactly what this is
-        res: PlayerHistoryDict = {
-            "source": source,
-            "has_priority": has_priority,
-            "is_new": is_new,
-            "juegos_este_ano": played,
-            "partidas_deseadas": desired,
-            "partidas_gm": gm,
-        }
-        # Safely add Notion fields if we found them
-        if nc:
-            res["notion_id"] = nc.notion_id
-            res["notion_name"] = nc.name
-
-        return res
+    ) -> PlayerHistoryItem:
+        return PlayerHistoryItem(
+            source=source,
+            has_priority=has_priority,
+            is_new=is_new,
+            juegos_este_ano=played,
+            partidas_deseadas=desired,
+            partidas_gm=gm,
+            notion_id=nc.notion_id if nc else None,
+            notion_name=nc.name if nc else None,
+        )
 
     while current_snapshot_id is not None and not found_in_history:
         if player:

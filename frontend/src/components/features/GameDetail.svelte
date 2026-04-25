@@ -1,30 +1,11 @@
 <script lang="ts">
-  import type { GameDetail, DraftResponse, DraftPlayer } from "../../types";
-
-  type GamePlayerData = {
-    nombre: string;
-    is_new?: boolean;
-    juegos_este_ano?: number;
-    has_priority?: boolean;
-    partidas_deseadas?: number;
-    partidas_gm?: number;
-    c_england?: number;
-    c_france?: number;
-    c_germany?: number;
-    c_italy?: number;
-    c_austria?: number;
-    c_russia?: number;
-    c_turkey?: number;
-    country?: { name: string; reason?: string } | null;
-  };
-
-  type GameTableData = {
-    jugadores: Array<{
-      nombre: string;
-      country?: { name: string; reason?: string } | null;
-    }>;
-  };
-  import { fetchGame } from "../../api";
+  import {
+    apiGame,
+    type GameDetailResponse,
+    type GameDraftPlayer,
+    type GameDraftResponseOutput,
+    type GameDraftTableOutput,
+  } from "../../generated-api";
   import { translateCountry, getCountryEmoji } from "../../i18n";
   import Button from "../ui/Button.svelte";
   import PanelLayout from "../layout/PanelLayout.svelte";
@@ -40,21 +21,22 @@
     id: number;
     onOpenGameDraft: (
       snapshotId: number,
-      draft: DraftResponse,
+      draft: GameDraftResponseOutput,
       gameId: number,
     ) => void;
   }
 
   let { id, onOpenGameDraft }: Props = $props();
 
-  let data = $state<GameDetail | null>(null);
+  let gameDetail = $state<GameDetailResponse | undefined>(undefined);
   let loading = $state(true);
   let copiedId = $state<string | null>(null);
 
   async function loadGame(): Promise<void> {
     loading = true;
     try {
-      data = await fetchGame(id);
+      const { data } = await apiGame({ path: { game_event_id: id } });
+      gameDetail = data;
     } finally {
       loading = false;
     }
@@ -68,11 +50,11 @@
     }, 1500);
   }
 
-  function mapToDraftPlayer(player: GamePlayerData): DraftPlayer {
+  function mapToDraftPlayer(player: GameDraftPlayer): GameDraftPlayer {
     return {
       nombre: player.nombre,
       is_new: player.is_new ?? false,
-      juegos_ano: player.juegos_este_ano ?? 0,
+      juegos_este_ano: player.juegos_este_ano ?? 0,
       has_priority: player.has_priority ?? false,
       partidas_deseadas: player.partidas_deseadas ?? 1,
       partidas_gm: player.partidas_gm ?? 0,
@@ -83,11 +65,11 @@
       c_austria: player.c_austria ?? 0,
       c_russia: player.c_russia ?? 0,
       c_turkey: player.c_turkey ?? 0,
-      country: player.country,
+      country: player.country || { name: "", reason: "" },
     };
   }
 
-  function getTableCopyText(table: GameTableData): string {
+  function getTableCopyText(table: GameDraftTableOutput): string {
     const footnotes: Record<string, string> = {};
     let footnoteCounter = 0;
 
@@ -130,7 +112,7 @@
     return allLines.join("\n");
   }
 
-  function getFullShareText(gameData: GameDetail | null): string {
+  function getFullShareText(gameData: GameDetailResponse | null): string {
     if (!gameData) return "";
 
     const lines: string[] = [];
@@ -140,7 +122,7 @@
       for (const table of gameData.mesas) {
         lines.push(`Partida ${table.numero}`);
         if (table.gm) {
-          lines.push(`GM: ${table.gm}`);
+          lines.push(`GM: ${table.gm.nombre}`);
         }
 
         // Add players
@@ -179,44 +161,44 @@
     fill={true}
     icon="✏️"
     onclick={() => {
-      const draft = {
+      const draft: GameDraftResponseOutput = {
         mesas:
-          (data?.mesas ?? []).map((m) => ({
+          (gameDetail?.mesas ?? []).map((m) => ({
             numero: m.numero,
-            gm: m.gm ? mapToDraftPlayer({ nombre: m.gm, is_new: false }) : null,
+            gm: m.gm ? mapToDraftPlayer(m.gm) : null,
             jugadores: m.jugadores.map(mapToDraftPlayer),
           })) || [],
         tickets_sobrantes:
-          (data?.waiting_list ?? []).map(mapToDraftPlayer) || [],
+          (gameDetail?.waiting_list ?? []).map(mapToDraftPlayer) || [],
         minimo_teorico: 0,
-        intentos_usados: data?.intentos || 0,
+        intentos_usados: gameDetail?.intentos || 0,
       };
-      if (!data) {
+      if (!gameDetail) {
         throw new Error("Game data is required for editing");
       }
-      onOpenGameDraft(data.input_snapshot_id, draft, id);
+      onOpenGameDraft(gameDetail.input_snapshot_id || 0, draft, id);
     }}>Editar Jornada</Button
   >
 {/snippet}
 
 {#if loading}
   <p class="loading-text">Cargando…</p>
-{:else if data}
-  {@const mesas = data.mesas ?? []}
-  {@const waiting = data.waiting_list ?? []}
+{:else if gameDetail}
+  {@const mesas = gameDetail.mesas ?? []}
+  {@const waiting = gameDetail.waiting_list ?? []}
   <PanelLayout footer={gameFooter}>
     {#snippet body()}
       <div class="section">
         <SectionTitle title="Resumen" />
         <div class="meta-grid">
           <span class="meta-key">Generado</span>
-          <span class="meta-val">{data?.created_at}</span>
+          <span class="meta-val">{gameDetail?.created_at}</span>
           <span class="meta-key">Intentos</span>
-          <span class="meta-val">{data?.intentos}</span>
+          <span class="meta-val">{gameDetail?.intentos}</span>
           <span class="meta-key">Snapshot entrada</span>
-          <span class="meta-val">#{data?.input_snapshot_id}</span>
+          <span class="meta-val">#{gameDetail?.input_snapshot_id}</span>
           <span class="meta-key">Snapshot salida</span>
-          <span class="meta-val">#{data?.output_snapshot_id}</span>
+          <span class="meta-val">#{gameDetail?.output_snapshot_id}</span>
         </div>
       </div>
       <div class="section">
@@ -225,7 +207,8 @@
           variant={copiedId === "share" ? "success" : "secondary"}
           icon={copiedId === "share" ? "✅" : "📋"}
           fill={true}
-          onclick={() => copyText(getFullShareText(data), "share")}
+          onclick={() =>
+            copyText(getFullShareText(gameDetail || null), "share")}
           >{copiedId === "share"
             ? "Copiado"
             : "Copiar lista para compartir"}</Button
@@ -238,7 +221,10 @@
             {#each mesas as table (table.numero)}
               {@const playersTxt = getTableCopyText(table)}
               <CardGridItem>
-                <GameTableCard tableNumber={table.numero} gmName={table.gm}>
+                <GameTableCard
+                  tableNumber={table.numero}
+                  gmName={table.gm?.nombre || null}
+                >
                   <ul class="player-list">
                     {#each table.jugadores as player, i (player.nombre)}
                       <li>

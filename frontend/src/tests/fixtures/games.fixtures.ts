@@ -1,17 +1,17 @@
 import type {
-  DraftPlayer,
-  DraftMesa,
-  DraftResponse,
-  GameDetail,
-} from "../../types";
+  GameDraftPlayer,
+  GameDraftTableOutput,
+  GameDraftResponseOutput,
+  GameDetailResponse,
+} from "../../generated-api";
 
 export const createMockDraftPlayer = (
-  overrides: Partial<DraftPlayer> = {},
-): DraftPlayer => {
-  const baseDraftPlayer: DraftPlayer = {
+  overrides: Partial<GameDraftPlayer> = {},
+): GameDraftPlayer => {
+  const baseDraftPlayer: GameDraftPlayer = {
     nombre: "Test Player",
     is_new: false,
-    juegos_ano: 0,
+    juegos_este_ano: 0,
     has_priority: false,
     partidas_deseadas: 1,
     partidas_gm: 0,
@@ -22,31 +22,31 @@ export const createMockDraftPlayer = (
     c_austria: 0,
     c_russia: 0,
     c_turkey: 0,
-    country: null,
+    country: { name: "", reason: "" },
   };
 
   return { ...baseDraftPlayer, ...overrides };
 };
 
 export const createMockDraftMesa = (
-  overrides: Partial<DraftMesa> = {},
-): DraftMesa => {
-  const baseDraftMesa: DraftMesa = {
+  overrides: Partial<GameDraftTableOutput> = {},
+): GameDraftTableOutput => {
+  const baseDraftMesa: GameDraftTableOutput = {
     numero: 1,
-    jugadores: [],
     gm: null,
+    jugadores: [],
   };
 
   return { ...baseDraftMesa, ...overrides };
 };
 
 export const createMockDraftResponse = (
-  overrides: Partial<DraftResponse> = {},
-): DraftResponse => {
-  const baseDraftResponse: DraftResponse = {
+  overrides: Partial<GameDraftResponseOutput> = {},
+): GameDraftResponseOutput => {
+  const baseDraftResponse: GameDraftResponseOutput = {
     mesas: [],
     tickets_sobrantes: [],
-    minimo_teorico: 1,
+    minimo_teorico: 0,
     intentos_usados: 0,
   };
 
@@ -54,16 +54,16 @@ export const createMockDraftResponse = (
 };
 
 export const createMockGameDetail = (
-  overrides: Partial<GameDetail> = {},
-): GameDetail => {
-  const baseGameDetail: GameDetail = {
+  overrides: Partial<GameDetailResponse> = {},
+): GameDetailResponse => {
+  const baseGameDetail: GameDetailResponse = {
     id: 1,
     created_at: "2024-01-01T00:00:00Z",
-    intentos: 3,
-    input_snapshot_id: 10,
-    output_snapshot_id: 20,
+    intentos: 1,
     mesas: [],
     waiting_list: [],
+    input_snapshot_id: 1,
+    output_snapshot_id: 2,
   };
 
   return { ...baseGameDetail, ...overrides };

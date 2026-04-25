@@ -25,7 +25,6 @@
     type NotionPlayerData,
   } from "../../generated-api";
   import { parseApiError } from "../../utils";
-  let resolutionModal: ReturnType<typeof SyncResolutionModal>;
 
   interface Props {
     id: number;
@@ -340,7 +339,7 @@
         <PlayerName player={row} editable={false} showNotionIndicator={true} />
       {/snippet}
 
-      {#snippet expCell(row: PlayerData, index: number)}
+      {#snippet expCell(row: PlayerData, _index: number)}
         {#if row.is_new !== undefined}
           <Badge
             variant={row.is_new ? "warning" : "success"}
@@ -350,11 +349,11 @@
         {/if}
       {/snippet}
 
-      {#snippet priorCell(row: PlayerData, index: number)}
+      {#snippet priorCell(row: PlayerData, _index: number)}
         {row.has_priority ? "✓" : ""}
       {/snippet}
 
-      {#snippet gmCell(row: PlayerData, index: number)}
+      {#snippet gmCell(row: PlayerData, _index: number)}
         {row.partidas_gm > 0 ? "✓" : ""}
       {/snippet}
 
@@ -397,7 +396,6 @@
 {/if}
 
 <SyncResolutionModal
-  bind:this={resolutionModal}
   visible={ui.resolutionVisible}
   pairs={resolutionPairs}
   onComplete={handleResolutionComplete}

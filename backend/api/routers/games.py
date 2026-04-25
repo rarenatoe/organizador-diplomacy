@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
-import subprocess
 from collections import Counter
 from typing import TYPE_CHECKING, Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy import select
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.session import AsyncSession
 
-from backend.config import PROJECT_ROOT
+from backend.api.models.games import (
+    GameDetailResponse,
+    GameDraftRequest,
+    GameDraftResponse,
+    GameSaveRequest,
+)
 from backend.crud.chain import squash_linear_branch
 from backend.crud.games import save_game_draft, update_game_draft
 from backend.crud.snapshots import delete_snapshot_cascade, get_snapshot_players
@@ -21,30 +24,16 @@ from backend.db.connection import get_session
 from backend.db.models import TimelineEdge
 from backend.db.views import get_game_event_detail
 from backend.organizador.core import calculate_matches
-from backend.organizador.models import DraftPlayer, DraftResult
+from backend.organizador.models import DraftPlayer
 
 router = APIRouter(prefix="/api/game")
-
-
-class GameDraftRequest(BaseModel):
-    snapshot_id: int
-
-
-class GameSaveRequest(BaseModel):
-    snapshot_id: int
-    draft: dict[str, Any]
-    editing_game_id: int | None = None
-
-
-class RunScriptRequest(BaseModel):
-    snapshot: int | None = None
 
 
 @router.get("/{game_event_id}")
 async def api_game(
     game_event_id: int,
     session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, Any]:
+) -> GameDetailResponse:
     """Returns full game event detail for the detail panel."""
     detail = await get_game_event_detail(session, game_event_id)
     if detail is None:
@@ -94,7 +83,7 @@ async def api_game_delete(
 async def api_game_draft(
     request: GameDraftRequest,
     session: AsyncSession = Depends(get_session),  # noqa: B008
-) -> dict[str, Any]:
+) -> GameDraftResponse:
     """
     Generates a draft of game tables without saving to the database.
     Returns: DraftResult as dict
@@ -131,7 +120,7 @@ async def api_game_draft(
                 detail=f"Nombres duplicados en el snapshot: {', '.join(duplicates)}",
             )
 
-        resultado: DraftResult | None = calculate_matches(jugadores)
+        resultado = calculate_matches(jugadores)
         if resultado is None:
             raise HTTPException(
                 status_code=400, detail="No hay suficientes jugadores para armar una partida."
@@ -139,85 +128,7 @@ async def api_game_draft(
 
         await session.commit()
 
-        waitlist_counts = Counter(p.name for p in resultado.waitlist_players)
-        unique_waitlist = list({p.name: p for p in resultado.waitlist_players}.values())
-
-        # Convert DraftResult to JSON for frontend with country object structure
-        result = {
-            "mesas": [
-                {
-                    "numero": table.table_number,
-                    "gm": {
-                        "nombre": table.gm.name,
-                        "is_new": table.gm.is_new,
-                        "juegos_este_ano": table.gm.games_this_year,
-                        "partidas_deseadas": table.gm.desired_games,
-                        "partidas_gm": table.gm.gm_games,
-                        "c_england": table.gm.c_england,
-                        "c_france": table.gm.c_france,
-                        "c_germany": table.gm.c_germany,
-                        "c_italy": table.gm.c_italy,
-                        "c_austria": table.gm.c_austria,
-                        "c_russia": table.gm.c_russia,
-                        "c_turkey": table.gm.c_turkey,
-                        "country": {"name": table.gm.country, "reason": table.gm.country_reason}
-                        if table.gm.country
-                        else None,
-                        "has_priority": table.gm.has_priority,
-                    }
-                    if table.gm
-                    else None,
-                    "jugadores": [
-                        {
-                            "nombre": player.name,
-                            "is_new": player.is_new,
-                            "juegos_este_ano": player.games_this_year,
-                            "partidas_deseadas": player.desired_games,
-                            "partidas_gm": player.gm_games,
-                            "c_england": player.c_england,
-                            "c_france": player.c_france,
-                            "c_germany": player.c_germany,
-                            "c_italy": player.c_italy,
-                            "c_austria": player.c_austria,
-                            "c_russia": player.c_russia,
-                            "c_turkey": player.c_turkey,
-                            "country": {"name": player.country, "reason": player.country_reason}
-                            if player.country
-                            else None,
-                            "has_priority": player.has_priority,
-                        }
-                        for player in table.players
-                    ],
-                }
-                for table in resultado.tables
-            ],
-            "tickets_sobrantes": [
-                {
-                    "nombre": player.name,
-                    "is_new": player.is_new,
-                    "juegos_este_ano": player.games_this_year,
-                    "partidas_deseadas": player.desired_games,
-                    "partidas_gm": player.gm_games,
-                    "c_england": player.c_england,
-                    "c_france": player.c_france,
-                    "c_germany": player.c_germany,
-                    "c_italy": player.c_italy,
-                    "c_austria": player.c_austria,
-                    "c_russia": player.c_russia,
-                    "c_turkey": player.c_turkey,
-                    "country": {"name": player.country, "reason": player.country_reason}
-                    if player.country
-                    else None,
-                    "has_priority": player.has_priority,
-                    "cupos_faltantes": waitlist_counts[player.name],
-                }
-                for player in unique_waitlist
-            ],
-            "minimo_teorico": resultado.theoretical_minimum,
-            "intentos_usados": resultado.attempts_used,
-        }
-
-        return result
+        return GameDraftResponse.from_domain(resultado)
     except HTTPException:
         raise
     except AttributeError as exc:
@@ -241,6 +152,9 @@ async def api_game_save(
     try:
         if not request.snapshot_id or not request.draft:
             raise HTTPException(status_code=400, detail="snapshot_id and draft are required")
+
+        # Convert Pydantic model back to dict for CRUD functions
+        draft_dict: dict[str, Any] = request.draft.model_dump(mode="json")
 
         if request.editing_game_id is not None:
             # In-place editing: check if game is a leaf node
@@ -272,13 +186,13 @@ async def api_game_save(
                     request.editing_game_id,
                     request.snapshot_id,
                     output_snapshot_id,
-                    request.draft,
+                    draft_dict,
                 )
                 await session.commit()
                 return {"game_id": game_id}
 
         # Create new game (fallback or normal flow)
-        game_id = await save_game_draft(session, request.snapshot_id, request.draft)
+        game_id = await save_game_draft(session, request.snapshot_id, draft_dict)
         await session.commit()
         return {"game_id": game_id}
     except HTTPException:
@@ -288,42 +202,4 @@ async def api_game_save(
         raise HTTPException(status_code=500, detail=f"Attribute error in save: {str(exc)}") from exc
     except Exception as exc:
         await session.rollback()
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-
-# Note: /api/snapshots endpoint moved to snapshots.py for consistency
-# This keeps all snapshot listing under the snapshot router
-
-
-@router.post("/run/{script}")
-async def api_run(
-    script: str,
-    request: RunScriptRequest,
-) -> dict[str, Any]:
-    """Runs a background script (e.g., notion_sync)."""
-    if script not in ("notion_sync",):
-        raise HTTPException(status_code=400, detail="unknown script")
-
-    cwd = PROJECT_ROOT
-    snapshot_id = request.snapshot
-
-    SCRIPT_MODULES = {"notion_sync": "backend.sync.notion_sync"}
-    cmd = ["uv", "run", "python", "-m", SCRIPT_MODULES[script]]
-    if snapshot_id is not None:
-        cmd += ["--snapshot", str(snapshot_id)]
-
-    try:
-        result = subprocess.run(
-            cmd,
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            timeout=90,
-        )
-        return {
-            "returncode": result.returncode,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-        }
-    except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc

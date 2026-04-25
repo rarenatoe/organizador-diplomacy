@@ -2,39 +2,42 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import GameDetail from "./GameDetail.svelte";
 import { tick } from "svelte";
+import * as generatedApi from "../../generated-api";
+import { mockApiSuccess } from "../../tests/mockHelpers";
+import { createMockDraftPlayer } from "../../tests/fixtures";
+import type { GameDetailResponse } from "../../generated-api";
 
-// Mock the API module
-vi.mock("../../api", () => ({
-  fetchGame: vi.fn().mockResolvedValue({
-    id: 1,
-    created_at: "2024-01-01T00:00:00Z",
-    intentos: 3,
-    input_snapshot_id: 10,
-    output_snapshot_id: 20,
-    mesas: [
-      {
-        numero: 1,
-        gm: "GameMaster1",
-        jugadores: [
-          {
-            nombre: "Alice",
-            is_new: true,
-            country: { name: "England", reason: "Algorithm says so" },
-          },
-          {
-            nombre: "Bob",
-            is_new: false,
-            country: { name: "France" },
-          },
-        ],
-      },
-    ],
-    waiting_list: [
-      { nombre: "Charlie", cupos_faltantes: 1 },
-      { nombre: "Diana", cupos_faltantes: 1 },
-    ],
-  }),
-}));
+const apiGameSpy = vi.spyOn(generatedApi, "apiGame");
+
+const defaultGameData: GameDetailResponse = {
+  id: 1,
+  created_at: "2024-01-01T00:00:00Z",
+  intentos: 3,
+  input_snapshot_id: 10,
+  output_snapshot_id: 20,
+  mesas: [
+    {
+      numero: 1,
+      gm: createMockDraftPlayer({ nombre: "GameMaster1" }),
+      jugadores: [
+        createMockDraftPlayer({
+          nombre: "Alice",
+          is_new: true,
+          country: { name: "England", reason: "Algorithm says so" },
+        }),
+        createMockDraftPlayer({
+          nombre: "Bob",
+          is_new: false,
+          country: { name: "France", reason: "" },
+        }),
+      ],
+    },
+  ],
+  waiting_list: [
+    createMockDraftPlayer({ nombre: "Charlie", cupos_faltantes: 1 }),
+    createMockDraftPlayer({ nombre: "Diana", cupos_faltantes: 1 }),
+  ],
+};
 
 // Mock the utils module
 vi.mock("../../utils", () => ({
@@ -55,6 +58,7 @@ describe("GameDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    apiGameSpy.mockResolvedValue(mockApiSuccess(defaultGameData));
   });
 
   afterEach(() => {
@@ -279,7 +283,7 @@ describe("GameDetail", () => {
               expect.objectContaining({
                 nombre: "Bob",
                 is_new: false,
-                country: { name: "France" },
+                country: { name: "France", reason: "" },
               }),
             ]),
           }),
@@ -486,38 +490,32 @@ describe("GameDetail", () => {
 
     it("renders no info icons when no players have country.reason", async () => {
       // Override the mock for this specific test
-      const mockFetchGame = vi.fn().mockResolvedValue({
-        id: 1,
-        mesas: [
-          {
-            numero: 1,
-            gm: "GameMaster1",
-            jugadores: [
-              { nombre: "Alice", is_new: true, country: { name: "England" } },
-              { nombre: "Bob", is_new: false, country: { name: "France" } },
-            ],
-          },
-          {
-            numero: 2, // CRITICAL: Changed from 1 to 2 to prevent Svelte crash
-            gm: "GameMaster1",
-            jugadores: [
-              { nombre: "Alice", is_new: true, country: { name: "England" } },
-              { nombre: "Bob", is_new: false, country: { name: "France" } },
-            ],
-          },
-        ],
-        waiting_list: [],
-      });
-
-      // Temporarily replace the mock
-      const originalMock = vi.mocked(await import("../../api")).fetchGame;
-      vi.mocked(await import("../../api")).fetchGame = mockFetchGame;
+      apiGameSpy.mockResolvedValueOnce(
+        mockApiSuccess({
+          ...defaultGameData,
+          mesas: [
+            {
+              numero: 1,
+              gm: createMockDraftPlayer({ nombre: "GameMaster1" }),
+              jugadores: [
+                createMockDraftPlayer({
+                  nombre: "Alice",
+                  is_new: true,
+                  country: { name: "England", reason: "" },
+                }),
+                createMockDraftPlayer({
+                  nombre: "Bob",
+                  is_new: false,
+                  country: { name: "France", reason: "" },
+                }),
+              ],
+            },
+          ],
+        } as GameDetailResponse),
+      );
 
       render(GameDetail, {
-        props: {
-          id: 2,
-          onOpenGameDraft: vi.fn(),
-        },
+        props: { id: 1, onOpenGameDraft: vi.fn() },
       });
 
       await waitFor(() => {
@@ -530,9 +528,6 @@ describe("GameDetail", () => {
 
       const reasonTooltips = document.querySelectorAll(".reason-tooltip");
       expect(reasonTooltips.length).toBe(0);
-
-      // Restore original mock
-      vi.mocked(await import("../../api")).fetchGame = originalMock;
     });
   });
 });

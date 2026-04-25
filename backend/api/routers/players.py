@@ -5,80 +5,29 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, TypeAdapter
+from pydantic import TypeAdapter
 from sqlalchemy import select
 
+from backend.api.models.players import (
+    CheckSimilarityRequest,
+    LookupRequest,
+    PlayerAutocompleteItem,
+    PlayerAutocompleteResponse,
+    PlayerHistoryResponse,
+    PlayerSimilarityItem,
+    PlayerSimilarityResponse,
+    RenameRequest,
+    SuccessResponse,
+)
+from backend.crud.players import lookup_player_history, rename_player
+from backend.db.connection import get_session
+from backend.db.models import NotionCache, Player
 from backend.sync.notion_sync import PlayerNameData, detect_similar_names
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.session import AsyncSession
 
-from backend.crud.players import SourceType, lookup_player_history, rename_player
-from backend.db.connection import get_session
-from backend.db.models import NotionCache, Player
-
 router = APIRouter(prefix="/api/player")
-
-
-class SuccessResponse(BaseModel):
-    success: bool
-
-
-class PlayerAutocompleteItem(BaseModel):
-    display: str
-    nombre: str
-    notion_id: str | None = None
-    notion_name: str | None = None
-    is_local: bool
-    is_alias: bool
-
-
-class PlayerAutocompleteResponse(BaseModel):
-    players: list[PlayerAutocompleteItem]
-
-
-class PlayerHistoryItem(BaseModel):
-    source: SourceType
-    is_new: bool
-    juegos_este_ano: int
-    has_priority: bool
-    partidas_deseadas: int
-    partidas_gm: int
-    notion_id: str | None = None
-    notion_name: str | None = None
-
-
-class PlayerHistoryResponse(BaseModel):
-    player: PlayerHistoryItem
-
-
-class PlayerSimilarityItem(BaseModel):
-    notion_id: str
-    notion_name: str
-    snapshot: str
-    similarity: float
-    match_method: str
-    matched_alias: str | None = None
-    existing_local_name: str | None = None
-
-
-class PlayerSimilarityResponse(BaseModel):
-    similarities: list[PlayerSimilarityItem]
-
-
-class RenameRequest(BaseModel):
-    old_name: str
-    new_name: str
-
-
-class LookupRequest(BaseModel):
-    name: str
-    notion_id: str | None = None
-    snapshot_id: int | None = None
-
-
-class CheckSimilarityRequest(BaseModel):
-    names: list[str]
 
 
 @router.post("/rename")
@@ -130,8 +79,6 @@ async def api_player_get_all(
 ) -> PlayerAutocompleteResponse:
     """Get all known players. Returns rich, unformatted objects to power UI autocomplete."""
     try:
-        from backend.db.models import NotionCache
-
         player_result = await session.execute(select(Player.name, Player.notion_id))
         local_players = player_result.fetchall()
 
@@ -210,7 +157,7 @@ async def api_player_lookup(
         result = await lookup_player_history(
             session, request.name, request.notion_id, request.snapshot_id
         )
-        return PlayerHistoryResponse(player=PlayerHistoryItem(**result))
+        return PlayerHistoryResponse(player=result)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

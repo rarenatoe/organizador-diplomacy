@@ -243,9 +243,9 @@ class TestShieldingAlgorithm(unittest.TestCase):
             players[2].country, "England", "Charlie should be picked as a shield for England"
         )
         # 3. The reason should explicitly mention Alice and count
-        self.assertIsNotNone(players[2].country_reason)
-        self.assertIn("Alice", players[2].country_reason or "")
-        self.assertIn("2", players[2].country_reason or "")
+        self.assertNotEqual(players[2].country_reason, "")
+        self.assertIn("Alice", players[2].country_reason)
+        self.assertIn("2", players[2].country_reason)
         # 4. Bob should be left alone
         self.assertEqual(players[1].country, "")
 

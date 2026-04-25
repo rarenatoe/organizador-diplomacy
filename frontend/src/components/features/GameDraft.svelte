@@ -1,12 +1,14 @@
 <script lang="ts">
-  import type { DraftResponse, DraftPlayer } from "../../types";
-  import { fetchGameDraft, saveGameDraft } from "../../api";
+  import { apiGameDraft, apiGameSave } from "../../generated-api/sdk.gen";
+  import type {
+    GameDraftResponseOutput,
+    GameDraftPlayer,
+  } from "../../generated-api";
   import { setActiveNodeId } from "../../stores.svelte";
   import { findLatestGameId } from "../../snapshotUtils";
   import Button from "../ui/Button.svelte";
   import PanelLayout from "../layout/PanelLayout.svelte";
   import SectionTitle from "../ui/SectionTitle.svelte";
-  import { logger } from "../../utils/logger";
   import Badge from "../ui/Badge.svelte";
   import Tooltip from "../ui/Tooltip.svelte";
   import GameTableCard from "./GameTableCard.svelte";
@@ -20,10 +22,10 @@
     onClose: () => void;
     onCancel: () => void;
     onChainUpdate: () => void;
-    onOpenGame: (id: number) => void;
+    onOpenGame: (gameId: number) => void;
     onShowError: (title: string, output: string) => void;
     editingGameId?: number | null;
-    initialDraft?: DraftResponse | null;
+    initialDraft?: GameDraftResponseOutput | null;
   }
 
   let {
@@ -37,7 +39,7 @@
     initialDraft,
   }: Props = $props();
 
-  let draftData = $state<DraftResponse | null>(null);
+  let draftData = $state<GameDraftResponseOutput | null>(null);
   let loading = $state(true);
   let saving = $state(false);
 
@@ -62,12 +64,14 @@
       if (initialDraft) {
         draftData = initialDraft;
       } else {
-        const response = await fetchGameDraft(snapshotId);
-        if (response.error) {
-          onShowError("Error al generar draft", response.error);
+        const { data, error } = await apiGameDraft({
+          body: { snapshot_id: snapshotId },
+        });
+        if (error) {
+          onShowError("Error al generar draft", String(error.detail || error));
           return;
         }
-        draftData = response;
+        draftData = data;
       }
     } catch (e) {
       onShowError("Error de conexión", String(e));
@@ -118,7 +122,10 @@
       if (!currentPlayer) {
         return;
       }
-      currentPlayer.country = newCountry !== "" ? { name: newCountry } : null;
+      currentPlayer.country =
+        newCountry !== ""
+          ? { name: newCountry, reason: "" }
+          : { name: "", reason: "" };
     }
   }
 
@@ -135,9 +142,9 @@
           country: country?.name
             ? {
                 name: country.name,
-                ...(country.reason ? { reason: country.reason } : {}),
+                reason: country.reason || "",
               }
-            : null,
+            : { name: "", reason: "" },
         })),
       }));
       const cleanTicketsSobrantes = draftData.tickets_sobrantes.map(
@@ -146,34 +153,37 @@
           country: country?.name
             ? {
                 name: country.name,
-                ...(country.reason ? { reason: country.reason } : {}),
+                reason: country.reason || "",
               }
-            : null,
+            : { name: "", reason: "" },
         }),
       );
-      const payload: DraftResponse = {
+      const payload: GameDraftResponseOutput = {
         ...draftData,
         mesas: cleanTables,
         tickets_sobrantes: cleanTicketsSobrantes,
       };
 
-      const response = await saveGameDraft({
-        snapshot_id: snapshotId,
-        draft: payload,
-        editing_game_id: editingGameId || null,
+      const { error } = await apiGameSave({
+        body: {
+          snapshot_id: snapshotId,
+          draft: payload,
+          editing_game_id: editingGameId || null,
+        },
       });
-      if (response.error) {
-        onShowError("Error al guardar draft", response.error);
+      if (error) {
+        onShowError("Error al guardar draft", String(error.detail || error));
         return;
       }
+      // Use data.game_id as needed...
 
       // Close the draft panel and open the new game
       onClose();
       onChainUpdate();
 
       // Find and open the latest game
-      const { data } = await apiChain();
-      const gameId = findLatestGameId(data?.roots ?? []);
+      const chainResult = await apiChain();
+      const gameId = findLatestGameId(chainResult.data?.roots ?? []);
       if (gameId !== null) {
         setActiveNodeId(gameId);
         onOpenGame(gameId);
@@ -206,8 +216,8 @@
       }
 
       // Get the two players to swap
-      let playerA: DraftPlayer | null = null;
-      let playerB: DraftPlayer | null = null;
+      let playerA: GameDraftPlayer | null = null;
+      let playerB: GameDraftPlayer | null = null;
 
       // Extract Player A
       if (selectedSwap.type === "table") {

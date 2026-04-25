@@ -10,6 +10,7 @@ priority: 20
 - **Universal IDs:** Use centralized `graph_nodes` table for universal IDs and cascading deletes. NEVER implement separate ID systems.
 - **Immutable Identity:** ALWAYS anchor to immutable external IDs (`notion_id`). NEVER rely on user-editable strings (`name`) for relational mapping.
 - **Immutable Snapshots:** Flow data through immutable snapshots connected by `timeline_edges`. NEVER create mutable historical data structures.
+- **Fortifying the Database Boundary:** Raw SQL results from `db/views.py` MUST be immediately mapped into strict Pydantic models at the data access layer. NEVER pass raw `Row` objects or dicts with unsanitized DB values (e.g., SQLite ISO date strings) beyond the `crud/` layer. Sanitize and coerce types (dates, enums) before Pydantic validation.
 
 ## 2. API & Logic Boundaries
 
@@ -17,6 +18,8 @@ priority: 20
 - **Strict API Purity:** Backend MUST NEVER send formatted UI strings (e.g., `"Antiguo (15 juegos)"`). APIs MUST send strictly typed primitive data.
 - **Synchronized CQRS:** When altering a schema or write payload, you MUST simultaneously update aggregate SQL views and their TS interfaces.
 - **Two-Step Generation:** Enforce `/api/game/draft` (in-memory) followed by `/api/game/save` (persistence). NEVER write draft data directly to DB.
+- **Eradication of Type Cancer:** NEVER use `dict[str, Any]` across architectural boundaries. Every API endpoint MUST return a strictly defined Pydantic response model. Internal functions that pass data between layers MUST use typed `TypedDict` or Pydantic models, not bare dicts.
+- **Absolute Trimming:** API response Pydantic models MUST contain ONLY the exact fields the frontend UI consumes. NEVER expose additional fields just because they were queried from the database. Each response model is a deliberate contract, not a DB row mirror.
 
 ## 3. Performance & SQLAlchemy "Fat Trimming"
 
@@ -29,6 +32,7 @@ priority: 20
 - **Minimal TypedDicts (ISP):** Pure functions MUST declare a minimal `TypedDict` representing exactly what they need, rather than demanding massive DB models.
 - **Covariant Hints:** Use `collections.abc.Mapping` and `Sequence` in type hints so functions accept both slim and ORM-derived dicts.
 - **Hashing Keys:** ALWAYS hash by primitive attributes (`.name`). NEVER pass Pydantic models as dict/Counter keys.
+- **Front-to-Back Honesty:** Do NOT overuse `Optional` / `| None` types in API response models. ALWAYS force default values to empty primitives (`""` instead of `None`, `[]` instead of `None`) unless `null` is a semantically meaningful value the frontend must distinguish from empty. Nullable fields MUST be documented with an explicit reason.
 
 ## 5. Coding Standards & Logging
 

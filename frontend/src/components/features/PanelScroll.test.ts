@@ -3,12 +3,11 @@ import SnapshotDetail from "./SnapshotDetail.svelte";
 import GameDetail from "./GameDetail.svelte";
 import SyncDetail from "./SyncDetail.svelte";
 import * as generatedApi from "../../generated-api";
-import * as legacyApi from "../../api";
 import { mockApiSuccess } from "../../tests/mockHelpers";
 
 const apiSnapshotSpy = vi.spyOn(generatedApi, "apiSnapshot");
 const apiChainSpy = vi.spyOn(generatedApi, "apiChain");
-const fetchGameSpy = vi.spyOn(legacyApi, "fetchGame");
+const apiGameSpy = vi.spyOn(generatedApi, "apiGame");
 
 const snapshotDetailResponse = {
   id: 1,
@@ -66,15 +65,17 @@ beforeEach(() => {
       ],
     }),
   );
-  fetchGameSpy.mockResolvedValue({
-    id: 1,
-    created_at: "2024-01-01",
-    intentos: 1,
-    input_snapshot_id: 1,
-    output_snapshot_id: 2,
-    mesas: [],
-    waiting_list: [],
-  });
+  apiGameSpy.mockResolvedValue(
+    mockApiSuccess({
+      id: 1,
+      created_at: "2024-01-01",
+      intentos: 1,
+      input_snapshot_id: 1,
+      output_snapshot_id: 2,
+      mesas: [],
+      waiting_list: [],
+    }),
+  );
 });
 
 describe("Panel Scroll Pattern", () => {
