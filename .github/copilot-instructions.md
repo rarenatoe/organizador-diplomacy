@@ -25,6 +25,7 @@
 - **History Lookup:** MUST use strict 4-tier traversal: `TimelineEdge` -> `SnapshotPlayer` -> `SnapshotHistory JSON` -> `NotionCache`. NEVER skip tiers.
 - **Manual Save (Dumb Save):** Frontend is absolute source of truth for manual edits. Backend strictly overwrites existing state. NEVER merge historical weights or apply smart corrections on manual saves.
 - **Draft Pipeline:** Calculate Tickets -> Distribute to Tables -> Assign Countries -> Deduplicate Waitlist. NEVER skip phases or execute out of order.
+- **Graceful Degradation on Incomplete Data:** Algorithms resolving user identity or matching entries must account for incomplete data representation across systems (e.g., Notion vs Local DB). A partial representation (like an abbreviated middle/last name) that strongly matches a subset of a fully fleshed-out entry must be scored favorably, rather than heavily penalized for strict word-length mismatches.
 
 ## 5. Domain-Driven Design (DDD) & DTO Separation
 
@@ -67,6 +68,7 @@
 ## 5. Coding Standards & Logging
 
 - **Logging:** ALWAYS use `from backend.core.logger import logger` with appropriate levels. Use `exc_info=True` for exceptions. NEVER use `print()` or `pprint()`.
+- **Real-World String Normalization:** Human-entered strings (like names) are messy. ALWAYS normalize strings used in comparisons or fuzzy matching algorithms. This MUST include: converting to lowercase, stripping surrounding whitespace, collapsing internal multiple spaces, and aggressively removing accents/diacritics (e.g., using `unicodedata.normalize("NFKD", ...).encode("ascii", "ignore")`). NEVER rely on raw strict equality or basic `.lower()` for human names.
 
 ## 1. Svelte 5 Reactivity & State
 
@@ -117,6 +119,7 @@
 - **Backend Mocking:** Use `unittest.mock` for external dependencies (e.g., Notion API). Use `:memory:` SQLite. NEVER hit real external APIs.
 - **Frontend Querying:** Use semantic queries (`getByRole`, `getByPlaceholderText`). NEVER test implementation details or use fragile DOM traversal.
 - **Backend Model Assertions:** When asserting structured API/view outputs in Python tests, ALWAYS use object attribute dot-notation (`response.mesas`, `result.players`). NEVER use dictionary key access (`response["mesas"]`, `result["players"]`). This enforces that response types are proper Pydantic models, not raw dicts.
+- **Heuristic & Algorithm Testing:** When testing fuzzy matching, comparisons, or scoring algorithms, ALWAYS explicitly test realistic human edge cases. You MUST include test fixtures for: length disparities (e.g., "Eduardo G." vs "Eduardo González-Prada Arriarán"), typographical variants and accents, and prefixes/abbreviations. NEVER just test the "happy path" or identical strings.
 
 ## 2. Svelte & DOM Testing Rules
 

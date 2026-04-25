@@ -10,6 +10,7 @@ priority: 40
 - **Backend Mocking:** Use `unittest.mock` for external dependencies (e.g., Notion API). Use `:memory:` SQLite. NEVER hit real external APIs.
 - **Frontend Querying:** Use semantic queries (`getByRole`, `getByPlaceholderText`). NEVER test implementation details or use fragile DOM traversal.
 - **Backend Model Assertions:** When asserting structured API/view outputs in Python tests, ALWAYS use object attribute dot-notation (`response.mesas`, `result.players`). NEVER use dictionary key access (`response["mesas"]`, `result["players"]`). This enforces that response types are proper Pydantic models, not raw dicts.
+- **Heuristic & Algorithm Testing:** When testing fuzzy matching, comparisons, or scoring algorithms, ALWAYS explicitly test realistic human edge cases. You MUST include test fixtures for: length disparities (e.g., "Eduardo G." vs "Eduardo González-Prada Arriarán"), typographical variants and accents, and prefixes/abbreviations. NEVER just test the "happy path" or identical strings.
 
 ## 2. Svelte & DOM Testing Rules
 

@@ -29,6 +29,7 @@ priority: 10
 - **History Lookup:** MUST use strict 4-tier traversal: `TimelineEdge` -> `SnapshotPlayer` -> `SnapshotHistory JSON` -> `NotionCache`. NEVER skip tiers.
 - **Manual Save (Dumb Save):** Frontend is absolute source of truth for manual edits. Backend strictly overwrites existing state. NEVER merge historical weights or apply smart corrections on manual saves.
 - **Draft Pipeline:** Calculate Tickets -> Distribute to Tables -> Assign Countries -> Deduplicate Waitlist. NEVER skip phases or execute out of order.
+- **Graceful Degradation on Incomplete Data:** Algorithms resolving user identity or matching entries must account for incomplete data representation across systems (e.g., Notion vs Local DB). A partial representation (like an abbreviated middle/last name) that strongly matches a subset of a fully fleshed-out entry must be scored favorably, rather than heavily penalized for strict word-length mismatches.
 
 ## 5. Domain-Driven Design (DDD) & DTO Separation
 

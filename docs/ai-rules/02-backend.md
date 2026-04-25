@@ -37,3 +37,4 @@ priority: 20
 ## 5. Coding Standards & Logging
 
 - **Logging:** ALWAYS use `from backend.core.logger import logger` with appropriate levels. Use `exc_info=True` for exceptions. NEVER use `print()` or `pprint()`.
+- **Real-World String Normalization:** Human-entered strings (like names) are messy. ALWAYS normalize strings used in comparisons or fuzzy matching algorithms. This MUST include: converting to lowercase, stripping surrounding whitespace, collapsing internal multiple spaces, and aggressively removing accents/diacritics (e.g., using `unicodedata.normalize("NFKD", ...).encode("ascii", "ignore")`). NEVER rely on raw strict equality or basic `.lower()` for human names.

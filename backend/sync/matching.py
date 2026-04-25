@@ -1,4 +1,5 @@
 import difflib
+import unicodedata
 from collections.abc import Mapping, Sequence
 from typing import NotRequired, TypedDict
 
@@ -20,7 +21,8 @@ class PlayerSimilarityDict(TypedDict):
 
 
 def normalize_name(name: str) -> str:
-    """Normalize a name for comparison: lowercase, strip, collapse whitespace."""
+    """Normalize a name for comparison: remove accents, lowercase, strip, collapse whitespace."""
+    name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("utf-8")
     return " ".join(name.lower().split())
 
 
@@ -79,10 +81,20 @@ def similarity(a: str, b: str) -> float:
             used_long_indices.add(best_idx)
 
     score = matched_count / len(long_words)
-    if matched_count == len(short_words) and len(long_words) - len(short_words) == 1:
-        return max(0.8, score)
+    best_score = score
 
-    return score
+    if matched_count == len(short_words) and len(long_words) - len(short_words) == 1:
+        best_score = max(best_score, 0.8)
+
+    # Boost if the shorter name is highly matched but the longer name has extra words/abbreviations
+    # E.g., "Eduardo G." (matched_count ~ 1.8) vs "Eduardo Gonzalez-Prada Arriaran" (3 words)
+    if len(short_words) >= 2 and matched_count >= len(short_words) - 0.25:
+        # Boost the score, but penalize slightly for missing long words
+        subset_score = matched_count / len(short_words)
+        boosted = subset_score * 0.85
+        best_score = max(best_score, boosted)
+
+    return best_score
 
 
 def detect_similar_names(

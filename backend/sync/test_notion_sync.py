@@ -42,6 +42,12 @@ class TestNormalizeName:
     def test_single_word(self):
         assert normalize_name("John") == "john"
 
+    def test_removes_accents(self):
+        assert (
+            normalize_name("Eduardo González-Prada Arriarán") == "eduardo gonzalez-prada arriaran"
+        )
+        assert normalize_name("Áéíóú Üñ") == "aeiou un"
+
 
 # ── Similarity calculation ────────────────────────────────────────────────────
 
@@ -65,9 +71,16 @@ class TestSimilarity:
 
     def test_jean_carlos_similarity(self):
         # "Jean Carlos" (2 words) vs "Jean Carlos R." (3 words)
-        # Exact match for 2 words, difference is 1 word -> Boosted to 0.8
+        # Exact match for 2 words, triggers subset boost -> 0.85
         sim = similarity("Jean Carlos", "Jean Carlos R.")
-        assert sim == 0.8
+        assert sim == 0.85
+
+    def test_jean_carlo_typo_and_abbreviation(self):
+        # "Jean Carlo" (2 words) vs "Jean Carlos R." (3 words)
+        # Typo in second word ("Carlo" vs "Carlos" ratio is ~0.9) plus a length difference.
+        # Should heavily trigger the subset boost since 2 words are matched at > 0.9.
+        sim = similarity("Jean Carlo", "Jean Carlos R.")
+        assert sim >= 0.76
 
     def test_word_count_difference_prefix_match(self):
         # "Jean" vs "Jean Carlos R." -> difference is 2 words, no boost
@@ -100,6 +113,13 @@ class TestSimilarity:
         sim = similarity("T. Lopez", "Tomas L")
         assert sim == 0.8
 
+    def test_abbreviated_subset_match_with_long_name(self):
+        # "Eduardo G." vs "Eduardo Gonzalez-Prada Arriaran"
+        # Difference is 2 words, but shorter name is highly matched.
+        # Triggers the length-aware subset boost.
+        sim = similarity("Eduardo G.", "Eduardo Gonzalez-Prada Arriaran")
+        assert sim >= 0.75
+
     def test_lori_sanchez_vs_lori_sal(self):
         # "Lori Sanchez" vs "Lori Sal." - "sal" is NOT prefix of "sanchez" (san vs sal)
         # Score = (1.0 + ratio("sanchez", "sal")) / 2
@@ -125,18 +145,12 @@ class TestSimilarity:
         # "Renato Alegre" vs "Renato J. Alegre"
         # 2 matches out of 3 total words. "J." doesn't match anything.
         # Score = (1.0 + 1.0 + 0.0) / 3 = 0.66
-        # Wait, if "J." is a prefix of nothing, it's 0.
-        # matched_count = 2.0. len(long_words) = 3.
-        # 2/3 = 0.66. But if we consider J. as a typo?
-        # Actually, "Renato" matches "Renato", "Alegre" matches "Alegre".
         # matched_count = 2.0.
         # len(long_words) = 3.
         # score = 2.0 / 3.0 = 0.66.
-        # This shouldn't be high enough by itself, but if we boost?
-        # Difference is 1 word, and all words of short_words match perfectly.
-        # Boost to 0.8!
+        # Triggers subset boost: 2/2 = 1.0 * 0.85 = 0.85
         sim = similarity("Renato Alegre", "Renato J. Alegre")
-        assert sim == 0.8
+        assert sim == 0.85
 
     def test_typo_in_long_name(self):
         # "Renato Alegre" vs "Renato Alegrre"
