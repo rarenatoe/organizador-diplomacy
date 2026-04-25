@@ -1,30 +1,33 @@
 <script lang="ts">
-  import type { EditPlayerRow, OrganizarValidation } from "../../types";
-  import type { MergePair } from "../../syncResolution";
-  import { setActiveNodeId } from "../../stores.svelte";
-  import { validateOrganizar, applySyncMerges } from "../../syncUtils";
-  import OrganizarConfirmModal from "../modals/OrganizarConfirmModal.svelte";
-  import Button from "../ui/Button.svelte";
-  import PanelLayout from "../layout/PanelLayout.svelte";
-  import Badge from "../ui/Badge.svelte";
-  import DataTable, { type ColumnDef } from "../layout/DataTable.svelte";
-  import SectionTitle from "../ui/SectionTitle.svelte";
-  import PlayerName from "../ui/PlayerName.svelte";
-  import SnapshotHistory from "./SnapshotHistory.svelte";
-  import { logger } from "../../utils/logger";
-  import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
   import {
+    apiNotionFetch,
     apiPlayerRename,
-    type PlayerData,
     apiSnapshot,
     apiSnapshotSave,
-    type SimilarName,
-    type SnapshotSaveEventType,
-    type SnapshotDetailResponse,
-    apiNotionFetch,
     type NotionPlayerData,
+    type PlayerData,
+    type SimilarName,
+    type SnapshotDetailResponse,
+    type SnapshotSaveEventType,
   } from "../../generated-api";
+  import { setActiveNodeId } from "../../stores.svelte";
+  import type { MergePair } from "../../syncResolution";
+  import { applySyncMerges, validateOrganizar } from "../../syncUtils";
+  import type { EditPlayerRow, OrganizarValidation } from "../../types";
   import { parseApiError } from "../../utils";
+  import { logger } from "../../utils/logger";
+  import DataTable, { type ColumnDef } from "../layout/DataTable.svelte";
+  import PanelLayout from "../layout/PanelLayout.svelte";
+  import PanelSection from "../layout/PanelSection.svelte";
+  import OrganizarConfirmModal from "../modals/OrganizarConfirmModal.svelte";
+  import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
+  import Badge from "../ui/Badge.svelte";
+  import Button from "../ui/Button.svelte";
+  import MetaGrid from "../ui/MetaGrid.svelte";
+  import MetaItem from "../ui/MetaItem.svelte";
+  import PlayerName from "../ui/PlayerName.svelte";
+  import SectionTitle from "../ui/SectionTitle.svelte";
+  import SnapshotHistory from "./SnapshotHistory.svelte";
 
   interface Props {
     id: number;
@@ -306,31 +309,29 @@
   {@const rows = snapshotDetail.players ?? []}
   <PanelLayout scrollable={false}>
     {#snippet header()}
-      <div class="section snapshot-header">
-        <div class="header-row">
-          <div>
-            <SectionTitle
-              title={`Snapshot #${id} · ${sourceLabel(snapshotDetail?.source)}`}
-              class="header-title"
-            />
-            <div class="meta-data">
-              {snapshotDetail?.created_at}
-            </div>
-          </div>
-          <Button
-            size="sm"
-            variant={ui.csvCopied ? "success" : "secondary"}
-            icon={ui.csvCopied ? "✅" : "📋"}
-            onclick={copyCsv}
-            style="min-width: calc(var(--space-8) * 15);"
-            >{ui.csvCopied ? "Copiado" : "Copiar CSV"}</Button
-          >
-        </div>
-      </div>
+      <PanelSection>
+        <SectionTitle title={`Snapshot #${id}`} />
+        <MetaGrid>
+          <MetaItem label="Generado" value={snapshotDetail?.created_at} />
+          <MetaItem
+            label="Origen"
+            value={sourceLabel(snapshotDetail?.source)}
+          />
+        </MetaGrid>
+      </PanelSection>
+      <PanelSection>
+        <Button
+          size="sm"
+          variant={ui.csvCopied ? "success" : "secondary"}
+          icon={ui.csvCopied ? "✅" : "📋"}
+          fill={true}
+          onclick={copyCsv}>{ui.csvCopied ? "Copiado" : "Copiar CSV"}</Button
+        >
+      </PanelSection>
       <SectionTitle
         title="Jugadores"
         count={rows.length}
-        class="compact-title"
+        class="table-heading"
       />
     {/snippet}
 
@@ -416,26 +417,7 @@
 />
 
 <style>
-  .snapshot-header {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-16);
-  }
-
-  .header-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--space-4);
-  }
-
-  .meta-data {
-    color: var(--text-muted);
-    font-size: 11px;
-    font-weight: 400;
-  }
-
-  .header-row :global(.section-title) {
-    margin-bottom: 0;
+  :global(.table-heading) {
+    margin-bottom: var(--space-8);
   }
 </style>

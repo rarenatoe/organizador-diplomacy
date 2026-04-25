@@ -1,20 +1,31 @@
 // eslint.config.ts — flat config for ESLint 10 + typescript-eslint v8
-import { defineConfig } from "eslint/config";
-import tseslint from "typescript-eslint";
 import svelte from "eslint-plugin-svelte";
+import { defineConfig } from "eslint/config";
+import globals from "globals";
+import tseslint from "typescript-eslint";
+
 import vitest from "@vitest/eslint-plugin";
 
 export default defineConfig([
+  {
+    files: ["**/*"],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+    },
+  },
   {
     ignores: ["frontend/src/generated-api/**"],
   },
   // TypeScript files configuration
   ...tseslint.configs.strictTypeChecked.map((config) => ({
     ...config,
-    files: ["frontend/src/**/*.ts"],
+    files: ["frontend/src/**/*.ts", "frontend/test-setup.ts"],
   })),
   {
-    files: ["frontend/src/**/*.ts"],
+    files: ["frontend/src/**/*.ts", "frontend/test-setup.ts"],
     plugins: {
       "@typescript-eslint": tseslint.plugin,
     },

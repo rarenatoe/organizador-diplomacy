@@ -1,5 +1,7 @@
-import { render, fireEvent } from "@testing-library/svelte";
-import { describe, it, expect, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import { fireEvent, render } from "@testing-library/svelte";
+
 import Node from "./Node.svelte";
 
 describe("Node", () => {

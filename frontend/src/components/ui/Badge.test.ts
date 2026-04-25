@@ -1,5 +1,7 @@
+import { describe, expect, it } from "vitest";
+
 import { render, screen } from "@testing-library/svelte";
-import { describe, it, expect } from "vitest";
+
 import Badge from "./Badge.svelte";
 
 describe("Badge.svelte", () => {

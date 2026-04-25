@@ -1,9 +1,10 @@
 import { render, screen } from "@testing-library/svelte";
-import SnapshotDetail from "./SnapshotDetail.svelte";
-import GameDetail from "./GameDetail.svelte";
-import SyncDetail from "./SyncDetail.svelte";
+
 import * as generatedApi from "../../generated-api";
 import { mockApiSuccess } from "../../tests/mockHelpers";
+import GameDetail from "./GameDetail.svelte";
+import SnapshotDetail from "./SnapshotDetail.svelte";
+import SyncDetail from "./SyncDetail.svelte";
 
 const apiSnapshotSpy = vi.spyOn(generatedApi, "apiSnapshot");
 const apiChainSpy = vi.spyOn(generatedApi, "apiChain");
@@ -178,7 +179,7 @@ describe("Panel Scroll Pattern", () => {
       expect(panelScroll).toBeTruthy();
 
       // Verify all sections are inside panel-scroll
-      const sections = panelScroll?.querySelectorAll(".section");
+      const sections = panelScroll?.querySelectorAll(".panel-section");
       expect(sections?.length).toBeGreaterThanOrEqual(1);
     });
 

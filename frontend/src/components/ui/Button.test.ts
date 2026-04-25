@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { fireEvent, render, screen } from "@testing-library/svelte";
+
 import ButtonTestWrapper, {
-  resetClickCount,
   getClickCount,
+  resetClickCount,
 } from "./ButtonTestWrapper.test.svelte";
 
 describe("Button.svelte", () => {

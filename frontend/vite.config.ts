@@ -1,7 +1,8 @@
-import { defineConfig } from "vite";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { resolve } from "path";
 import dotenv from "dotenv";
+import { defineConfig } from "vite";
+
+import { svelte } from "@sveltejs/vite-plugin-svelte";
 
 // Manually load the root .env file into Node's process.env
 dotenv.config({ path: resolve(__dirname, "../.env") });

@@ -2,10 +2,10 @@
   lang="ts"
   generics="T extends { nombre: string; notion_id?: string | null; notion_name?: string | null }"
 >
-  import { normalizeName } from "../../utils";
-  import Tooltip from "./Tooltip.svelte";
-  import PlayerAutocompleteInput from "../features/PlayerAutocompleteInput.svelte";
   import type { PlayerAutocompleteItem } from "../../generated-api";
+  import { normalizeName } from "../../utils";
+  import PlayerAutocompleteInput from "../features/PlayerAutocompleteInput.svelte";
+  import Tooltip from "./Tooltip.svelte";
 
   interface Props {
     player: T;

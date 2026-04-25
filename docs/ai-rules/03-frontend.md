@@ -29,6 +29,10 @@ priority: 30
 - **Svelte CSS Pruning:** Wrap dynamic target selectors in `:global()` (e.g., `.btn-icon :global(svg)`).
 - **Sticky Stacking Contexts:** Elements inside `position: sticky` are trapped in its stacking context. To make an absolute child (like a dropdown) overlap, you MUST elevate the parent cell's z-index on focus/hover.
 - **Intrinsic Sizing:** Leaf components MUST NOT define their own external margins. Parent layouts must govern spacing exclusively using `display: flex; gap: ...`.
+- **Structural Abstractions over CSS Classes:** Do not copy-paste standard layout CSS (like `.section` or `.meta-grid`) across files. Instead, use or create Svelte structural wrapper components (e.g., `<PanelSection>`, `<MetaGrid>`).
+- **Strict Intrinsic Sizing:** Leaf components and structural wrappers MUST NOT define external margins (`margin-top`, `margin-bottom`). The parent container must dictate spacing using `display: flex` and `gap`.
+- **Zero Inline Styles:** Avoid using inline `style="..."` attributes for structural adjustments. Pass a `class` prop and use Svelte's `:global(.your-class)` modifier in the parent's `<style>` block.
+- **Organized Imports:** All imports MUST be automatically sorted. NEVER manually order imports; rely on `@ianvs/prettier-plugin-sort-imports` via the format-on-save pipeline.
 
 ## 4. UI Architecture & UX
 

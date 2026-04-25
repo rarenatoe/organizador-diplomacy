@@ -1,9 +1,11 @@
 // frontend/src/components/features/Waitlist.test.ts
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
-import Waitlist from "./Waitlist.svelte";
+import { describe, expect, it } from "vitest";
+
+import { render, screen } from "@testing-library/svelte";
+
 import { createMockDraftPlayer } from "../../tests/fixtures";
+import Waitlist from "./Waitlist.svelte";
 
 describe("Waitlist.svelte", () => {
   const mockPlayers = [

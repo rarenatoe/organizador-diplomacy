@@ -1,11 +1,12 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+
 import type { ChainResponse } from "./generated-api";
 import {
-  setSnapshotCount,
-  setChainData,
+  getActiveNodeId,
   getChainData,
   setActiveNodeId,
-  getActiveNodeId,
+  setChainData,
+  setSnapshotCount,
 } from "./stores.svelte";
 
 describe("stores.svelte", () => {

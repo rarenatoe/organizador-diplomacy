@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/svelte";
 import { tick } from "svelte";
+
+import { fireEvent, render, screen } from "@testing-library/svelte";
+
 import Tooltip from "./Tooltip.svelte";
 
 describe("Tooltip.svelte", () => {

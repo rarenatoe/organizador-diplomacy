@@ -1,3 +1,5 @@
+import type { Mock } from "vitest";
+
 /**
  * Wraps a successful payload in the Hey-API client response format.
  * Preserves full type safety for the `data` generic!
@@ -23,8 +25,6 @@ export function mockApiError<TError>(error: TError, status = 400) {
     response: new Response(null, { status, statusText: "Error" }),
   };
 }
-
-import type { Mock } from "vitest";
 
 export function mockSdkSuccess(mockFn: Mock, data: unknown) {
   mockFn.mockResolvedValue({

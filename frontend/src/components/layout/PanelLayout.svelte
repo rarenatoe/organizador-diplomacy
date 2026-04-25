@@ -42,6 +42,9 @@
   .panel-body-fixed {
     padding: var(--space-16) var(--space-16) 0 var(--space-16);
     flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-24);
   }
 
   .panel-scroll {
@@ -49,6 +52,9 @@
     overflow-y: auto;
     min-height: 0;
     padding: var(--space-16);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-24);
   }
 
   .panel-footer {

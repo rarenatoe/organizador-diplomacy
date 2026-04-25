@@ -1,7 +1,7 @@
-import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/svelte";
-import PlayerNameTestWrapper from "./PlayerNameTestWrapper.svelte";
+
 import type { GameDraftPlayer } from "../../generated-api";
+import PlayerNameTestWrapper from "./PlayerNameTestWrapper.svelte";
 
 describe("PlayerName.svelte", () => {
   type PlayerNameTestPlayer = GameDraftPlayer & {

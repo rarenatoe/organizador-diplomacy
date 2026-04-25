@@ -1,5 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 import { render } from "@testing-library/svelte";
+
 import Toaster from "./Toaster.svelte";
 
 interface ToasterComponent {

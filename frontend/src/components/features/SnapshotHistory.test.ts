@@ -1,7 +1,9 @@
-import { render, screen, fireEvent } from "@testing-library/svelte";
-import { describe, it, expect } from "vitest";
-import SnapshotHistory from "./SnapshotHistory.svelte";
+import { describe, expect, it } from "vitest";
+
+import { fireEvent, render, screen } from "@testing-library/svelte";
+
 import type { HistoryEntry } from "../../generated-api";
+import SnapshotHistory from "./SnapshotHistory.svelte";
 
 describe("SnapshotHistory.svelte", () => {
   const mockHistory: HistoryEntry[] = [

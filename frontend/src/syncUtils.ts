@@ -1,9 +1,9 @@
 // ── Sync Utilities ────────────────────────────────────────────────────
 // Name similarity detection logic ported from backend/sync/notion_sync.py
 
+import type { NotionPlayerData } from "./generated-api";
 import { MergePair } from "./syncResolution";
 import type { OrganizarValidation } from "./types";
-import type { NotionPlayerData } from "./generated-api";
 import { normalizeName } from "./utils";
 
 type OrganizarPlayer = {

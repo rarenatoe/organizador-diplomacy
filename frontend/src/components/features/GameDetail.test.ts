@@ -1,11 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
-import GameDetail from "./GameDetail.svelte";
 import { tick } from "svelte";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+
 import * as generatedApi from "../../generated-api";
-import { mockApiSuccess } from "../../tests/mockHelpers";
-import { createMockDraftPlayer } from "../../tests/fixtures";
 import type { GameDetailResponse } from "../../generated-api";
+import { createMockDraftPlayer } from "../../tests/fixtures";
+import { mockApiSuccess } from "../../tests/mockHelpers";
+import GameDetail from "./GameDetail.svelte";
 
 const apiGameSpy = vi.spyOn(generatedApi, "apiGame");
 
@@ -79,7 +81,7 @@ describe("GameDetail", () => {
     });
 
     // Assert structural hierarchy - major content blocks should be wrapped in .section divs
-    expect(container.querySelector(".section")).toBeInTheDocument();
+    expect(container.querySelector(".panel-section")).toBeInTheDocument();
 
     // Verify game info is displayed
     expect(screen.getByText(/Resumen/)).toBeTruthy();

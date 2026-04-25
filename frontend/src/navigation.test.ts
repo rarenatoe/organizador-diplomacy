@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
 import { nav, type PanelContext } from "./navigation.svelte";
 import * as stores from "./stores.svelte";
 
@@ -13,7 +12,11 @@ describe("NavigationManager", () => {
     vi.clearAllMocks();
   });
 
-  const mockSnapshotPanel: PanelContext = { title: "Snap 1", type: "snapshot", id: 1 };
+  const mockSnapshotPanel: PanelContext = {
+    title: "Snap 1",
+    type: "snapshot",
+    id: 1,
+  };
   const mockGamePanel: PanelContext = { title: "Game 2", type: "game", id: 2 };
 
   it("should initialize empty", () => {
@@ -23,7 +26,7 @@ describe("NavigationManager", () => {
 
   it("push() should add to the stack and set active node", () => {
     nav.push(mockSnapshotPanel);
-    
+
     expect(nav.isOpen).toBe(true);
     expect(nav.current).toEqual(mockSnapshotPanel);
     expect(stores.setActiveNodeId).toHaveBeenCalledWith(1);
@@ -32,11 +35,11 @@ describe("NavigationManager", () => {
   it("pop() should return to the previous panel and restore active node", () => {
     nav.push(mockSnapshotPanel);
     nav.push(mockGamePanel);
-    
+
     expect(nav.current).toEqual(mockGamePanel);
-    
+
     nav.pop();
-    
+
     expect(nav.current).toEqual(mockSnapshotPanel);
     expect(stores.setActiveNodeId).toHaveBeenCalledWith(1);
   });
@@ -44,7 +47,7 @@ describe("NavigationManager", () => {
   it("pop() on the last item should close the panel and clear active node", () => {
     nav.push(mockSnapshotPanel);
     nav.pop();
-    
+
     expect(nav.isOpen).toBe(false);
     expect(nav.current).toBeNull();
     expect(stores.setActiveNodeId).toHaveBeenCalledWith(null);
@@ -53,7 +56,7 @@ describe("NavigationManager", () => {
   it("clearAndPush() should wipe the stack and start fresh", () => {
     nav.push(mockSnapshotPanel);
     nav.clearAndPush(mockGamePanel);
-    
+
     expect(nav.stack.length).toBe(1);
     expect(nav.current).toEqual(mockGamePanel);
     expect(stores.setActiveNodeId).toHaveBeenCalledWith(2);

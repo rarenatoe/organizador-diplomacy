@@ -1,9 +1,10 @@
 // ── Sync Utilities Tests ──────────────────────────────────────────────
-import { describe, it, expect } from "vitest";
-import { applySyncMerges } from "./syncUtils";
-import type { EditPlayerRow } from "./types";
+import { describe, expect, it } from "vitest";
+
 import type { NotionPlayerData } from "./generated-api";
 import { MergePair } from "./syncResolution";
+import { applySyncMerges } from "./syncUtils";
+import type { EditPlayerRow } from "./types";
 
 const createNotionPlayer = (
   overrides: Partial<NotionPlayerData> = {},

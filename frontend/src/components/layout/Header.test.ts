@@ -1,5 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, fireEvent, screen } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
+
+import { fireEvent, render, screen } from "@testing-library/svelte";
+
 import Header from "./Header.svelte";
 
 describe("Header", () => {

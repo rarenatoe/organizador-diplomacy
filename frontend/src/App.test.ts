@@ -1,4 +1,3 @@
-import { describe, it, expect, beforeEach } from "vitest";
 import { nav } from "./navigation.svelte";
 import type { EditPlayerRow } from "./types";
 

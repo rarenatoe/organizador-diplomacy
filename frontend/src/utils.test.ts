@@ -1,7 +1,8 @@
 /**
  * Tests for utils.ts
  */
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
+
 import { parsePlayersCsv } from "./utils";
 
 describe("parsePlayersCsv", () => {

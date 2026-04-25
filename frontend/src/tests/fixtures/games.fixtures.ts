@@ -1,8 +1,8 @@
 import type {
-  GameDraftPlayer,
-  GameDraftTableOutput,
-  GameDraftResponseOutput,
   GameDetailResponse,
+  GameDraftPlayer,
+  GameDraftResponseOutput,
+  GameDraftTableOutput,
 } from "../../generated-api";
 
 export const createMockDraftPlayer = (

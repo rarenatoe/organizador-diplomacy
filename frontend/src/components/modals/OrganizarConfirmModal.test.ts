@@ -1,5 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
+
+import { fireEvent, render, screen } from "@testing-library/svelte";
+
 import OrganizarConfirmModal from "./OrganizarConfirmModal.svelte";
 
 describe("OrganizarConfirmModal", () => {

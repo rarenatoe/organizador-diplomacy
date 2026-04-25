@@ -1,8 +1,9 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+
   import type { GameDraftPlayer } from "../../generated-api";
-  import PlayerName from "../ui/PlayerName.svelte";
   import { cx } from "../../utils/css";
+  import PlayerName from "../ui/PlayerName.svelte";
 
   interface Props {
     player: GameDraftPlayer;

@@ -1,12 +1,12 @@
 <script lang="ts">
+  import { apiChain, type SnapshotNode } from "../../generated-api";
   import {
-    setSnapshotCount,
-    setChainData,
     getActiveNodeId,
+    setChainData,
+    setSnapshotCount,
   } from "../../stores.svelte";
   import Button from "../ui/Button.svelte";
   import Node from "../ui/Node.svelte";
-  import { apiChain, type SnapshotNode } from "../../generated-api";
 
   interface Props {
     onOpenSnapshot: (id: number) => void;

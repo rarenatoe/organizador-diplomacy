@@ -1,5 +1,4 @@
-import { describe, it, expect } from "vitest";
-import { translateCountry, getCountryEmoji } from "./i18n";
+import { getCountryEmoji, translateCountry } from "./i18n";
 
 describe("translateCountry", () => {
   it("should translate English country names to Spanish", () => {

@@ -1,8 +1,37 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
-  import type { EditPlayerRow } from "../../types";
+
+  import { clickOutside } from "../../clickOutside";
+  import {
+    apiNotionFetch,
+    apiPlayerCheckSimilarity,
+    apiPlayerGetAll,
+    apiPlayerLookup,
+    apiSnapshotSave,
+    type NotionPlayerData,
+    type PlayerAutocompleteItem,
+    type PlayerHistoryItem,
+    type PlayerSimilarityItem,
+    type SnapshotSaveEventType,
+  } from "../../generated-api";
+  import { buildPlayerRow } from "../../snapshotUtils";
+  import { setActiveNodeId } from "../../stores.svelte";
   import type { MergePair } from "../../syncResolution";
+  import { applySyncMerges } from "../../syncUtils";
+  import type { EditPlayerRow } from "../../types";
+  import { normalizeName, parseApiError, parsePlayersCsv } from "../../utils";
+  import DataTable, { type ColumnDef } from "../layout/DataTable.svelte";
+  import PanelLayout from "../layout/PanelLayout.svelte";
+  import PanelSection from "../layout/PanelSection.svelte";
+  import CsvImportModal from "../modals/CsvImportModal.svelte";
+  import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
+  import Badge from "../ui/Badge.svelte";
+  import Button from "../ui/Button.svelte";
+  import PlayerName from "../ui/PlayerName.svelte";
+  import SectionTitle from "../ui/SectionTitle.svelte";
+  import Tooltip from "../ui/Tooltip.svelte";
+  import PlayerAutocompleteInput from "./PlayerAutocompleteInput.svelte";
 
   type CsvPlayerRow = {
     nombre: string;
@@ -15,34 +44,6 @@
     notion_name?: string | null;
     notion_alias?: string[] | null;
   };
-
-  import { buildPlayerRow } from "../../snapshotUtils";
-  import PlayerName from "../ui/PlayerName.svelte";
-  import { parseApiError, parsePlayersCsv, normalizeName } from "../../utils";
-  import { setActiveNodeId } from "../../stores.svelte";
-  import { applySyncMerges } from "../../syncUtils";
-  import { clickOutside } from "../../clickOutside";
-  import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
-  import CsvImportModal from "../modals/CsvImportModal.svelte";
-  import Button from "../ui/Button.svelte";
-  import PanelLayout from "../layout/PanelLayout.svelte";
-  import Badge from "../ui/Badge.svelte";
-  import Tooltip from "../ui/Tooltip.svelte";
-  import DataTable, { type ColumnDef } from "../layout/DataTable.svelte";
-  import SectionTitle from "../ui/SectionTitle.svelte";
-  import PlayerAutocompleteInput from "./PlayerAutocompleteInput.svelte";
-  import {
-    apiPlayerCheckSimilarity,
-    apiPlayerGetAll,
-    apiPlayerLookup,
-    apiNotionFetch,
-    apiSnapshotSave,
-    type SnapshotSaveEventType,
-    type NotionPlayerData,
-    type PlayerAutocompleteItem,
-    type PlayerHistoryItem,
-    type PlayerSimilarityItem,
-  } from "../../generated-api";
 
   const DEFAULT_PLAYER_HISTORY: PlayerHistoryItem = {
     source: "default",
@@ -495,21 +496,26 @@
 
 <PanelLayout scrollable={false}>
   {#snippet header()}
-    <div class="section draft-header">
+    <PanelSection>
       <SectionTitle title={headerTitle} />
-      <div class="node-meta">
-        {headerSubtitle}
-      </div>
+      <p class="node-meta-desc">{headerSubtitle}</p>
+    </PanelSection>
+    <PanelSection>
       <div class="action-row">
-        <Button variant="secondary" onclick={handleAddPlayer}>
+        <Button variant="secondary" fill={true} onclick={handleAddPlayer}>
           ➕ Agregar jugador
         </Button>
         {#if parentId === null}
-          <Button variant="secondary" onclick={() => (showCsvModal = true)}>
+          <Button
+            variant="secondary"
+            fill={true}
+            onclick={() => (showCsvModal = true)}
+          >
             📥 Pegar CSV
           </Button>
           <Button
             variant="secondary"
+            fill={true}
             onclick={handleImportNotion}
             disabled={isImporting}
           >
@@ -517,11 +523,11 @@
           </Button>
         {/if}
       </div>
-    </div>
+    </PanelSection>
     <SectionTitle
       title="Jugadores"
       count={draftPlayers.length}
-      class="compact-title"
+      style="margin-bottom: var(--space-8);"
     />
   {/snippet}
 
@@ -700,12 +706,6 @@
 />
 
 <style>
-  .draft-header {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-16);
-  }
-
   .action-row {
     display: flex;
     gap: var(--space-8);
@@ -726,5 +726,11 @@
 
   :global(.compact-title) {
     margin-bottom: var(--space-8) !important;
+  }
+
+  .node-meta-desc {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin: 0;
   }
 </style>

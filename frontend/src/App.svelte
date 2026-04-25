@@ -1,24 +1,26 @@
 <script lang="ts">
-  import type { EditPlayerRow } from "./types";
+  import ChainViewer from "./components/features/ChainViewer.svelte";
+  import GameDetail from "./components/features/GameDetail.svelte";
+  import GameDraft from "./components/features/GameDraft.svelte";
+  import SnapshotDetail from "./components/features/SnapshotDetail.svelte";
+  import SnapshotDraft from "./components/features/SnapshotDraft.svelte";
+  import SyncDetail from "./components/features/SyncDetail.svelte";
+  import Toaster from "./components/features/Toaster.svelte";
+  import Header from "./components/layout/Header.svelte";
+  import SidePanel from "./components/layout/SidePanel.svelte";
+  import TerminalModal, {
+    type TerminalState,
+  } from "./components/modals/TerminalModal.svelte";
   import {
     apiGameDelete,
     apiSyncStatus,
     type GameDraftResponseOutput,
   } from "./generated-api";
   import { nav, type PanelContext } from "./navigation.svelte";
-  import Header from "./components/layout/Header.svelte";
-  import ChainViewer from "./components/features/ChainViewer.svelte";
-  import SidePanel from "./components/layout/SidePanel.svelte";
-  import SnapshotDetail from "./components/features/SnapshotDetail.svelte";
-  import SnapshotDraft from "./components/features/SnapshotDraft.svelte";
-  import GameDraft from "./components/features/GameDraft.svelte";
-  import GameDetail from "./components/features/GameDetail.svelte";
-  import SyncDetail from "./components/features/SyncDetail.svelte";
-  import Toaster from "./components/features/Toaster.svelte";
-  import TerminalModal, {
-    type TerminalState,
-  } from "./components/modals/TerminalModal.svelte";
+  import type { EditPlayerRow } from "./types";
+
   import "../static/style.css";
+
   import { apiSnapshot, type SnapshotSaveEventType } from "./generated-api";
 
   let isAppReady = $state(false);

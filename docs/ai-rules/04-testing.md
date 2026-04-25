@@ -18,6 +18,9 @@ priority: 40
 - **Structural Regression Guards:** Explicitly test HTML hierarchy. When a layout is centralized into a shared container component (e.g., `Waitlist.svelte`), parent components MUST explicitly assert the presence of that specific abstraction's CSS class in their DOM (e.g., `expect(container.querySelector(".waitlist-container")).toBeInTheDocument()`). This guarantees future refactors do not accidentally decouple layouts back into raw `{#each}` loops.
 - **DRY Renders & Fixtures:** Extensively mock data MUST live in `*.fixtures.ts`. EVERY test file MUST implement a centralized `renderComponent(overrides = {})` factory.
 - **Snippet Testing:** Use `createRawSnippet` from `svelte` for snippet components. NEVER test without proper Svelte 5 snippet creation.
+- **Snippet API Integrity:** NEVER weaken a component's API for testing convenience (e.g., changing `children: Snippet` to `children?: Snippet`) just to prevent Svelte 5 runtime `{@render}` errors.
+- **Test Wrappers for Snippets:** To test layout or wrapper components that require Snippets, you MUST create a dedicated `.test.svelte` wrapper file (e.g., `MetaGridTestWrapper.test.svelte`). Render the wrapper in your test so the Snippet is populated with actual DOM nodes.
+- **Selector Stability:** When testing structural hierarchy, ensure you are targeting the centralized layout classes (e.g., `.panel-section`) rather than legacy/generic utility classes.
 
 ## 3. Auto-Generated SDK Testing Patterns (CRITICAL)
 

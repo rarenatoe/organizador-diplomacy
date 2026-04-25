@@ -1,5 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, fireEvent, screen } from "@testing-library/svelte";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { fireEvent, render, screen } from "@testing-library/svelte";
+
 import SidePanel from "./SidePanel.svelte";
 
 describe("SidePanel", () => {

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import PlayerName from "./PlayerName.svelte";
   import type { GameDraftPlayer } from "../../generated-api";
+  import PlayerName from "./PlayerName.svelte";
 
   interface Props {
     player: GameDraftPlayer;

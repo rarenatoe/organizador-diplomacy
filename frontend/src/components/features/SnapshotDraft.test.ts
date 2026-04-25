@@ -1,10 +1,12 @@
-import { render, screen, fireEvent } from "@testing-library/svelte";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import SnapshotDraft from "./SnapshotDraft.svelte";
-import { defaultProps, mockInitialPlayers } from "./SnapshotDraft.fixtures";
+import { tick } from "svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { fireEvent, render, screen } from "@testing-library/svelte";
+
 import * as api from "../../generated-api";
 import { mockApiSuccess } from "../../tests/mockHelpers";
-import { tick } from "svelte";
+import { defaultProps, mockInitialPlayers } from "./SnapshotDraft.fixtures";
+import SnapshotDraft from "./SnapshotDraft.svelte";
 
 const mockGeneratedApi = vi.hoisted(() => ({
   apiPlayerCheckSimilarity: vi.fn(),
@@ -131,7 +133,7 @@ describe("SnapshotDraft", () => {
     });
 
     // Assert structural hierarchy - major content blocks should be wrapped in .section divs
-    expect(container.querySelector(".section")).toBeInTheDocument();
+    expect(container.querySelector(".panel-section")).toBeInTheDocument();
 
     expect(container.textContent).toContain("Nueva Lista");
     expect(container.textContent).toContain("No hay jugadores en el borrador");

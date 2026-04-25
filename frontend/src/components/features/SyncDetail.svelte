@@ -1,6 +1,9 @@
 <script lang="ts">
   import { apiChain, type SnapshotNode } from "../../generated-api";
   import PanelLayout from "../layout/PanelLayout.svelte";
+  import PanelSection from "../layout/PanelSection.svelte";
+  import MetaGrid from "../ui/MetaGrid.svelte";
+  import MetaItem from "../ui/MetaItem.svelte";
 
   interface Props {
     id: number;
@@ -49,17 +52,17 @@
 {:else if info}
   <PanelLayout>
     {#snippet body()}
-      <div class="section">
+      <PanelSection>
         <div class="section-title">Detalles del Sync</div>
-        <div class="meta-grid">
-          <span class="meta-key">Generado</span>
-          <span class="meta-val">{info?.created_at}</span>
-          <span class="meta-key">De snapshot</span>
-          <span class="meta-val">#{info?.from_id}</span>
-          <span class="meta-key">A snapshot</span>
-          <span class="meta-val">#{info?.to_id}</span>
-        </div>
-      </div>
+        <MetaGrid>
+          <MetaItem label="Generado" value={info?.created_at} />
+          <MetaItem label="De snapshot" value={`#${info?.from_id}`} />
+          <MetaItem
+            label="A snapshot"
+            value={info?.to_id ? `#${info?.to_id}` : "Ninguno"}
+          />
+        </MetaGrid>
+      </PanelSection>
     {/snippet}
   </PanelLayout>
 {:else}
@@ -84,28 +87,5 @@
     letter-spacing: 0.6px;
     color: var(--text-muted);
     margin-bottom: 10px;
-  }
-
-  .section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-16);
-    margin-bottom: var(--space-24);
-  }
-
-  .meta-grid {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: var(--space-4) var(--space-16);
-    font-size: 12px;
-  }
-
-  .meta-key {
-    color: var(--text-muted);
-    font-weight: 500;
-  }
-
-  .meta-val {
-    font-weight: 600;
   }
 </style>

@@ -1,9 +1,9 @@
+import type {
+  GameDraftResponseOutput,
+  SnapshotSaveEventType,
+} from "./generated-api";
 import { setActiveNodeId } from "./stores.svelte";
 import type { EditPlayerRow } from "./types";
-import type {
-  SnapshotSaveEventType,
-  GameDraftResponseOutput,
-} from "./generated-api";
 
 export interface PanelContext {
   title: string;

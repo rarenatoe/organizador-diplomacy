@@ -1,6 +1,7 @@
-import { describe, it, expect } from "vitest";
-import { findLatestSnapshotId, findLatestGameId } from "./snapshotUtils";
+import { describe, expect, it } from "vitest";
+
 import type { Branch, ChainEdge, SnapshotNode } from "./generated-api";
+import { findLatestGameId, findLatestSnapshotId } from "./snapshotUtils";
 
 describe("snapshotUtils", () => {
   const createSnapshot = (

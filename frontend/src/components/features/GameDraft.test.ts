@@ -1,16 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/svelte";
-import GameDraft from "./GameDraft.svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { fireEvent, render, screen } from "@testing-library/svelte";
+
 import {
-  createMockDraftResponse,
   createMockDraftMesa,
   createMockDraftPlayer,
+  createMockDraftResponse,
 } from "../../tests/fixtures";
 import {
-  mockSdkSuccess,
-  mockSdkError,
   mockApiSuccess,
+  mockSdkError,
+  mockSdkSuccess,
 } from "../../tests/mockHelpers";
+import GameDraft from "./GameDraft.svelte";
 
 // Mock the API module
 vi.mock("../../generated-api/sdk.gen", () => ({
@@ -106,7 +108,7 @@ describe("GameDraft.svelte", () => {
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     // Assert structural hierarchy - major content blocks should be wrapped in .section divs
-    expect(container.querySelector(".section")).toBeInTheDocument();
+    expect(container.querySelector(".panel-section")).toBeInTheDocument();
 
     expect(screen.getByText("Partida 1")).toBeInTheDocument();
     expect(screen.getByText("Alice")).toBeInTheDocument();

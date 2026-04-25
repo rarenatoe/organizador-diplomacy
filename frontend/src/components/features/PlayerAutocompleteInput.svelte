@@ -2,17 +2,17 @@
   lang="ts"
   generics="T extends { nombre: string; notion_id?: string | null; notion_name?: string | null }"
 >
-  import type { MergePair } from "../../syncResolution";
-  import { createAutocompleteState } from "./playerAutocompleteState.svelte.ts";
   import { clickOutside } from "../../clickOutside";
-  import { normalizeName } from "../../utils";
-  import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
-  import { cx } from "../../utils/css.ts";
-  import type {
-    PlayerAutocompleteItem,
-    PlayerSimilarityItem,
+  import {
+    apiPlayerCheckSimilarity,
+    type PlayerAutocompleteItem,
+    type PlayerSimilarityItem,
   } from "../../generated-api";
-  import { apiPlayerCheckSimilarity } from "../../generated-api";
+  import type { MergePair } from "../../syncResolution";
+  import { normalizeName } from "../../utils";
+  import { cx } from "../../utils/css.ts";
+  import SyncResolutionModal from "../modals/SyncResolutionModal.svelte";
+  import { createAutocompleteState } from "./playerAutocompleteState.svelte.ts";
 
   interface Props {
     value: string;

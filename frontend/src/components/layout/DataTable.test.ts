@@ -1,6 +1,8 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/svelte";
 import { createRawSnippet } from "svelte";
+import { describe, expect, it } from "vitest";
+
+import { render, screen } from "@testing-library/svelte";
+
 import DataTable, { type ColumnDef } from "./DataTable.svelte";
 
 interface TestRow {

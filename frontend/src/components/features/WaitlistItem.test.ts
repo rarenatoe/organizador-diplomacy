@@ -1,8 +1,9 @@
 import { render, screen } from "@testing-library/svelte";
+
 import * as generatedApi from "../../generated-api";
-import { mockApiSuccess } from "../../tests/mockHelpers";
-import { createMockDraftPlayer } from "../../tests/fixtures";
 import type { GameDetailResponse } from "../../generated-api";
+import { createMockDraftPlayer } from "../../tests/fixtures";
+import { mockApiSuccess } from "../../tests/mockHelpers";
 import GameDetail from "./GameDetail.svelte";
 
 const apiGameSpy = vi.spyOn(generatedApi, "apiGame");

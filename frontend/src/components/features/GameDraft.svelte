@@ -1,22 +1,25 @@
 <script lang="ts">
-  import Waitlist from "./Waitlist.svelte";
-  import { apiGameDraft, apiGameSave } from "../../generated-api/sdk.gen";
-  import type {
-    GameDraftResponseOutput,
-    GameDraftPlayer,
+  import {
+    apiChain,
+    type GameDraftPlayer,
+    type GameDraftResponseOutput,
   } from "../../generated-api";
-  import { setActiveNodeId } from "../../stores.svelte";
+  import { apiGameDraft, apiGameSave } from "../../generated-api/sdk.gen";
   import { findLatestGameId } from "../../snapshotUtils";
-  import Button from "../ui/Button.svelte";
-  import PanelLayout from "../layout/PanelLayout.svelte";
-  import SectionTitle from "../ui/SectionTitle.svelte";
-  import Badge from "../ui/Badge.svelte";
-  import Tooltip from "../ui/Tooltip.svelte";
-  import GameTableCard from "./GameTableCard.svelte";
-  import PlayerName from "../ui/PlayerName.svelte";
+  import { setActiveNodeId } from "../../stores.svelte";
   import CardGrid from "../layout/CardGrid.svelte";
   import CardGridItem from "../layout/CardGridItem.svelte";
-  import { apiChain } from "../../generated-api";
+  import PanelLayout from "../layout/PanelLayout.svelte";
+  import PanelSection from "../layout/PanelSection.svelte";
+  import Badge from "../ui/Badge.svelte";
+  import Button from "../ui/Button.svelte";
+  import MetaGrid from "../ui/MetaGrid.svelte";
+  import MetaItem from "../ui/MetaItem.svelte";
+  import PlayerName from "../ui/PlayerName.svelte";
+  import SectionTitle from "../ui/SectionTitle.svelte";
+  import Tooltip from "../ui/Tooltip.svelte";
+  import GameTableCard from "./GameTableCard.svelte";
+  import Waitlist from "./Waitlist.svelte";
 
   interface Props {
     snapshotId: number;
@@ -389,19 +392,19 @@
     {#if loading}
       <p class="loading-text">Generando draft...</p>
     {:else if draftData}
-      <div class="section">
+      <PanelSection>
         <SectionTitle title={`Draft de Partidas - Snapshot #${snapshotId}`} />
-        <div class="meta-grid">
-          <span class="meta-key">Mesas generadas</span>
-          <span class="meta-val">{draftData.mesas.length}</span>
-          <span class="meta-key">Jugadores en espera</span>
-          <span class="meta-val">{draftData.tickets_sobrantes.length}</span>
-          <span class="meta-key">Intentos usados</span>
-          <span class="meta-val">{draftData.intentos_usados}</span>
-        </div>
-      </div>
+        <MetaGrid>
+          <MetaItem label="Mesas generadas" value={draftData.mesas.length} />
+          <MetaItem
+            label="Jugadores en espera"
+            value={draftData.tickets_sobrantes.length}
+          />
+          <MetaItem label="Intentos usados" value={draftData.intentos_usados} />
+        </MetaGrid>
+      </PanelSection>
       {#if draftData.mesas.length > 0}
-        <div class="section">
+        <PanelSection>
           <SectionTitle title="Partidas" count={draftData.mesas.length} />
           <CardGrid>
             {#each draftData.mesas as table, tableIndex (table.numero + "_" + tableIndex)}
@@ -472,10 +475,10 @@
               </CardGridItem>
             {/each}
           </CardGrid>
-        </div>
+        </PanelSection>
       {/if}
       {#if draftData.tickets_sobrantes.length > 0}
-        <div class="section">
+        <PanelSection>
           <SectionTitle title="Lista de espera" class="waiting-title" />
 
           <Waitlist
@@ -495,7 +498,7 @@
               />
             {/snippet}
           </Waitlist>
-        </div>
+        </PanelSection>
       {/if}
     {:else}
       <p class="error-text">No se pudo generar el draft</p>
@@ -523,13 +526,6 @@
 </PanelLayout>
 
 <style>
-  .section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-16);
-    margin-bottom: var(--space-24);
-  }
-
   :global(.waiting-title) {
     margin-top: var(--space-16);
   }
@@ -544,22 +540,6 @@
     color: var(--danger-text);
     font-size: 12px;
     padding: var(--space-4) 0;
-  }
-
-  .meta-grid {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: var(--space-4) var(--space-16);
-    font-size: 12px;
-  }
-
-  .meta-key {
-    color: var(--text-muted);
-    font-weight: 500;
-  }
-
-  .meta-val {
-    font-weight: 600;
   }
 
   .player-list {

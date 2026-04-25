@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+
   import { cx } from "../../utils/css";
 
   interface Props {

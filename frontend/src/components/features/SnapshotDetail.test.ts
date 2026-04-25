@@ -1,12 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
-import SnapshotDetail from "./SnapshotDetail.svelte";
-import {
-  createMockSnapshotDetail,
-  createMockEditPlayerRow,
-} from "../../tests/fixtures";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+
 import * as generatedApi from "../../generated-api";
+import {
+  createMockEditPlayerRow,
+  createMockSnapshotDetail,
+} from "../../tests/fixtures";
 import { mockApiError, mockApiSuccess } from "../../tests/mockHelpers";
+import SnapshotDetail from "./SnapshotDetail.svelte";
 
 const createMockPlayerData = (
   overrides: Partial<generatedApi.PlayerData> = {},
@@ -133,7 +135,7 @@ describe("SnapshotDetail", () => {
     const { container } = await renderSnapshotDetail();
 
     // Assert structural hierarchy - major content blocks should be wrapped in .section divs
-    expect(container.querySelector(".section")).toBeInTheDocument();
+    expect(container.querySelector(".panel-section")).toBeInTheDocument();
 
     expect(screen.getByText("P1")).toBeInTheDocument();
     expect(screen.getByText("P2")).toBeInTheDocument();

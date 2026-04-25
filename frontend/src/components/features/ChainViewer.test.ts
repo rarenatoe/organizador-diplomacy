@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Import ChainViewer and API
-import ChainViewer from "./ChainViewer.svelte";
+import { fireEvent, render, screen } from "@testing-library/svelte";
+
 import * as generatedApi from "../../generated-api";
 import { mockApiSuccess } from "../../tests/mockHelpers";
+// Import ChainViewer and API
+import ChainViewer from "./ChainViewer.svelte";
 
 const apiChainSpy = vi.spyOn(generatedApi, "apiChain");
 

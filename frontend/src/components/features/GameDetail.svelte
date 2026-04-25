@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Waitlist from "./Waitlist.svelte";
   import {
     apiGame,
     type GameDetailResponse,
@@ -7,16 +6,20 @@
     type GameDraftResponseOutput,
     type GameDraftTableOutput,
   } from "../../generated-api";
-  import { translateCountry, getCountryEmoji } from "../../i18n";
-  import Button from "../ui/Button.svelte";
-  import PanelLayout from "../layout/PanelLayout.svelte";
-  import Badge from "../ui/Badge.svelte";
-  import Tooltip from "../ui/Tooltip.svelte";
-  import PlayerName from "../ui/PlayerName.svelte";
-  import GameTableCard from "./GameTableCard.svelte";
-  import SectionTitle from "../ui/SectionTitle.svelte";
+  import { getCountryEmoji, translateCountry } from "../../i18n";
   import CardGrid from "../layout/CardGrid.svelte";
   import CardGridItem from "../layout/CardGridItem.svelte";
+  import PanelLayout from "../layout/PanelLayout.svelte";
+  import PanelSection from "../layout/PanelSection.svelte";
+  import Badge from "../ui/Badge.svelte";
+  import Button from "../ui/Button.svelte";
+  import MetaGrid from "../ui/MetaGrid.svelte";
+  import MetaItem from "../ui/MetaItem.svelte";
+  import PlayerName from "../ui/PlayerName.svelte";
+  import SectionTitle from "../ui/SectionTitle.svelte";
+  import Tooltip from "../ui/Tooltip.svelte";
+  import GameTableCard from "./GameTableCard.svelte";
+  import Waitlist from "./Waitlist.svelte";
 
   interface Props {
     id: number;
@@ -189,20 +192,22 @@
   {@const waiting = gameDetail.waiting_list ?? []}
   <PanelLayout footer={gameFooter}>
     {#snippet body()}
-      <div class="section">
+      <PanelSection>
         <SectionTitle title="Resumen" />
-        <div class="meta-grid">
-          <span class="meta-key">Generado</span>
-          <span class="meta-val">{gameDetail?.created_at}</span>
-          <span class="meta-key">Intentos</span>
-          <span class="meta-val">{gameDetail?.intentos}</span>
-          <span class="meta-key">Snapshot entrada</span>
-          <span class="meta-val">#{gameDetail?.input_snapshot_id}</span>
-          <span class="meta-key">Snapshot salida</span>
-          <span class="meta-val">#{gameDetail?.output_snapshot_id}</span>
-        </div>
-      </div>
-      <div class="section">
+        <MetaGrid>
+          <MetaItem label="Generado" value={gameDetail?.created_at} />
+          <MetaItem label="Intentos" value={gameDetail?.intentos} />
+          <MetaItem
+            label="Snapshot entrada"
+            value={`#${gameDetail?.input_snapshot_id}`}
+          />
+          <MetaItem
+            label="Snapshot salida"
+            value={`#${gameDetail?.output_snapshot_id}`}
+          />
+        </MetaGrid>
+      </PanelSection>
+      <PanelSection>
         <Button
           size="sm"
           variant={copiedId === "share" ? "success" : "secondary"}
@@ -214,9 +219,9 @@
             ? "Copiado"
             : "Copiar lista para compartir"}</Button
         >
-      </div>
+      </PanelSection>
       {#if mesas.length > 0}
-        <div class="section">
+        <PanelSection>
           <SectionTitle title="Partidas" count={mesas.length} />
           <CardGrid>
             {#each mesas as table (table.numero)}
@@ -285,11 +290,11 @@
               </CardGridItem>
             {/each}
           </CardGrid>
-        </div>
+        </PanelSection>
       {/if}
       {#if waiting.length > 0}
         {@const waitTxt = waiting.map((w) => w.nombre).join("\n")}
-        <div class="section">
+        <PanelSection>
           <SectionTitle title="Lista de espera" />
 
           <Waitlist players={waiting} />
@@ -304,36 +309,13 @@
               ? "Copiado"
               : "Copiar lista de espera"}</Button
           >
-        </div>
+        </PanelSection>
       {/if}
     {/snippet}
   </PanelLayout>
 {/if}
 
 <style>
-  .section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-16);
-    margin-bottom: var(--space-24);
-  }
-
-  .meta-grid {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: var(--space-4) var(--space-16);
-    font-size: 12px;
-  }
-
-  .meta-key {
-    color: var(--text-muted);
-    font-weight: 500;
-  }
-
-  .meta-val {
-    font-weight: 600;
-  }
-
   .player-list {
     list-style: none;
   }

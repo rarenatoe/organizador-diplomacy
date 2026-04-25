@@ -1,8 +1,10 @@
-import { render, fireEvent, screen, waitFor } from "@testing-library/svelte";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import PlayerAutocompleteInput from "./PlayerAutocompleteInput.svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+
 import * as api from "../../generated-api";
 import { mockApiSuccess } from "../../tests/mockHelpers";
+import PlayerAutocompleteInput from "./PlayerAutocompleteInput.svelte";
 
 describe("PlayerAutocompleteInput", () => {
   beforeEach(() => {
