@@ -84,13 +84,14 @@
       let line = `${index}. ${player.nombre}`;
       if (player.country) {
         const translated = translateCountry(player.country.name);
-        if (player.country.reason) {
+        if (player.country.reason && player.country.reason.length > 0) {
           // Get or create footnote marker
-          if (!footnotes[player.country.reason]) {
+          const reasonKey = player.country.reason.join("; ");
+          if (!footnotes[reasonKey]) {
             footnoteCounter++;
-            footnotes[player.country.reason] = "*".repeat(footnoteCounter);
+            footnotes[reasonKey] = "*".repeat(footnoteCounter);
           }
-          const marker = footnotes[player.country.reason];
+          const marker = footnotes[reasonKey];
           line += ` (${translated}${marker})`;
         } else {
           line += ` (${translated})`;
@@ -255,8 +256,11 @@
                           {/if}
                         </div>
                         <div class="tooltip-cell">
-                          {#if player.country?.reason}
-                            <Tooltip text={player.country.reason} icon="ℹ️" />
+                          {#if player.country?.reason && player.country.reason.length > 0}
+                            <Tooltip
+                              text={player.country.reason.join("; ")}
+                              icon="ℹ️"
+                            />
                           {/if}
                         </div>
                         <div class="tag-wrapper">

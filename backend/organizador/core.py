@@ -1,58 +1,134 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from .models import DraftPlayer, DraftResult
+
+
+class ActiveCurse(TypedDict):
+    player: DraftPlayer
+    country: str
+    severity: int
+    count: int
+
 
 # ── Country Assignment Algorithm ───────────────────────────────────────────
 
 
 def assign_countries_to_table(players: list[DraftPlayer]) -> None:
     """
-    Assign countries to players using a "shielding" strategy.
-    Only assigns countries to prevent players from repeating countries they've played 2+ times.
+    Assign countries using the "Greedy Intervention Minimization" strategy.
+    Identifies curses based on a player's internal stats, then calculates
+    the most efficient way to resolve them using either Self-Assignment or Shielding,
+    minimizing the total number of forced assignments at the table.
     """
     # Initialize all players with no country
     for player in players:
         player.country = ""
-        player.country_reason = ""
+        player.country_reason = []
 
-    # Identify cursed players (those with >= 2 games in any country)
-    cursed_assignments: list[tuple[DraftPlayer, str, int]] = []
+    countries = ["England", "France", "Germany", "Italy", "Austria", "Russia", "Turkey"]
+
+    # 1. Identify all active curses based purely on the player's PERSONAL statistics
+    active_curses: list[ActiveCurse] = []
     for player in players:
-        country_counts = {
-            "England": player.c_england,
-            "France": player.c_france,
-            "Germany": player.c_germany,
-            "Italy": player.c_italy,
-            "Austria": player.c_austria,
-            "Russia": player.c_russia,
-            "Turkey": player.c_turkey,
-        }
+        counts = {c: getattr(player, f"c_{c.lower()}", 0) for c in countries}
+        if not counts:
+            continue
 
-        for country, count in country_counts.items():
-            if count >= 2:
-                cursed_assignments.append((player, country, count))
+        # The baseline is the player's own least-played country
+        min_count = min(counts.values())
 
-    # For each cursed assignment, find a shield player
-    for cursed_player, country, count in cursed_assignments:
-        # Find the best shield player (no country assigned, lowest historical count for this country)
-        best_shield_player: DraftPlayer | None = None
-        best_shield_count = float("inf")
+        for country, count in counts.items():
+            # A curse is any country played 2+ times more than their personal baseline
+            if count >= min_count + 2:
+                active_curses.append(
+                    {
+                        "player": player,
+                        "country": country,
+                        "severity": count - min_count,
+                        "count": count,
+                    }
+                )
 
-        for potential_shield in players:
-            if potential_shield.country == "" and potential_shield != cursed_player:
-                shield_count = getattr(potential_shield, f"c_{country.lower()}", 0)
-                if shield_count < best_shield_count:
-                    best_shield_count = shield_count
-                    best_shield_player = potential_shield
+    # 2. Greedy Resolution Loop: Find the single assignment that resolves the most curses
+    while active_curses:
+        best_assignment = None
+        # Score format: (curses_resolved, severity_resolved, -player_historical_count)
+        best_score = (-1, -1, float("-inf"))
 
-        # Assign the shield player
-        if best_shield_player:
-            best_shield_player.country = country
-            times = "veces" if count > 1 else "vez"
-            best_shield_player.country_reason = f"Cualquier jugador disponible podía recibir este país; se asignó para evitar que {cursed_player.name} lo repita ({count} {times})."
+        unassigned_players = [p for p in players if p.country == ""]
+        available_countries = [c for c in countries if not any(p.country == c for p in players)]
+
+        for p in unassigned_players:
+            p_counts = {c: getattr(p, f"c_{c.lower()}", 0) for c in available_countries}
+            if not p_counts:
+                continue
+
+            p_min_all = min(getattr(p, f"c_{c.lower()}", 0) for c in countries)
+
+            for c in available_countries:
+                p_c_count = p_counts[c]
+
+                # A player cannot be assigned a country they are currently cursed for
+                if p_c_count >= p_min_all + 2:
+                    continue
+
+                # Calculate how many curses THIS specific assignment resolves
+                # Tool B (Self): Resolves all curses belonging to this player
+                # Tool A (Shield): Resolves all curses involving this country for other players
+                resolved = [
+                    curse
+                    for curse in active_curses
+                    if curse["player"] == p or curse["country"] == c
+                ]
+
+                if not resolved:
+                    continue
+
+                num_resolved = len(resolved)
+                severity_resolved = sum(curse["severity"] for curse in resolved)
+
+                # Tie-breaker: prioritize assigning the player to their absolute lowest historical country
+                self_healing_score = -p_c_count
+
+                score = (num_resolved, severity_resolved, self_healing_score)
+
+                if score > best_score:
+                    best_score = score
+                    best_assignment = (p, c, resolved)
+
+        if not best_assignment:
+            # No valid assignments left that can resolve remaining curses (gridlock defense)
+            break
+
+        assignee, country_to_assign, resolved_curses = best_assignment
+
+        # Apply the optimal assignment
+        assignee.country = country_to_assign
+
+        # Generate an intelligent explanation for the GM based on which tools triggered
+        reasons: list[str] = []
+        self_curses = [rc for rc in resolved_curses if rc["player"] == assignee]
+        shield_curses = [
+            rc
+            for rc in resolved_curses
+            if rc["country"] == country_to_assign and rc["player"] != assignee
+        ]
+
+        if self_curses:
+            c_names = ", ".join(rc["country"] for rc in self_curses)
+            reasons.append(f"Auto-asignación estratégica para evitar que reciba {c_names}.")
+
+        if shield_curses:
+            p_names = ", ".join(rc["player"].name for rc in shield_curses)
+            reasons.append(f"Actúa de escudo para evitar que {p_names} repitan este país.")
+
+        assignee.country_reason = reasons
+
+        # Remove the resolved curses from the pool
+        active_curses = [curse for curse in active_curses if curse not in resolved_curses]
 
 
 # ── Algorithm Orchestrator ───────────────────────────────────────────────────

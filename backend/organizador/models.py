@@ -36,7 +36,7 @@ class DraftPlayer(BaseModel):
     c_russia: int = 0
     c_turkey: int = 0
     country: str = ""
-    country_reason: str = ""
+    country_reason: list[str] = []
 
     @field_validator("games_this_year", "desired_games", "gm_games", mode="before")
     @classmethod

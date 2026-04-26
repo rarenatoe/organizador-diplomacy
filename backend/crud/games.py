@@ -30,7 +30,7 @@ async def add_table_player(
     player_id: int,
     seat_order: int,
     country: str,
-    country_reason: str | None = None,
+    country_reason: list[str] | None = None,
 ) -> None:
     """Add a player to a game table."""
     tp = TablePlayer(

@@ -726,7 +726,7 @@ describe("GameDraft.svelte", () => {
     if (modifiedDraft.mesas[0]?.jugadores[0]) {
       modifiedDraft.mesas[0].jugadores[0].country = {
         name: "France",
-        reason: "Test Reason",
+        reason: ["Test Reason"],
       };
     }
 
@@ -764,11 +764,11 @@ describe("GameDraft.svelte", () => {
           jugadores: [
             createMockDraftPlayer({
               nombre: "Player A",
-              country: { name: "France", reason: "Algorithm says so" },
+              country: { name: "France", reason: ["Algorithm says so"] },
             }),
             createMockDraftPlayer({
               nombre: "Player B",
-              country: { name: "Germany", reason: "" },
+              country: { name: "Germany", reason: [] },
             }), // No reason
           ],
         }),
@@ -816,11 +816,11 @@ describe("GameDraft.svelte", () => {
           jugadores: [
             createMockDraftPlayer({
               nombre: "Player A",
-              country: { name: "France", reason: "Reason A" },
+              country: { name: "France", reason: ["Reason A"] },
             }),
             createMockDraftPlayer({
               nombre: "Player B",
-              country: { name: "Germany", reason: "Reason B" },
+              country: { name: "Germany", reason: ["Reason B"] },
             }),
           ],
         }),
@@ -874,7 +874,7 @@ describe("GameDraft.svelte", () => {
           jugadores: [
             createMockDraftPlayer({
               nombre: "Player C",
-              country: { name: "France", reason: "Manual override test" },
+              country: { name: "France", reason: ["Manual override test"] },
             }),
           ],
         }),

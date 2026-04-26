@@ -316,7 +316,7 @@ class TestCountryReasonPersistence:
         draft = draft_resp.json()
 
         # Manually add reason to simulate algorithm output
-        test_reason = "Player was assigned this country to avoid repetition after 3 games"
+        test_reason = ["Player was assigned this country to avoid repetition after 3 games"]
         if draft["mesas"] and draft["mesas"][0]["jugadores"]:
             draft["mesas"][0]["jugadores"][0]["country"]["name"] = "England"
             draft["mesas"][0]["jugadores"][0]["country"]["reason"] = test_reason
@@ -361,7 +361,7 @@ class TestCountryReasonPersistence:
         # Explicitly set country.reason to empty string for all players
         for mesa in draft["mesas"]:
             for jugador in mesa["jugadores"]:
-                jugador["country"]["reason"] = ""
+                jugador["country"]["reason"] = []
 
         # Save draft
         save_resp = await client.post(
@@ -377,7 +377,7 @@ class TestCountryReasonPersistence:
         # Verify all players have empty string for country.reason
         for mesa in detail.mesas:
             for jugador in mesa.jugadores:
-                assert jugador.country.reason == ""
+                assert jugador.country.reason == []
 
     async def test_save_draft_with_mixed_country_reasons(
         self, client: Any, db_session: Any
@@ -398,13 +398,13 @@ class TestCountryReasonPersistence:
         draft = draft_resp.json()
 
         # Add reason to only the first player
-        reason_for_first = "Test reason for first player"
+        reason_for_first = ["Test reason for first player"]
         if draft["mesas"] and len(draft["mesas"][0]["jugadores"]) >= 2:
             draft["mesas"][0]["jugadores"][0]["country"]["name"] = "England"
             draft["mesas"][0]["jugadores"][0]["country"]["reason"] = reason_for_first
 
             # Explicitly ensure second player has empty reason
-            draft["mesas"][0]["jugadores"][1]["country"]["reason"] = ""
+            draft["mesas"][0]["jugadores"][1]["country"]["reason"] = []
 
         # Save draft
         save_resp = await client.post(
@@ -423,7 +423,7 @@ class TestCountryReasonPersistence:
         second_player = first_mesa.jugadores[1]
 
         assert first_player.country.reason == reason_for_first
-        assert second_player.country.reason == ""
+        assert second_player.country.reason == []
 
 
 # ── DELETE /api/game/{game_id} ───────────────────────────────────────────────────

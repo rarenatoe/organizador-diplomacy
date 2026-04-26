@@ -167,7 +167,7 @@ class TablePlayer(Base, kw_only=True):
     player_id: Mapped[int] = mapped_column(ForeignKey("players.id"), primary_key=True)
     seat_order: Mapped[int] = mapped_column()
     country: Mapped[str] = mapped_column()
-    country_reason: Mapped[str | None] = mapped_column(default=None)
+    country_reason: Mapped[list[str] | None] = mapped_column(JSON, default=None)
 
     # Relationships
     game_table: Mapped[GameTable] = relationship(

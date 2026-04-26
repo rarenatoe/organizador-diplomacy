@@ -42,6 +42,7 @@ priority: 30
 - **Zero Layout Shift (Ghost Elements):** Read-only states MUST mimic the exact padding/height of editable states. Specifically, conditional ghost buttons or icons MUST NOT stretch grid/flex rows. Always set a strict `min-height` on the row container (e.g., `min-height: var(--space-32)`) to absorb conditional elements without shifting the layout.
 - **Action Bubbling:** Feature components MUST bubble actions via callback props. NEVER perform API side-effects deeply in nested UI components.
 - **Data Discovery:** NEVER rely on native HTML `title` attributes. ALWAYS use `<Tooltip>` components wrapping Svelte Snippets.
+- **Array Rendering in Tooltips:** When rendering arrays of strings (like backend explanation logs) in tight spaces like Tooltips, join them contextually at the template level (`array.join(" ")`), rather than expecting the backend to pre-format them.
 - **Banned Browser APIs:** NEVER use `window.prompt()`, `window.alert()`, or `window.confirm()`. ALWAYS use custom modal components.
 - **Floating UI Guard:** Do not base the visibility of floating elements (dropdowns, modals) solely on derived array lengths. ALWAYS pair visibility with an explicit user-interaction boolean (e.g., `isActive`) to prevent zombie UI elements.
 - **Logging:** ALWAYS use `logger.info()` from `src/utils/logger.ts`. NEVER use `console.log()`.

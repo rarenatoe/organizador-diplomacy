@@ -260,7 +260,9 @@ async def test_view_returns_country_reason(db_session: Any) -> None:
 
     # Create game table and player with country_reason
     table_id = await create_game_table(db_session, game_id, 1)
-    await add_table_player(db_session, table_id, player, 1, "England", country_reason="Test Reason")
+    await add_table_player(
+        db_session, table_id, player, 1, "England", country_reason=["Test Reason"]
+    )
     await db_session.commit()
 
     # Test the view
@@ -270,7 +272,7 @@ async def test_view_returns_country_reason(db_session: Any) -> None:
     assert len(detail.mesas[0].jugadores) == 1
 
     player_data = detail.mesas[0].jugadores[0]
-    assert player_data.country.reason == "Test Reason"
+    assert player_data.country.reason == ["Test Reason"]
 
 
 class TestSnapshotHistoryInDetail:

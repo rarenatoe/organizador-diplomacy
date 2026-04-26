@@ -26,12 +26,12 @@ const defaultGameData: GameDetailResponse = {
         createMockDraftPlayer({
           nombre: "Alice",
           is_new: true,
-          country: { name: "England", reason: "Algorithm says so" },
+          country: { name: "England", reason: ["Algorithm says so"] },
         }),
         createMockDraftPlayer({
           nombre: "Bob",
           is_new: false,
-          country: { name: "France", reason: "" },
+          country: { name: "France", reason: [] },
         }),
       ],
     },
@@ -288,12 +288,12 @@ describe("GameDetail", () => {
               expect.objectContaining({
                 nombre: "Alice",
                 is_new: true,
-                country: { name: "England", reason: "Algorithm says so" },
+                country: { name: "England", reason: ["Algorithm says so"] },
               }),
               expect.objectContaining({
                 nombre: "Bob",
                 is_new: false,
-                country: { name: "France", reason: "" },
+                country: { name: "France", reason: [] },
               }),
             ]),
           }),
@@ -511,12 +511,12 @@ describe("GameDetail", () => {
                 createMockDraftPlayer({
                   nombre: "Alice",
                   is_new: true,
-                  country: { name: "England", reason: "" },
+                  country: { name: "England", reason: [] },
                 }),
                 createMockDraftPlayer({
                   nombre: "Bob",
                   is_new: false,
-                  country: { name: "France", reason: "" },
+                  country: { name: "France", reason: [] },
                 }),
               ],
             },

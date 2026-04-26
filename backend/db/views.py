@@ -288,7 +288,7 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> GameDet
                     c_austria=0,
                     c_russia=0,
                     c_turkey=0,
-                    country=CountrySelection(name="", reason=""),
+                    country=CountrySelection(name="", reason=[]),
                 )
 
         # Get players for this mesa
@@ -328,7 +328,7 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> GameDet
                     c_turkey=0,
                     country=CountrySelection(
                         name=country or "",
-                        reason=country_reason or "",
+                        reason=country_reason or [],
                     ),
                 )
             )
@@ -374,7 +374,7 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> GameDet
                 c_austria=0,
                 c_russia=0,
                 c_turkey=0,
-                country=CountrySelection(name="", reason=""),
+                country=CountrySelection(name="", reason=[]),
                 cupos_faltantes=sp.desired_games,
             )
         )

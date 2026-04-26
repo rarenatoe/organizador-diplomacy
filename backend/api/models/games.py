@@ -12,7 +12,7 @@ from backend.organizador.models import DraftPlayer, DraftResult  # noqa: TC001
 
 class CountrySelection(BaseModel):
     name: str
-    reason: str
+    reason: list[str] = []
 
 
 class GameDraftPlayer(BaseModel):

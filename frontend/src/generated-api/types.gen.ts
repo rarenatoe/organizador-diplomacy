@@ -81,7 +81,7 @@ export type CountrySelection = {
     /**
      * Reason
      */
-    reason: string;
+    reason?: Array<string>;
 };
 
 /**

@@ -12,6 +12,7 @@ priority: 20
 - **Immutable Identity:** ALWAYS anchor to immutable external IDs (`notion_id`). NEVER rely on user-editable strings (`name`) for relational mapping.
 - **Immutable Snapshots:** Flow data through immutable snapshots connected by `timeline_edges`. NEVER create mutable historical data structures.
 - **Fortifying the Database Boundary:** Raw SQL results from `db/views.py` MUST be immediately mapped into strict Pydantic models at the data access layer. NEVER pass raw `Row` objects or dicts with unsanitized DB values (e.g., SQLite ISO date strings) beyond the `crud/` layer. Sanitize and coerce types (dates, enums) before Pydantic validation.
+- **JSON Column Strictness:** When migrating columns to hold collections (like lists of strings), ALWAYS use SQLAlchemy's `JSON` type. Ensure Pydantic DTOs and DB models strictly expect `list[str]` and default to `[]`, NEVER `""` or `None`, to prevent cascading validation crashes when reading from or writing to the database.
 
 ## 2. API & Logic Boundaries
 

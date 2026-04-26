@@ -23,7 +23,7 @@ describe("PlayerName.svelte", () => {
     c_austria: 0,
     c_russia: 0,
     c_turkey: 0,
-    country: { name: "", reason: "" },
+    country: { name: "", reason: [] },
   };
 
   it("renders just the name when not linked (read-only)", () => {

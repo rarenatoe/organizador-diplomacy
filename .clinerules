@@ -27,6 +27,8 @@
 - **Draft Pipeline:** Calculate Tickets -> Distribute to Tables -> Assign Countries -> Deduplicate Waitlist. NEVER skip phases or execute out of order.
 - **Graceful Degradation on Incomplete Data:** Algorithms resolving user identity or matching entries must account for incomplete data representation across systems (e.g., Notion vs Local DB). A partial representation (like an abbreviated middle/last name) that strongly matches a subset of a fully fleshed-out entry must be scored favorably, rather than heavily penalized for strict word-length mismatches.
 - **Graceful Degradation over Strict Blocking:** When the user supplies configuration that exceeds a logical limit (e.g., assigning more GMs than available tables), DO NOT block the UI or throw backend errors unless it fundamentally breaks data integrity. Prioritize the most eligible subjects (e.g., pure GMs who want 0 games), cap the resources for the rest to valid limits, and allow the system to proceed smoothly.
+- **Relative vs. Absolute Thresholds:** In long-running leagues, absolute thresholds degrade over time. Domain algorithms MUST define constraints (like "curses" or disproportionate repetitions) relative to a dynamic baseline (e.g., the table minimum or the player's personal minimum), rather than hardcoded absolute limits.
+- **Greedy Optimization over Linear Checks:** For complex assignment logic (like country distribution), prefer Greedy Intervention loops over linear passes. Score potential assignments by how many constraints they resolve simultaneously (e.g., "Self-Healing" vs. "Shielding") to mathematically minimize total forced interventions.
 
 ## 5. Domain-Driven Design (DDD) & DTO Separation
 
@@ -35,6 +37,7 @@
 - **Factory Methods on DTOs:** Pydantic response models in `api/models/` MUST expose a `@classmethod def from_domain(cls, obj: DomainModel) -> "Self"` factory to translate Domain Models into API responses. NEVER perform this translation inside a router function.
 - **Lean Routers:** FastAPI routers MUST only: validate input, call a CRUD or domain function, call the DTO factory, and return. NEVER embed business logic or data reshaping directly in router functions.
 - **No Upward Coupling:** Domain layer (`organizador/`) MUST NEVER reference DTO models from `api/models/`. Data flows strictly downward: Router → CRUD/Domain → DTO factory → Response.
+- **Structured Data over Pre-Formatted Strings (Separation of Concerns):** The backend MUST deliver structured data (e.g., `list[str]` for multiple reasons or logs). NEVER pre-join strings or apply UI formatting (like bullet points or line breaks) in the backend. Let the frontend dictate the presentation.
 
 ## 1. Database & Schema
 
@@ -44,6 +47,7 @@
 - **Immutable Identity:** ALWAYS anchor to immutable external IDs (`notion_id`). NEVER rely on user-editable strings (`name`) for relational mapping.
 - **Immutable Snapshots:** Flow data through immutable snapshots connected by `timeline_edges`. NEVER create mutable historical data structures.
 - **Fortifying the Database Boundary:** Raw SQL results from `db/views.py` MUST be immediately mapped into strict Pydantic models at the data access layer. NEVER pass raw `Row` objects or dicts with unsanitized DB values (e.g., SQLite ISO date strings) beyond the `crud/` layer. Sanitize and coerce types (dates, enums) before Pydantic validation.
+- **JSON Column Strictness:** When migrating columns to hold collections (like lists of strings), ALWAYS use SQLAlchemy's `JSON` type. Ensure Pydantic DTOs and DB models strictly expect `list[str]` and default to `[]`, NEVER `""` or `None`, to prevent cascading validation crashes when reading from or writing to the database.
 
 ## 2. API & Logic Boundaries
 
@@ -112,6 +116,7 @@
 - **Zero Layout Shift (Ghost Elements):** Read-only states MUST mimic the exact padding/height of editable states. Specifically, conditional ghost buttons or icons MUST NOT stretch grid/flex rows. Always set a strict `min-height` on the row container (e.g., `min-height: var(--space-32)`) to absorb conditional elements without shifting the layout.
 - **Action Bubbling:** Feature components MUST bubble actions via callback props. NEVER perform API side-effects deeply in nested UI components.
 - **Data Discovery:** NEVER rely on native HTML `title` attributes. ALWAYS use `<Tooltip>` components wrapping Svelte Snippets.
+- **Array Rendering in Tooltips:** When rendering arrays of strings (like backend explanation logs) in tight spaces like Tooltips, join them contextually at the template level (`array.join(" ")`), rather than expecting the backend to pre-format them.
 - **Banned Browser APIs:** NEVER use `window.prompt()`, `window.alert()`, or `window.confirm()`. ALWAYS use custom modal components.
 - **Floating UI Guard:** Do not base the visibility of floating elements (dropdowns, modals) solely on derived array lengths. ALWAYS pair visibility with an explicit user-interaction boolean (e.g., `isActive`) to prevent zombie UI elements.
 - **Logging:** ALWAYS use `logger.info()` from `src/utils/logger.ts`. NEVER use `console.log()`.

@@ -129,8 +129,8 @@
       }
       currentPlayer.country =
         newCountry !== ""
-          ? { name: newCountry, reason: "" }
-          : { name: "", reason: "" };
+          ? { name: newCountry, reason: [] }
+          : { name: "", reason: [] };
     }
   }
 
@@ -144,23 +144,13 @@
         ...table,
         jugadores: table.jugadores.map(({ country, ...rest }) => ({
           ...rest,
-          country: country?.name
-            ? {
-                name: country.name,
-                reason: country.reason || "",
-              }
-            : { name: "", reason: "" },
+          country: country?.name ? country : { name: "", reason: [] },
         })),
       }));
       const cleanTicketsSobrantes = draftData.tickets_sobrantes.map(
         ({ country, ...rest }) => ({
           ...rest,
-          country: country?.name
-            ? {
-                name: country.name,
-                reason: country.reason || "",
-              }
-            : { name: "", reason: "" },
+          country: country?.name ? country : { name: "", reason: [] },
         }),
       );
       const payload: GameDraftResponseOutput = {
@@ -448,8 +438,11 @@
                         </select>
 
                         <div class="tooltip-cell">
-                          {#if j.country?.reason}
-                            <Tooltip text={j.country.reason} icon="ℹ️" />
+                          {#if j.country?.reason && j.country.reason.length > 0}
+                            <Tooltip
+                              text={j.country.reason.join("; ")}
+                              icon="ℹ️"
+                            />
                           {/if}
                         </div>
 

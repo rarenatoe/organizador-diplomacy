@@ -22,7 +22,7 @@ export const createMockDraftPlayer = (
     c_austria: 0,
     c_russia: 0,
     c_turkey: 0,
-    country: { name: "", reason: "" },
+    country: { name: "", reason: [] },
   };
 
   return { ...baseDraftPlayer, ...overrides };

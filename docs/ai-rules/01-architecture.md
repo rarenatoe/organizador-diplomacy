@@ -31,6 +31,8 @@ priority: 10
 - **Draft Pipeline:** Calculate Tickets -> Distribute to Tables -> Assign Countries -> Deduplicate Waitlist. NEVER skip phases or execute out of order.
 - **Graceful Degradation on Incomplete Data:** Algorithms resolving user identity or matching entries must account for incomplete data representation across systems (e.g., Notion vs Local DB). A partial representation (like an abbreviated middle/last name) that strongly matches a subset of a fully fleshed-out entry must be scored favorably, rather than heavily penalized for strict word-length mismatches.
 - **Graceful Degradation over Strict Blocking:** When the user supplies configuration that exceeds a logical limit (e.g., assigning more GMs than available tables), DO NOT block the UI or throw backend errors unless it fundamentally breaks data integrity. Prioritize the most eligible subjects (e.g., pure GMs who want 0 games), cap the resources for the rest to valid limits, and allow the system to proceed smoothly.
+- **Relative vs. Absolute Thresholds:** In long-running leagues, absolute thresholds degrade over time. Domain algorithms MUST define constraints (like "curses" or disproportionate repetitions) relative to a dynamic baseline (e.g., the table minimum or the player's personal minimum), rather than hardcoded absolute limits.
+- **Greedy Optimization over Linear Checks:** For complex assignment logic (like country distribution), prefer Greedy Intervention loops over linear passes. Score potential assignments by how many constraints they resolve simultaneously (e.g., "Self-Healing" vs. "Shielding") to mathematically minimize total forced interventions.
 
 ## 5. Domain-Driven Design (DDD) & DTO Separation
 
@@ -39,3 +41,4 @@ priority: 10
 - **Factory Methods on DTOs:** Pydantic response models in `api/models/` MUST expose a `@classmethod def from_domain(cls, obj: DomainModel) -> "Self"` factory to translate Domain Models into API responses. NEVER perform this translation inside a router function.
 - **Lean Routers:** FastAPI routers MUST only: validate input, call a CRUD or domain function, call the DTO factory, and return. NEVER embed business logic or data reshaping directly in router functions.
 - **No Upward Coupling:** Domain layer (`organizador/`) MUST NEVER reference DTO models from `api/models/`. Data flows strictly downward: Router → CRUD/Domain → DTO factory → Response.
+- **Structured Data over Pre-Formatted Strings (Separation of Concerns):** The backend MUST deliver structured data (e.g., `list[str]` for multiple reasons or logs). NEVER pre-join strings or apply UI formatting (like bullet points or line breaks) in the backend. Let the frontend dictate the presentation.
