@@ -247,86 +247,56 @@ async def get_snapshot_players(session: AsyncSession, snapshot_id: int) -> list[
 # Timeline edge operations moved to backend.crud.chain module
 
 
-async def delete_snapshot_cascade(session: AsyncSession, snapshot_id: int) -> bool:
-    """Delete a snapshot and all its dependent data."""
-    # Delete snapshot history logs
-    await session.execute(delete(SnapshotHistory).where(SnapshotHistory.snapshot_id == snapshot_id))
+async def delete_timeline_edge_cascade(session: AsyncSession, edge_id: int) -> None:
+    """Helper: Deletes a timeline edge and all its dependent game/table data."""
 
-    # Delete snapshot players
+    # 1. Bulk delete all TablePlayers for all tables in this edge (Fixes N+1 issue)
+    table_subquery = select(GameTable.id).where(GameTable.timeline_edge_id == edge_id)
+    await session.execute(delete(TablePlayer).where(TablePlayer.table_id.in_(table_subquery)))
+
+    # 2. Delete the remaining edge dependencies
+    await session.execute(delete(GameTable).where(GameTable.timeline_edge_id == edge_id))
+    await session.execute(delete(GameDetail).where(GameDetail.timeline_edge_id == edge_id))
+    await session.execute(delete(WaitingList).where(WaitingList.timeline_edge_id == edge_id))
+
+    # 3. Delete the edge itself and its graph node
+    await session.execute(delete(TimelineEdge).where(TimelineEdge.id == edge_id))
+    await session.execute(delete(GraphNode).where(GraphNode.id == edge_id))
+
+
+async def delete_snapshot_cascade(session: AsyncSession, snapshot_id: int) -> bool:
+    """Delete a snapshot and all its dependent data recursively."""
+
+    # 1. Clean up simple Snapshot-specific tables
+    await session.execute(delete(SnapshotHistory).where(SnapshotHistory.snapshot_id == snapshot_id))
     await session.execute(delete(SnapshotPlayer).where(SnapshotPlayer.snapshot_id == snapshot_id))
 
-    # Delete incoming timeline edges (where this snapshot is output)
+    # 2. Recursively delete child snapshots (this automatically handles outgoing edges)
+    # We only fetch the IDs, not the full ORM objects.
     result = await session.execute(
-        select(TimelineEdge).where(TimelineEdge.output_snapshot_id == snapshot_id)
-    )
-    incoming_edges = result.scalars().all()
-
-    for edge in incoming_edges:
-        # Delete edge details
-        await session.execute(delete(GameDetail).where(GameDetail.timeline_edge_id == edge.id))
-
-        # Delete game tables
-        result = await session.execute(
-            select(GameTable).where(GameTable.timeline_edge_id == edge.id)
+        select(TimelineEdge.output_snapshot_id).where(
+            TimelineEdge.source_snapshot_id == snapshot_id
         )
-        tables = result.scalars().all()
+    )
+    child_snapshot_ids = result.scalars().all()
 
-        for table in tables:
-            # Delete table players
-            await session.execute(delete(TablePlayer).where(TablePlayer.table_id == table.id))
+    for child_id in child_snapshot_ids:
+        await delete_snapshot_cascade(session, child_id)
 
-        await session.execute(delete(GameTable).where(GameTable.timeline_edge_id == edge.id))
-
-        # Delete waiting list
-        await session.execute(delete(WaitingList).where(WaitingList.timeline_edge_id == edge.id))
-
-        # Delete the timeline edge itself
-        await session.execute(delete(TimelineEdge).where(TimelineEdge.id == edge.id))
-
-        # Delete graph node
-        await session.execute(delete(GraphNode).where(GraphNode.id == edge.id))
-
-    # Delete outgoing timeline edges (where this snapshot is source)
+    # 3. Clean up incoming edges (the link between our parent and us)
     result = await session.execute(
-        select(TimelineEdge).where(TimelineEdge.source_snapshot_id == snapshot_id)
+        select(TimelineEdge.id).where(TimelineEdge.output_snapshot_id == snapshot_id)
     )
-    outgoing_edges = result.scalars().all()
+    incoming_edge_ids = result.scalars().all()
 
-    for edge in outgoing_edges:
-        # Delete edge details
-        await session.execute(delete(GameDetail).where(GameDetail.timeline_edge_id == edge.id))
+    for edge_id in incoming_edge_ids:
+        await delete_timeline_edge_cascade(session, edge_id)
 
-        # Delete game tables
-        result = await session.execute(
-            select(GameTable).where(GameTable.timeline_edge_id == edge.id)
-        )
-        tables = result.scalars().all()
-
-        for table in tables:
-            # Delete table players
-            await session.execute(delete(TablePlayer).where(TablePlayer.table_id == table.id))
-
-        await session.execute(delete(GameTable).where(GameTable.timeline_edge_id == edge.id))
-
-        # Delete waiting list
-        await session.execute(delete(WaitingList).where(WaitingList.timeline_edge_id == edge.id))
-
-        # Delete the timeline edge itself
-        await session.execute(delete(TimelineEdge).where(TimelineEdge.id == edge.id))
-
-        # Delete graph node
-        await session.execute(delete(GraphNode).where(GraphNode.id == edge.id))
-
-    # Delete snapshot
+    # 4. Finally, delete the snapshot itself and its graph node
     await session.execute(delete(Snapshot).where(Snapshot.id == snapshot_id))
-
-    # Delete graph node
     await session.execute(delete(GraphNode).where(GraphNode.id == snapshot_id))
 
     return True
-
-
-# ── Game Organization ─────────────────────────────────────────────────────────
 
 
 # ── Notion Cache ─────────────────────────────────────────────────────────────

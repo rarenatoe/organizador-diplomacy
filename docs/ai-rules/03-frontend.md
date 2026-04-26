@@ -19,6 +19,7 @@ priority: 30
 - **SDK as Single Source of Truth:** The generated SDK (`frontend/src/generated-api`) is the ABSOLUTE single source of truth for all domain types. NEVER manually define domain interfaces (e.g., `Game`, `Player`, `DraftResponse`) in `src/types.ts` or any other file. ALL domain types MUST be imported exclusively from `frontend/src/generated-api`. `src/types.ts` is reserved ONLY for purely UI-local types (e.g., `ToastState`, `EditPlayerRow`) that have no backend equivalent.
 - **Explicit Response Unpacking:** ALWAYS unpack the `@hey-api` standardized response tuple immediately at the call site: `const { data, error } = await apiEndpoint()`. NEVER pass the raw response object to child components. Handle `error` explicitly before using `data`.
 - **Global Error Handling:** FastAPI `422 ValidationErrors` are intercepted/normalized in `api/client.ts`. UI components MUST safely read `response.error` as a clean string. Legacy `api.ts` is DEPRECATED.
+- **Robust API Error Parsing & Type Safety:** FastAPI `HTTPException`s (400/500) return `{ detail: "string" }`, which bypasses the standard 422 `HttpValidationError` (where detail is an array). ALWAYS use a heavily typed union (e.g., `HttpValidationError | { detail: string } | { error: string } | string`) for global error parsers. NEVER use `any` or `unknown` to bypass ESLint union rules, and NEVER cast error objects blindly using `String(error)`.
 
 ## 3. Layout, CSS Grid & The Rule of 8
 

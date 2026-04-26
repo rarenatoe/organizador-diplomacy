@@ -7,6 +7,7 @@
   import { apiGameDraft, apiGameSave } from "../../generated-api/sdk.gen";
   import { findLatestGameId } from "../../snapshotUtils";
   import { setActiveNodeId } from "../../stores.svelte";
+  import { parseApiError } from "../../utils";
   import CardGrid from "../layout/CardGrid.svelte";
   import CardGridItem from "../layout/CardGridItem.svelte";
   import PanelLayout from "../layout/PanelLayout.svelte";
@@ -72,7 +73,7 @@
           body: { snapshot_id: snapshotId },
         });
         if (error) {
-          onShowError("Error al generar draft", String(error.detail || error));
+          onShowError("Error al generar draft", parseApiError(error));
           return;
         }
         draftData = data;
@@ -176,7 +177,7 @@
         },
       });
       if (error) {
-        onShowError("Error al guardar draft", String(error.detail || error));
+        onShowError("Error al guardar draft", parseApiError(error));
         return;
       }
       // Use data.game_id as needed...

@@ -119,6 +119,16 @@ export type DeleteResponse = {
 };
 
 /**
+ * ErrorMessage
+ */
+export type ErrorMessage = {
+    /**
+     * Detail
+     */
+    detail: string;
+};
+
+/**
  * FieldChange
  */
 export type FieldChange = {
@@ -973,6 +983,19 @@ export type ApiChainData = {
     url: '/api/chain';
 };
 
+export type ApiChainErrors = {
+    /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
+};
+
+export type ApiChainError = ApiChainErrors[keyof ApiChainErrors];
+
 export type ApiChainResponses = {
     /**
      * Successful Response
@@ -996,9 +1019,17 @@ export type ApiDeleteSnapshotData = {
 
 export type ApiDeleteSnapshotErrors = {
     /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
 };
 
 export type ApiDeleteSnapshotError = ApiDeleteSnapshotErrors[keyof ApiDeleteSnapshotErrors];
@@ -1026,9 +1057,17 @@ export type ApiSnapshotData = {
 
 export type ApiSnapshotErrors = {
     /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
 };
 
 export type ApiSnapshotError = ApiSnapshotErrors[keyof ApiSnapshotErrors];
@@ -1051,9 +1090,17 @@ export type ApiSnapshotSaveData = {
 
 export type ApiSnapshotSaveErrors = {
     /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
 };
 
 export type ApiSnapshotSaveError = ApiSnapshotSaveErrors[keyof ApiSnapshotSaveErrors];
@@ -1076,9 +1123,17 @@ export type ApiNotionFetchData = {
 
 export type ApiNotionFetchErrors = {
     /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
 };
 
 export type ApiNotionFetchError = ApiNotionFetchErrors[keyof ApiNotionFetchErrors];
@@ -1106,9 +1161,17 @@ export type ApiGameData = {
 
 export type ApiGameErrors = {
     /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
 };
 
 export type ApiGameError = ApiGameErrors[keyof ApiGameErrors];
@@ -1136,9 +1199,17 @@ export type ApiGameDeleteData = {
 
 export type ApiGameDeleteErrors = {
     /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
 };
 
 export type ApiGameDeleteError = ApiGameDeleteErrors[keyof ApiGameDeleteErrors];
@@ -1165,9 +1236,17 @@ export type ApiGameDraftData = {
 
 export type ApiGameDraftErrors = {
     /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
 };
 
 export type ApiGameDraftError = ApiGameDraftErrors[keyof ApiGameDraftErrors];
@@ -1190,9 +1269,17 @@ export type ApiGameSaveData = {
 
 export type ApiGameSaveErrors = {
     /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
 };
 
 export type ApiGameSaveError = ApiGameSaveErrors[keyof ApiGameSaveErrors];
@@ -1219,9 +1306,17 @@ export type ApiPlayerRenameData = {
 
 export type ApiPlayerRenameErrors = {
     /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
 };
 
 export type ApiPlayerRenameError = ApiPlayerRenameErrors[keyof ApiPlayerRenameErrors];
@@ -1242,6 +1337,19 @@ export type ApiPlayerGetAllData = {
     url: '/api/player/all';
 };
 
+export type ApiPlayerGetAllErrors = {
+    /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
+};
+
+export type ApiPlayerGetAllError = ApiPlayerGetAllErrors[keyof ApiPlayerGetAllErrors];
+
 export type ApiPlayerGetAllResponses = {
     /**
      * Successful Response
@@ -1260,9 +1368,17 @@ export type ApiPlayerLookupData = {
 
 export type ApiPlayerLookupErrors = {
     /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
 };
 
 export type ApiPlayerLookupError = ApiPlayerLookupErrors[keyof ApiPlayerLookupErrors];
@@ -1285,9 +1401,17 @@ export type ApiPlayerCheckSimilarityData = {
 
 export type ApiPlayerCheckSimilarityErrors = {
     /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
 };
 
 export type ApiPlayerCheckSimilarityError = ApiPlayerCheckSimilarityErrors[keyof ApiPlayerCheckSimilarityErrors];
@@ -1310,9 +1434,17 @@ export type ApiRunNotionSyncData = {
 
 export type ApiRunNotionSyncErrors = {
     /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
 };
 
 export type ApiRunNotionSyncError = ApiRunNotionSyncErrors[keyof ApiRunNotionSyncErrors];
@@ -1332,6 +1464,19 @@ export type ApiSyncStatusData = {
     query?: never;
     url: '/api/sync/status';
 };
+
+export type ApiSyncStatusErrors = {
+    /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
+};
+
+export type ApiSyncStatusError = ApiSyncStatusErrors[keyof ApiSyncStatusErrors];
 
 export type ApiSyncStatusResponses = {
     /**
@@ -1356,9 +1501,17 @@ export type CatchAllData = {
 
 export type CatchAllErrors = {
     /**
+     * Client Error
+     */
+    400: ErrorMessage;
+    /**
      * Validation Error
      */
     422: HttpValidationError;
+    /**
+     * Server Error
+     */
+    500: ErrorMessage;
 };
 
 export type CatchAllError = CatchAllErrors[keyof CatchAllErrors];

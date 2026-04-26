@@ -33,7 +33,7 @@ client.interceptors.error.use((error: unknown, response: Response) => {
 
   // We return the normalized error object.
   // Hey-API will wrap this and return it as the `error` property to your components.
-  return { error: errorMessage };
+  return errorMessage;
 });
 
 export { client };

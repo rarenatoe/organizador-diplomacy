@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from backend.api.routers.chain import router as chain_router
 from backend.api.routers.games import router as games_router
@@ -51,10 +52,18 @@ def custom_generate_unique_id(route: APIRoute):
 
 
 # Initialize FastAPI app with lifespan
+class ErrorMessage(BaseModel):
+    detail: str
+
+
 app = FastAPI(
     title="Organizador Diplomacy API",
     generate_unique_id_function=custom_generate_unique_id,
     lifespan=lifespan,
+    responses={
+        400: {"model": ErrorMessage, "description": "Client Error"},
+        500: {"model": ErrorMessage, "description": "Server Error"},
+    },
 )
 
 # Include all routers

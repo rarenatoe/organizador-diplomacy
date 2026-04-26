@@ -2,7 +2,7 @@
  * Shared utility functions for the frontend.
  */
 
-import { HttpValidationError } from "./generated-api";
+import { ErrorMessage, HttpValidationError } from "./generated-api";
 
 /**
  * Parses CSV text into an array of player objects.
@@ -94,11 +94,23 @@ export function normalizeName(name: string): string {
 /**
  * Extracts a safe string from any FastAPI error response
  */
-export function parseApiError(error: HttpValidationError): string {
-  // 1. Catch FastAPI Validation Errors (422) where detail is an array
-  if (error.detail) {
-    // We can safely map over the array knowing it matches the ValidationError shape
-    return error.detail.map((err: { msg: string }) => err.msg).join("; ");
+export function parseApiError(
+  error: HttpValidationError | ErrorMessage,
+): string {
+  // 1. Is it a FastAPI 400/500 custom string error?
+  // TypeScript now KNOWS this is valid and autocomplete will work!
+  if ("detail" in error && typeof error.detail === "string") {
+    return error.detail;
+  }
+
+  // 2. Is it a strict 422 Validation Error?
+  if ("detail" in error && Array.isArray(error.detail)) {
+    return error.detail.map((err) => err.msg).join("; ");
+  }
+
+  // 3. Fallback for custom interceptors
+  if (typeof error === "string") {
+    return error;
   }
 
   return "Ocurrió un error inesperado";

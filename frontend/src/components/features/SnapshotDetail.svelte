@@ -153,7 +153,6 @@
 
   async function handleOrganizar(): Promise<void> {
     if (!snapshotDetail?.players) return;
-
     if (snapshotDetail.players.length < 7) {
       onShowError(
         "Error al organizar",

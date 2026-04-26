@@ -24,15 +24,28 @@ def build_weighted_tickets(
     if estimated_tables == 0:
         return 0, 0, 0, [], []
 
-    # Each table accepts exactly one GM.
-    total_gm_slots: int = sum(j.gm_games for j in players)
-    if total_gm_slots > estimated_tables:
-        raise ValueError(
-            f"There are {total_gm_slots} GM slot(s) but only {estimated_tables} "
-            f"game(s). Each table accepts a single GM."
-        )
+    # Handle excess GMs: limit total GM slots to estimated_tables.
+    # Prioritize players who want to play less (desired_games ASC), then by gm_games DESC.
+    potential_gms = [p for p in players if p.gm_games > 0]
+    potential_gms.sort(key=lambda p: (p.desired_games, -p.gm_games))
 
-    # Real game slots: GMs discounted, without mutating the DraftPlayer objects.
+    allocated_gm_slots: int = 0
+    active_gms: list[DraftPlayer] = []
+
+    for p in potential_gms:
+        if allocated_gm_slots >= estimated_tables:
+            p.gm_games = 0  # Cannot GM anymore
+            continue
+
+        slots_to_take = min(p.gm_games, estimated_tables - allocated_gm_slots)
+        p.gm_games = slots_to_take
+        allocated_gm_slots += slots_to_take
+        active_gms.append(p)
+
+    # Sorted GMs: those who referee more tables receive their assignment first.
+    active_gms.sort(key=lambda j: j.gm_games, reverse=True)
+
+    # Real game slots: GMs discounted (now safely using the capped gm_games)
     playable: dict[str, int] = {
         player.name: (
             min(player.desired_games, estimated_tables - player.gm_games)
@@ -41,13 +54,6 @@ def build_weighted_tickets(
         )
         for player in players
     }
-
-    # Sorted GMs: those who referee more tables receive their assignment first.
-    active_gms: list[DraftPlayer] = sorted(
-        [j for j in players if j.gm_games > 0],
-        key=lambda j: j.gm_games,
-        reverse=True,
-    )
 
     # Tickets with participation weight (deterministic weights).
     #

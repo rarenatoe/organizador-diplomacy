@@ -8,6 +8,7 @@ priority: 20
 
 - **Database System:** Use disposable local SQLite (`aiosqlite`). NEVER use persistent external DBs or Alembic migrations. Define schema strictly in code.
 - **Universal IDs:** Use centralized `graph_nodes` table for universal IDs and cascading deletes. NEVER implement separate ID systems.
+- **Deep Recursive Cascades for Graphs:** When deleting entities tied to a tree or graph (like Snapshots and TimelineEdges), NEVER use shallow, manual loops to delete incoming and outgoing edges. ALWAYS use a dedicated, recursive cascade function that calls itself on child nodes to sever edges and prevent orphaned "stray nodes".
 - **Immutable Identity:** ALWAYS anchor to immutable external IDs (`notion_id`). NEVER rely on user-editable strings (`name`) for relational mapping.
 - **Immutable Snapshots:** Flow data through immutable snapshots connected by `timeline_edges`. NEVER create mutable historical data structures.
 - **Fortifying the Database Boundary:** Raw SQL results from `db/views.py` MUST be immediately mapped into strict Pydantic models at the data access layer. NEVER pass raw `Row` objects or dicts with unsanitized DB values (e.g., SQLite ISO date strings) beyond the `crud/` layer. Sanitize and coerce types (dates, enums) before Pydantic validation.
@@ -27,6 +28,7 @@ priority: 20
 - **Explicit Selection:** Fetch ONLY required columns (`select(NotionCache.notion_id, NotionCache.name)`). NEVER fetch entire models (`select(NotionCache)`) for read-only algorithms.
 - **The Cartesian Trap:** When optimizing queries, NEVER remove `.join()` clauses if they restrict relational mapping. Missing joins cause cross-join fan-outs.
 - **Type-Safe Mapping:** Explicitly map SQLAlchemy `Row` objects into typed dicts (`{"name": row.name}`). Avoid `**row.mappings()` to guarantee Pyright compile-time safety.
+- **Bulk Deletions (Prevent N+1 Queries):** Avoid looping over ORM objects in Python just to delete their children (e.g., querying `tables` and doing `for table in tables: delete(players)`). ALWAYS use SQLAlchemy subqueries and `.in_()` clauses to execute bulk relational deletes directly in the database.
 
 ## 4. Python Typing & ISP
 

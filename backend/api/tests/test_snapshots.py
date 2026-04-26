@@ -290,6 +290,37 @@ class TestApiSnapshotDelete:
         result = await db_session.execute(select(TimelineEdge).where(TimelineEdge.id == edge_id))
         assert result.scalar_one_or_none() is None
 
+    async def test_delete_snapshot_deep_recursive_cascade(
+        self, client: Any, db_session: Any
+    ) -> None:
+        """Deleting a root snapshot should recursively delete children and grandchildren, leaving no stray nodes."""
+        snap1 = await make_snapshot_with_players(db_session, n=5)
+        snap2 = await create_snapshot(db_session, SnapshotSource.ORGANIZAR)
+        snap3 = await create_snapshot(db_session, SnapshotSource.MANUAL)
+
+        # Create Chain: snap1 -> (game) -> snap2 -> (branch) -> snap3
+        edge1_id = await create_game_edge(db_session, snap1, snap2, 1)
+        edge2_id = await create_branch_edge(db_session, snap2, snap3)
+        await db_session.commit()
+
+        # Action: Delete the root snapshot
+        resp = await client.delete(f"/api/snapshot/{snap1}")
+        assert resp.status_code == 200
+        await db_session.commit()
+        db_session.expire_all()
+
+        # Verify all snapshots in the chain are deleted (no stray orphans)
+        for snap_id in [snap1, snap2, snap3]:
+            result = await db_session.execute(select(Snapshot).where(Snapshot.id == snap_id))
+            assert result.scalar_one_or_none() is None
+
+        # Verify all connecting edges are deleted
+        for edge_id in [edge1_id, edge2_id]:
+            result = await db_session.execute(
+                select(TimelineEdge).where(TimelineEdge.id == edge_id)
+            )
+            assert result.scalar_one_or_none() is None
+
     async def test_delete_sibling_triggers_squash(self, client: Any, db_session: Any) -> None:
         """
         Regression test: When a snapshot has two children (Game -> B, Manual -> C)

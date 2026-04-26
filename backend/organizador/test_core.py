@@ -183,12 +183,15 @@ class TestCalcularPartidas(unittest.TestCase):
 
     # ── Error de configuración ────────────────────────────────────────────────
 
-    def test_error_mas_gm_slots_que_partidas(self):
-        """Si hay más slots de GM que tables, debe lanzar ValueError."""
+    def test_excess_gms_does_not_fail(self):
+        """If there are more GM slots than tables, it should not fail (graceful degradation)."""
         players = _pool(7)  # 1 table
         players += [_j("GM1", gm_games=1), _j("GM2", gm_games=1)]
-        with self.assertRaises(ValueError):
-            calculate_matches(players)
+        res = calculate_matches(players)
+
+        # It should silently handle the excess and build 1 table
+        assert res is not None
+        self.assertEqual(len(res.tables), 1)
 
     def test_un_gm_en_unica_table_no_es_error(self):
         """Un solo GM para una sola table es configuración válida."""

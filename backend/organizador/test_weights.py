@@ -45,11 +45,44 @@ class TestWeights(unittest.TestCase):
         # GM has 1 ticket as player (default)
         self.assertEqual(len(tickets), 14)
 
-    def test_error_too_many_gms(self):
-        # 7 players -> 1 table. 2 GMs.
-        players = [_j(f"P{i}") for i in range(5)] + [_j("GM1", g=1), _j("GM2", g=1)]
-        with self.assertRaises(ValueError):
-            build_weighted_tickets(players)
+    def test_handle_too_many_gms(self):
+        """Test that excess GMs are gracefully capped instead of raising an error."""
+        # 7 players -> 1 table. 3 GMs competing for 1 slot.
+        players = [_j(f"P{i}") for i in range(4)] + [
+            _j("GM1", g=1, d=1),
+            _j("GM2", g=1, d=1),
+            _j("GM3", g=1, d=1),
+        ]
+        estimated, _, _, gms, _ = build_weighted_tickets(players)
+
+        self.assertEqual(estimated, 1)
+        self.assertEqual(len(gms), 1)  # Only 1 GM accepted
+        self.assertEqual(gms[0].gm_games, 1)
+
+        # The other 2 GMs should have their gm_games securely capped to 0
+        capped_gms = [p for p in players if "GM" in p.name and p.gm_games == 0]
+        self.assertEqual(len(capped_gms), 2)
+
+    def test_prioritize_pure_gms(self):
+        """Test that players who only want to GM (0 desired games) get priority."""
+        # 8 players total. 7 want to play, 1 wants to only GM. -> 1 table. 1 slot available.
+        # PlayerGM wants 1 game to play, 1 to GM.
+        # PureGM wants 0 games to play, 1 to GM.
+        players = [_j(f"P{i}") for i in range(6)] + [
+            _j("PlayerGM", d=1, g=1),
+            _j("PureGM", d=0, g=1),
+        ]
+        estimated, _, _, gms, _ = build_weighted_tickets(players)
+
+        self.assertEqual(estimated, 1)
+        self.assertEqual(len(gms), 1)
+
+        # PureGM should win the slot because they have fewer desired_games
+        self.assertEqual(gms[0].name, "PureGM")
+
+        # Check that PlayerGM was gracefully capped
+        player_gm = next(p for p in players if p.name == "PlayerGM")
+        self.assertEqual(player_gm.gm_games, 0)
 
     def test_theoretical_minimum_never_negative(self):
         """Test that theoretical_minimum is calculated using max(0, ...) and never drops below 0."""

@@ -26,6 +26,7 @@
 - **Manual Save (Dumb Save):** Frontend is absolute source of truth for manual edits. Backend strictly overwrites existing state. NEVER merge historical weights or apply smart corrections on manual saves.
 - **Draft Pipeline:** Calculate Tickets -> Distribute to Tables -> Assign Countries -> Deduplicate Waitlist. NEVER skip phases or execute out of order.
 - **Graceful Degradation on Incomplete Data:** Algorithms resolving user identity or matching entries must account for incomplete data representation across systems (e.g., Notion vs Local DB). A partial representation (like an abbreviated middle/last name) that strongly matches a subset of a fully fleshed-out entry must be scored favorably, rather than heavily penalized for strict word-length mismatches.
+- **Graceful Degradation over Strict Blocking:** When the user supplies configuration that exceeds a logical limit (e.g., assigning more GMs than available tables), DO NOT block the UI or throw backend errors unless it fundamentally breaks data integrity. Prioritize the most eligible subjects (e.g., pure GMs who want 0 games), cap the resources for the rest to valid limits, and allow the system to proceed smoothly.
 
 ## 5. Domain-Driven Design (DDD) & DTO Separation
 
@@ -39,6 +40,7 @@
 
 - **Database System:** Use disposable local SQLite (`aiosqlite`). NEVER use persistent external DBs or Alembic migrations. Define schema strictly in code.
 - **Universal IDs:** Use centralized `graph_nodes` table for universal IDs and cascading deletes. NEVER implement separate ID systems.
+- **Deep Recursive Cascades for Graphs:** When deleting entities tied to a tree or graph (like Snapshots and TimelineEdges), NEVER use shallow, manual loops to delete incoming and outgoing edges. ALWAYS use a dedicated, recursive cascade function that calls itself on child nodes to sever edges and prevent orphaned "stray nodes".
 - **Immutable Identity:** ALWAYS anchor to immutable external IDs (`notion_id`). NEVER rely on user-editable strings (`name`) for relational mapping.
 - **Immutable Snapshots:** Flow data through immutable snapshots connected by `timeline_edges`. NEVER create mutable historical data structures.
 - **Fortifying the Database Boundary:** Raw SQL results from `db/views.py` MUST be immediately mapped into strict Pydantic models at the data access layer. NEVER pass raw `Row` objects or dicts with unsanitized DB values (e.g., SQLite ISO date strings) beyond the `crud/` layer. Sanitize and coerce types (dates, enums) before Pydantic validation.
@@ -58,6 +60,7 @@
 - **Explicit Selection:** Fetch ONLY required columns (`select(NotionCache.notion_id, NotionCache.name)`). NEVER fetch entire models (`select(NotionCache)`) for read-only algorithms.
 - **The Cartesian Trap:** When optimizing queries, NEVER remove `.join()` clauses if they restrict relational mapping. Missing joins cause cross-join fan-outs.
 - **Type-Safe Mapping:** Explicitly map SQLAlchemy `Row` objects into typed dicts (`{"name": row.name}`). Avoid `**row.mappings()` to guarantee Pyright compile-time safety.
+- **Bulk Deletions (Prevent N+1 Queries):** Avoid looping over ORM objects in Python just to delete their children (e.g., querying `tables` and doing `for table in tables: delete(players)`). ALWAYS use SQLAlchemy subqueries and `.in_()` clauses to execute bulk relational deletes directly in the database.
 
 ## 4. Python Typing & ISP
 
@@ -86,6 +89,7 @@
 - **SDK as Single Source of Truth:** The generated SDK (`frontend/src/generated-api`) is the ABSOLUTE single source of truth for all domain types. NEVER manually define domain interfaces (e.g., `Game`, `Player`, `DraftResponse`) in `src/types.ts` or any other file. ALL domain types MUST be imported exclusively from `frontend/src/generated-api`. `src/types.ts` is reserved ONLY for purely UI-local types (e.g., `ToastState`, `EditPlayerRow`) that have no backend equivalent.
 - **Explicit Response Unpacking:** ALWAYS unpack the `@hey-api` standardized response tuple immediately at the call site: `const { data, error } = await apiEndpoint()`. NEVER pass the raw response object to child components. Handle `error` explicitly before using `data`.
 - **Global Error Handling:** FastAPI `422 ValidationErrors` are intercepted/normalized in `api/client.ts`. UI components MUST safely read `response.error` as a clean string. Legacy `api.ts` is DEPRECATED.
+- **Robust API Error Parsing & Type Safety:** FastAPI `HTTPException`s (400/500) return `{ detail: "string" }`, which bypasses the standard 422 `HttpValidationError` (where detail is an array). ALWAYS use a heavily typed union (e.g., `HttpValidationError | { detail: string } | { error: string } | string`) for global error parsers. NEVER use `any` or `unknown` to bypass ESLint union rules, and NEVER cast error objects blindly using `String(error)`.
 
 ## 3. Layout, CSS Grid & The Rule of 8
 
@@ -122,6 +126,7 @@
 - **Frontend Querying:** Use semantic queries (`getByRole`, `getByPlaceholderText`). NEVER test implementation details or use fragile DOM traversal.
 - **Backend Model Assertions:** When asserting structured API/view outputs in Python tests, ALWAYS use object attribute dot-notation (`response.mesas`, `result.players`). NEVER use dictionary key access (`response["mesas"]`, `result["players"]`). This enforces that response types are proper Pydantic models, not raw dicts.
 - **Heuristic & Algorithm Testing:** When testing fuzzy matching, comparisons, or scoring algorithms, ALWAYS explicitly test realistic human edge cases. You MUST include test fixtures for: length disparities (e.g., "Eduardo G." vs "Eduardo González-Prada Arriarán"), typographical variants and accents, and prefixes/abbreviations. NEVER just test the "happy path" or identical strings.
+- **Explicit Setup Math for Integer Divisions:** When testing algorithms that rely on integer division (e.g., `estimated_tables = tickets // 7`), be extremely careful with test setups. ALWAYS leave a comment explicitly summing the math in the test setup (e.g., `# 6 players + 1 GM = 7 tickets -> 1 table`) to ensure edge cases don't fail due to off-by-one division errors.
 
 ## 2. Svelte & DOM Testing Rules
 

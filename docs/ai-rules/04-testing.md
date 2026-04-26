@@ -11,6 +11,7 @@ priority: 40
 - **Frontend Querying:** Use semantic queries (`getByRole`, `getByPlaceholderText`). NEVER test implementation details or use fragile DOM traversal.
 - **Backend Model Assertions:** When asserting structured API/view outputs in Python tests, ALWAYS use object attribute dot-notation (`response.mesas`, `result.players`). NEVER use dictionary key access (`response["mesas"]`, `result["players"]`). This enforces that response types are proper Pydantic models, not raw dicts.
 - **Heuristic & Algorithm Testing:** When testing fuzzy matching, comparisons, or scoring algorithms, ALWAYS explicitly test realistic human edge cases. You MUST include test fixtures for: length disparities (e.g., "Eduardo G." vs "Eduardo González-Prada Arriarán"), typographical variants and accents, and prefixes/abbreviations. NEVER just test the "happy path" or identical strings.
+- **Explicit Setup Math for Integer Divisions:** When testing algorithms that rely on integer division (e.g., `estimated_tables = tickets // 7`), be extremely careful with test setups. ALWAYS leave a comment explicitly summing the math in the test setup (e.g., `# 6 players + 1 GM = 7 tickets -> 1 table`) to ensure edge cases don't fail due to off-by-one division errors.
 
 ## 2. Svelte & DOM Testing Rules
 

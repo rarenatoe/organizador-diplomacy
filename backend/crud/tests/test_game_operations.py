@@ -195,6 +195,9 @@ class TestGameDraftOperations:
         }
 
         # Action: Update game draft
+        # Expunge objects from the session to simulate a fresh HTTP request and prevent
+        # identity map conflicts from raw SQL DELETEs overlapping with new INSERTs.
+        db_session.expunge_all()
         updated_game_id = await update_game_draft(
             db_session, game_id, input_snap, output_snap, new_draft_data
         )

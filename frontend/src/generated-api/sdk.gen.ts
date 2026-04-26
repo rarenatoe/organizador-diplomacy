@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ApiChainData, ApiChainResponses, ApiDeleteSnapshotData, ApiDeleteSnapshotErrors, ApiDeleteSnapshotResponses, ApiGameData, ApiGameDeleteData, ApiGameDeleteErrors, ApiGameDeleteResponses, ApiGameDraftData, ApiGameDraftErrors, ApiGameDraftResponses, ApiGameErrors, ApiGameResponses, ApiGameSaveData, ApiGameSaveErrors, ApiGameSaveResponses, ApiNotionFetchData, ApiNotionFetchErrors, ApiNotionFetchResponses, ApiPlayerCheckSimilarityData, ApiPlayerCheckSimilarityErrors, ApiPlayerCheckSimilarityResponses, ApiPlayerGetAllData, ApiPlayerGetAllResponses, ApiPlayerLookupData, ApiPlayerLookupErrors, ApiPlayerLookupResponses, ApiPlayerRenameData, ApiPlayerRenameErrors, ApiPlayerRenameResponses, ApiRunNotionSyncData, ApiRunNotionSyncErrors, ApiRunNotionSyncResponses, ApiSnapshotData, ApiSnapshotErrors, ApiSnapshotResponses, ApiSnapshotSaveData, ApiSnapshotSaveErrors, ApiSnapshotSaveResponses, ApiSyncStatusData, ApiSyncStatusResponses, CatchAllData, CatchAllErrors, CatchAllResponses } from './types.gen';
+import type { ApiChainData, ApiChainErrors, ApiChainResponses, ApiDeleteSnapshotData, ApiDeleteSnapshotErrors, ApiDeleteSnapshotResponses, ApiGameData, ApiGameDeleteData, ApiGameDeleteErrors, ApiGameDeleteResponses, ApiGameDraftData, ApiGameDraftErrors, ApiGameDraftResponses, ApiGameErrors, ApiGameResponses, ApiGameSaveData, ApiGameSaveErrors, ApiGameSaveResponses, ApiNotionFetchData, ApiNotionFetchErrors, ApiNotionFetchResponses, ApiPlayerCheckSimilarityData, ApiPlayerCheckSimilarityErrors, ApiPlayerCheckSimilarityResponses, ApiPlayerGetAllData, ApiPlayerGetAllErrors, ApiPlayerGetAllResponses, ApiPlayerLookupData, ApiPlayerLookupErrors, ApiPlayerLookupResponses, ApiPlayerRenameData, ApiPlayerRenameErrors, ApiPlayerRenameResponses, ApiRunNotionSyncData, ApiRunNotionSyncErrors, ApiRunNotionSyncResponses, ApiSnapshotData, ApiSnapshotErrors, ApiSnapshotResponses, ApiSnapshotSaveData, ApiSnapshotSaveErrors, ApiSnapshotSaveResponses, ApiSyncStatusData, ApiSyncStatusErrors, ApiSyncStatusResponses, CatchAllData, CatchAllErrors, CatchAllResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -23,7 +23,7 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
  *
  * Returns the full chain tree for the timeline view.
  */
-export const apiChain = <ThrowOnError extends boolean = false>(options?: Options<ApiChainData, ThrowOnError>) => (options?.client ?? client).get<ApiChainResponses, unknown, ThrowOnError>({ url: '/api/chain', ...options });
+export const apiChain = <ThrowOnError extends boolean = false>(options?: Options<ApiChainData, ThrowOnError>) => (options?.client ?? client).get<ApiChainResponses, ApiChainErrors, ThrowOnError>({ url: '/api/chain', ...options });
 
 /**
  * Api Delete Snapshot
@@ -134,7 +134,7 @@ export const apiPlayerRename = <ThrowOnError extends boolean = false>(options: O
  *
  * Get all known players. Returns rich, unformatted objects to power UI autocomplete.
  */
-export const apiPlayerGetAll = <ThrowOnError extends boolean = false>(options?: Options<ApiPlayerGetAllData, ThrowOnError>) => (options?.client ?? client).get<ApiPlayerGetAllResponses, unknown, ThrowOnError>({ url: '/api/player/all', ...options });
+export const apiPlayerGetAll = <ThrowOnError extends boolean = false>(options?: Options<ApiPlayerGetAllData, ThrowOnError>) => (options?.client ?? client).get<ApiPlayerGetAllResponses, ApiPlayerGetAllErrors, ThrowOnError>({ url: '/api/player/all', ...options });
 
 /**
  * Api Player Lookup
@@ -184,7 +184,7 @@ export const apiRunNotionSync = <ThrowOnError extends boolean = false>(options: 
  *
  * Returns the current status of the background Notion sync daemon.
  */
-export const apiSyncStatus = <ThrowOnError extends boolean = false>(options?: Options<ApiSyncStatusData, ThrowOnError>) => (options?.client ?? client).get<ApiSyncStatusResponses, unknown, ThrowOnError>({ url: '/api/sync/status', ...options });
+export const apiSyncStatus = <ThrowOnError extends boolean = false>(options?: Options<ApiSyncStatusData, ThrowOnError>) => (options?.client ?? client).get<ApiSyncStatusResponses, ApiSyncStatusErrors, ThrowOnError>({ url: '/api/sync/status', ...options });
 
 /**
  * Catch All

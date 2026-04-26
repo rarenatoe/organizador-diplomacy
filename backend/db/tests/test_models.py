@@ -271,7 +271,7 @@ class TestModelInstantiation:
 class TestRelationshipConfiguration:
     """Verify SQLAlchemy relationships are properly configured without conflicts."""
 
-    def test_configure_mappers_no_warnings(self) -> None:
+    async def test_configure_mappers_no_warnings(self) -> None:
         """Configuring mappers should not produce relationship conflict warnings."""
         # This will raise warnings if relationships overlap incorrectly
         configure_mappers()
