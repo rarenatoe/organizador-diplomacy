@@ -4,19 +4,18 @@ title: Pillar 5 - Workflow & Git Rules
 priority: 50
 ---
 
-## 1. Meta-Prompting & AI Constraints
+## 1. Meta-Prompting Rules
 
-- **ABSOLUTE CONSTRAINTS ONLY:** ALWAYS use absolute terms (MUST, NEVER, BANNED, STRICTLY). NEVER use polite/emotional language ("Please", "Try to", "Avoid") as it dilutes LLM token weights.
-- **ATOMIZE PROMPTS:** Break instructions down into atomized, file-specific prompts. Monolithic prompts cause agents to gloss over critical lines of code.
+- **Absolute Constraints:** Use MUST, NEVER, BANNED, STRICTLY. BANNED: Polite/suggestive language ("Please", "Try to").
+- **Atomization:** Break instructions into focused, file-specific prompts to prevent AI context gloss-over.
 
-## 2. The OpenAPI SDK Pipeline
+## 2. OpenAPI SDK Pipeline
 
-- **Backend Change Impact:** ANY backend change to a Pydantic model or FastAPI router REQUIRES running the generation pipeline to keep the frontend SDK in sync.
-- **Generation Workflow:** Run `uv run scripts/export_openapi.py`, then `cd frontend && bun run typegen` (Lefthook runs this pre-commit).
-- **Synchronization:** Backend and frontend MUST remain in sync strictly through the auto-generated SDK. Manual interface definitions are BANNED.
+- **Generation:** ANY backend change to a Pydantic model or FastAPI router REQUIRES running `bun run typegen`
+- **Sync:** Backend and frontend communicate STRICTLY through the generated SDK. BANNED: Manual interface definitions.
 
-## 3. Rule Governance & Verification
+## 3. Rule Governance
 
-- **Source of Truth:** Edit rules ONLY in the `docs/ai-rules/` directory. NEVER directly edit generated artifacts (`.clinerules`, `.windsurfrules`).
-- **Compilation:** ALWAYS run `bun run scripts/generate-ai-instructions.ts` after editing rules to propagate them to agent configs.
-- **Pre-Commit:** Validate with `bun run build && bun run lint && bun run typecheck`. NEVER rely on CI/CD to catch Svelte syntax or type errors.
+- **Source of Truth:** Edit rules ONLY in `docs/ai-rules/*.md`. BANNED: Editing `.clinerules` or `.windsurfrules` directly.
+- **Compilation:** Run `bun run ai-rules:generate` after editing rules to propagate them to agent configs.
+- **Validation:** Let pre-commit hooks (`lefthook`) handle format/lint/typecheck.

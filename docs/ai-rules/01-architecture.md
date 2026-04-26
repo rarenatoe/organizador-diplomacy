@@ -4,41 +4,31 @@ title: Pillar 1 - Domain, Boundaries & Architecture
 priority: 10
 ---
 
-## 1. Domain Context (CRITICAL)
+## 1. Domain & Workflows
 
-- **The Application:** Diplomacy Tournament Organizer.
-- **Core Entities:** `Snapshots` (player rosters), `Games` (7-player tables + GMs), `Waitlists` (unseated players).
-- **The Algorithm:** Prioritizes seating based on veteran status, games played this year, and historical country assignments to prevent repetition.
-
-## 2. Global Architecture & Boundaries
-
-- **Backend Stack:** Python 3.13, uv, FastAPI, SQLAlchemy. NEVER use Flask or mix presentation logic in backend.
-- **Frontend Stack:** Svelte 5, TypeScript, Vite. NEVER place business logic or data processing in frontend components.
-- **Language Boundaries:** - Internal Code: English ONLY (variables, types, DB schemas, endpoints). NEVER use Spanish (e.g., `listaEspera`).
-  - UI Text: Spanish ONLY (HTML labels, buttons, error messages). NEVER translate user-facing text.
-  - API Properties: NEVER translate API-coupled data properties (e.g., `mesa.jugadores`).
-
-## 3. Directory Layout
-
-- **Backend (`backend/`):** `api/routers/` (Endpoints), `db/` (Models), `crud/` (Data access), `organizador/` (Algorithms), `sync/` (Notion integration).
-- **Frontend (`frontend/src/`):** ALL frontend code lives here. NEVER scatter outside.
-
-## 4. Core Workflows
-
-- **Player Ingestion:** Users enter players via Autocomplete or bulk CSV. Unrecognized names MUST be intercepted via Notion similarity check (`SyncResolutionModal`). NEVER bypass validations.
+- **Core Entities:** `Snapshots` (rosters), `Games` (7-player tables + GMs), `Waitlists` (unseated).
 - **History Lookup:** MUST use strict 4-tier traversal: `TimelineEdge` -> `SnapshotPlayer` -> `SnapshotHistory JSON` -> `NotionCache`. NEVER skip tiers.
-- **Manual Save (Dumb Save):** Frontend is absolute source of truth for manual edits. Backend strictly overwrites existing state. NEVER merge historical weights or apply smart corrections on manual saves.
+- **Manual Save:** Frontend is the absolute source of truth. Backend strictly overwrites state. NEVER merge weights or apply smart corrections on manual saves.
 - **Draft Pipeline:** Calculate Tickets -> Distribute to Tables -> Assign Countries -> Deduplicate Waitlist. NEVER skip phases or execute out of order.
-- **Graceful Degradation on Incomplete Data:** Algorithms resolving user identity or matching entries must account for incomplete data representation across systems (e.g., Notion vs Local DB). A partial representation (like an abbreviated middle/last name) that strongly matches a subset of a fully fleshed-out entry must be scored favorably, rather than heavily penalized for strict word-length mismatches.
-- **Graceful Degradation over Strict Blocking:** When the user supplies configuration that exceeds a logical limit (e.g., assigning more GMs than available tables), DO NOT block the UI or throw backend errors unless it fundamentally breaks data integrity. Prioritize the most eligible subjects (e.g., pure GMs who want 0 games), cap the resources for the rest to valid limits, and allow the system to proceed smoothly.
-- **Relative vs. Absolute Thresholds:** In long-running leagues, absolute thresholds degrade over time. Domain algorithms MUST define constraints (like "curses" or disproportionate repetitions) relative to a dynamic baseline (e.g., the table minimum or the player's personal minimum), rather than hardcoded absolute limits.
-- **Greedy Optimization over Linear Checks:** For complex assignment logic (like country distribution), prefer Greedy Intervention loops over linear passes. Score potential assignments by how many constraints they resolve simultaneously (e.g., "Self-Healing" vs. "Shielding") to mathematically minimize total forced interventions.
 
-## 5. Domain-Driven Design (DDD) & DTO Separation
+## 2. Global Architecture & Language Boundaries
 
-- **Domain Model Purity:** Core business logic in `organizador/` (e.g., weight calculations, distribution algorithms) MUST NEVER import FastAPI, Pydantic, or any web framework. Domain models are plain Python dataclasses or TypedDicts only.
-- **Strict Layer Boundaries:** `organizador/` owns Domain Models. `api/models/` owns DTOs (Pydantic). `api/routers/` owns HTTP concerns only. NEVER collapse these layers.
-- **Factory Methods on DTOs:** Pydantic response models in `api/models/` MUST expose a `@classmethod def from_domain(cls, obj: DomainModel) -> "Self"` factory to translate Domain Models into API responses. NEVER perform this translation inside a router function.
-- **Lean Routers:** FastAPI routers MUST only: validate input, call a CRUD or domain function, call the DTO factory, and return. NEVER embed business logic or data reshaping directly in router functions.
-- **No Upward Coupling:** Domain layer (`organizador/`) MUST NEVER reference DTO models from `api/models/`. Data flows strictly downward: Router → CRUD/Domain → DTO factory → Response.
-- **Structured Data over Pre-Formatted Strings (Separation of Concerns):** The backend MUST deliver structured data (e.g., `list[str]` for multiple reasons or logs). NEVER pre-join strings or apply UI formatting (like bullet points or line breaks) in the backend. Let the frontend dictate the presentation.
+- **Backend Stack:** Python 3.13, uv, FastAPI, SQLAlchemy. NEVER use Flask or mix presentation logic.
+- **Frontend Stack:** Svelte 5, TypeScript, Vite. NEVER place business logic in UI components.
+- **Bilingual Codebase:** - **Internal Code:** English ONLY (variables, types, schemas, endpoints).
+  - **UI Text:** Spanish ONLY (HTML labels, buttons, errors). NEVER translate user-facing text.
+  - **API Payloads:** NEVER translate API-coupled data properties.
+
+## 3. Domain-Driven Design (DDD)
+
+- **Layer Separation:** - `organizador/`: Pure domain logic (Python dataclasses/TypedDicts). NO FastAPI/Pydantic imports.
+  - `api/models/`: Pydantic DTOs. MUST expose `@classmethod def from_domain(cls, obj) -> "Self"` factories.
+  - `api/routers/`: HTTP routing only. Validate input -> Call CRUD/Domain -> Call DTO factory.
+- **Data Flow:** Downward only (Router → CRUD/Domain → DTO). Domain layer MUST NEVER reference DTOs.
+- **Separation of Concerns:** Backend delivers structured primitives (e.g., `list[str]`). Frontend handles presentation/formatting (e.g., joining strings).
+
+## 4. Algorithm & Degradation Principles
+
+- **Graceful Degradation:** Favour partial matches (e.g., abbreviated names) over strict failures. Cap excessive user limits (e.g., too many GMs) instead of blocking the UI.
+- **Relative Thresholds:** Use dynamic baselines (e.g., table minimums) for algorithms, NEVER hardcoded absolute limits.
+- **Greedy Optimization:** Prefer Greedy Intervention loops over linear passes for complex assignments. Score assignments by simultaneous constraint resolutions.

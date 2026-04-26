@@ -6,46 +6,31 @@ priority: 30
 
 ## 1. Svelte 5 Reactivity & State
 
-- **Runes ONLY:** USE `$state`, `$derived`, `$effect`. NEVER use `let` for reactive state. Use `$derived.by()` for complex logic.
-- **Functional POJO State:** Extract complex state into plain objects using Runes, NEVER ES6 Classes.
-- **Discriminated Unions:** Group related state variables (e.g., `status: 'idle' | 'resolving'`) into Discriminated Unions to eliminate impossible states.
-- **Navigation Stack:** USE an in-memory stack (array) for multi-level navigation. NEVER use flat variables (`$state(panelId)`).
-- **Logic File Naming:** NEVER name a logic file identically to a UI file (e.g., avoid `Component.svelte` and `Component.svelte.ts`). Use `lowerCamelCaseState.svelte.ts` to prevent bundler collisions.
-- **Component-Level Generics:** Use component-level Generics (`<script lang="ts" generics="T extends {...}">`) so components adapt safely to diverse data shapes.
+- **Runes ONLY:** USE `$state`, `$derived`, `$effect`. BANNED: `let` for reactivity, ES6 Classes for state.
+- **State Architecture:** Group related states in Discriminated Unions. Extract complex state into POJOs using `lowerCamelCaseState.svelte.ts` files. Use an array stack for navigation.
+- **Thick Logic Extraction:** Complex data mutations (e.g., drag-and-drop, multi-array swapping, draft orchestrations) MUST be extracted into a dedicated `.svelte.ts` controller. NEVER leave massive (50+ line) mutation functions inside `.svelte` script blocks.
+- **Loop Constants:** ALWAYS use Svelte's `{@const ...}` to compute derived target objects or parameters within `{#each}` loops. NEVER instantiate new objects inline inside HTML event handlers (e.g., `onclick={() => fn({ id })}`).
+- **Typing:** Use component-level Generics (`<script lang="ts" generics="...">`) so components adapt safely to diverse data shapes.
 
-## 2. Auto-Generated API SDK (CRITICAL)
+## 2. Auto-Generated SDK (`@hey-api`)
 
-- **NO MANUAL FETCHING:** NEVER write manual `fetch` calls or custom interfaces. ALWAYS use the `@hey-api` generated endpoints (e.g., `apiPlayerCheckSimilarity`) and types from `frontend/src/generated-api`.
-- **SDK as Single Source of Truth:** The generated SDK (`frontend/src/generated-api`) is the ABSOLUTE single source of truth for all domain types. NEVER manually define domain interfaces (e.g., `Game`, `Player`, `DraftResponse`) in `src/types.ts` or any other file. ALL domain types MUST be imported exclusively from `frontend/src/generated-api`. `src/types.ts` is reserved ONLY for purely UI-local types (e.g., `ToastState`, `EditPlayerRow`) that have no backend equivalent.
-- **Explicit Response Unpacking:** ALWAYS unpack the `@hey-api` standardized response tuple immediately at the call site: `const { data, error } = await apiEndpoint()`. NEVER pass the raw response object to child components. Handle `error` explicitly before using `data`.
-- **Global Error Handling:** FastAPI `422 ValidationErrors` are intercepted/normalized in `api/client.ts`. UI components MUST safely read `response.error` as a clean string. Legacy `api.ts` is DEPRECATED.
-- **Robust API Error Parsing & Type Safety:** FastAPI `HTTPException`s (400/500) return `{ detail: "string" }`, which bypasses the standard 422 `HttpValidationError` (where detail is an array). ALWAYS use a heavily typed union (e.g., `HttpValidationError | { detail: string } | { error: string } | string`) for global error parsers. NEVER use `any` or `unknown` to bypass ESLint union rules, and NEVER cast error objects blindly using `String(error)`.
+- **Single Source of Truth:** Import all domain types from `src/generated-api`. BANNED: Manual `fetch` calls, manual domain interfaces in `src/types.ts`.
+- **Response Unpacking:** ALWAYS unpack immediately: `const { data, error } = await apiEndpoint()`. Handle `error` explicitly.
+- **Error Handling:** Intercepted globally in `api/client.ts`. Use typed unions for error parsers, NEVER `any`/`unknown`.
 
-## 3. Layout, CSS Grid & The Rule of 8
+## 3. Layout & CSS Grid (Rule of 8)
 
-- **Strict Rule of 8:** ALL spacing uses absolute variables (`var(--space-8)`). Borders (`1px`) are the ONLY exemption.
-- **Pure CSS ONLY:** NEVER use Tailwind, utility classes, or inline `style="..."`. Use semantic variables (`var(--bg-secondary)`).
-- **Class Injection:** ALWAYS use `cx()` or `clsx` for dynamic classes. NEVER use string concatenation (`class="{base} {active}"`).
-- **Flexbox-in-Grid Blowout:** Apply `min-width: 0` to flex containers AND children inside CSS Grids to prevent `minmax()` blowout.
-- **Svelte CSS Pruning:** Wrap dynamic target selectors in `:global()` (e.g., `.btn-icon :global(svg)`).
-- **Sticky Stacking Contexts:** Elements inside `position: sticky` are trapped in its stacking context. To make an absolute child (like a dropdown) overlap, you MUST elevate the parent cell's z-index on focus/hover.
-- **Intrinsic Sizing:** Leaf components MUST NOT define their own external margins. Parent layouts must govern spacing exclusively using `display: flex; gap: ...`.
-- **Structural Abstractions over CSS Classes:** Do not copy-paste standard layout CSS (like `.section` or `.meta-grid`) across files. Instead, use or create Svelte structural wrapper components (e.g., `<PanelSection>`, `<MetaGrid>`).
-- **Strict Intrinsic Sizing:** Leaf components and structural wrappers MUST NOT define external margins (`margin-top`, `margin-bottom`). The parent container must dictate spacing using `display: flex` and `gap`.
-- **Zero Inline Styles:** Avoid using inline `style="..."` attributes for structural adjustments. Pass a `class` prop and use Svelte's `:global(.your-class)` modifier in the parent's `<style>` block.
-- **Organized Imports:** All imports MUST be automatically sorted. NEVER manually order imports; rely on `@ianvs/prettier-plugin-sort-imports` via the format-on-save pipeline.
+- **Styling:** Pure CSS only. Use semantic variables (`var(--space-8)`). BANNED: Tailwind, utility classes, inline `style="..."`.
+- **Class Injection:** Use `cx()`/`clsx`. BANNED: String concatenation.
+- **Intrinsic Sizing:** Leaf components MUST NOT define external margins. Parents dictate spacing via `display: flex; gap: ...`. Wrap target selectors in `:global()`.
+- **Grid Blowout:** Apply `min-width: 0` to flex containers and children inside CSS Grids.
+- **Structural Abstractions:** Create wrapper components (`<PanelSection>`) instead of copy-pasting layout classes.
 
 ## 4. UI Architecture & UX
 
-- **Component Routing:** `ui/` MUST be domain-agnostic. `features/` MUST be domain-aware.
-- **Reference Swapping:** When exchanging complex nested objects, swap the entire object reference. NEVER manually overwrite individual properties.
-- **Zero Layout Shift (Ghost Elements):** Read-only states MUST mimic the exact padding/height of editable states. Specifically, conditional ghost buttons or icons MUST NOT stretch grid/flex rows. Always set a strict `min-height` on the row container (e.g., `min-height: var(--space-32)`) to absorb conditional elements without shifting the layout.
-- **Action Bubbling:** Feature components MUST bubble actions via callback props. NEVER perform API side-effects deeply in nested UI components.
-- **Data Discovery:** NEVER rely on native HTML `title` attributes. ALWAYS use `<Tooltip>` components wrapping Svelte Snippets.
-- **Array Rendering in Tooltips:** When rendering arrays of strings (like backend explanation logs) in tight spaces like Tooltips, join them contextually at the template level (`array.join(" ")`), rather than expecting the backend to pre-format them.
+- **Smart vs Dumb Components:** `features/` are Smart components that handle API side-effects and complex state orchestration. `ui/` and `layout/` are Dumb components that MUST remain domain-agnostic and bubble actions via callback props. NEVER perform API calls in Dumb components.
+- **References:** Swap entire object references for complex nested objects. BANNED: Deep mutations of nested properties.
+- **Snippets:** Presentation lists must be dumb. Use Svelte 5 Snippets to yield domain logic (indices, IDs) back to the parent. Abstract entire list containers, not just leaf items.
+- **UX Guards:** Mimic padding in read-only states and set `min-height` to prevent layout shifts. Pair floating UI visibility with explicit interaction booleans to prevent zombies.
 - **Banned Browser APIs:** NEVER use `window.prompt()`, `window.alert()`, or `window.confirm()`. ALWAYS use custom modal components.
-- **Floating UI Guard:** Do not base the visibility of floating elements (dropdowns, modals) solely on derived array lengths. ALWAYS pair visibility with an explicit user-interaction boolean (e.g., `isActive`) to prevent zombie UI elements.
-- **Logging:** ALWAYS use `logger.info()` from `src/utils/logger.ts`. NEVER use `console.log()`.
-- **List-Level Abstraction Priority:** When standardizing repeated UI elements across different views (e.g., read-only vs. interactive), prioritize abstracting the _entire list container_ (e.g., `<Waitlist>`) rather than just the leaf item (`<WaitlistItem>`). This guarantees unified flex/grid `gap` spacing and eliminates duplicated `{#each}` loops in parent views.
-- **Snippet Arguments for Domain Logic:** Presentation list components MUST remain entirely unaware of domain logic. Use Svelte 5 Snippet arguments (e.g., `actions?: Snippet<[number]>`) to yield contextual data (like loop indices or player IDs) back to the parent. The parent injects the UI (like `<Button>`) and handles the API side-effects.
-- **Date & Time Formatting:** The backend often sends "naive" timestamps (e.g., `2024-01-01T10:00:00`). To ensure the browser correctly translates these to the user's local timezone, frontend formatters must explicitly cast them to UTC by appending a "Z" if it is missing before parsing them with `new Date()`. ALWAYS use the shared `formatDate` utility from `src/i18n.ts` rather than manually splitting or parsing strings in Svelte components.
+- **Dates:** Cast naive backend timestamps to UTC (`+ "Z"`) before parsing to adapt to local timezones. ALWAYS use the shared `formatDate` utility from `src/i18n.ts`.
