@@ -102,25 +102,33 @@ def detect_similar_names(
     snapshot_names: list[str],
     threshold: float = 0.75,
 ) -> list[PlayerSimilarityDict]:
-    """Detect similar names between Notion and snapshot using waterfall algorithm."""
     players_list = (
         list(notion_players.values()) if isinstance(notion_players, Mapping) else notion_players
     )
     norm_snapshots = {name: normalize_name(name) for name in snapshot_names}
     potential_matches: list[PlayerSimilarityDict] = []
+
     exact_matches_snapshot: set[str] = set()
+    claimed_notion_ids: set[str] = set()
 
     for player_data in players_list:
         notion_main_name = player_data["name"]
         norm_notion_main = normalize_name(notion_main_name)
+        notion_id = player_data["notion_id"]
+
         for snap_name in snapshot_names:
             if norm_notion_main == norm_snapshots[snap_name]:
                 exact_matches_snapshot.add(snap_name)
+                claimed_notion_ids.add(notion_id)  # Reclamamos este ID
                 continue
 
     for player_data in players_list:
-        notion_main_name = player_data["name"]
         notion_id = player_data["notion_id"]
+
+        if notion_id in claimed_notion_ids:
+            continue
+
+        notion_main_name = player_data["name"]
         notion_variations = [notion_main_name] + player_data.get("alias", [])
 
         for snap_name in snapshot_names:

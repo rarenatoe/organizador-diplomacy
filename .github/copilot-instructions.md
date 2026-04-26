@@ -57,6 +57,13 @@
 - **String Normalization:** Aggressively normalize human strings (lowercase, strip, collapse spaces, remove accents) for comparisons.
 - **Logging:** Use `backend.core.logger`. BANNED: `print()`, `pprint()`.
 
+## 4. Data Synchronization & Matching
+
+- **Destination Collision Exclusion (Claimed IDs):** When importing or syncing lists (e.g., CSV imports) that require fuzzy matching against a source of truth:
+  1. Always resolve exact matches first and **mark those target IDs as "claimed"**.
+  2. When evaluating ambiguous or misspelled items (fuzzy matching), **never suggest a target ID that has already been claimed** by an exact match in the same batch.
+  3. _Why:_ Prevents "Multiple Silent Assignments" where distinct rows accidentally merge into the same foreign identity, corrupting data integrity.
+
 ## 1. Svelte 5 Reactivity & State
 
 - **Runes ONLY:** USE `$state`, `$derived`, `$effect`. BANNED: `let` for reactivity, ES6 Classes for state.
@@ -91,6 +98,11 @@
 - **UX Guards:** Mimic padding in read-only states and set `min-height` to prevent layout shifts. NEVER use UI-layer fallbacks (e.g., `{cupos ?? deseadas}`) to mask inaccurate underlying data; fix the mathematical source of truth. Pair floating UI visibility with explicit interaction booleans to prevent zombies.
 - **Banned Browser APIs:** NEVER use `window.prompt()`, `window.alert()`, or `window.confirm()`. ALWAYS use custom modal components.
 - **Dates:** Cast naive backend timestamps to UTC (`+ "Z"`) before parsing to adapt to local timezones. ALWAYS use the shared `formatDate` utility from `src/i18n.ts`.
+- **1-to-N Disambiguation (Resolving Conflicts):** When resolving sync conflicts where a single local string matches multiple remote entities:
+  - **Avoid Sequential Modals:** Do not show a 1-to-1 Yes/No modal sequentially for the same item.
+  - **Use Grouped Radio Lists:** Group the conflicts by the ambiguous local name. Present the remote options as a scrollable list of selectable cards (Radio buttons) with a fixed `max-height`.
+  - **Rich Context:** Each card must show relevant metadata (similarity score, alias used, existing local entity status) so the user can make an informed decision at a glance.
+  - **Dynamic Actions:** Action buttons at the bottom of the modal MUST change reactively based on the metadata of the currently selected radio option (e.g., swapping "Link & Rename" buttons for a single "Use Existing Local Player" button).
 
 ## 1. Backend Testing (`pytest`)
 

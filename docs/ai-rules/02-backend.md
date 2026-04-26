@@ -30,3 +30,10 @@ priority: 20
 - **Interface Segregation:** Pure functions declare minimal `TypedDict`s instead of demanding massive ORM models. Use covariant hints (`Mapping`, `Sequence`).
 - **String Normalization:** Aggressively normalize human strings (lowercase, strip, collapse spaces, remove accents) for comparisons.
 - **Logging:** Use `backend.core.logger`. BANNED: `print()`, `pprint()`.
+
+## 4. Data Synchronization & Matching
+
+- **Destination Collision Exclusion (Claimed IDs):** When importing or syncing lists (e.g., CSV imports) that require fuzzy matching against a source of truth:
+  1. Always resolve exact matches first and **mark those target IDs as "claimed"**.
+  2. When evaluating ambiguous or misspelled items (fuzzy matching), **never suggest a target ID that has already been claimed** by an exact match in the same batch.
+  3. _Why:_ Prevents "Multiple Silent Assignments" where distinct rows accidentally merge into the same foreign identity, corrupting data integrity.

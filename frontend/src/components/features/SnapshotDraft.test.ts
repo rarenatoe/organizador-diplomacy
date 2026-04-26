@@ -1008,9 +1008,7 @@ describe("SnapshotDraft", () => {
       await tick();
 
       // Modal should appear with autocorrect
-      expect(
-        screen.getByText(/Jugador existente detectado/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Jugador existente/i)).toBeInTheDocument();
       const useExistingBtn = screen.getByRole("button", {
         name: /Usar Daniel E/i,
       });

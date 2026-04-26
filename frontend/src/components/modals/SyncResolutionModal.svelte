@@ -14,38 +14,48 @@
   let { visible, pairs, onComplete, onCancel }: Props = $props();
 
   let currentIndex = $state(0);
+  let selectedMatchIndex = $state(0);
   let decisions = $state<
     { pair: PlayerSimilarityItem; action: ResolutionAction }[]
   >([]);
 
-  let currentPair = $derived(pairs[currentIndex]);
-  let total = $derived(pairs.length);
-  let similarity = $derived(
-    currentPair ? Math.round(currentPair.similarity * 100) : 0,
+  // Group the flat pairs array by the snapshot name
+  let groupedConflicts = $derived.by(() => {
+    const groups: Record<string, PlayerSimilarityItem[]> = {};
+    for (const pair of pairs) {
+      if (!groups[pair.snapshot]) {
+        groups[pair.snapshot] = [];
+      }
+      groups[pair.snapshot]?.push(pair);
+    }
+    return Object.values(groups);
+  });
+
+  let total = $derived(groupedConflicts.length);
+  let currentGroup = $derived(groupedConflicts[currentIndex]);
+  let currentSelectedPair = $derived(
+    currentGroup ? currentGroup[selectedMatchIndex] : undefined,
   );
 
   function handleAction(action: ResolutionAction): void {
-    if (!currentPair) return;
-    decisions = [...decisions, { pair: currentPair, action }];
+    if (!currentSelectedPair) return;
+
+    // Record the decision for the currently selected radio option
+    decisions = [...decisions, { pair: currentSelectedPair, action }];
 
     let nextIndex = currentIndex + 1;
 
-    if (action !== "skip") {
-      while (
-        nextIndex < pairs.length &&
-        pairs[nextIndex]?.snapshot === currentPair.snapshot
-      ) {
-        nextIndex++;
-      }
-    }
-
-    if (nextIndex < pairs.length) {
+    if (nextIndex < total) {
+      // Move to the next grouped conflict and reset the radio selection
       currentIndex = nextIndex;
+      selectedMatchIndex = 0;
     } else {
+      // Finished resolving all groups
       const merges: MergePair[] = decisions
         .filter((d) => d.action !== "skip")
         .map((d) => {
           let toName = d.pair.notion_name;
+          // If we chose to use the existing local, map 'to' to that local name
           if (d.action === "use_existing" && d.pair.existing_local_name) {
             toName = d.pair.existing_local_name;
           }
@@ -67,6 +77,7 @@
   $effect(() => {
     if (visible) {
       currentIndex = 0;
+      selectedMatchIndex = 0;
       decisions = [];
     }
   });
@@ -82,105 +93,99 @@
           Conflicto {currentIndex + 1} de {total}
         </span>
       </div>
-      {#if currentPair}
-        <div class="comparison-card">
-          <span class="side-label notion-label">Notion</span>
-          <div class="vs-divider">VS</div>
-          <span class="side-label snapshot-label">Snapshot</span>
 
-          <span
-            class="side-name highlight-notion notion-name"
-            title={currentPair.notion_name}>{currentPair.notion_name}</span
+      {#if currentGroup && currentSelectedPair}
+        <div class="resolution-message">
+          Coincidencias para: <span class="highlight-snapshot"
+            >{currentGroup[0]?.snapshot}</span
           >
-          <span
-            class="side-name highlight-snapshot snapshot-name"
-            title={currentPair.snapshot}>{currentPair.snapshot}</span
-          >
-
-          {#if currentPair.matched_alias}
-            <span
-              class="alias-text notion-alias"
-              title={`(vía alias: ${currentPair.matched_alias})`}
-            >
-              (vía alias: {currentPair.matched_alias})</span
-            >
-          {/if}
         </div>
 
-        <div class="resolution-similarity">
-          <Badge
-            variant="warning"
-            text={`${similarity}% similar`}
-            pill={true}
-          />
+        <div class="options-list">
+          {#each currentGroup as match, i (match.notion_id)}
+            <label
+              class="match-option"
+              class:selected={selectedMatchIndex === i}
+            >
+              <input type="radio" bind:group={selectedMatchIndex} value={i} />
+              <div class="match-info">
+                <div class="match-info-header">
+                  <span class="notion-name highlight-notion"
+                    >{match.notion_name}</span
+                  >
+                  <Badge
+                    variant="warning"
+                    text={`${Math.round(match.similarity * 100)}%`}
+                    pill={true}
+                  />
+                </div>
+                {#if match.matched_alias}
+                  <span
+                    class="alias-text"
+                    title={`(vía alias: ${match.matched_alias})`}
+                  >
+                    (vía alias: {match.matched_alias})
+                  </span>
+                {/if}
+                {#if match.existing_local_name}
+                  <div class="existing-badge">
+                    ✨ Jugador existente ({match.existing_local_name})
+                  </div>
+                {/if}
+              </div>
+            </label>
+          {/each}
         </div>
 
-        {#if currentPair.existing_local_name}
-          <div class="resolution-message">
-            Jugador existente detectado. ¿Deseas usar <span
-              class="highlight-snapshot">{currentPair.existing_local_name}</span
-            >?
-          </div>
-          <div class="resolution-actions">
+        <div class="dynamic-actions">
+          {#if currentSelectedPair.existing_local_name}
             <Button
               variant="primary"
-              title={`Usar el jugador existente: ${currentPair.existing_local_name}`}
+              title={`Usar el jugador existente: ${currentSelectedPair.existing_local_name}`}
               onclick={() => handleAction("use_existing")}
-              icon="✨">Usar {currentPair.existing_local_name}</Button
+              icon="✨">Usar {currentSelectedPair.existing_local_name}</Button
             >
+            <div class="compact-hint">
+              <span class="hint-icon">💡</span>
+              <div class="hint-text">
+                <strong>Autocorrección:</strong> Evita duplicados vinculando al jugador
+                que ya está en tu base local.
+              </div>
+            </div>
+          {:else}
+            <div class="button-row">
+              <Button
+                variant="primary"
+                title="Vincular y actualizar el nombre local al de Notion"
+                onclick={() => handleAction("link_rename")}
+                icon="📋">Vincular & Renombrar</Button
+              >
+              <Button
+                variant="secondary"
+                title="Vincular manteniendo el nombre local actual"
+                onclick={() => handleAction("link_only")}
+                icon="🔗">Vincular Solo</Button
+              >
+            </div>
+            <div class="compact-hint">
+              <span class="hint-icon">💡</span>
+              <div class="hint-text">
+                <strong>Vincular Solo</strong> conserva tu nombre local.<br />
+                <strong>Renombrar</strong> usa el nombre de Notion.
+              </div>
+            </div>
+          {/if}
+          <div class="skip-row">
             <Button
               variant="ghost"
-              title="No realizar ninguna acción"
+              title="Ignorar Notion y añadir como jugador nuevo"
               onclick={() => handleAction("skip")}
               icon="⏭">Añadir sin vincular</Button
             >
           </div>
-          <div class="compact-hint">
-            <span class="hint-icon">💡</span>
-            <div class="hint-text">
-              <strong>Autocorrección:</strong> Evita duplicados usando el jugador
-              que ya está en la lista.
-            </div>
-          </div>
-        {:else}
-          <div class="resolution-message">
-            Encontramos a <span class="highlight-snapshot"
-              >{currentPair.snapshot}</span
-            >. Coincide con el jugador de Notion
-            <span class="highlight-notion">{currentPair.notion_name}</span>
-            {#if currentPair.matched_alias}<span class="alias-text"
-                >(vía alias: {currentPair.matched_alias})</span
-              >{/if}
-          </div>
-          <div class="resolution-actions">
-            <Button
-              variant="primary"
-              title="Vincular y actualizar el nombre local al de Notion"
-              onclick={() => handleAction("link_rename")}
-              icon="📋">Vincular & Renombrar</Button
-            >
-            <Button
-              variant="secondary"
-              title="Vincular manteniendo el nombre local actual"
-              onclick={() => handleAction("link_only")}
-              icon="🔗">Vincular Solo</Button
-            >
-            <Button
-              variant="ghost"
-              title="No realizar ninguna acción"
-              onclick={() => handleAction("skip")}
-              icon="⏭">Añadir sin vincular</Button
-            >
-          </div>
-          <div class="compact-hint">
-            <span class="hint-icon">💡</span>
-            <div class="hint-text">
-              <strong>Vincular Solo</strong> conserva tu nombre local.<br />
-              <strong>Renombrar</strong> usa el nombre de Notion.
-            </div>
-          </div>
-        {/if}
+        </div>
       {/if}
+
       <div class="resolution-footer">
         <Button variant="ghost" onclick={handleStop}>Detener resolución</Button>
       </div>
@@ -212,7 +217,7 @@
     border-radius: var(--space-16);
     padding: var(--space-24);
     width: 100%;
-    max-width: calc(var(--space-8) * 52);
+    max-width: calc(var(--space-8) * 56);
     box-shadow: var(--shadow-xl);
     display: flex;
     flex-direction: column;
@@ -242,94 +247,12 @@
     font-weight: 600;
   }
 
-  .comparison-card {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-    grid-template-rows: auto auto auto;
-    row-gap: 2px;
-    align-items: center;
-    background: var(--bg-tertiary);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--space-8);
-    padding: var(--space-12) var(--space-16);
-    box-shadow: var(--shadow-sm);
-  }
-
-  .notion-label {
-    grid-column: 1;
-    grid-row: 1;
-    text-align: right;
-  }
-
-  .snapshot-label {
-    grid-column: 3;
-    grid-row: 1;
-    text-align: left;
-  }
-
-  .vs-divider {
-    grid-column: 2;
-    grid-row: 2;
-    font-size: 11px;
-    font-weight: 800;
-    color: var(--text-muted);
-    padding: 0 var(--space-16);
-    text-transform: uppercase;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .notion-name {
-    grid-column: 1;
-    grid-row: 2;
-    text-align: right;
-  }
-
-  .snapshot-name {
-    grid-column: 3;
-    grid-row: 2;
-    text-align: left;
-  }
-
-  .notion-alias {
-    grid-column: 1;
-    grid-row: 3;
-    text-align: right;
-    font-size: 11px;
-    color: var(--text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .side-label {
-    font-size: 10px;
-    font-weight: 700;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .side-name {
-    font-size: 15px;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .resolution-similarity {
-    display: flex;
-    justify-content: center;
-    margin-bottom: var(--space-4);
-  }
-
   .resolution-message {
-    font-size: 13px;
+    font-size: 14px;
     line-height: 1.5;
     color: var(--text-secondary);
     text-align: center;
+    margin-bottom: var(--space-4);
   }
 
   .highlight-snapshot {
@@ -342,15 +265,107 @@
     color: var(--info-text-subtle);
   }
 
-  .alias-text {
-    color: var(--text-muted);
-    font-style: italic;
-  }
-
-  .resolution-actions {
+  /* --- Radio List Styles --- */
+  .options-list {
     display: flex;
     flex-direction: column;
     gap: var(--space-8);
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: var(--space-4); /* Prevents scrollbar from hugging content */
+  }
+
+  .options-list::-webkit-scrollbar {
+    width: 6px;
+  }
+  .options-list::-webkit-scrollbar-thumb {
+    background-color: var(--border-muted);
+    border-radius: 4px;
+  }
+
+  .match-option {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-12);
+    padding: var(--space-12);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--space-8);
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+  }
+
+  .match-option:hover {
+    border-color: var(--border-muted);
+  }
+
+  .match-option.selected {
+    background: var(--info-bg-subtle);
+    border-color: var(--info-border-subtle);
+  }
+
+  .match-option input[type="radio"] {
+    margin-top: var(--space-4);
+    accent-color: var(--info-text-subtle);
+    cursor: pointer;
+  }
+
+  .match-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+  }
+
+  .match-info-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .notion-name {
+    font-size: 14px;
+  }
+
+  .alias-text {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .existing-badge {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--success-text-subtle);
+    background: var(--success-bg-subtle);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    width: fit-content;
+    margin-top: 2px;
+  }
+
+  /* --- Dynamic Actions Styles --- */
+  .dynamic-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-8);
+    margin-top: var(--space-4);
+  }
+
+  .button-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-8);
+  }
+
+  .skip-row {
+    display: flex;
+    justify-content: center;
   }
 
   .compact-hint {

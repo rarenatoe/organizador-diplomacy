@@ -331,6 +331,32 @@ class TestDetectSimilarNames:
         assert "Renato Alegre" in snapshot_names_result
         assert "Renato Garcia" in snapshot_names_result
 
+    def test_destination_collision_exclusion(self):
+        """
+        Regression: If a Notion player is an exact match for one row in the CSV,
+        they are 'claimed' and MUST NOT be offered as a fuzzy match for another row.
+        """
+        notion_players = [
+            _create_test_notion_player_names("Daniel V.", notion_id="id_1"),
+            _create_test_notion_player_names(
+                "DaniVonKlaus", alias=["Daniel Eiler"], notion_id="id_2"
+            ),
+        ]
+
+        # The CSV has two people. "Daniel V." is an exact match. "Daniel" is ambiguous.
+        snapshot_names = ["Daniel V.", "Daniel"]
+
+        result = detect_similar_names(notion_players, snapshot_names)
+
+        # Only ONE fuzzy match should be returned (for "Daniel")
+        assert len(result) == 1
+
+        # It MUST be linked to DaniVonKlaus (id_2).
+        # Daniel V. (id_1) must be completely excluded because it was claimed by the exact match.
+        assert result[0]["snapshot"] == "Daniel"
+        assert result[0]["notion_id"] == "id_2"
+        assert result[0]["notion_name"] == "DaniVonKlaus"
+
 
 # ── find_notion_player tests ─────────────────────────────────────────────────────
 
