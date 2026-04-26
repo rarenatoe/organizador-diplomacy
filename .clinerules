@@ -5,7 +5,8 @@
 - **Core Entities:** `Snapshots` (rosters), `Games` (7-player tables + GMs), `Waitlists` (unseated).
 - **History Lookup:** MUST use strict 4-tier traversal: `TimelineEdge` -> `SnapshotPlayer` -> `SnapshotHistory JSON` -> `NotionCache`. NEVER skip tiers.
 - **Manual Save:** Frontend is the absolute source of truth. Backend strictly overwrites state. NEVER merge weights or apply smart corrections on manual saves.
-- **Draft Pipeline:** Calculate Tickets -> Distribute to Tables -> Assign Countries -> Deduplicate Waitlist. NEVER skip phases or execute out of order.
+- **Draft Pipeline & Reconciliation:** Calculate Tickets -> Distribute to Tables -> Assign Countries -> Mathematically Reconcile Waitlist. Treat complex algorithm outputs as "rough drafts". Both backend and frontend MUST use identical, deterministic mathematical reconciliation (e.g., `desired_games - seated_games = missing_slots`) to resolve final state instead of naive array patching.
+- **Symmetric Optimistic UI:** When the frontend needs to react instantly to user mutations (like swapping players), it MUST execute the exact same deterministic math as the backend to rebuild the state. NEVER replicate complex backend algorithms in the UI; reduce the logic to shared mathematical truths.
 
 ## 2. Global Architecture & Language Boundaries
 
@@ -43,6 +44,8 @@
 - **Strict API Purity:** Backend MUST NEVER send formatted UI strings (e.g., `"Antiguo (15 juegos)"`). APIs MUST send strictly typed primitive data.
 - **Synchronized CQRS:** When altering a schema or write payload, you MUST simultaneously update aggregate SQL views and their TS interfaces.
 - **Two-Step Generation:** Enforce `/api/game/draft` (in-memory) followed by `/api/game/save` (persistence). NEVER write draft data directly to DB.
+- **Strict SDK Optionality:** If the frontend strictly requires a field, DO NOT assign a default value in the Pydantic response model. Default values in Pydantic implicitly mark fields as optional (`?`) in the generated TypeScript.
+- **Strict Primitives:** Eliminate `None`/`null` for calculable numeric or boolean states. Use strict types (e.g., `int` defaulting to `0` behind the scenes) to eradicate defensive `?? 0` fallback checks in the frontend UI.
 - **Eradication of Type Cancer:** NEVER use `dict[str, Any]` across architectural boundaries, **with ONE strict exception:** passing serialized Pydantic writes (`model_dump(mode="json")`) from Routers into CRUD functions. Everywhere else, use typed `TypedDict` or Pydantic models.
 - **Absolute Trimming:** API response Pydantic models MUST contain ONLY the exact fields the frontend UI consumes. NEVER expose additional fields just because they were queried from the database. Each response model is a deliberate contract, not a DB row mirror.
 - **Named Types for Unions (RootModel):** When frontend components need to reference a complex union type used across multiple fields (e.g., `str | int | bool | None`), NEVER define them inline repeatedly in Pydantic models. Inline unions cause the OpenAPI generator to emit anonymous types that can trigger ESLint's `no-duplicate-type-constituents` when extracted or combined in TypeScript. ALWAYS define an explicit `RootModel` (e.g., `class FieldValue(RootModel[str | int | bool | None]): pass`) so the frontend SDK generates and exports a clean, strongly-typed named alias.
@@ -59,6 +62,8 @@
 - **Runes ONLY:** USE `$state`, `$derived`, `$effect`. BANNED: `let` for reactivity, ES6 Classes for state.
 - **State Architecture:** Group related states in Discriminated Unions. Extract complex state into POJOs using `lowerCamelCaseState.svelte.ts` files. Use an array stack for navigation.
 - **Thick Logic Extraction:** Complex data mutations (e.g., drag-and-drop, multi-array swapping, draft orchestrations) MUST be extracted into a dedicated `.svelte.ts` controller. NEVER leave massive (50+ line) mutation functions inside `.svelte` script blocks.
+- **Deterministic State Rebuilding:** When users perform complex mutations (like multi-array swaps), NEVER surgically patch array indexes (which causes duplicates). Always re-run a deterministic mathematical pass over the entire state to rebuild derived lists.
+- **Declarative Transformations:** Use modern declarative chains (`Object.values().map().filter().sort()`) instead of imperative `for...in` loops to derive state.
 - **Loop Constants:** ALWAYS use Svelte's `{@const ...}` to compute derived target objects or parameters within `{#each}` loops. NEVER instantiate new objects inline inside HTML event handlers (e.g., `onclick={() => fn({ id })}`).
 - **Typing:** Use component-level Generics (`<script lang="ts" generics="...">`) so components adapt safely to diverse data shapes.
 
@@ -81,7 +86,7 @@
 - **Smart vs Dumb Components:** `features/` are Smart components that handle API side-effects and complex state orchestration. `ui/` and `layout/` are Dumb components that MUST remain domain-agnostic and bubble actions via callback props. NEVER perform API calls in Dumb components.
 - **References:** Swap entire object references for complex nested objects. BANNED: Deep mutations of nested properties.
 - **Snippets:** Presentation lists must be dumb. Use Svelte 5 Snippets to yield domain logic (indices, IDs) back to the parent. Abstract entire list containers, not just leaf items.
-- **UX Guards:** Mimic padding in read-only states and set `min-height` to prevent layout shifts. Pair floating UI visibility with explicit interaction booleans to prevent zombies.
+- **UX Guards:** Mimic padding in read-only states and set `min-height` to prevent layout shifts. NEVER use UI-layer fallbacks (e.g., `{cupos ?? deseadas}`) to mask inaccurate underlying data; fix the mathematical source of truth. Pair floating UI visibility with explicit interaction booleans to prevent zombies.
 - **Banned Browser APIs:** NEVER use `window.prompt()`, `window.alert()`, or `window.confirm()`. ALWAYS use custom modal components.
 - **Dates:** Cast naive backend timestamps to UTC (`+ "Z"`) before parsing to adapt to local timezones. ALWAYS use the shared `formatDate` utility from `src/i18n.ts`.
 
@@ -91,13 +96,14 @@
 - **Assertions:** Use object attribute dot-notation (`result.players`). BANNED: Dict key access (`result["players"]`), guaranteeing Pydantic compliance.
 - **Algorithms:** Explicitly test edge cases: length disparities, typo variants, accents, abbreviations.
 - **Math Setup:** Explicitly comment integer division math in test setups to prevent off-by-one failures.
+- **Mirrored Test Coverage:** Any business logic duplicated across the stack (e.g., state reconciliation math) MUST have parallel unit tests in both `pytest` and `vitest` asserting the exact same scenarios and edge cases.
 
 ## 2. Frontend Testing (`vitest`)
 
 - **State:** Test `.svelte.ts` logic files in isolation. BANNED: DOM mounting for pure logic.
 - **Isolation:** ALWAYS wipe globally exported class/state instances in `beforeEach()`.
 - **DOM Queries:** Use semantic queries (`getByRole`). Normalize whitespace on i18n dates to match Testing Library's DOM handling.
-- **Structural Guards:** Assert the presence of abstraction CSS classes to prevent regressions that decouple layouts back into raw `{#each}` loops.
+- **Structural Guards & Selectors:** Assert the presence of abstraction CSS classes (e.g., `.panel-section`). NEVER query by generic, partial class names (e.g., `.section`) or use `.closest()` loosely, as CSS abstractions frequently evolve.
 - **Snippets:** Use `createRawSnippet`. BANNED: Weakening a component's API to bypass test errors. Create `.test.svelte` wrapper files for layout snippet tests.
 
 ## 3. SDK Mocking Patterns (CRITICAL)

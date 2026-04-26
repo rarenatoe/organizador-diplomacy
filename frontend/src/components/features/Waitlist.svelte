@@ -26,7 +26,7 @@
       <PlayerName {player} compact={true} showNotionIndicator={false} />
 
       <span class="waiting-cupos">
-        {player.cupos_faltantes ?? player.partidas_deseadas} cupo(s)
+        {player.cupos_faltantes} cupo(s)
       </span>
 
       {#if actions}

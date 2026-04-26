@@ -235,7 +235,7 @@ export type GameDraftPlayer = {
     /**
      * Cupos Faltantes
      */
-    cupos_faltantes?: number | null;
+    cupos_faltantes: number;
 };
 
 /**

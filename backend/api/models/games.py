@@ -30,10 +30,10 @@ class GameDraftPlayer(BaseModel):
     c_russia: int
     c_turkey: int
     country: CountrySelection
-    cupos_faltantes: int | None = None
+    cupos_faltantes: int
 
     @classmethod
-    def from_domain(cls, p: DraftPlayer, waitlist_count: int | None = None) -> GameDraftPlayer:
+    def from_domain(cls, p: DraftPlayer, waitlist_count: int = 0) -> GameDraftPlayer:
         return cls(
             nombre=p.name,
             is_new=p.is_new,
@@ -67,8 +67,29 @@ class GameDraftResponse(BaseModel):
 
     @classmethod
     def from_domain(cls, resultado: DraftResult) -> GameDraftResponse:
-        waitlist_counts = Counter(p.name for p in resultado.waitlist_players)
-        unique_waitlist = list({p.name: p for p in resultado.waitlist_players}.values())
+        # 1. Gather ALL unique players from the draft result (including GMs)
+        all_players: dict[str, DraftPlayer] = {}
+        for table in resultado.tables:
+            if table.gm:
+                all_players[table.gm.name] = table.gm
+            for p in table.players:
+                all_players[p.name] = p
+
+        for p in resultado.waitlist_players:
+            all_players[p.name] = p
+
+        # 2. Count actual playing seats taken (GMs do not consume playing seats)
+        play_counts = Counter(p.name for table in resultado.tables for p in table.players)
+
+        # 3. Deterministically rebuild the waitlist based purely on math
+        waitlist_players: list[GameDraftPlayer] = []
+        for p in all_players.values():
+            missing_seats = p.desired_games - play_counts[p.name]
+            if missing_seats > 0:
+                waitlist_players.append(GameDraftPlayer.from_domain(p, missing_seats))
+
+        # 4. Sort: most missing games first, then alphabetical
+        waitlist_players.sort(key=lambda x: (-x.cupos_faltantes, x.nombre))
 
         mesas = [
             GameDraftTable(
@@ -79,13 +100,9 @@ class GameDraftResponse(BaseModel):
             for table in resultado.tables
         ]
 
-        tickets_sobrantes = [
-            GameDraftPlayer.from_domain(p, waitlist_counts[p.name]) for p in unique_waitlist
-        ]
-
         return cls(
             mesas=mesas,
-            tickets_sobrantes=tickets_sobrantes,
+            tickets_sobrantes=waitlist_players,
             minimo_teorico=resultado.theoretical_minimum,
             intentos_usados=resultado.attempts_used,
         )

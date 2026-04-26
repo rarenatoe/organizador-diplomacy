@@ -190,6 +190,52 @@
     }
   }
 
+  function recalculateWaitlist(): void {
+    if (!draftData) return;
+
+    const allPlayers: Record<string, GameDraftPlayer> = {};
+
+    // 1. Gather ALL players (Crucial: including GMs)
+    const addPlayer = (p: GameDraftPlayer) => {
+      if (p.nombre && !allPlayers[p.nombre]) {
+        allPlayers[p.nombre] = { ...p, country: { name: "", reason: [] } };
+      }
+    };
+
+    draftData.mesas.forEach((table) => {
+      if (table.gm) addPlayer(table.gm);
+      table.jugadores.forEach(addPlayer);
+    });
+    draftData.tickets_sobrantes.forEach(addPlayer);
+
+    // 2. Count playing seats (excluding GM roles)
+    const playCounts: Record<string, number> = {};
+    draftData.mesas.forEach((table) => {
+      table.jugadores.forEach((p) => {
+        if (p.nombre) {
+          playCounts[p.nombre] = (playCounts[p.nombre] || 0) + 1;
+        }
+      });
+    });
+
+    // 3. Rebuild waitlist deterministically
+    const waitlistPlayers: GameDraftPlayer[] = Object.values(allPlayers)
+      .map((p) => {
+        const missingSeats =
+          (p.partidas_deseadas || 1) - (playCounts[p.nombre] || 0);
+        return { ...p, cupos_faltantes: missingSeats };
+      })
+      .filter((p) => p.cupos_faltantes > 0);
+
+    // 4. Sort identically to backend
+    waitlistPlayers.sort((a, b) => {
+      const diff = b.cupos_faltantes - a.cupos_faltantes;
+      return diff !== 0 ? diff : a.nombre.localeCompare(b.nombre);
+    });
+
+    draftData.tickets_sobrantes = waitlistPlayers;
+  }
+
   function handlePlayerClick(target: SwapTarget): void {
     if (!draftData) return;
 
@@ -344,7 +390,6 @@
         } else {
           // Espera to Espera swap
           const targetPlayerIndex = target.playerIndex;
-
           if (
             draftData.tickets_sobrantes[selectedPlayerIndex] !== undefined &&
             draftData.tickets_sobrantes[targetPlayerIndex] !== undefined
@@ -354,6 +399,9 @@
           }
         }
       }
+
+      // Recalculate waitlist completely to fix counts and prevent duplicates
+      recalculateWaitlist();
 
       // Reset selection
       selectedSwap = null;

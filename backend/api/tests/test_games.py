@@ -165,7 +165,39 @@ class TestApiGameDraft:
         # Verify minimo_teorico equals 0 (theoretical minimum from mock)
         assert data["minimo_teorico"] == 0
 
-        assert data["tickets_sobrantes"][0]["cupos_faltantes"] == 2
+        # Math: desired=1, seated=0 -> missing=1 (deduplicated perfectly)
+        assert data["tickets_sobrantes"][0]["cupos_faltantes"] == 1
+
+
+def test_draft_response_waitlist_reconciliation_math() -> None:
+    """Test that the from_domain logic perfectly mathematically reconciles waitlists."""
+    from backend.api.models.games import GameDraftResponse
+    from backend.organizador.models import DraftPlayer, DraftResult, DraftTable
+
+    p_gm = DraftPlayer(name="Alice", games_this_year=0, desired_games=2)
+    p_seated = DraftPlayer(name="Bob", games_this_year=0, desired_games=2)
+    p_wait = DraftPlayer(name="Charlie", games_this_year=0, desired_games=1)
+    p_fully_seated = DraftPlayer(name="Dave", games_this_year=0, desired_games=1)
+
+    mock_result = DraftResult(
+        tables=[DraftTable(table_number=1, gm=p_gm, players=[p_seated, p_fully_seated])],
+        waitlist_players=[p_wait, p_seated, p_fully_seated],  # Contains noise/duplicates
+        theoretical_minimum=0,
+        attempts_used=1,
+    )
+
+    resp = GameDraftResponse.from_domain(mock_result)
+    waitlist = resp.tickets_sobrantes
+    names = [p.nombre for p in waitlist]
+
+    # Dave desired 1, played 1 -> missing 0 (Should be completely dropped)
+    assert "Dave" not in names
+
+    # Sorting rule: Missing descending, then alphabetical
+    assert names == ["Alice", "Bob", "Charlie"]
+    assert waitlist[0].cupos_faltantes == 2  # Alice: desired 2, played 0 (GM does NOT count)
+    assert waitlist[1].cupos_faltantes == 1  # Bob: desired 2, played 1
+    assert waitlist[2].cupos_faltantes == 1  # Charlie: desired 1, played 0
 
 
 # ── POST /api/game/save ───────────────────────────────────────────────────────

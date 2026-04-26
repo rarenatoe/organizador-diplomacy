@@ -185,77 +185,138 @@ describe("GameDraft.svelte", () => {
     });
   });
 
-  it("handles duplicate waitlist users without key warnings", async () => {
-    // Create mock draft data with duplicate users in waitlist
-    const mockDraftWithDuplicates = createMockDraftResponse({
+  it("recalculates waitlist missing slots and deduplicates after a swap", async () => {
+    // Initial state: Alice wants 2 games, seated in 1. Charlie wants 1, seated in 0.
+    const mockState = createMockDraftResponse({
       mesas: [
         createMockDraftMesa({
           numero: 1,
           jugadores: [
             createMockDraftPlayer({
               nombre: "Alice",
-              is_new: false,
-              juegos_este_ano: 5,
-              has_priority: true,
               partidas_deseadas: 2,
-              c_england: 1,
+            }),
+            createMockDraftPlayer({
+              nombre: "Bob",
+              partidas_deseadas: 1,
             }),
           ],
         }),
       ],
       tickets_sobrantes: [
         createMockDraftPlayer({
-          nombre: "DuplicateUser",
-          juegos_este_ano: 2,
+          nombre: "Alice",
           partidas_deseadas: 2,
-          c_germany: 1,
+          cupos_faltantes: 1,
         }),
         createMockDraftPlayer({
-          nombre: "DuplicateUser", // Same name as above
-          juegos_este_ano: 1,
+          nombre: "Charlie",
           partidas_deseadas: 1,
-          c_france: 1,
-        }),
-        createMockDraftPlayer({
-          nombre: "DuplicateUser", // Same name again
-          juegos_este_ano: 3,
-          partidas_deseadas: 3,
-          c_italy: 1,
+          cupos_faltantes: 1,
         }),
       ],
-      minimo_teorico: 3,
-      intentos_usados: 1,
     });
 
     const { apiGameDraft } = vi.mocked(
       await import("../../generated-api/sdk.gen"),
     );
-    mockSdkSuccess(apiGameDraft, mockDraftWithDuplicates);
+    mockSdkSuccess(apiGameDraft, mockState);
 
-    // Mock console.warn to catch any duplicate key warnings
-    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-
-    // Render the component with duplicate waitlist users
     render(GameDraft, { props: mockProps });
 
-    // Wait for the component to render
     await vi.waitFor(() => {
-      const duplicateUsers = screen.getAllByText("DuplicateUser");
-      expect(duplicateUsers).toHaveLength(3);
+      expect(screen.getByText("Partida 1")).toBeInTheDocument();
     });
 
-    // Verify all duplicate users are rendered
-    const duplicateUsers = screen.getAllByText("DuplicateUser");
-    expect(duplicateUsers).toHaveLength(3);
+    // Swap Alice from Table with Charlie from Waitlist
+    const swapButtons = screen.getAllByTitle("Intercambiar");
+    const aliceMesaBtn = swapButtons[0]; // Alice in Mesa 1
+    const charlieWaitlistBtn = swapButtons[3]; // Charlie in Waitlist
 
-    // Verify that no duplicate key warnings were thrown
-    expect(consoleSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining("duplicate key"),
-      expect.any(Object),
+    if (aliceMesaBtn && charlieWaitlistBtn) {
+      await fireEvent.click(aliceMesaBtn);
+      await fireEvent.click(charlieWaitlistBtn);
+    }
+
+    await vi.waitFor(() => {
+      // After swap:
+      // Mesa 1 has Charlie and Bob.
+      // Waitlist has Alice (missing 2) and Charlie is gone (missing 0).
+      const waitingSection = screen
+        .getByText("Lista de espera")
+        .closest(".panel-section");
+      expect(waitingSection).toBeInTheDocument();
+
+      // Waitlist should only have Alice now
+      expect(waitingSection?.textContent).toContain("Alice");
+      expect(waitingSection?.textContent).not.toContain("Charlie");
+
+      // Verify missing slots mathematically updated for Alice (needs 2 instead of 1)
+      const cuposText = screen.getByText("2 cupo(s)");
+      expect(cuposText).toBeInTheDocument();
+    });
+  });
+
+  it("does not count GM roles as playing seats when recalculating waitlist", async () => {
+    const mockState = createMockDraftResponse({
+      mesas: [
+        createMockDraftMesa({
+          numero: 1,
+          gm: createMockDraftPlayer({
+            nombre: "Boss",
+            partidas_deseadas: 2, // Boss wants 2 games to play, but is currently GM
+          }),
+          jugadores: [
+            createMockDraftPlayer({ nombre: "Worker1", partidas_deseadas: 1 }),
+            createMockDraftPlayer({ nombre: "Worker2", partidas_deseadas: 1 }),
+          ],
+        }),
+      ],
+      tickets_sobrantes: [
+        createMockDraftPlayer({
+          nombre: "Boss",
+          partidas_deseadas: 2,
+          cupos_faltantes: 2,
+        }),
+      ],
+    });
+
+    const { apiGameDraft } = vi.mocked(
+      await import("../../generated-api/sdk.gen"),
     );
+    mockSdkSuccess(apiGameDraft, mockState);
 
-    // Clean up
-    consoleSpy.mockRestore();
+    render(GameDraft, { props: mockProps });
+
+    await vi.waitFor(() => {
+      expect(screen.getByText("GM: Boss")).toBeInTheDocument();
+    });
+
+    // Swap Worker1 with Boss (from waitlist)
+    const swapButtons = screen.getAllByTitle("Intercambiar");
+    const worker1Btn = swapButtons[0];
+    const bossWaitlistBtn = swapButtons[2];
+
+    if (worker1Btn && bossWaitlistBtn) {
+      await fireEvent.click(worker1Btn);
+      await fireEvent.click(bossWaitlistBtn);
+    }
+
+    await vi.waitFor(() => {
+      // Boss is now seated as a player AND remains GM.
+      // Boss missing seats mathematically goes from 2 -> 1.
+      // Worker1 is now in waitlist (missing 1).
+      const waitingSection = screen
+        .getByText("Lista de espera")
+        .closest(".panel-section");
+
+      expect(waitingSection?.textContent).toContain("Boss");
+      expect(waitingSection?.textContent).toContain("Worker1");
+
+      // Both should have "1 cupo(s)" since Boss plays 1, Worker1 plays 0.
+      const cuposTexts = screen.getAllByText("1 cupo(s)");
+      expect(cuposTexts.length).toBeGreaterThanOrEqual(2);
+    });
   });
 
   it("shows error when save fails", async () => {
@@ -452,7 +513,7 @@ describe("GameDraft.svelte", () => {
         const mesa1 = screen.getByText("Partida 1").closest(".card");
         const waitingSection = screen
           .getByText("Lista de espera")
-          .closest(".section");
+          .closest(".panel-section");
         if (mesa1 && waitingSection) {
           // Alice should be in waiting list, David should be in Mesa 1
           expect(mesa1.textContent).toContain("David");

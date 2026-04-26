@@ -288,6 +288,7 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> GameDet
                     c_austria=0,
                     c_russia=0,
                     c_turkey=0,
+                    cupos_faltantes=0,
                     country=CountrySelection(name="", reason=[]),
                 )
 
@@ -330,6 +331,7 @@ async def get_game_event_detail(session: AsyncSession, event_id: int) -> GameDet
                         name=country or "",
                         reason=country_reason or [],
                     ),
+                    cupos_faltantes=0,
                 )
             )
 

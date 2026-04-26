@@ -2,7 +2,6 @@
   import {
     apiGame,
     type GameDetailResponse,
-    type GameDraftPlayer,
     type GameDraftResponseOutput,
     type GameDraftTableOutput,
   } from "../../generated-api";
@@ -52,25 +51,6 @@
     setTimeout(() => {
       if (copiedId === buttonId) copiedId = null;
     }, 1500);
-  }
-
-  function mapToDraftPlayer(player: GameDraftPlayer): GameDraftPlayer {
-    return {
-      nombre: player.nombre,
-      is_new: player.is_new ?? false,
-      juegos_este_ano: player.juegos_este_ano ?? 0,
-      has_priority: player.has_priority ?? false,
-      partidas_deseadas: player.partidas_deseadas ?? 1,
-      partidas_gm: player.partidas_gm ?? 0,
-      c_england: player.c_england ?? 0,
-      c_france: player.c_france ?? 0,
-      c_germany: player.c_germany ?? 0,
-      c_italy: player.c_italy ?? 0,
-      c_austria: player.c_austria ?? 0,
-      c_russia: player.c_russia ?? 0,
-      c_turkey: player.c_turkey ?? 0,
-      country: player.country || { name: "", reason: "" },
-    };
   }
 
   function getTableCopyText(table: GameDraftTableOutput): string {
@@ -170,11 +150,10 @@
         mesas:
           (gameDetail?.mesas ?? []).map((m) => ({
             numero: m.numero,
-            gm: m.gm ? mapToDraftPlayer(m.gm) : null,
-            jugadores: m.jugadores.map(mapToDraftPlayer),
+            gm: m.gm ? m.gm : null,
+            jugadores: m.jugadores,
           })) || [],
-        tickets_sobrantes:
-          (gameDetail?.waiting_list ?? []).map(mapToDraftPlayer) || [],
+        tickets_sobrantes: gameDetail?.waiting_list ?? [],
         minimo_teorico: 0,
         intentos_usados: gameDetail?.intentos || 0,
       };

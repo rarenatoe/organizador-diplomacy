@@ -10,13 +10,14 @@ priority: 40
 - **Assertions:** Use object attribute dot-notation (`result.players`). BANNED: Dict key access (`result["players"]`), guaranteeing Pydantic compliance.
 - **Algorithms:** Explicitly test edge cases: length disparities, typo variants, accents, abbreviations.
 - **Math Setup:** Explicitly comment integer division math in test setups to prevent off-by-one failures.
+- **Mirrored Test Coverage:** Any business logic duplicated across the stack (e.g., state reconciliation math) MUST have parallel unit tests in both `pytest` and `vitest` asserting the exact same scenarios and edge cases.
 
 ## 2. Frontend Testing (`vitest`)
 
 - **State:** Test `.svelte.ts` logic files in isolation. BANNED: DOM mounting for pure logic.
 - **Isolation:** ALWAYS wipe globally exported class/state instances in `beforeEach()`.
 - **DOM Queries:** Use semantic queries (`getByRole`). Normalize whitespace on i18n dates to match Testing Library's DOM handling.
-- **Structural Guards:** Assert the presence of abstraction CSS classes to prevent regressions that decouple layouts back into raw `{#each}` loops.
+- **Structural Guards & Selectors:** Assert the presence of abstraction CSS classes (e.g., `.panel-section`). NEVER query by generic, partial class names (e.g., `.section`) or use `.closest()` loosely, as CSS abstractions frequently evolve.
 - **Snippets:** Use `createRawSnippet`. BANNED: Weakening a component's API to bypass test errors. Create `.test.svelte` wrapper files for layout snippet tests.
 
 ## 3. SDK Mocking Patterns (CRITICAL)

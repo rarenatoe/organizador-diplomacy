@@ -9,6 +9,8 @@ priority: 30
 - **Runes ONLY:** USE `$state`, `$derived`, `$effect`. BANNED: `let` for reactivity, ES6 Classes for state.
 - **State Architecture:** Group related states in Discriminated Unions. Extract complex state into POJOs using `lowerCamelCaseState.svelte.ts` files. Use an array stack for navigation.
 - **Thick Logic Extraction:** Complex data mutations (e.g., drag-and-drop, multi-array swapping, draft orchestrations) MUST be extracted into a dedicated `.svelte.ts` controller. NEVER leave massive (50+ line) mutation functions inside `.svelte` script blocks.
+- **Deterministic State Rebuilding:** When users perform complex mutations (like multi-array swaps), NEVER surgically patch array indexes (which causes duplicates). Always re-run a deterministic mathematical pass over the entire state to rebuild derived lists.
+- **Declarative Transformations:** Use modern declarative chains (`Object.values().map().filter().sort()`) instead of imperative `for...in` loops to derive state.
 - **Loop Constants:** ALWAYS use Svelte's `{@const ...}` to compute derived target objects or parameters within `{#each}` loops. NEVER instantiate new objects inline inside HTML event handlers (e.g., `onclick={() => fn({ id })}`).
 - **Typing:** Use component-level Generics (`<script lang="ts" generics="...">`) so components adapt safely to diverse data shapes.
 
@@ -31,6 +33,6 @@ priority: 30
 - **Smart vs Dumb Components:** `features/` are Smart components that handle API side-effects and complex state orchestration. `ui/` and `layout/` are Dumb components that MUST remain domain-agnostic and bubble actions via callback props. NEVER perform API calls in Dumb components.
 - **References:** Swap entire object references for complex nested objects. BANNED: Deep mutations of nested properties.
 - **Snippets:** Presentation lists must be dumb. Use Svelte 5 Snippets to yield domain logic (indices, IDs) back to the parent. Abstract entire list containers, not just leaf items.
-- **UX Guards:** Mimic padding in read-only states and set `min-height` to prevent layout shifts. Pair floating UI visibility with explicit interaction booleans to prevent zombies.
+- **UX Guards:** Mimic padding in read-only states and set `min-height` to prevent layout shifts. NEVER use UI-layer fallbacks (e.g., `{cupos ?? deseadas}`) to mask inaccurate underlying data; fix the mathematical source of truth. Pair floating UI visibility with explicit interaction booleans to prevent zombies.
 - **Banned Browser APIs:** NEVER use `window.prompt()`, `window.alert()`, or `window.confirm()`. ALWAYS use custom modal components.
 - **Dates:** Cast naive backend timestamps to UTC (`+ "Z"`) before parsing to adapt to local timezones. ALWAYS use the shared `formatDate` utility from `src/i18n.ts`.

@@ -9,7 +9,8 @@ priority: 10
 - **Core Entities:** `Snapshots` (rosters), `Games` (7-player tables + GMs), `Waitlists` (unseated).
 - **History Lookup:** MUST use strict 4-tier traversal: `TimelineEdge` -> `SnapshotPlayer` -> `SnapshotHistory JSON` -> `NotionCache`. NEVER skip tiers.
 - **Manual Save:** Frontend is the absolute source of truth. Backend strictly overwrites state. NEVER merge weights or apply smart corrections on manual saves.
-- **Draft Pipeline:** Calculate Tickets -> Distribute to Tables -> Assign Countries -> Deduplicate Waitlist. NEVER skip phases or execute out of order.
+- **Draft Pipeline & Reconciliation:** Calculate Tickets -> Distribute to Tables -> Assign Countries -> Mathematically Reconcile Waitlist. Treat complex algorithm outputs as "rough drafts". Both backend and frontend MUST use identical, deterministic mathematical reconciliation (e.g., `desired_games - seated_games = missing_slots`) to resolve final state instead of naive array patching.
+- **Symmetric Optimistic UI:** When the frontend needs to react instantly to user mutations (like swapping players), it MUST execute the exact same deterministic math as the backend to rebuild the state. NEVER replicate complex backend algorithms in the UI; reduce the logic to shared mathematical truths.
 
 ## 2. Global Architecture & Language Boundaries
 

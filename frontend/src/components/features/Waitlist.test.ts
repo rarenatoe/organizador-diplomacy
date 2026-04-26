@@ -16,19 +16,19 @@ describe("Waitlist.svelte", () => {
     }),
     createMockDraftPlayer({
       nombre: "Player 2",
-      cupos_faltantes: null,
+      cupos_faltantes: 0,
       partidas_deseadas: 3,
     }),
   ];
 
-  it("renders players with correct cupos text (handling both API data shapes)", () => {
+  it("renders players with correct cupos text", () => {
     render(Waitlist, { props: { players: mockPlayers } });
 
     expect(screen.getByText("Player 1")).toBeInTheDocument();
-    expect(screen.getByText("1 cupo(s)")).toBeInTheDocument(); // Uses cupos_faltantes
+    expect(screen.getByText("1 cupo(s)")).toBeInTheDocument();
 
     expect(screen.getByText("Player 2")).toBeInTheDocument();
-    expect(screen.getByText("3 cupo(s)")).toBeInTheDocument(); // Fallback to partidas_deseadas
+    expect(screen.getByText("0 cupo(s)")).toBeInTheDocument();
   });
 
   it("applies structural regression guards: unified container and layout shift prevention", () => {
