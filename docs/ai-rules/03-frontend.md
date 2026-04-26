@@ -13,6 +13,8 @@ priority: 30
 - **Declarative Transformations:** Use modern declarative chains (`Object.values().map().filter().sort()`) instead of imperative `for...in` loops to derive state.
 - **Loop Constants:** ALWAYS use Svelte's `{@const ...}` to compute derived target objects or parameters within `{#each}` loops. NEVER instantiate new objects inline inside HTML event handlers (e.g., `onclick={() => fn({ id })}`).
 - **Typing:** Use component-level Generics (`<script lang="ts" generics="...">`) so components adapt safely to diverse data shapes.
+- **Snippet Event Handlers:** NEVER use inline arrow functions for event handlers inside HTML elements within Svelte 5 `{#snippet}` blocks or `{#each}` loops (e.g., `onchange={(e) => update(i)}`). ALWAYS declare them first using `{@const handleChange = (e: Event) => update(i)}` and pass the reference. This ensures strict Svelte 5 architectural compliance and prevents reactive instantiation bugs.
+- **Immutable Array Mutations:** BANNED: `Array.prototype.splice()`. NEVER mutate array states surgically. To remove an item, ALWAYS rebuild the array deterministically using `.filter((_, i) => i !== targetIndex)`.
 
 ## 2. Auto-Generated SDK (`@hey-api`)
 

@@ -230,7 +230,8 @@
   }
 
   function handleDeletePlayer(index: number): void {
-    draftPlayers.splice(index, 1);
+    // LLM Rule: Avoid surgical array patching. Use deterministic mapping.
+    draftPlayers = draftPlayers.filter((_, i) => i !== index);
   }
 
   async function handleImportCsv(text: string): Promise<void> {
@@ -266,17 +267,19 @@
   }
 
   async function applyFinalCsvPlayers(parsedRows: CsvPlayerRow[]) {
-    const uniqueRows: CsvPlayerRow[] = [];
     const seenNames = new SvelteSet(
       draftPlayers.map((p) => normalizeName(p.nombre)),
     );
-    for (const row of parsedRows) {
+
+    // LLM Rule: Declarative `.filter()` derivation instead of `for...of` iteration.
+    const uniqueRows = parsedRows.filter((row) => {
       const normName = normalizeName(row.nombre);
       if (!seenNames.has(normName)) {
-        uniqueRows.push(row);
         seenNames.add(normName);
+        return true;
       }
-    }
+      return false;
+    });
 
     if (uniqueRows.length === 0) {
       showCsvModal = false;
@@ -489,7 +492,8 @@
     const input = e.target as HTMLInputElement;
     const player = draftPlayers[index];
     if (player) {
-      player[field] = parseInt(input.value, 10) || 0;
+      const parsedValue = parseInt(input.value, 10);
+      player[field] = !isNaN(parsedValue) ? parsedValue : 0;
     }
   }
 </script>
@@ -564,53 +568,62 @@
     {/snippet}
 
     {#snippet gamesInput(row: EditPlayerRow, i: number)}
+      {@const handleChange = (e: Event) =>
+        handleNumberChange(e, i, "juegos_este_ano")}
       <input
         type="number"
         class="table-input"
         value={row.juegos_este_ano}
         min="0"
         style="width: var(--space-48);"
-        onchange={(e) => handleNumberChange(e, i, "juegos_este_ano")}
+        onchange={handleChange}
       />
     {/snippet}
 
     {#snippet priorInput(row: EditPlayerRow, i: number)}
+      {@const handleChange = (e: Event) =>
+        handleCheckboxChange(e, i, "has_priority")}
       <input
         type="checkbox"
         class="table-checkbox"
         checked={row.has_priority}
-        onchange={(e) => handleCheckboxChange(e, i, "has_priority")}
+        onchange={handleChange}
       />
     {/snippet}
 
     {#snippet deseaInput(row: EditPlayerRow, i: number)}
+      {@const handleChange = (e: Event) =>
+        handleNumberChange(e, i, "partidas_deseadas")}
       <input
         type="number"
         class="table-input"
         value={row.partidas_deseadas}
-        min="1"
+        min="0"
         max="9"
         style="width: var(--space-48);"
-        onchange={(e) => handleNumberChange(e, i, "partidas_deseadas")}
+        onchange={handleChange}
       />
     {/snippet}
 
     {#snippet gmInput(row: EditPlayerRow, i: number)}
+      {@const handleChange = (e: Event) =>
+        handleCheckboxChange(e, i, "partidas_gm")}
       <input
         type="checkbox"
         class="table-checkbox"
         checked={row.partidas_gm > 0}
-        onchange={(e) => handleCheckboxChange(e, i, "partidas_gm")}
+        onchange={handleChange}
       />
     {/snippet}
     {#snippet actionsCell(_row: EditPlayerRow, i: number)}
+      {@const handleDelete = () => handleDeletePlayer(i)}
       <Button
         variant="ghost"
         destructive={true}
         size="sm"
         iconOnly={true}
         title="Eliminar"
-        onclick={() => handleDeletePlayer(i)}
+        onclick={handleDelete}
         icon="🗑"
       />
     {/snippet}

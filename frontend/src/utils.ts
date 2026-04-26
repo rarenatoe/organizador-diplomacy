@@ -20,68 +20,65 @@ export function parsePlayersCsv(csvText: string): Array<{
   const lines = csvText.trim().split("\n");
   if (lines.length === 0) return [];
 
-  // Parse header to find column indices
-  const header =
+  const headerCols =
     lines[0]
       ?.toLowerCase()
       .split(",")
       .map((h) => h.trim()) ?? [];
-  const nombreIdx = header.indexOf("nombre");
-  const experienciaIdx = header.indexOf("experiencia");
-  const juegosIdx = header.indexOf("juegos_este_ano");
-  const hasPriorityIdx = header.indexOf("prioridad");
-  const deseadasIdx = header.indexOf("partidas_deseadas");
-  const gmIdx = header.indexOf("partidas_gm");
+  const nameIndex = headerCols.indexOf("nombre");
+  const experienceIndex = headerCols.indexOf("experiencia");
+  const gamesThisYearIndex = headerCols.indexOf("juegos_este_ano");
+  const priorityIndex = headerCols.indexOf("prioridad");
+  const desiredGamesIndex = headerCols.indexOf("partidas_deseadas");
+  const gmGamesIndex = headerCols.indexOf("partidas_gm");
 
-  const result: Array<{
-    nombre: string;
-    is_new: boolean;
-    juegos_este_ano: number;
-    has_priority: boolean;
-    partidas_deseadas: number;
-    partidas_gm: number;
-  }> = [];
+  return lines
+    .slice(1)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const cols = line.split(",").map((c) => c.trim());
+      const name = nameIndex >= 0 ? (cols[nameIndex] ?? "") : (cols[0] ?? "");
 
-  // Process data rows (skip header)
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i]?.trim();
-    if (!line) continue; // Skip empty rows
+      const experienceText = experienceIndex >= 0 ? cols[experienceIndex] : "";
+      const isNew = experienceText
+        ? ["nuevo", "new", "principiante", "novato", "novice"].includes(
+            experienceText.toLowerCase(),
+          )
+        : true;
 
-    const cols = line.split(",").map((c) => c.trim());
+      const gamesThisYearText =
+        gamesThisYearIndex >= 0 ? cols[gamesThisYearIndex] : "";
+      const parsedGamesThisYear = parseInt(gamesThisYearText ?? "", 10);
+      const gamesThisYear = !isNaN(parsedGamesThisYear)
+        ? parsedGamesThisYear
+        : 0;
 
-    // Get nombre (required)
-    const nombre = nombreIdx >= 0 ? (cols[nombreIdx] ?? "") : (cols[0] ?? "");
-    if (!nombre) continue; // Skip rows without a name
+      const priorityText = priorityIndex >= 0 ? cols[priorityIndex] : "";
+      const hasPriority = priorityText
+        ? parseInt(priorityText, 10) > 0 ||
+          ["true", "t", "si", "yes"].includes(priorityText.toLowerCase())
+        : false;
 
-    result.push({
-      nombre,
-      is_new:
-        experienciaIdx >= 0 && cols[experienciaIdx]
-          ? ["nuevo", "new", "principiante", "novato", "novice"].includes(
-              cols[experienciaIdx].toLocaleLowerCase(),
-            )
-          : true,
-      juegos_este_ano:
-        juegosIdx >= 0 && cols[juegosIdx]
-          ? parseInt(cols[juegosIdx], 10) || 0
-          : 0,
-      has_priority:
-        hasPriorityIdx >= 0 && cols[hasPriorityIdx]
-          ? parseInt(cols[hasPriorityIdx], 10) > 0 ||
-            ["true", "t", "si", "yes"].includes(
-              cols[hasPriorityIdx].toLowerCase(),
-            )
-          : false,
-      partidas_deseadas:
-        deseadasIdx >= 0 && cols[deseadasIdx]
-          ? parseInt(cols[deseadasIdx], 10) || 1
-          : 1,
-      partidas_gm:
-        gmIdx >= 0 && cols[gmIdx] ? parseInt(cols[gmIdx], 10) || 0 : 0,
-    });
-  }
+      const desiredGamesText =
+        desiredGamesIndex >= 0 ? cols[desiredGamesIndex] : "";
+      const parsedDesiredGames = parseInt(desiredGamesText ?? "", 10);
+      const desiredGames = !isNaN(parsedDesiredGames) ? parsedDesiredGames : 1;
 
-  return result;
+      const gmGamesText = gmGamesIndex >= 0 ? cols[gmGamesIndex] : "";
+      const parsedGmGames = parseInt(gmGamesText ?? "", 10);
+      const gmGames = !isNaN(parsedGmGames) ? parsedGmGames : 0;
+
+      return {
+        nombre: name,
+        is_new: isNew,
+        juegos_este_ano: gamesThisYear,
+        has_priority: hasPriority,
+        partidas_deseadas: desiredGames,
+        partidas_gm: gmGames,
+      };
+    })
+    .filter((row) => row.nombre.length > 0);
 }
 
 /**

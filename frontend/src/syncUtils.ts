@@ -51,7 +51,7 @@ export function validateOrganizar(
   const assignedGMs = players.reduce((sum, p) => sum + p.partidas_gm, 0);
   const isAllOnes = players.every((p) => p.partidas_deseadas === 1);
   const excludedPlayers = players
-    .filter((p) => p.partidas_deseadas === 0)
+    .filter((p) => p.partidas_deseadas === 0 && p.partidas_gm === 0)
     .map((p) => p.nombre);
 
   const hasGmShortage = checkGMShortage(assignedGMs, projectedTables);
