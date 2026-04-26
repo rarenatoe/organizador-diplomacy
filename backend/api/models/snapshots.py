@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, RootModel, field_validator
 
 from backend.db.models import SnapshotSource
 
@@ -20,9 +20,13 @@ class RenameChange(BaseModel):
     new_name: str
 
 
+class FieldValue(RootModel[str | int | bool | list[str] | None]):
+    pass
+
+
 class FieldChange(BaseModel):
-    old: str | int | bool | list[str] | None
-    new: str | int | bool | list[str] | None
+    old: FieldValue
+    new: FieldValue
 
 
 class ModifiedPlayer(BaseModel):

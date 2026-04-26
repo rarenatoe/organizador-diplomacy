@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 from backend.api.models.snapshots import (
     DeepDiffResult,
     FieldChange,
+    FieldValue,
     HistoryState,
     ModifiedPlayer,
     PlayerData,
@@ -85,7 +86,9 @@ def generate_deep_diff(
             new_value = new.get(key)
 
             if old_value != new_value:
-                field_changes[key] = FieldChange(old=old_value, new=new_value)
+                field_changes[key] = FieldChange(
+                    old=FieldValue(old_value), new=FieldValue(new_value)
+                )
 
         if field_changes:
             modified.append(ModifiedPlayer(nombre=name, changes=field_changes))

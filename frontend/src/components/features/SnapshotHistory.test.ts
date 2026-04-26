@@ -90,7 +90,7 @@ describe("SnapshotHistory.svelte", () => {
 
     expect(screen.getByText("✏️ Editados:")).toBeTruthy();
     expect(screen.getByText("David:")).toBeTruthy();
-    expect(screen.getByText("[is_new: true ➔ false]")).toBeTruthy();
+    expect(screen.getByText("[Experiencia: Nuevo ➔ Antiguo]")).toBeTruthy();
   });
 
   it("displays 'Sin cambios locales' when no changes exist", () => {
@@ -172,8 +172,8 @@ describe("SnapshotHistory.svelte", () => {
     render(SnapshotHistory, { props: { history: historyWithMultipleMods } });
 
     expect(screen.getByText("Player1:")).toBeTruthy();
-    expect(screen.getByText("[is_new: true ➔ false]")).toBeTruthy();
-    expect(screen.getByText("[juegos_este_ano: 0 ➔ 5]")).toBeTruthy();
+    expect(screen.getByText("[Experiencia: Nuevo ➔ Antiguo]")).toBeTruthy();
+    expect(screen.getByText("[Juegos: 0 ➔ 5]")).toBeTruthy();
   });
 
   it("is collapsed by default", () => {

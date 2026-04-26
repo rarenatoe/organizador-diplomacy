@@ -1,3 +1,5 @@
+import type { FieldValue, PlayerData } from "./generated-api";
+
 // Country translation and emoji utilities
 // Internal variable names use English, but translation values remain in Spanish
 
@@ -91,4 +93,49 @@ export function formatDate(dateString?: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+const fieldTranslations = {
+  is_new: "Experiencia",
+  has_priority: "Prioridad",
+  juegos_este_ano: "Juegos",
+  partidas_deseadas: "Desea",
+  partidas_gm: "GM",
+} satisfies Partial<Record<keyof PlayerData, string>>;
+
+function isTranslatedField(
+  field: string,
+): field is keyof typeof fieldTranslations {
+  return field in fieldTranslations;
+}
+
+/**
+ * Translates a player field name to Spanish display name
+ * @param field - The field name to translate
+ * @returns The translated field name in Spanish, or the original field if no translation exists
+ */
+export function translateField(field: string): string {
+  if (isTranslatedField(field)) {
+    return fieldTranslations[field];
+  }
+  return field;
+}
+
+/**
+ * Translates a player field value to Spanish display string
+ * @param field - The field name the value belongs to
+ * @param value - The value to translate
+ * @returns The translated value as a string
+ */
+export function translateValue(field: string, value: FieldValue): string {
+  if (field === "is_new") {
+    // Explicit boolean check safely narrows the union type
+    return value === true ? "Nuevo" : "Antiguo";
+  }
+  if (field === "has_priority") {
+    return value === true ? "Sí" : "No";
+  }
+
+  // Safely handle nulls and convert everything else to a string
+  return value !== null ? String(value) : "";
 }

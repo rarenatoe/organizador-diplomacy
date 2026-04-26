@@ -5,7 +5,7 @@ These tests are synchronous and don't require a database session.
 
 from __future__ import annotations
 
-from backend.api.models.snapshots import FieldChange, RenameChange
+from backend.api.models.snapshots import FieldChange, FieldValue, RenameChange
 from backend.crud.snapshots import generate_deep_diff
 
 
@@ -69,7 +69,7 @@ class TestGenerateDeepDiff:
         mod = modified_list[0]
         assert mod.nombre == "Pablo"
         assert "juegos_este_ano" in mod.changes
-        assert mod.changes["juegos_este_ano"] == FieldChange(old=2, new=3)
+        assert mod.changes["juegos_este_ano"] == FieldChange(old=FieldValue(2), new=FieldValue(3))
 
     def test_multiple_field_changes(self) -> None:
         """Multiple field changes should all be reported."""
@@ -92,9 +92,15 @@ class TestGenerateDeepDiff:
         mod = modified_list[0]
         assert mod.nombre == "Pablo"
         assert len(mod.changes) == 3
-        assert mod.changes["is_new"] == FieldChange(old=True, new=False)
-        assert mod.changes["juegos_este_ano"] == FieldChange(old=2, new=3)
-        assert mod.changes["has_priority"] == FieldChange(old=False, new=True)
+        assert mod.changes["is_new"] == FieldChange(
+            old=FieldValue(root=True), new=FieldValue(root=False)
+        )
+        assert mod.changes["juegos_este_ano"] == FieldChange(
+            old=FieldValue(root=2), new=FieldValue(root=3)
+        )
+        assert mod.changes["has_priority"] == FieldChange(
+            old=FieldValue(root=False), new=FieldValue(root=True)
+        )
 
     def test_no_changes_empty_result(self) -> None:
         """Identical player lists should produce empty changes."""
@@ -152,4 +158,4 @@ class TestGenerateDeepDiff:
         assert len(modified_list) == 1
         mod = modified_list[0]
         assert mod.nombre == "Alice"
-        assert mod.changes["juegos_este_ano"] == FieldChange(old=0, new=1)
+        assert mod.changes["juegos_este_ano"] == FieldChange(old=FieldValue(0), new=FieldValue(1))

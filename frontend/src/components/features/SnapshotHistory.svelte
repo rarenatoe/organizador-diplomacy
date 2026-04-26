@@ -1,6 +1,11 @@
 <script lang="ts">
   import type { HistoryEntry } from "../../generated-api";
-  import { formatAction, formatDate } from "../../i18n";
+  import {
+    formatAction,
+    formatDate,
+    translateField,
+    translateValue,
+  } from "../../i18n";
 
   let { history }: { history: HistoryEntry[] } = $props();
 </script>
@@ -44,7 +49,10 @@
                       <span class="mod-name">{mod.nombre}:</span>
                       {#each Object.entries(mod.changes) as [field, vals] (field)}
                         <span class="mod-detail"
-                          >[{field}: {vals.old} ➔ {vals.new}]</span
+                          >[{translateField(field)}: {translateValue(
+                            field,
+                            vals.old,
+                          )} ➔ {translateValue(field, vals.new)}]</span
                         >
                       {/each}
                     </li>

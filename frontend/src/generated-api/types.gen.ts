@@ -122,15 +122,14 @@ export type DeleteResponse = {
  * FieldChange
  */
 export type FieldChange = {
-    /**
-     * Old
-     */
-    old: string | number | boolean | Array<string> | null;
-    /**
-     * New
-     */
-    new: string | number | boolean | Array<string> | null;
+    old: FieldValue;
+    new: FieldValue;
 };
+
+/**
+ * FieldValue
+ */
+export type FieldValue = string | number | boolean | Array<string> | null;
 
 /**
  * GameDetailResponse

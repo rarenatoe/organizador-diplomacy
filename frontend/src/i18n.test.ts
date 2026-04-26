@@ -1,4 +1,10 @@
-import { formatDate, getCountryEmoji, translateCountry } from "./i18n";
+import {
+  formatDate,
+  getCountryEmoji,
+  translateCountry,
+  translateField,
+  translateValue,
+} from "./i18n";
 
 describe("translateCountry", () => {
   it("should translate English country names to Spanish", () => {
@@ -90,6 +96,36 @@ describe("formatDate", () => {
     // Verify the parser successfully handled the string
     expect(formattedNaive).not.toContain("Invalid");
     // Verify both strings yield the exact same local time translation
+    // Verify both strings yield the exact same local time translation
     expect(formattedNaive).toEqual(formattedUTC);
+  });
+});
+
+describe("translateField", () => {
+  it("translates known fields correctly", () => {
+    expect(translateField("is_new")).toBe("Experiencia");
+    expect(translateField("has_priority")).toBe("Prioridad");
+    expect(translateField("juegos_este_ano")).toBe("Juegos");
+  });
+
+  it("returns the original field if unknown", () => {
+    expect(translateField("unknown_field")).toBe("unknown_field");
+  });
+});
+
+describe("translateValue", () => {
+  it("translates is_new correctly", () => {
+    expect(translateValue("is_new", true)).toBe("Nuevo");
+    expect(translateValue("is_new", false)).toBe("Antiguo");
+  });
+
+  it("translates has_priority correctly", () => {
+    expect(translateValue("has_priority", true)).toBe("Sí");
+    expect(translateValue("has_priority", false)).toBe("No");
+  });
+
+  it("converts unknown fields to strings", () => {
+    expect(translateValue("juegos_este_ano", 5)).toBe("5");
+    expect(translateValue("unknown", null)).toBe("");
   });
 });

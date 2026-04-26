@@ -20,6 +20,7 @@ priority: 20
 - **Two-Step Generation:** Enforce `/api/game/draft` (in-memory) followed by `/api/game/save` (persistence). NEVER write draft data directly to DB.
 - **Eradication of Type Cancer:** NEVER use `dict[str, Any]` across architectural boundaries. Every API endpoint MUST return a strictly defined Pydantic response model. Internal functions that pass data between layers MUST use typed `TypedDict` or Pydantic models, not bare dicts.
 - **Absolute Trimming:** API response Pydantic models MUST contain ONLY the exact fields the frontend UI consumes. NEVER expose additional fields just because they were queried from the database. Each response model is a deliberate contract, not a DB row mirror.
+- **Named Types for Unions (RootModel):** When frontend components need to reference a complex union type used across multiple fields (e.g., `str | int | bool | None`), NEVER define them inline repeatedly in Pydantic models. Inline unions cause the OpenAPI generator to emit anonymous types that can trigger ESLint's `no-duplicate-type-constituents` when extracted or combined in TypeScript. ALWAYS define an explicit `RootModel` (e.g., `class FieldValue(RootModel[str | int | bool | None]): pass`) so the frontend SDK generates and exports a clean, strongly-typed named alias.
 
 ## 3. Performance & SQLAlchemy "Fat Trimming"
 
