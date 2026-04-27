@@ -160,13 +160,13 @@ def count_games_this_year(client: Client, participaciones_db_id: str, año: int)
 async def fetch_notion_data() -> tuple[list[NotionPage], dict[str, int], Client]:
     load_dotenv()
     token = os.getenv("NOTION_TOKEN")
-    db_id = os.getenv("NOTION_DATABASE_ID")
+    db_id = os.getenv("NOTION_PLAYERS_DB_ID")
     part_db_id = os.getenv("NOTION_PARTICIPACIONES_DB_ID")
 
     if not token or token.startswith("secret_XXX"):
         raise RuntimeError("NOTION_TOKEN no configurado")
     if not db_id or "XXX" in db_id:
-        raise RuntimeError("NOTION_DATABASE_ID no configurado")
+        raise RuntimeError("NOTION_PLAYERS_DB_ID no configurado")
     if not part_db_id or "XXX" in part_db_id:
         raise RuntimeError("NOTION_PARTICIPACIONES_DB_ID no configurado")
 
